@@ -29,7 +29,7 @@ explicitly, not several contradictory visual variants at once.
 
 ## Runtime dependency
 
-`@designcodeio/threeui` was added to `package.json` and `package-lock.json`.
+`@designcodeio/threeui` is declared in `package.json` and locked in `pnpm-lock.yaml`.
 It is a React/ThreeUI package, not a Codex skill. Keep Three.js usage inside FE;
 do not add it to BE, AI, or Mobile.
 
