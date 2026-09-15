@@ -39,6 +39,8 @@ explicitly, not several contradictory visual variants at once.
 
 Runtime boundary: `@designcodeio/threeui@1.2.0` is already declared and locked. Inspect a component before reuse; `EmberStorm`/particle components may provide visual references or bounded effects, but the Fire3D building scene remains custom Three.js and must have a fallback. Three.js stays in FE; Unity remains the Mobile gameplay runtime.
 
+Source organization: follow the documented feature-first tree (`assets`, shared `components`, `configs`, feature-owned `components/services/types`, `hooks`, `layouts`, route `pages`, cross-feature `services`, `store`, `utils`, `App.tsx`). Keep landing scene code and heavy assets inside the landing feature and lazy-load them; do not move business logic into pages or the root component.
+
 ## Runtime dependency
 
 `@designcodeio/threeui` is declared in `package.json` and locked in `pnpm-lock.yaml`.
