@@ -1,5 +1,14 @@
 # React web
-Copy `.env.example` to `.env`, then run `npm install` and `npm run dev`.
+Copy `.env.example` to `.env`, then run `pnpm install --frozen-lockfile` and `pnpm dev`.
+
+## Package manager
+
+Use pnpm 10.28.2 (pinned in `package.json`). With Corepack installed, run `corepack enable` and `corepack prepare pnpm@10.28.2 --activate` once, then verify `pnpm --version`.
+
+- Install dependencies: `pnpm install --frozen-lockfile`.
+- Add dependencies: `pnpm add <package>` or `pnpm add -D <package>`.
+- Build: `pnpm build`.
+- Commit `pnpm-lock.yaml` with dependency changes. Use pnpm for this repository; do not generate npm/yarn lockfiles.
 
 ## Codex cho thành viên team
 
