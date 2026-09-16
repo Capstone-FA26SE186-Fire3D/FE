@@ -11,7 +11,7 @@ const beats = [
 export function LandingContent() {
   const panels = [
     <div key="intro" className={styles.intro}>
-      <p className={styles.eyebrow}>FIRE3D / KHÔNG GIAN ĐỂ TẬP DƯỢT</p>
+      <p className={styles.eyebrow}>FET3D / KHÔNG GIAN ĐỂ TẬP DƯỢT</p>
       <h1>Làm quen hôm nay.<br /><em>Chủ động ngày mai.</em></h1>
       <p>Một lần bước vào không gian mô phỏng.<br />Thêm một bước chuẩn bị cho thực tế.</p>
       <span className={styles.scrollHint}><ArrowDown size={17} /> Cuộn để bước vào</span>

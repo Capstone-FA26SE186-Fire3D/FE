@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { ArrowUpRight, Flame } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { routes } from "@/configs/routes";
 import { Button } from "@/components/ui/button";
+import { FET3DLogo } from "@/components/brand/fet3d-logo";
 import { MobileMenu } from "./mobile-menu";
 
 const links = [
@@ -14,9 +15,8 @@ const links = [
 export function SiteHeader() {
   return (
     <header className="site-header">
-      <Link className="brand-mark" href={routes.home} aria-label="Fire3D, về trang chủ">
-        <span className="brand-icon" aria-hidden="true"><Flame size={17} strokeWidth={2.4} /></span>
-        <span>Fire3D</span>
+      <Link className="brand-mark" href={routes.home} aria-label="FET3D, về trang chủ">
+        <FET3DLogo />
       </Link>
       <nav className="site-nav" aria-label="Điều hướng chính">
         {links.map((link) => <Link key={link.href} href={link.href}>{link.label}</Link>)}

@@ -22,8 +22,11 @@ a { color: inherit; text-decoration: none; }
 button, input, textarea { font: inherit; }
 button { cursor: pointer; }
 
-.brand-mark { display: inline-flex; align-items: center; gap: 9px; font-size: 16px; font-weight: 760; letter-spacing: -0.03em; }
-.brand-icon { display: inline-grid; width: 28px; height: 28px; place-items: center; border: 1px solid rgba(238, 134, 84, 0.65); border-radius: 8px; color: var(--ember); }
+.brand-mark { display: inline-flex; align-items: center; color: var(--text); }
+.fet3d-logo { display: inline-flex; align-items: center; gap: 9px; color: inherit; }
+.fet3d-logo__asset { display: block; width: 104px; height: 104px; flex: 0 0 auto; object-fit: contain; }
+.fet3d-logo--mark .fet3d-logo__asset { width: 38px; height: 38px; }
+.site-footer .brand-mark { color: var(--text); }
 .kicker { display: flex; align-items: center; gap: 10px; margin: 0; color: var(--ember); font-size: 11px; font-weight: 750; letter-spacing: 0.18em; text-transform: uppercase; }
 .kicker-line { width: 26px; height: 1px; background: var(--ember); }
 
@@ -145,4 +148,4 @@ button { cursor: pointer; }
 .site-header { position: relative; z-index: 12; min-height: 88px; }
 .site-nav a, .header-login { display: inline-flex; align-items: center; min-height: 44px; }
 .article-body { font-size: 18px; line-height: 1.7; }
-@media(max-width:640px) { .site-header { gap: 10px; min-height: 76px; } .site-actions { gap: 8px; } .brand-mark { font-size: 15px; } .page-hero h1, .article-reading h1 { font-size: 36px; line-height: 1.2; } }
+@media(max-width:640px) { .site-header { gap: 10px; min-height: 76px; } .site-actions { gap: 8px; } .fet3d-logo__asset { width: 88px; height: 88px; } .fet3d-logo--mark .fet3d-logo__asset { width: 34px; height: 34px; } .page-hero h1, .article-reading h1 { font-size: 36px; line-height: 1.2; } }
