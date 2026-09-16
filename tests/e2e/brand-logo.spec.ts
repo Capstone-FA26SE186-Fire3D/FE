@@ -31,7 +31,4 @@ test("landing page exposes the FET3D brand and production favicon", async ({ pag
   const icon = await page.request.get("/icon.png");
   expect(icon.ok()).toBeTruthy();
   expect(icon.headers()["content-type"]).toContain("image/png");
-  const mark = await page.request.get("/brand/fet3d-mark.png");
-  expect(mark.ok()).toBeTruthy();
-  expect(mark.headers()["content-type"]).toContain("image/png");
 });

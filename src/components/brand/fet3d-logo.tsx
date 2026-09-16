@@ -7,7 +7,7 @@ type FET3DLogoProps = {
 
 const assets = {
   lockup: "/brand/fet3d-lockup.png",
-  mark: "/brand/fet3d-mark.png",
+  mark: "/icon.png",
 } as const;
 
 /**
