@@ -21,13 +21,13 @@ export function createBuilding() {
       const section = new THREE.Group(); section.name = name; section.position.set(...at); parent.add(section);
       const count = Math.ceil(size[2] / 6.5), length = size[2] / count;
       for (let part = 0; part < count; part++) box(section, `${name}-section`, [size[0],size[1],length], [0,0,-size[2]/2+length*(part+.5)], material);
-      if (["east-spandrel", "east-header", "front-right"].includes(name)) cutawayShell.add(section);
+      if (["east-spandrel", "east-header", "front-right", "west-stair-wall"].includes(name)) cutawayShell.add(section);
       return section;
     }
     const geometry = new THREE.BoxGeometry(...size); geometries.add(geometry);
     const mesh = new THREE.Mesh(geometry, material); mesh.name = name; mesh.position.set(...at);
     mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh);
-    if (["east-spandrel", "east-header", "facade-mullion", "facade-glazing", "front-right"].includes(name)) cutawayShell.add(mesh);
+    if (["east-spandrel", "east-header", "facade-mullion", "facade-glazing", "front-right", "west-stair-wall"].includes(name)) cutawayShell.add(mesh);
     return mesh;
   }
   function sign(parent: THREE.Object3D, text: string, at: [number, number, number], width: number, background?: string) {
@@ -49,16 +49,17 @@ export function createBuilding() {
     box(floor, "rear-cross-landing", [1.9, .22, .65], [-3.3, -.11, stairs.landingZ], mat.floor);
     box(floor, "stair-exit-landing", [1.9, .22, .75], [-3.3, -.11, -10.675], mat.floor);
     if (level === 0) box(floor, "ground-stair-base", [1.9, .22, 5.65], [-3.3, -.11, -13.125], mat.floor);
-    box(floor, "rear-wall", [10.4, 3.2, .18], [0, 1.6, -17], mat.wall);
+    box(floor, "rear-wall", [10.4, 3.4, .18], [0, 1.7, -17], mat.wall);
     box(floor, "west-spandrel", [.18, .9, 26], [-5.2, .45, -4], mat.wall);
-    box(floor, "west-header", [.18, .5, 26], [-5.2, 3.05, -4], mat.wall);
+    box(floor, "west-header", [.18, .6, 26], [-5.2, 3.1, -4], mat.wall);
     for (const z of [5, -1, -7]) {
-      box(floor, "west-window-pier", [.18, 1.9, 3.4], [-5.2, 1.85, z + 3], mat.wall);
+      const pierRear = z + 1.3, pierFront = Math.min(9, z + 4.7);
+      box(floor, "west-window-pier", [.18, 1.9, pierFront - pierRear], [-5.2, 1.85, (pierFront + pierRear) / 2], mat.wall);
       box(floor, "west-window-sill", [.3, .1, 2.6], [-5.2, .95, z], mat.metal);
     }
     box(floor, "west-stair-wall", [.18, 1.9, 8.7], [-5.2, 1.85, -12.65], mat.wall);
     box(floor, "east-spandrel", [.18, .9, 26], [5.2, .45, -4], mat.wall);
-    box(floor, "east-header", [.18, .5, 26], [5.2, 3.05, -4], mat.wall);
+    box(floor, "east-header", [.18, .6, 26], [5.2, 3.1, -4], mat.wall);
     for (let bay = 0; bay < 9; bay++) {
       const z = 8.5 - bay * 3;
       box(floor, "facade-mullion", [.23, 2.1, .24], [5.2, 1.85, z], mat.metal);
@@ -72,10 +73,11 @@ export function createBuilding() {
       for (const z of [5, -1, -7]) {
         const wall = new THREE.Group(); wall.position.set(side * 1.5, 0, z); floor.add(wall);
         if (side === 1) cutawayShell.add(wall);
+        if (z === 5) box(wall, "entry-room-wall", [.16, 3.4, 1], [0, 1.7, 3.5], mat.wall);
         // Jambs and lintel surround an actual open doorway, not a door pasted on a wall.
-        box(wall, "room-wall-a", [.16, 3.2, 2.1], [0, 1.6, 1.95], mat.wall);
-        box(wall, "room-wall-b", [.16, 3.2, 2.7], [0, 1.6, -1.65], mat.wall);
-        box(wall, "door-lintel", [.16, .9, 1.2], [0, 2.75, .3], mat.wall);
+        box(wall, "room-wall-a", [.16, 3.4, 2.1], [0, 1.7, 1.95], mat.wall);
+        box(wall, "room-wall-b", [.16, 3.4, 2.7], [0, 1.7, -1.65], mat.wall);
+        box(wall, "door-lintel", [.16, 1.1, 1.2], [0, 2.85, .3], mat.wall);
         box(wall, "lower-wall-a", [.19, 1.03, 2.1], [0, .52, 1.95], mat.lower);
         box(wall, "lower-wall-b", [.19, 1.03, 2.7], [0, .52, -1.65], mat.lower);
         for (const jamb of [-.3, .9]) box(wall, "door-jamb", [.23, 2.35, .07], [0, 1.175, jamb], mat.metal);
@@ -85,7 +87,7 @@ export function createBuilding() {
         box(door, "door-glazing", [.081, .7, .32], [0, 1.6, .55], mat.glass);
         box(door, "door-handle", [.14, .04, .16], [-side * .08, 1.05, .94], mat.metal);
         const number = sign(wall, `${level + 1}0${Math.abs(z) + 1}`, [-side * .12, 2.62, .3], .5, "#263635"); number.rotation.y = -side * Math.PI / 2;
-        box(floor, "room-partition", [3.6, 3.2, .15], [side * 3.35, 1.6, z - 3], mat.wall);
+        box(floor, "room-partition", [3.6, 3.4, .15], [side * 3.35, 1.7, z - 3], mat.wall);
         box(floor, "desk-top", [1.4, .06, .7], [side * 3.2, .76, z], mat.door);
         for (const dx of [-.6, .6]) box(floor, "desk-leg", [.05, .75, .6], [side * 3.2 + dx, .375, z], mat.metal);
       }
@@ -161,16 +163,14 @@ export function createBuilding() {
       const z = [5, -1, -7][roomIndex] + Math.sin(seed) * .55;
       const timeline = roomFireTimeline(level, side, roomIndex);
       box(levels[level], "charred-room-furniture", [1.1, .48, .75], [side * 3.5, .24, z], mat.soot);
-      // Interior furniture ignites first; a second front rolls out toward the facade.
-      for (let front = 0; front < 2; front++) {
-        spreadSources.push({
-          position: new THREE.Vector3(side * (3.35 + front * 1.9), level * 3.6 + (front ? .35 : .48), z + front * Math.sin(seed * 2) * .7),
-          intensity: front ? .38 : .65, color: new THREE.Color(0xff802c),
-          ignition: front ? timeline.facade : timeline.ignition, exterior: level > 0 || front > 0,
-          drift: [side * (.25 + front * .55), Math.sin(seed * 1.7) * .55],
-          size: [1.8 + .45 * Math.sin(seed * 2.4), (front ? 1.25 : .9) + .2 * Math.cos(seed)],
-        });
-      }
+      // Exterior fire uses the wall-bound volume, not floating crossed cards.
+      spreadSources.push({
+        position: new THREE.Vector3(side * 3.35, level * 3.6 + .48, z),
+        intensity: .65, color: new THREE.Color(0xff802c),
+        ignition: timeline.ignition, exterior: level > 0,
+        drift: [side * .25, Math.sin(seed * 1.7) * .55],
+        size: [1.8 + .45 * Math.sin(seed * 2.4), .9 + .2 * Math.cos(seed)],
+      });
     }
   }
   const routePoints = [new THREE.Vector3(-3.5, .15, -12), new THREE.Vector3(0, .15, -12), new THREE.Vector3(0, .15, -5), new THREE.Vector3(2.8, .15, -5), new THREE.Vector3(2.8, 3.75, -5), new THREE.Vector3(2.8, 7.35, -5)];
