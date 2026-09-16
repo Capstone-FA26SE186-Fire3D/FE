@@ -24,7 +24,7 @@ export function BuildingScene({ input, onStatus, snapshotRef, choiceRefs }: Prop
     const canvas = document.createElement("canvas");
     canvas.className = "building-canvas";
     canvas.setAttribute("role", "img");
-    canvas.setAttribute("aria-label", "Công trình Fire3D ba tầng, hành lang và cầu thang");
+    canvas.setAttribute("aria-label", "Công trình FET3D ba tầng, hành lang và cầu thang");
     let disposed = false, runtime: LandingRuntime | null = null, frame = 0;
     let visible = true, lastTime = 0, status = "", lastBranch: LandingBranch = null;
     const report = (value: Parameters<Props["onStatus"]>[0], detail?: string) => {
