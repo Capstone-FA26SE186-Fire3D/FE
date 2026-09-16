@@ -11,6 +11,7 @@
 .page[data-scene-mode='motion'][data-stage='4'][data-branch='none'] .actions { display: none; }
 .page[data-scene-mode='motion'][data-stage='4'][data-branch='none'] .scrim { background: linear-gradient(#101719c9, transparent 28%, transparent 85%, #10171988); }
 .page[data-branch='organization'] { user-select: none; -webkit-user-select: none; }
+.page[data-branch='organization'] .scrim { background: linear-gradient(90deg, #101719d8 0%, #101719a0 22%, #10171928 46%, transparent 72%), linear-gradient(0deg, #101719df, transparent 22%, transparent 83%, #10171988); }
 .orbit:focus, .orbit:focus-visible { outline: none; }
 .orbit { position: absolute; z-index: 4; right: 2%; top: 14%; width: 48%; height: 72%; touch-action: none; cursor: grab; border-radius: 12px; }
 .orbit:active { cursor: grabbing; }

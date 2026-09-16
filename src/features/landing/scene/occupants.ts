@@ -60,10 +60,10 @@ export function createOccupants(mobile: boolean) {
         const z = THREE.MathUtils.lerp(startZ, targetZ, step / count);
         // Different phases produce diagonal crossings and gentle bends rather
         // than two fixed lanes. Stay inside the clear central corridor.
-        const x = Math.sin(index * 2.399 + step * 1.3 + y) * .58;
+        const x = Math.sin(index * 2.399 + step * 1.3 + y) * .82;
         waypoints.push(new THREE.Vector3(x, y, z));
       }
-      waypoints.push(new THREE.Vector3(Math.sin(index * 1.7) * .5, y, targetZ));
+      waypoints.push(new THREE.Vector3(Math.sin(index * 1.7) * .64, y, targetZ));
     };
     // Cross the rear landing, descend the same staircase geometry, then take the ground exit.
     for (let floor = level; floor > 0; floor--) {
@@ -75,8 +75,10 @@ export function createOccupants(mobile: boolean) {
     }
     crossCorridor(10, 0);
     const escapeAngle = (index * 2.399) % Math.PI;
-    waypoints.push(new THREE.Vector3(Math.cos(escapeAngle) * 3, 0, 13 + Math.sin(escapeAngle) * 2));
-    waypoints.push(new THREE.Vector3(Math.cos(escapeAngle) * 13, 0, 16 + Math.sin(escapeAngle) * 9));
+    // Continue across the plaza; never park a running actor at the exit.
+    waypoints.push(new THREE.Vector3(Math.cos(escapeAngle) * 2.8, 0, 11 + Math.sin(escapeAngle) * 1.6));
+    waypoints.push(new THREE.Vector3(Math.cos(escapeAngle) * 8, 0, 19 + Math.sin(escapeAngle) * 3));
+    waypoints.push(new THREE.Vector3(Math.cos(escapeAngle) * 15, 0, 32 + Math.sin(escapeAngle) * 4));
     const points = roundWalkingPath(waypoints);
     const distances = [0];
     for (let i = 1; i < points.length; i++) distances.push(distances[i - 1] + points[i].distanceTo(points[i - 1]));
@@ -90,6 +92,14 @@ export function createOccupants(mobile: boolean) {
   });
   const player = person(0); player.root.name = "demo-controlled-character";
   const instances = createOccupantInstances(group);
+  // A small in-world marker makes the controlled avatar legible inside the
+  // phone render without turning the preview into a fake UI screenshot.
+  const markerMaterial = new THREE.MeshBasicMaterial({ color: 0x68e0cf, transparent: true, opacity: .84, side: THREE.DoubleSide, depthWrite: false });
+  const marker = new THREE.Mesh(new THREE.RingGeometry(.14, .18, 24), markerMaterial);
+  marker.rotation.x = -Math.PI / 2; marker.position.y = .018; marker.name = "controlled-character-marker"; player.root.add(marker);
+  const markerArrowGeometry = new THREE.ConeGeometry(.06, .12, 3);
+  const markerArrow = new THREE.Mesh(markerArrowGeometry, markerMaterial);
+  markerArrow.position.y = 1.55; markerArrow.name = "controlled-character-arrow"; player.root.add(markerArrow);
   const panicAgents = agents.filter(agent => agent.reaction === "panic");
   const clothingSources: FireSource[] = panicAgents.map(() => ({
     position: new THREE.Vector3(), color: new THREE.Color(0xff802c),
@@ -127,7 +137,8 @@ export function createOccupants(mobile: boolean) {
       for (const agent of agents) {
         const length = agent.distances.at(-1)!;
         const elapsed = time - agent.delay;
-        const cycle = length / agent.speed + 8 + (agent.reaction ? 6 : 0);
+        const routeDuration = length / agent.speed;
+        const cycle = routeDuration + 8 + (agent.reaction ? 6 : 0);
         const cycleTime = Math.max(0, elapsed) % cycle;
         const reaction = sampleReaction(cycleTime, agent.reactionStart, agent.reaction);
         const distance = reaction.travelTime * agent.speed;
@@ -180,6 +191,6 @@ export function createOccupants(mobile: boolean) {
       clothingFire.update(time);
       instances.update();
     },
-    dispose() { clothingFire.dispose(); instances.dispose(); geometry.dispose(); headGeometry.dispose(); torsoGeometry.dispose(); shinGeometry.dispose(); shoeGeometry.dispose(); forearmGeometry.dispose(); neckGeometry.dispose(); skin.dispose(); trousers.dispose(); shirts.forEach(m => m.dispose()); group.clear(); },
+    dispose() { clothingFire.dispose(); instances.dispose(); geometry.dispose(); headGeometry.dispose(); torsoGeometry.dispose(); shinGeometry.dispose(); shoeGeometry.dispose(); forearmGeometry.dispose(); neckGeometry.dispose(); marker.geometry.dispose(); markerArrowGeometry.dispose(); markerMaterial.dispose(); skin.dispose(); trousers.dispose(); shirts.forEach(m => m.dispose()); group.clear(); },
   };
 }
