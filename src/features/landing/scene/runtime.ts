@@ -7,6 +7,7 @@ import { createOccupants } from "./occupants";
 import { createJunction } from "./junction";
 import { createRoomAtmosphere } from "./room-atmosphere";
 import { createAtmosphereCompositor } from "./atmosphere-compositor";
+import { roomFireTimeline } from "./fire-timeline";
 import type { LandingBranch } from "../types";
 
 export type SceneReport = { organization: number; phone: number; settled: boolean; position: THREE.Vector3; hitAreas: ReturnType<ReturnType<typeof createJunction>["hitAreas"]> };
@@ -26,7 +27,26 @@ export function createLandingRuntime(canvas: HTMLCanvasElement, mobile: boolean)
   const camera = new THREE.PerspectiveCamera(mobile ? 62 : 60, 1, .06, 140);
   const building = createBuilding();
   const junction = createJunction(); building.group.add(junction.group); junction.layout(mobile);
-  const effects = createFireEffects(building.fireSources, mobile);
+  // Reuse the same flame material, motion and ignition as all other sources.
+  // Irregular near/far positions keep the junction floor from becoming a row.
+  const junctionSources = [
+    [-3.1,-16.2],[-1.9,-15.9],[-.7,-16.3],[.45,-16.1],[1.6,-15.8],[2.9,-16.25],
+    [-2.6,-14.8],[-1.1,-15.1],[.8,-15.25],[2.1,-14.6],
+    [-3.7,-13.6],[-1.65,-13.9],[1.4,-13.7],[3.3,-14.1],
+  ].map(([x,z],i) => ({
+    position: new THREE.Vector3(x,.015,z), intensity: 0,
+    softFloor: true,
+    color: new THREE.Color(0xff802c),
+    ignition: roomFireTimeline(0,1,2).wall+10+(i*7%19),
+    size: [.65+(i%3)*.13,.27+(i%4)*.045] as [number,number],
+  }));
+  const edgeSources = [-1,1].map((side,i) => ({
+    position: new THREE.Vector3(side*3,.015,-16.35), intensity: 0,
+    cameraFacing: true, color: new THREE.Color(0xff802c),
+    ignition: roomFireTimeline(0,1,2).wall+12+i*5,
+    size: [.9,.9] as [number,number],
+  }));
+  const effects = createFireEffects([...building.fireSources,...junctionSources,...edgeSources], mobile);
   const atmosphere = createRoomAtmosphere(mobile);
   const compositor = createAtmosphereCompositor(renderer, atmosphere, mobile);
   const occupants = createOccupants(mobile); scene.add(occupants.group, occupants.renderGroup, occupants.effectsGroup);
@@ -67,6 +87,11 @@ export function createLandingRuntime(canvas: HTMLCanvasElement, mobile: boolean)
     resize(w: number, h: number) {
       width = Math.max(1, w); height = Math.max(1, h);
       camera.aspect = width / height; camera.updateProjectionMatrix(); renderer.setSize(width, height, false);
+      // At the settled junction, left sits just inside the frame while right
+      // straddles the edge. Both roots stay on the floor, including on mobile.
+      const edgeHalfWidth=3.45*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*camera.aspect;
+      edgeSources[0].position.x=-edgeHalfWidth*.94;
+      edgeSources[1].position.x=edgeHalfWidth;
       target.setSize(mobile ? 384 : 512, mobile ? 780 : 1040);
     },
     update(delta: number, progress: number, branch: LandingBranch, orbit?: { yaw: number; pitch: number }): SceneReport {

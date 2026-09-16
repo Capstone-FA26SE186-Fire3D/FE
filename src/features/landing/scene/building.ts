@@ -5,7 +5,7 @@ import { stairs } from "./building-layout";
 import { roomFireTimeline } from "./fire-timeline";
 import { createBuildingDamage } from "./building-damage";
 
-export type FireSource = { position: THREE.Vector3; intensity: number; color: THREE.Color; ignition?: number; exterior?: boolean; drift?: [number, number]; size?: [number, number]; activity?: number };
+export type FireSource = { position: THREE.Vector3; intensity: number; color: THREE.Color; ignition?: number; exterior?: boolean; drift?: [number, number]; size?: [number, number]; activity?: number; softFloor?: boolean; cameraFacing?: boolean };
 
 export function createBuilding() {
   const group = new THREE.Group(); group.name = "fire3d-building";

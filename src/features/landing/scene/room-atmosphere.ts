@@ -28,6 +28,7 @@ export function createRoomAtmosphere(mobile: boolean) {
     uResolution: { value: new THREE.Vector2(1, 1) },
     uInverseProjection: { value: new THREE.Matrix4() },
     uCameraWorld: { value: new THREE.Matrix4() },
+    uJunctionClearance: { value: 1 },
   };
   const rooms: { root: THREE.Group; time: { value: number }; growth: { value: number }; smoke: { value: number }; onset: number; level: number }[] = [];
   for (let level = 0; level < 3; level++) for (const side of [-1, 1]) for (let room = 0; room < 3; room++) {
@@ -38,7 +39,7 @@ export function createRoomAtmosphere(mobile: boolean) {
     const y = level * 3.6, z = [5,-1,-7][room];
     const time = { value: 0 }, growth = { value: 0 }, smoke = { value: 0 };
     const origin = new THREE.Vector3(side * 3.35 - 1.7, y, z - 2.91);
-    const addVolume = (size: THREE.Vector3, center: THREE.Vector3, ceiling: boolean, fieldMatrix = new THREE.Matrix4().makeTranslation(-origin.x, -origin.y, -origin.z), roof = false, ignition = timeline.wall) => {
+    const addVolume = (size: THREE.Vector3, center: THREE.Vector3, ceiling: boolean, fieldMatrix = new THREE.Matrix4().makeTranslation(-origin.x, -origin.y, -origin.z), roof = false, ignition = timeline.wall, junctionFloor = false) => {
       const half = size.clone().multiplyScalar(.5);
       const material = new THREE.ShaderMaterial({
         vertexShader: atmosphereVertex, fragmentShader: atmosphereFragment,
@@ -48,6 +49,7 @@ export function createRoomAtmosphere(mobile: boolean) {
           uTime: time, uGrowth: growth, uSmoke: smoke,
           uWind: { value: new THREE.Vector2() }, uGust: { value: 0 }, uFlare: { value: 0 },
           uOpacity: { value: 1 },
+          uJunctionFloor: { value: junctionFloor ? 1 : 0 },
           uIgnition: { value: ignition },
           uNoise: { value: noiseTexture },
           uSeed: { value: seed }, uStrength: { value: strength },
@@ -75,6 +77,15 @@ export function createRoomAtmosphere(mobile: boolean) {
       oppositeField, false, timeline.wall+14);
     addVolume(new THREE.Vector3(3.4, 1.15, 5.7), new THREE.Vector3(side * 3.35, y + 2.625, z - .06), true);
     if (room === 2) {
+      if (level === 0 && side === 1) {
+        // Scattered floor fires across the junction, including the foreground.
+        // This bounds their shared field, not a continuous burning strip.
+        const floorField = new THREE.Matrix4().set(
+          3.4/10.2,0,0,1.7, 0,1,0,0, 0,0,1,16.89, 0,0,0,1,
+        );
+        addVolume(new THREE.Vector3(10.2,3.38,6.2), new THREE.Vector3(0,1.69,-13.79), false,
+          floorField, false, timeline.wall+10, true);
+      }
       // Rear stair bay spans z=-17..-11. Continue the same surface-bound
       // effect onto its rear wall and ceiling on every storey.
       const stairOrigin = new THREE.Vector3(origin.x,y,-16.89);
@@ -164,6 +175,7 @@ export function createRoomAtmosphere(mobile: boolean) {
       view.uCameraWorld.value.copy(camera.matrixWorld);
     },
     update(time:number,cutaway:number,damageTime=0){
+      view.uJunctionClearance.value = 1-THREE.MathUtils.smoothstep(cutaway,0,.65);
       for(const room of rooms){
         room.root.visible=room.level===0||cutaway>.01;
         const age=Math.max(0,time-room.onset);

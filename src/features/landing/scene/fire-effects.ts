@@ -9,7 +9,9 @@ float noise(vec2 p) { vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f); return mix(mi
 float fbm(vec2 p) { return .57*noise(p)+.28*noise(p*2.03)+.15*noise(p*4.07); }
 `;
 const vertex = `
+uniform float uCameraFacing;
 uniform float uTime; uniform float uSeed; uniform vec2 uDrift; uniform vec2 uWind;
+uniform float uSoftFloor;
 varying vec2 vUv;
 void main(){
   vUv=uv; vec3 p=position;
@@ -18,11 +20,19 @@ void main(){
   p.z += tip*cos(uTime*1.7+uv.y*4.+uSeed)*.03;
   p.y += tip*sin(uTime*3.2+uSeed+uv.x*8.)*.12;
   vec4 world=modelMatrix*vec4(p,1.);
+  if(uCameraFacing>.5){
+    // Vertical camera-facing layers eliminate the visible crossed-card wings.
+    vec3 right=normalize(vec3(viewMatrix[0][0],0.,viewMatrix[2][0]));
+    world=modelMatrix*vec4(0.,0.,0.,1.);
+    world.xyz+=right*p.x*length(modelMatrix[0].xyz);
+    world.y+=p.y*length(modelMatrix[1].xyz);
+  }
   world.xz+=uWind*tip*.55;
   gl_Position=projectionMatrix*viewMatrix*world;
 }`;
 const flame = `
 uniform float uTime; uniform float uSeed; varying vec2 vUv;
+uniform float uSoftFloor;
 ${noise}
 void main() {
   vec2 p=vUv;
@@ -36,6 +46,28 @@ void main() {
   float alpha=shape*top*smoothstep(0.,.06,p.y)*smoothstep(.25,.58,n+curl*.2)*mix(.62,1.,smoothstep(.34,.72,tongues));
   vec3 col=mix(vec3(1.,.12,.015),vec3(1.,.68,.16),clamp((1.-p.y)*shape,0.,1.));
   col=mix(col,vec3(1.,.91,.59),pow(shape,5.)*(1.-p.y)*.2);
+  if(uSoftFloor>.5){
+    // Broad, overlapping lobes with slow independent variation and soft edges.
+    // Noise bends the silhouette rather than breaking it into grainy specks.
+    float mass=0.;
+    for(int i=0;i<3;i++){
+      float s=uSeed+float(i)*7.31;
+      float phase=noise(vec2(s,uTime*.9));
+      float h=.38+phase*.42;
+      float centre=.22+float(i)*.28+(curl-.5)*.38*p.y;
+      float radius=.18+noise(vec2(s+4.,uTime*.37))*.12;
+      vec2 q=vec2((p.x-centre)/radius,(p.y-.1+(n-.5)*.28)/(h*.83));
+      mass+=exp(-dot(q,q)*1.5);
+    }
+    float rolling=fbm(vec2(p.x*5.+uSeed+(curl-.5)*1.8,p.y*5.-uTime*1.8));
+    float field=mass*(.5+rolling*.75)+(rolling-.5)*.65*p.y;
+    float rim=smoothstep(.12,.55,field);
+    float boundary=smoothstep(0.,.08,p.x)*(1.-smoothstep(.92,1.,p.x));
+    alpha=rim*boundary*smoothstep(0.,.09,p.y)*(1.-smoothstep(.82,1.,p.y))*.95;
+    float heat=clamp(field*.48+rolling*.38+(1.-p.y)*.12,0.,1.);
+    col=mix(vec3(.8,.055,.005),vec3(1.,.49,.055),smoothstep(.1,.7,heat));
+    col=mix(col,vec3(1.,.83,.32),smoothstep(.65,1.,heat)*(1.-p.y)*.8);
+  }
   gl_FragColor=vec4(pow(col,vec3(2.2)),alpha*.9);
 }`;
 const smokeVertex = `
@@ -79,9 +111,10 @@ export function createFireEffects(sources: FireSource[], mobile: boolean) {
     roots.push(root);
     const drift = new THREE.Vector2(...(source.drift ?? [.2 * Math.sin(index), .2 * Math.cos(index)]));
     const geometry = new THREE.PlaneGeometry(.78, 1.75, 6, 12); geometry.translate(0, .875, 0); geometries.push(geometry);
-    for (let sheet = 0; sheet < 3; sheet++) {
-      const material = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uSeed: { value: index * 4 + sheet * 9 }, uDrift: { value: drift }, uWind: wind }, vertexShader: vertex, fragmentShader: flame, transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.NormalBlending });
+    for (let sheet = 0; sheet < (source.softFloor ? 2 : 3); sheet++) {
+      const material = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uSeed: { value: index * 4 + sheet * 9 }, uSoftFloor: { value: source.softFloor ? 1 : 0 }, uDrift: { value: drift }, uWind: wind }, vertexShader: vertex, fragmentShader: flame, transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.NormalBlending });
       const mesh = new THREE.Mesh(geometry, material); mesh.rotation.y = sheet * Math.PI / 3; mesh.frustumCulled = false;
+      material.uniforms.uCameraFacing = { value: source.softFloor || source.cameraFacing ? 1 : 0 };
       mesh.position.set(Math.sin(index * 2.7 + sheet) * .17, 0, Math.cos(index * 1.9 + sheet) * .16);
       mesh.scale.y = .78 + .25 * Math.sin(index * 2.3 + sheet * 2.1); root.add(mesh); materials.push(material);
     }
