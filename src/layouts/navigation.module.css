@@ -1,0 +1,7 @@
+.mobile { display: none; position: relative; }
+.mobile summary { display: grid; place-items: center; width: 44px; height: 44px; cursor: pointer; list-style: none; border: 1px solid #b8c1c450; border-radius: 8px; }
+.mobile summary::-webkit-details-marker { display: none; }
+.panel { position: absolute; z-index: 30; top: 54px; right: 0; width: min(300px, calc(100vw - 40px)); padding: 10px; display: grid; background: #202629; border: 1px solid #b8c1c450; border-radius: 12px; box-shadow: 0 20px 60px #0008; }
+.panel a { display: flex; align-items: center; min-height: 48px; padding: 10px 14px; font-size: 14px; border-radius: 6px; }
+.panel a:hover { background: #323d3f; }
+@media(max-width: 900px) { .mobile { display: block; } }
