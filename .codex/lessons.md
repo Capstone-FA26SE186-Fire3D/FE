@@ -12,6 +12,7 @@ Chỉ lưu kiến thức đã xác minh và cần cho team. Nhật ký lỗi, th
 - Pointerdown preventDefault ngăn focus mặc định: gọi focus({preventScroll:true}) để Arrow/Home hoạt động mà không chọn chữ. Outline orbit đã bỏ theo yêu cầu; không tuyên bố đạt accessibility đầy đủ từ đó.
 - Build/TypeScript không compile GPU shader: đã gặp GLSL reserved `patch`. Runtime phải ghi shader error và test canvas thật; poster/text DOM không chứng minh WebGL hoạt động.
 - Timeout/session closed ở test dài không chứng minh assertion sai. Tách tình huống, đo timing, không đổi expected chỉ để lấy pass. Code check không thay visual review toàn bộ cảnh sụp.
+- Build xong rồi mới chạy server production cho E2E; không rebuild cùng thư mục .next khi suite đang chạy. Kết quả từ server trộn hai bản build không đủ làm bằng chứng phát hành. Ngân sách thời gian test chức năng phải tách khỏi tiêu chí hiệu năng.
 - Hydration `mdl-js` ngoài source cho thấy DOM khác trước hydrate; chưa xác định extension cụ thể. Kiểm tra browser sạch, không mặc định suppressHydrationWarning.
 - Lệnh nối bằng `;` có thể trả exit code cuối dù build trước fail. Chạy độc lập hoặc fail-fast, ghi kết quả từng lệnh. Sandbox spawn EPERM cần quyền chạy phù hợp, không tắt kiểm tra TypeScript.
 

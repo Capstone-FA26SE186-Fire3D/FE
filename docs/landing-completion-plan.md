@@ -40,6 +40,15 @@ Performance targets: LCP <=2.5s, CLS <=0.1, interaction <=200ms, desktop 60fps/m
 
 ## Delivery boundaries
 
+### Release verification — 2026-09-16
+
+- Tested application/test tree: 2c7d421. Frozen install, TypeScript, full ESLint and Next production build passed (14 generated pages).
+- Stable completed production build: `pnpm test:e2e` passed all30 tests in3.8min, including real WebGL startup/context-loss, scroll reversal, branch interruption/return/login, pointer/Arrow/Home, mobile menu, session failures, RAG contracts and numerical fire/NPC/damage regressions.
+- The original90s multi-flow test was split into three focused tests. Trace measured7–11s per rendered click on this runner; the two GPU-heavy functional cases allow120s and completed around72–78s. This is NOT evidence of meeting interaction/FPS targets.
+- An intermediate suite overlapped a rebuild and had28/30 passes; it is not release evidence. The clean rerun above passed unchanged session assertions. Build first, then start the production test server.
+- Documentation-only follow-up records these results and lessons. Docs companion PR5/6 merged. No remote CI was configured at review; these are local checks, not CI status.
+- Remaining visual143s/four-viewport/real-device/performance acceptance above stays open. No backend or validated structural simulation claim.
+
 Keep feature/landing-experience and existing relevant changes. No commit/push/PR unless requested.
 Session data is demonstrative; no active QR/APK claims. Remotion only for separately requested video.
 Runtime findings and remaining verification limits belong in the local handoff and verification report, not invented success claims.
