@@ -17,6 +17,7 @@ uniform mat4 uFieldMatrix;
 uniform float uRoof;
 uniform float uIgnition;
 uniform float uOpacity;
+uniform float uJunctionClearance, uJunctionFloor;
 uniform vec2 uWind;
 uniform float uGust, uFlare;
 varying vec3 vWorld;
@@ -32,6 +33,7 @@ float turbulence(vec3 p) {
 }
 void main() {
   if(uOpacity<.001) discard;
+  if(uJunctionFloor>.5 && uTime<=uIgnition) discard;
   float growth=smoothstep(uIgnition,uIgnition+32.,uTime);
   vec3 direction = normalize(vWorld - cameraPosition);
   vec3 inverseRay = 1. / (sign(direction) * max(abs(direction), vec3(.00001)) + vec3(.0000001));
@@ -45,7 +47,7 @@ void main() {
   vec4 viewPosition=uInverseProjection*vec4(screenUv*2.-1.,depth*2.-1.,1.);
   vec3 opaqueWorld=(uCameraWorld*vec4(viewPosition.xyz/viewPosition.w,1.)).xyz;
   end=min(end,length(opaqueWorld-cameraPosition));
-  if (end <= start || (uGrowth < .001 && uSmoke < .001)) discard;
+  if (end <= start || (uJunctionFloor < .5 && uGrowth < .001 && uSmoke < .001)) discard;
   float stepLength = (end-start)/float(MARCH_STEPS);
   float jitter = hash(floor(vWorld*190.));
   vec4 result = vec4(0.);
@@ -55,6 +57,7 @@ void main() {
     // Advect turbulence, not the supporting surface: roots remain attached.
     vec3 windInField=(uFieldMatrix*vec4(uWind.x,0.,uWind.y,0.)).xyz;
     vec3 flow = (p-windInField*max(0.,p.y)*.35)*vec3(2.2,2.1,2.2) + vec3(uSeed,-uTime*1.2,-uTime*.36);
+    if(uJunctionFloor>.5) flow=vec3(world.x*9.,p.y*7.-uTime*2.,p.z*5.+uSeed);
     float curl = turbulence(flow*.65);
     float detail = turbulence(flow + vec3(curl*1.8,0.,curl));
     float lateSpread=smoothstep(uIgnition+20.,uIgnition+65.,uTime);
@@ -123,6 +126,31 @@ void main() {
       float wisps=smoothstep(.2,.78,detail*.65+pockets*.35);
       smokeDensity+=roofSmoke*envelope*growth*wisps*feather.x*feather.y*feather.z*3.6;
     }
+    if(uJunctionFloor>.5){
+      // Flames use the shared source renderer; this volume provides soot only.
+      density=0.;
+      // Wisps climb at the edges and collect overhead, leaving the signs clear.
+      vec3 smokeFlow=world*vec3(1.8,2.4,1.8)-vec3(uWind.x*.4,uTime*.22,uTime*.12+uWind.y*.4);
+      float soot=turbulence(smokeFlow+vec3(uSeed,0.,0.));
+      float sideVeil=1.-smoothstep(.04,.23,min(screenUv.x,1.-screenUv.x));
+      float overhead=smoothstep(.76,.95,screenUv.y);
+      float plume=smoothstep(.25,1.1,p.y);
+      vec3 boundsUv=(world-uMin)/(uMax-uMin);
+      vec3 edge=min(boundsUv,1.-boundsUv);
+      vec3 feather=smoothstep(vec3(0.),vec3(.07,.09,.08),edge);
+      smokeDensity=max(sideVeil*.6,overhead*.85)*plume*smoothstep(.32,.7,soot)
+        *feather.x*feather.y*feather.z*smoothstep(uIgnition+8.,uIgnition+48.,uTime)*1.3;
+    }
+    // The junction signage lives on the rear wall. Reserve its reading height
+    // in the walk-through, fading back to full fire in the building overview.
+    float rearZone=1.-smoothstep(-14.,-12.,world.z);
+    float aboveFloor=smoothstep(.55,.8,world.y);
+    // Remove the old rear wall strip as well: only scattered floor pockets
+    // should remain here in the walk-through, even late in the burn timeline.
+    float protectedHeight=uJunctionFloor>.5 ? aboveFloor : 1.;
+    float clearance=1.-uJunctionClearance*rearZone*protectedHeight;
+    density*=clearance;
+    if(uJunctionFloor<.5) smokeDensity*=clearance;
     vec3 hot = mix(vec3(.45,.008,.001),vec3(2.2,.22,.003),billow);
     hot = mix(hot,vec3(3.,1.3,.12),pow(billow,4.)*smoothstep(.6,.85,detail));
     float total = density+smokeDensity;
