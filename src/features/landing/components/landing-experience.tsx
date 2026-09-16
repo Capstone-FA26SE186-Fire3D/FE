@@ -96,7 +96,7 @@ export function LandingExperience({ panels }: { panels: ReactNode[] }) {
 
   return <main className={`${styles.page} ${staticMode ? styles.static : ""}`} data-scene-mode={mode} data-stage={step} data-branch={branch ?? "none"}>
     <div className={styles.header}><SiteHeader /></div>
-    <section ref={journey} className={styles.journey} aria-label="Hành trình làm quen Fire3D">
+    <section ref={journey} className={styles.journey} aria-label="Hành trình làm quen FET3D">
       <div className={styles.stage}>
         <div className={styles.world}>{mode === "motion" && <BuildingScene input={input} onStatus={handleStatus} snapshotRef={snapshot} choiceRefs={choiceRefs} />}</div>
         {!staticMode && step === 4 && !branch && <div className={styles.wallTargets}>
