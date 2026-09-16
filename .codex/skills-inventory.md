@@ -37,15 +37,13 @@ explicitly, not several contradictory visual variants at once.
 - `remotion-best-practices`: optional for storyboard/teaser/video assets; it is not a runtime dependency and must not replace scroll-controlled Three.js scene state.
 - `vercel-react-best-practices` + `web-design-guidelines`: review loading, accessibility, mobile composition, focus order and performance before implementation.
 
-Runtime boundary: `@designcodeio/threeui@1.2.0` is already declared and locked. Inspect a component before reuse; `EmberStorm`/particle components may provide visual references or bounded effects, but the Fire3D building scene remains custom Three.js and must have a fallback. Three.js stays in FE; Unity remains the Mobile gameplay runtime.
+Runtime boundary: ThreeUI was inspected as a reference; it is no longer a runtime dependency. Fire3D uses custom Three.js with fallback. Three.js stays in FE; Unity remains the Mobile gameplay runtime.
 
-Source organization: follow the documented feature-first tree (`assets`, shared `components`, `configs`, feature-owned `components/services/types`, `hooks`, `layouts`, route `pages`, cross-feature `services`, `store`, `utils`, `App.tsx`). Keep landing scene code and heavy assets inside the landing feature and lazy-load them; do not move business logic into pages or the root component.
+Source organization: Next.js App Router `app/` composes feature-first routes; no `pages/` or root `App.tsx`. Keep feature-owned components/scene/types together; create shared folders only when used. Lazy-load landing WebGL.
 
 ## Runtime dependency
 
-`@designcodeio/threeui` is declared in `package.json` and locked in `pnpm-lock.yaml`.
-It is a React/ThreeUI package, not a Codex skill. Keep Three.js usage inside FE;
-do not add it to BE, AI, or Mobile.
+Three.js is declared in package.json and pnpm-lock.yaml. ThreeUI is a reference library, not a skill or current runtime dependency. Do not add it to BE, AI or Mobile as part of web work.
 
 ## Safety
 
