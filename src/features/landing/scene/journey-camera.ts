@@ -54,13 +54,13 @@ export function createJourneyCamera(camera: THREE.PerspectiveCamera) {
       phone = THREE.MathUtils.lerp(phone, branch === "trainee" ? 1 : 0, blend);
       // Orbit the building centre, not the front doorway. Fit a bounding sphere
       // against both viewport axes so side-on views cannot crop the rear bay.
-      exteriorLook.set(0, 5.4, -4);
+      exteriorLook.set(0, 6.6, -4);
       const halfFov = THREE.MathUtils.degToRad(camera.fov / 2);
       const limitingFov = Math.min(
         halfFov,
         Math.atan(Math.tan(halfFov) * camera.aspect),
       );
-      const distance = (16.5 / Math.sin(limitingFov)) * (mobile ? 1.01 : 0.9);
+      const distance = (16.5 / Math.sin(limitingFov)) * (mobile ? 1.08 : 1.02);
       exterior
         .set(1, 0.5 + orbit.pitch * 0.55, 1.15)
         .normalize()
