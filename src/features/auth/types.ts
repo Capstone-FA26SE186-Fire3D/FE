@@ -15,3 +15,12 @@ export type TokenSet = {
   accessToken: string;
   refreshToken: string;
 };
+
+export type LoginResponse = TokenSet & {
+  user: AuthUser;
+};
+
+export type TokenResponse = LoginResponse & {
+  accessTokenExpiresAt: string;
+  refreshTokenExpiresAt: string;
+};

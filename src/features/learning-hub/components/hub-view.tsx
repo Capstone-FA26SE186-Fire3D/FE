@@ -9,11 +9,13 @@ import { Card } from "@/components/ui/card";
 import { routes } from "@/configs/routes";
 import { articles } from "@/features/learn/data/articles";
 import { useDemoSession } from "@/store/demo-session";
+import { useAuthSession } from "@/features/auth/auth-session";
 import { demoAnswer } from "../demo-answer";
 
 export function HubView() {
   const params = useSearchParams();
-  const { ready, isAuthenticated, name, bookmarks, chat, askQuestion, logout, reset, storageAvailable } = useDemoSession();
+  const { ready, isAuthenticated, name, bookmarks, chat, askQuestion, reset, storageAvailable } = useDemoSession();
+  const { logout } = useAuthSession();
   const articleSlug = params.get("article");
   const article = articles.find((item) => item.slug === articleSlug);
   const savedArticles = articles.filter((item) => bookmarks.includes(item.slug));

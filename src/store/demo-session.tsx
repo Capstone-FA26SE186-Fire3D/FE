@@ -19,6 +19,7 @@ type SessionContextValue = DemoSession & {
   ready: boolean;
   storageAvailable: boolean;
   login: (email: string, password: string) => boolean;
+  beginAuthenticatedSession: (name: string) => void;
   logout: () => void;
   reset: () => void;
   toggleBookmark: (slug: string) => void;
@@ -92,6 +93,10 @@ export function DemoSessionProvider({ children }: { children: ReactNode }) {
           ? [...new Set([...current.bookmarks, current.pendingAction.slug])] : current.bookmarks,
       }));
       return true;
+    },
+    beginAuthenticatedSession: (name) => {
+      if (!ready) return;
+      setSession((current) => ({ ...current, isAuthenticated: true, name: name.trim() || "Người dùng", pendingAction: null }));
     },
     logout: () => setSession(initialSession),
     reset: () => setSession(initialSession),
