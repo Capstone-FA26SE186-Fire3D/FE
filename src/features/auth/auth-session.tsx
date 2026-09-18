@@ -33,7 +33,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const demoRef = useRef(demo);
-  demoRef.current = demo;
+
+  useEffect(() => { demoRef.current = demo; }, [demo]);
 
   useEffect(() => {
     let active = true;

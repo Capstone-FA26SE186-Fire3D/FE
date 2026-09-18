@@ -76,7 +76,7 @@ export function HubView() {
         <Card className="hub-card"><h3>Phiên trải nghiệm</h3>
           <p className="text-sm leading-6 text-[var(--muted)]">Lưu tối đa 50 câu hỏi trong tab này. Đặt lại hoặc đăng xuất sẽ xóa bài lưu và lịch sử mẫu.</p>
           {!storageAvailable && <p role="status">Trình duyệt không cho phép lưu phiên. Dữ liệu sẽ mất khi tải lại.</p>}
-          <div className="flex flex-wrap gap-2"><Button onClick={reset} variant="quiet"><RotateCcw size={14} /> Đặt lại</Button><Button onClick={logout} variant="ghost"><LogOut size={14} /> Đăng xuất</Button></div>
+          <div className="flex flex-wrap gap-2"><Button onClick={() => { reset(); void logout(); }} variant="quiet"><RotateCcw size={14} /> Đặt lại</Button><Button onClick={() => { void logout(); }} variant="ghost"><LogOut size={14} /> Đăng xuất</Button></div>
         </Card>
       </aside>
     </div>
