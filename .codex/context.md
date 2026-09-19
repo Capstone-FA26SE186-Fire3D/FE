@@ -69,3 +69,10 @@ Khi Docs có cạnh repo, đọc requirements/features/workflows phù hợp. UI 
 - UI period AI chỉ hiển thị snapshot đã chốt; late/uncertain usage là adjustment riêng, không tự tính lại theo policy mới. FE không tự gắn quotation/payment hoặc đổi status.
 - Package/artifact pinned không cho phép editor/publish flow thay tại chỗ; package compatibility phải fail-closed khi capability có phần tử sai kiểu/rỗng hoặc provenance/hash thiếu.
 - Processing UI hiển thị mã kết quả worker ổn định (`Claimed`, `Busy`, `AlreadyCompleted`, `NotClaimable`, `Conflict`, `StaleAttempt`) và dùng idempotency/reconcile; không suy diễn từ lỗi text.
+
+## Redis boundary — 2026-09-19
+
+- FE chỉ gọi API qua Nginx/.NET; không kết nối Redis, không đọc stream và không giữ Redis credential. Backend là authority cho auth, entitlement, quota, billing và publish.
+- UI xử lý trạng thái chờ/chậm khi cache fallback hoặc event processing chưa hoàn tất; retry dùng idempotency key và không tự coi request timeout là thất bại.
+- Danh mục/package metadata/list/dashboard có thể được backend cache-aside, nhưng response phải vẫn kiểm tra tenant/scope và không dùng cache cũ để vượt revoke hoặc start gate.
+- FE không suy diễn completion hoặc business success từ Redis delivery/ACK; chỉ hiển thị trạng thái API (`pending`/`retry`/`conflict`) và gửi lại cùng idempotency key khi backend yêu cầu.
