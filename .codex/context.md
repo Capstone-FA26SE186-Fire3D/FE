@@ -4,14 +4,14 @@
 
 - Next.js App Router + React + TypeScript strict; [package.json](../package.json) có scripts `dev`, `build`, `start`, `typecheck`, `lint`, `test:e2e` và giữ pnpm 10.28.2.
 - Route composition nằm trong [src/app](../src/app); feature code nằm trong [src/features](../src/features); style/token nền nằm trong [src/assets/styles/globals.css](../src/assets/styles/globals.css).
-- [RAG client](../src/features/rag/api.ts) hiện vẫn gọi trực tiếp `POST /chat` và `POST /documents` qua `NEXT_PUBLIC_RAG_API_URL`; production contract phải chuyển qua `.NET API`, nơi kiểm tra Firebase identity, tenant scope, quota/consent và idempotency. Không xem prototype direct call là kiến trúc production.
+- [RAG client](../src/features/rag/api.ts) hiện vẫn gọi trực tiếp `POST /chat` và `POST /documents` qua `NEXT_PUBLIC_RAG_API_URL`; production contract phải chuyển qua `.NET API`, nơi kiểm tra phiên FET3D (local hoặc Google exchange), tenant scope, quota/consent và idempotency. Firebase chỉ xác minh Google identity; không phải mọi phiên đều bắt buộc Google. Không xem prototype direct call là kiến trúc production.
 - Prototype hiện có Three.js landing với một `WebGLRenderer`, building/effects/camera/lifecycle tách module. Editor/preview tổ chức là kiến trúc đích chưa được chứng minh đầy đủ trong code; không gọi prototype landing là editor production. ThreeUI chỉ tham khảo; package runtime hiện không còn dependency ThreeUI.
 - Có [pnpm-lock.yaml](../pnpm-lock.yaml); dependency thay đổi phải đi cùng lockfile và xác minh lại bằng `pnpm install --frozen-lockfile`.
 
 ## Kiến trúc tích hợp đích — 2026-09-17
 
 - FE tiếp tục dùng Next.js App Router/React/TypeScript. Three.js phục vụ landing và editor/preview 3D của OrganizationUser; Unity gameplay đầy đủ không chạy trong web. Editor có floor/layer/object selection, scenario placement, validation, undo/redo, draft/version và timeline preview.
-- Đăng nhập production dùng Firebase Authentication với Google Sign-In. FE gửi Firebase ID token tới C#/.NET backend; không tự quyết định role/`organizationId` và không dùng Supabase Auth.
+- Đăng nhập production dùng email/password qua .NET hoặc Google Sign-In qua Firebase. FE gửi credential/token tới backend theo contract; không tự quyết định role/`organizationId` và không dùng Supabase Auth.
 - FE không kết nối trực tiếp Supabase PostgreSQL/`pgvector`, AWS S3 private hoặc FCM Admin. Database, vector retrieval, signed URL và notification orchestration đi qua backend/service được cấp quyền.
 - RAG production dùng Python/FastAPI với Supabase PostgreSQL + `pgvector`; LLM chọn một trong OpenAI hoặc Gemini qua provider adapter. UI không phụ thuộc payload riêng của provider.
 - Azure đã được chọn cho AI/RAG FastAPI service; compute cho BE, IFC/Blender worker và Unity worker vẫn phải spike/chốt riêng. Không hard-code public backend URL ngoài cấu hình môi trường.
@@ -76,3 +76,27 @@ Khi Docs có cạnh repo, đọc requirements/features/workflows phù hợp. UI 
 - UI xử lý trạng thái chờ/chậm khi cache fallback hoặc event processing chưa hoàn tất; retry dùng idempotency key và không tự coi request timeout là thất bại.
 - Danh mục/package metadata/list/dashboard có thể được backend cache-aside, nhưng response phải vẫn kiểm tra tenant/scope và không dùng cache cũ để vượt revoke hoặc start gate.
 - FE không suy diễn completion hoặc business success từ Redis delivery/ACK; chỉ hiển thị trạng thái API (`pending`/`retry`/`conflict`) và gửi lại cùng idempotency key khi backend yêu cầu.
+
+## Learn blog boundary — 2026-09-19
+
+- FE mục tiêu có public Learn reader/search/filter theo situation và kind `Article`/`Tip`/`Video`, cùng PlatformAdmin CMS cho Draft/Published và trạng thái bài Unpublished/Published/Hidden/Deleted; hỗ trợ publish ngay, hide/show/delete/restore và ETag/idempotency. Hidden không public nhưng RAG hợp lệ; Deleted bị loại. Đây là target contract; Learn hiện trong code vẫn là prototype/demo.
+- Renderer chỉ nhận media descriptor đã backend validate; hỗ trợ YouTube/Facebook/TikTok theo provider allowlist, có fallback summary/link khi không embed được. Không render iframe/HTML/script tùy ý.
+- Admin UI gửi ETag/revision và idempotency cho version/publish/hide/show/delete/restore; public UI không nhận Draft/Hidden/Deleted. Trainee bookmark qua `.NET API` và gửi `postId`/`versionId` khi hỏi AI; FE không tự quyết định source scope, RAG eligibility, cache invalidation hoặc quota.
+
+- Hồ sơ mục tiêu cho phép đổi username/tên hiển thị/avatar/mật khẩu; username unique lowercase. Trainee nhập username ngay ở local registration hoặc Google onboarding; FE không hiển thị username gate ở session start. Account cũ thiếu username được nhắc hoàn thiện qua profile. Avatar upload qua S3 intent/complete/delete, không lưu signed URL.
+
+## FET3D onboarding and commercial UI — 2026-09-19
+
+- Google mới hiển thị onboarding chọn Trainee hoặc OrganizationUser sau khi backend xác minh Firebase; account đã link đăng nhập theo role cũ. FE không tự cho chọn PlatformAdmin hoặc organization có sẵn.
+- Organization UI quản lý nhiều Building, bắt buộc tên/địa chỉ trước checkout, chọn một/nhiều Building và thời hạn, hiển thị giá gốc/discount/tổng tiền theo quotation snapshot. Gói số lượng lớn dùng form liên hệ, chưa tạo payment.
+- Billing UI hiển thị entitlement từng Building, kỳ hết hạn và danh sách nhắc trước 5 ngày; gia hạn chọn lọc. FE chỉ gọi API, không tự tính entitlement/discount cuối cùng hoặc kết nối Redis.
+
+## Final review corrections — 2026-09-19
+
+- Local email/password and Google sessions are both valid for QR/onboarding; Google is not a mandatory login path. FE sends the backend-owned session/exchange result and never chooses tenant or PlatformAdmin.
+- Profile/reset UI must represent server-side family revocation and ETag conflicts. Learn publish/hide/show/delete/restore retries use durable idempotency; FE does not infer success from stale cache or Redis ACK.
+- BuildingService quotation scope is represented by quotation lines; the removed header fields `building_id`, `service_package_id` and `service_duration_months` must not be added back to client forms or response types.
+
+## Recovery and billing correction — 2026-09-19
+
+- FE calls API gates for session events/results, processing status and AI billing; it does not infer completion, payment or entitlement from Redis/cache. Retry sends the stable idempotency key/hash and handles Conflict/StaleAttempt/NeedsReconcile explicitly.
