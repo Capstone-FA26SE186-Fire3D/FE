@@ -27,7 +27,7 @@ Installed from `Leonxlnx/taste-skill`: `design-taste-frontend`,
 Use `design-taste-frontend` as the default. Use v1 or a style-specific skill
 explicitly, not several contradictory visual variants at once.
 
-## Fire3D web UX execution map
+## FET3D web UX execution map
 
 - `design-taste-frontend`: translate the approved dark architectural visual system, Vietnamese typography and content hierarchy into tokens and components.
 - `scroll-craft`: author the first-person building journey, one clear visual peak and the two audience branches; preserve readable pauses for copy.
@@ -37,7 +37,7 @@ explicitly, not several contradictory visual variants at once.
 - `remotion-best-practices`: optional for storyboard/teaser/video assets; it is not a runtime dependency and must not replace scroll-controlled Three.js scene state.
 - `vercel-react-best-practices` + `web-design-guidelines`: review loading, accessibility, mobile composition, focus order and performance before implementation.
 
-Runtime boundary: ThreeUI was inspected as a reference; it is no longer a runtime dependency. Fire3D uses custom Three.js with fallback. Three.js stays in FE; Unity remains the Mobile gameplay runtime.
+Runtime boundary: ThreeUI was inspected as a reference; it is no longer a runtime dependency. FET3D uses custom Three.js with fallback. Three.js stays in FE; Unity remains the Mobile gameplay runtime.
 
 Source organization: Next.js App Router `app/` composes feature-first routes; no `pages/` or root `App.tsx`. Keep feature-owned components/scene/types together; create shared folders only when used. Lazy-load landing WebGL.
 
