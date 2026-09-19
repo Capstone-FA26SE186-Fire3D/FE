@@ -2,6 +2,12 @@ import { expect, test, type Page } from "@playwright/test";
 
 // Inherit the verified production origin from playwright.config.ts.
 
+test("auth mode is explicit and defaults to local mock", async ({ page }) => {
+  await page.goto("/login");
+  await expect(page.getByTestId("auth-mode")).toHaveText("mock");
+  expect(await page.evaluate(() => sessionStorage.getItem("fire3d-auth-tokens"))).toBeNull();
+});
+
 const slug = "doc-khong-gian-truoc-khi-hanh-dong";
 const secondSlug = "mot-luot-hoc-co-y-nghia";
 const storageKey = "fire3d-demo-session";

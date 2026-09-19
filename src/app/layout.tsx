@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DemoSessionProvider } from "@/store/demo-session";
+import { AuthSessionProvider } from "@/features/auth/auth-session";
 import "@/assets/styles/globals.css";
 import "@fontsource/be-vietnam-pro/latin-400.css";
 import "@fontsource/be-vietnam-pro/vietnamese-400.css";
@@ -16,5 +17,5 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="vi"><body><DemoSessionProvider>{children}</DemoSessionProvider></body></html>;
+  return <html lang="vi"><body><DemoSessionProvider><AuthSessionProvider>{children}</AuthSessionProvider></DemoSessionProvider></body></html>;
 }
