@@ -15,7 +15,7 @@
 - FE không kết nối trực tiếp Supabase PostgreSQL/`pgvector`, AWS S3 private hoặc FCM Admin. Database, vector retrieval, signed URL và notification orchestration đi qua backend/service được cấp quyền.
 - RAG production dùng Python/FastAPI với Supabase PostgreSQL + `pgvector`; LLM chọn một trong OpenAI hoặc Gemini qua provider adapter. UI không phụ thuộc payload riêng của provider.
 - Azure đã được chọn cho AI/RAG FastAPI service; compute cho BE, IFC/Blender worker và Unity worker vẫn phải spike/chốt riêng. Không hard-code public backend URL ngoài cấu hình môi trường.
-- Client production gọi API qua endpoint Nginx đã chốt; FE không gọi FastAPI trực tiếp. Base URL, TLS và môi trường được lấy từ cấu hình triển khai.
+- Client production gọi API qua endpoint OneShield/OnePortal (iNET) → Nginx đã chốt; FE không gọi FastAPI trực tiếp. Base URL, TLS, edge policy và môi trường được lấy từ cấu hình triển khai; FE không phụ thuộc vào header edge để quyết định quyền.
 - Khu organization cần UI cho IFC upload/processing issues/preview, scenario editor, AI draft có citation, Building service/payment và AI usage (granted/used/remaining/overage/unit price/period/terms). FE không tự quyết định entitlement, quota, price hay publish.
 - OrganizationUser có thể chạy thử draft/version riêng qua Mobile/Unity; FE chỉ tạo playtest request đúng tenant, để backend kiểm tra Trial quota hoặc Building entitlement Active ở bước start, và không đưa playtest vào learner analytics.
 - QR landing là cấp Building: resolve → list bài đã publish → chọn bài → prepare/download/verify package → explicit online start → app session. Preparation không cấp quyền; start mới kiểm tra entitlement/QR/package/runtime và tạo launch grant. Hết hạn vẫn xem landing/status nhưng không tạo phiên mới; không hứa giữ deep link xuyên cài nếu chưa kiểm chứng.
@@ -72,7 +72,7 @@ Khi Docs có cạnh repo, đọc requirements/features/workflows phù hợp. UI 
 
 ## Redis boundary — 2026-09-19
 
-- FE chỉ gọi API qua Nginx/.NET; không kết nối Redis, không đọc stream và không giữ Redis credential. Backend là authority cho auth, entitlement, quota, billing và publish.
+- FE chỉ gọi API qua OneShield/OnePortal → Nginx/.NET; không kết nối Redis, không đọc stream và không giữ Redis credential. Backend là authority cho auth, entitlement, quota, billing và publish.
 - UI xử lý trạng thái chờ/chậm khi cache fallback hoặc event processing chưa hoàn tất; retry dùng idempotency key và không tự coi request timeout là thất bại.
 - Danh mục/package metadata/list/dashboard có thể được backend cache-aside, nhưng response phải vẫn kiểm tra tenant/scope và không dùng cache cũ để vượt revoke hoặc start gate.
 - FE không suy diễn completion hoặc business success từ Redis delivery/ACK; chỉ hiển thị trạng thái API (`pending`/`retry`/`conflict`) và gửi lại cùng idempotency key khi backend yêu cầu.
