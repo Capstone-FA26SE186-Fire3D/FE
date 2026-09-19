@@ -64,6 +64,7 @@ export function createLandingRuntime(canvas: HTMLCanvasElement, mobile: boolean)
   let lastPhoneAmount = 0;
   let phoneReveal = 0;
   let damageTime = 0;
+  let disposed = false;
 
   function draw(phoneAmount: number) {
     renderer.info.reset();
@@ -85,6 +86,7 @@ export function createLandingRuntime(canvas: HTMLCanvasElement, mobile: boolean)
   return {
     renderer,
     resize(w: number, h: number) {
+      if (disposed) return;
       width = Math.max(1, w); height = Math.max(1, h);
       camera.aspect = width / height; camera.updateProjectionMatrix(); renderer.setSize(width, height, false);
       // At the settled junction, left sits just inside the frame while right
@@ -119,8 +121,14 @@ export function createLandingRuntime(canvas: HTMLCanvasElement, mobile: boolean)
       canvas.dataset.drawCalls = String(renderer.info.render.calls);
       return { ...report, hitAreas: junction.hitAreas(camera) };
     },
-    snapshot() { draw(lastPhoneAmount); return canvas.toDataURL("image/webp", .88); },
+    snapshot() {
+      if (disposed) return "";
+      draw(lastPhoneAmount);
+      return canvas.toDataURL("image/webp", .88);
+    },
     dispose() {
+      if (disposed) return;
+      disposed = true;
       compositor.dispose(); atmosphere.dispose(); effects.dispose(); occupants.dispose(); junction.dispose(); building.dispose(); phone.dispose(); target.dispose(); backdropGeometry.dispose(); backdropMaterial.dispose();
       scene.clear(); renderer.dispose(); renderer.forceContextLoss();
     },
