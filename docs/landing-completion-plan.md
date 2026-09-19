@@ -5,11 +5,17 @@ Direction: cinematic semi-realistic architecture, physically coherent scale and 
 
 ## Milestones
 
-- [ ] Diagnose WebGL fallback with runtime evidence; fix lifecycle, fonts, navigation.
-- [ ] Complete eye-level hallway, doors, connected stairs, source-bound fire/smoke and three reading beats.
-- [ ] Complete interruptible Android render-target reveal and same-building cutaway; explicit continue and return.
-- [ ] Complete sample auth/save/ask/hub and truthful public pages; preserve RAG contract.
+- [x] Diagnose WebGL fallback with runtime evidence; fix lifecycle, fonts, navigation.
+- [x] Complete eye-level hallway, doors, connected stairs, source-bound fire/smoke and three reading beats.
+- [x] Complete interruptible Android render-target reveal and same-building cutaway; explicit continue and return.
+- [x] Complete sample auth/save/ask/hub and truthful public pages; preserve RAG contract.
 - [ ] Verify production, actual rendered scenes, reduced motion, failures, keyboard, mobile and performance.
+
+### Current verification — 2026-09-20
+
+The implementation milestones above are covered by the production build and the full Playwright suite. From the FE repository, `pnpm typecheck`, `pnpm lint`, `pnpm build`, and `pnpm test:e2e -- --reporter=line` completed successfully; the suite ran 38 tests covering WebGL rendering, branch interruption and return, render-target handoff, reduced motion, context-loss fallback, keyboard/orbit controls, mobile layout, session recovery, RAG request handling, fire/weather timelines, authored paths and collapse/reset behavior.
+
+The final verification milestone remains open for the visual four-viewport capture matrix, the full 143-second visual review, real-device performance measurements and contrast review. Automated tests establish behavior and lifecycle handling; they do not establish those visual or hardware targets.
 
 ## Acceptance
 
