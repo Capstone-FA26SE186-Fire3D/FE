@@ -86,6 +86,7 @@ button { cursor: pointer; }
 .form-field input:focus { border-color: var(--ember); }
 .form-submit { width: 100%; margin-top: 10px; }
 .google-sign-in { width: 100%; margin-top: 10px; }
+.google-icon { width: 18px; height: 18px; flex: 0 0 auto; }
 .form-message { margin: 14px 0 0; color: var(--ember); font-size: 12px; }
 .hub-layout { display: grid; grid-template-columns: 1fr .75fr; gap: 18px; }
 .hub-main, .hub-side { display: grid; gap: 18px; align-content: start; }

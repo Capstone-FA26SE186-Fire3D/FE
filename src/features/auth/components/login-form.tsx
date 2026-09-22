@@ -8,6 +8,7 @@ import { routes } from "@/configs/routes";
 import { useDemoSession } from "@/store/demo-session";
 import { useAuthSession } from "../auth-session";
 import { safeNext } from "../redirect";
+import { GoogleIcon } from "./google-icon";
 
 export function LoginForm() {
   const router = useRouter();
@@ -68,7 +69,7 @@ export function LoginForm() {
       <label className="form-field">Email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" aria-invalid={!!message} /></label>
       <label className="form-field">Mật khẩu<input required minLength={12} maxLength={128} type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} aria-invalid={!!message} /></label>
       <Button disabled={!ready || !hasFirebaseAuthConfig || submitting} className="form-submit" type="submit">{submitting ? "Đang xử lý…" : mode === "login" ? "Đăng nhập" : "Tạo tài khoản"}</Button>
-      {mode === "login" && <Button disabled={!ready || !hasFirebaseAuthConfig || submitting} className="google-sign-in" type="button" variant="secondary" onClick={() => void submitGoogle()}>Tiếp tục với Google</Button>}
+      {mode === "login" && <Button disabled={!ready || !hasFirebaseAuthConfig || submitting} className="google-sign-in" type="button" variant="secondary" onClick={() => void submitGoogle()}><GoogleIcon /> Tiếp tục với Google</Button>}
       {message && <p role="alert" aria-label="Lỗi xác thực" className="form-message">{message}</p>}
     </form>
   );

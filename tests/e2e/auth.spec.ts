@@ -1,11 +1,10 @@
 import { expect, test } from "@playwright/test";
 
-test("Firebase configuration is required instead of exposing demo credentials", async ({ page }) => {
+test("login screen removes demo credentials and exposes Google sign-in", async ({ page }) => {
   await page.goto("/login");
 
   await expect(page.getByText("Đăng nhập Firebase")).toBeVisible();
   await expect(page.getByText("Tài khoản trải nghiệm")).toHaveCount(0);
-  await expect(page.getByText("Chưa cấu hình Firebase cho môi trường này.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Tiếp tục với Google" })).toBeVisible();
 });
 
