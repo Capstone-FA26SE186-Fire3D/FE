@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { hasFirebaseAuthConfig } from "@/configs/env";
 import { routes } from "@/configs/routes";
@@ -14,13 +14,19 @@ export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const { pendingAction } = useDemoSession();
-  const { login, loginWithGoogle, ready, register } = useAuthSession();
+  const { isAuthenticated, login, loginWithGoogle, ready, register } = useAuthSession();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (ready && isAuthenticated) router.replace(safeNext(params.get("next")));
+  }, [isAuthenticated, params, ready, router]);
+
+  if (ready && isAuthenticated) return <p className="auth-redirect" role="status">Bạn đã đăng nhập. Đang chuyển hướng…</p>;
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
