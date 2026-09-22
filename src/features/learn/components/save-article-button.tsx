@@ -4,11 +4,13 @@ import { Bookmark, Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/configs/routes";
+import { useAuthSession } from "@/features/auth/auth-session";
 import { useDemoSession } from "@/store/demo-session";
 
 export function SaveArticleButton({ slug, compact = false }: { slug: string; compact?: boolean }) {
   const router = useRouter();
-  const { isAuthenticated, bookmarks, toggleBookmark, setPendingAction, ready } = useDemoSession();
+  const { bookmarks, toggleBookmark, setPendingAction, ready } = useDemoSession();
+  const { isAuthenticated } = useAuthSession();
   const saved = bookmarks.includes(slug);
 
   const save = () => {

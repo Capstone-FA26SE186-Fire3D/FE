@@ -7,6 +7,7 @@ export const routes = {
   about: "/about",
   download: "/download",
   rag: "/demo/rag",
+  adminAccounts: "/admin/accounts",
 } as const;
 
 export type RouteKey = keyof typeof routes;
