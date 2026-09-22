@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ApiError } from "@/api/types/common";
 import { authApi } from "./api";
-import { signInWithFirebase } from "./firebase";
+import { signInWithFirebase, signInWithGoogle } from "./firebase";
 import type { AuthUser, RegisterInput, TokenResponse } from "./types";
 
 type StoredTokens = Pick<TokenResponse, "accessToken" | "refreshToken">;
@@ -14,6 +14,7 @@ type AuthSessionContextValue = {
   ready: boolean;
   user: AuthUser | null;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
 };
@@ -109,6 +110,15 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     }
   }, [saveSession]);
 
+  const loginWithGoogle = useCallback(async () => {
+    try {
+      const firebaseIdToken = await signInWithGoogle();
+      saveSession(await authApi.loginFirebase(firebaseIdToken));
+    } catch (error) {
+      throw new Error(toMessage(error));
+    }
+  }, [saveSession]);
+
   const register = useCallback(async (input: RegisterInput) => {
     try {
       await authApi.register(input);
@@ -135,9 +145,10 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     ready,
     user,
     login,
+    loginWithGoogle,
     logout,
     register,
-  }), [accessToken, login, logout, ready, register, user]);
+  }), [accessToken, login, loginWithGoogle, logout, ready, register, user]);
 
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;
 }

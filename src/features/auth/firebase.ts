@@ -1,5 +1,5 @@
 import { getApps, initializeApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { GoogleAuthProvider, getAuth, signInWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 import { env, hasFirebaseAuthConfig } from "@/configs/env";
 
 function firebaseAuth() {
@@ -13,5 +13,10 @@ function firebaseAuth() {
 
 export async function signInWithFirebase(email: string, password: string): Promise<string> {
   const credential = await signInWithEmailAndPassword(firebaseAuth(), email.trim(), password);
+  return credential.user.getIdToken();
+}
+
+export async function signInWithGoogle(): Promise<string> {
+  const credential = await signInWithPopup(firebaseAuth(), new GoogleAuthProvider());
   return credential.user.getIdToken();
 }
