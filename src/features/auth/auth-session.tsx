@@ -1,101 +1,183 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ApiError } from "@/api";
-import { env } from "@/configs/env";
-import { useDemoSession } from "@/store/demo-session";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { ApiError } from "@/api/types/common";
 import { authApi } from "./api";
-import { clearTokenSet, readTokenSet, writeTokenSet } from "./token-storage";
-import type { AuthUser, LoginInput, TokenSet } from "./types";
+import { signInWithFirebase, signInWithGoogle } from "./firebase";
+import type { AuthUser, RegisterInput, TokenResponse } from "./types";
 
-type AuthSessionValue = {
-  ready: boolean;
+type StoredTokens = Pick<TokenResponse, "accessToken" | "refreshToken">;
+
+type AuthSessionContextValue = {
+  accessToken: string | null;
+  isAuthenticated: boolean;
   pending: boolean;
-  error: string | null;
+  ready: boolean;
   user: AuthUser | null;
-  login: (input: LoginInput) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
+  register: (input: RegisterInput) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
   resetPassword: (token: string, newPassword: string) => Promise<void>;
 };
 
-const AuthSessionContext = createContext<AuthSessionValue | null>(null);
-const mockUser: AuthUser = { id: "mock-user", email: "demo@fire3d.local", fullName: "Minh Anh", role: 0, organizationId: null };
+const storageKey = "fire3d-auth-tokens";
+const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
 
-function userName(user: AuthUser) {
-  return user.fullName?.trim() || user.email;
+function readTokens(): StoredTokens | null {
+  try {
+    const raw = window.sessionStorage.getItem(storageKey);
+    if (!raw) return null;
+    const value: unknown = JSON.parse(raw);
+    if (typeof value !== "object" || value === null) return null;
+    const tokens = value as Record<string, unknown>;
+    return typeof tokens.accessToken === "string" && typeof tokens.refreshToken === "string"
+      ? { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistTokens(tokens: StoredTokens | null) {
+  try {
+    if (tokens) window.sessionStorage.setItem(storageKey, JSON.stringify(tokens));
+    else window.sessionStorage.removeItem(storageKey);
+  } catch {
+    // The session continues in memory when browser storage is unavailable.
+  }
+}
+
+function toMessage(error: unknown) {
+  if (error instanceof ApiError) return error.message;
+  if (error instanceof Error) return error.message;
+  return "Không thể hoàn tất xác thực. Vui lòng thử lại.";
 }
 
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
-  const demo = useDemoSession();
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [ready, setReady] = useState(false);
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const demoRef = useRef(demo);
+  const [ready, setReady] = useState(false);
 
-  useEffect(() => { demoRef.current = demo; }, [demo]);
+  const saveSession = useCallback((response: TokenResponse) => {
+    setAccessToken(response.accessToken);
+    setUser(response.user);
+    persistTokens({ accessToken: response.accessToken, refreshToken: response.refreshToken });
+  }, []);
+
+  const clearSession = useCallback(() => {
+    setAccessToken(null);
+    setUser(null);
+    persistTokens(null);
+  }, []);
 
   useEffect(() => {
     let active = true;
     const restore = async () => {
-      if (env.authMode === "mock") { if (active) setReady(true); return; }
-      const tokens = readTokenSet();
-      if (!tokens) { if (active) setReady(true); return; }
+      const tokens = readTokens();
+      if (!tokens) {
+        if (active) setReady(true);
+        return;
+      }
       try {
-        let currentTokens: TokenSet = tokens;
-        let currentUser: AuthUser;
-        try { currentUser = await authApi.me(currentTokens.accessToken); }
-        catch (cause) {
-          if (!(cause instanceof ApiError) || cause.status !== 401) throw cause;
-          const refreshed = await authApi.refresh(currentTokens.refreshToken);
-          currentTokens = refreshed;
-          writeTokenSet(refreshed);
-          currentUser = refreshed.user;
+        const currentUser = await authApi.me(tokens.accessToken);
+        if (!active) return;
+        setAccessToken(tokens.accessToken);
+        setUser(currentUser);
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 401) {
+          if (active) clearSession();
+          return;
         }
-        if (active) { setUser(currentUser); demoRef.current.beginAuthenticatedSession(userName(currentUser)); }
-      } catch { clearTokenSet(); }
-      finally { if (active) setReady(true); }
+        try {
+          const refreshed = await authApi.refresh(tokens.refreshToken);
+          if (active) saveSession(refreshed);
+        } catch {
+          if (active) clearSession();
+        }
+      } finally {
+        if (active) setReady(true);
+      }
     };
     void restore();
     return () => { active = false; };
+  }, [clearSession, saveSession]);
+
+  const login = useCallback(async (email: string, password: string) => {
+    try {
+      const firebaseIdToken = await signInWithFirebase(email, password);
+      saveSession(await authApi.loginFirebase(firebaseIdToken));
+    } catch (error) {
+      throw new Error(toMessage(error));
+    }
+  }, [saveSession]);
+
+  const loginWithGoogle = useCallback(async () => {
+    try {
+      const firebaseIdToken = await signInWithGoogle();
+      saveSession(await authApi.loginFirebase(firebaseIdToken));
+    } catch (error) {
+      throw new Error(toMessage(error));
+    }
+  }, [saveSession]);
+
+  const register = useCallback(async (input: RegisterInput) => {
+    try {
+      await authApi.register(input);
+      await login(input.email, input.password);
+    } catch (error) {
+      throw new Error(toMessage(error));
+    }
+  }, [login]);
+
+  const requestPasswordReset = useCallback(async (email: string) => {
+    setPending(true);
+    try {
+      await authApi.forgotPassword(email);
+    } catch (error) {
+      throw new Error(toMessage(error));
+    } finally {
+      setPending(false);
+    }
   }, []);
 
-  const value = useMemo<AuthSessionValue>(() => ({
-    ready,
+  const resetPassword = useCallback(async (token: string, newPassword: string) => {
+    setPending(true);
+    try {
+      await authApi.resetPassword(token, newPassword);
+    } catch (error) {
+      throw new Error(toMessage(error));
+    } finally {
+      setPending(false);
+    }
+  }, []);
+
+  const logout = useCallback(async () => {
+    const token = accessToken;
+    clearSession();
+    if (!token) return;
+    try {
+      await authApi.logout(token);
+    } catch {
+      // A local logout must succeed even if an expired token is rejected by the API.
+    }
+  }, [accessToken, clearSession]);
+
+  const value = useMemo<AuthSessionContextValue>(() => ({
+    accessToken,
+    isAuthenticated: !!user,
     pending,
-    error,
+    ready,
     user,
-    login: async (input) => {
-      setPending(true); setError(null);
-      try {
-        if (env.authMode === "mock") {
-          if (!demo.login(input.email, input.password)) throw new Error("Email hoặc mật khẩu mẫu chưa đúng.");
-          setUser(mockUser);
-          return true;
-        }
-        const response = await authApi.login(input);
-        writeTokenSet(response);
-        demo.beginAuthenticatedSession(userName(response.user));
-        setUser(response.user);
-        return true;
-      } catch (cause) {
-        setError(cause instanceof Error ? cause.message : "Không thể đăng nhập. Vui lòng thử lại.");
-        return false;
-      } finally { setPending(false); }
-    },
-    logout: async () => {
-      const tokens = env.authMode === "api" ? readTokenSet() : null;
-      clearTokenSet(); setUser(null); demo.logout();
-      if (tokens) { try { await authApi.logout(tokens.accessToken); } catch { /* local logout remains successful */ } }
-    },
-    requestPasswordReset: async (email) => {
-      if (env.authMode === "api") await authApi.forgotPassword(email);
-    },
-    resetPassword: async (token, newPassword) => {
-      if (env.authMode === "api") await authApi.resetPassword(token, newPassword);
-    },
-  }), [demo, error, pending, ready, user]);
+    login,
+    loginWithGoogle,
+    logout,
+    register,
+    requestPasswordReset,
+    resetPassword,
+  }), [accessToken, login, loginWithGoogle, logout, pending, ready, register, requestPasswordReset, resetPassword, user]);
 
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;
 }

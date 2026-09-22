@@ -1,26 +1,23 @@
+export type UserRole = 0 | 1 | 2;
+
 export type AuthUser = {
   id: string;
   email: string;
   fullName: string | null;
-  role: number;
+  role: UserRole;
   organizationId: string | null;
 };
 
-export type LoginInput = {
-  email: string;
-  password: string;
-};
-
-export type TokenSet = {
+export type TokenResponse = {
   accessToken: string;
   refreshToken: string;
-};
-
-export type LoginResponse = TokenSet & {
+  accessTokenExpiresAt: string;
+  refreshTokenExpiresAt: string;
   user: AuthUser;
 };
 
-export type TokenResponse = LoginResponse & {
-  accessTokenExpiresAt: string;
-  refreshTokenExpiresAt: string;
+export type RegisterInput = {
+  email: string;
+  password: string;
+  fullName: string;
 };
