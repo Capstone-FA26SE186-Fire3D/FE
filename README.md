@@ -13,6 +13,8 @@ Mở [http://localhost:5173](http://localhost:5173). RAG demo đọc `NEXT_PUBLI
 
 ## Kiểm tra
 
+CI/CD và thiết lập GitHub/Vercel: [hướng dẫn triển khai](docs/ci-cd.md).
+
 ```bash
 pnpm typecheck
 pnpm lint

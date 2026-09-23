@@ -1,0 +1,95 @@
+name: Deploy Vercel
+
+on:
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize the entire CI + deployment, not just the upload step.
+concurrency:
+  group: vercel-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: Release CI
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+      VERCEL_TELEMETRY_DISABLED: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+      DEPLOY_TARGET: ${{ github.ref == 'refs/heads/main' && 'production' || 'preview' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          for key in VERCEL_TOKEN VERCEL_ORG_ID VERCEL_PROJECT_ID; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing $key. See docs/ci-cd.md."
+              exit 1
+            fi
+          done
+      - name: Skip outdated commits
+        id: current
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/$GITHUB_REF_NAME" --jq '.object.sha')
+          if [ "$latest" = "$GITHUB_SHA" ]; then
+            echo 'deploy=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'Skipped: a newer commit is already on this branch.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'deploy=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install Vercel CLI
+        if: steps.current.outputs.deploy == 'true'
+        run: npm install --global vercel@59.25.4
+      - name: Pull environment and build
+        if: steps.current.outputs.deploy == 'true'
+        shell: bash
+        run: |
+          vercel pull --yes --environment="$DEPLOY_TARGET" --git-branch="$GITHUB_REF_NAME" --token="$VERCEL_TOKEN"
+          if [ "$DEPLOY_TARGET" = production ]; then
+            vercel build --prod --token="$VERCEL_TOKEN"
+          else
+            vercel build --token="$VERCEL_TOKEN"
+          fi
+      - name: Deploy prebuilt output
+        id: deploy
+        if: steps.current.outputs.deploy == 'true'
+        shell: bash
+        run: |
+          args=(--prebuilt --yes --token="$VERCEL_TOKEN")
+          if [ "$DEPLOY_TARGET" = production ]; then
+            args+=(--prod)
+          fi
+          url=$(vercel deploy "${args[@]}")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Deployment ($DEPLOY_TARGET): $url" >> "$GITHUB_STEP_SUMMARY"
+          echo "Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"

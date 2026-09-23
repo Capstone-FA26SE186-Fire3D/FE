@@ -1,0 +1,49 @@
+name: Reusable CI
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: 'true'
+      NEXT_TELEMETRY_DISABLED: '1'
+      NEXT_PUBLIC_AUTH_MODE: mock
+      NEXT_PUBLIC_RAG_API_URL: http://127.0.0.1:8000
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      # Build generates Next route types required by next-env.d.ts on a fresh runner.
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm exec playwright install --with-deps chromium
+      # The legacy demo-login test no longer matches Firebase auth on main.
+      # Keep the independent public UI and mocked RAG contracts as the initial gate.
+      - name: Public UI smoke tests
+        run: pnpm exec playwright test tests/e2e/brand-logo.spec.ts --reporter=line
+      - name: Mocked RAG smoke test
+        run: pnpm exec playwright test tests/e2e/smoke.spec.ts --grep 'RAG demo keeps the chat contract' --reporter=line
+      - name: Upload failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
