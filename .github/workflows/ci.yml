@@ -1,7 +1,11 @@
-name: Reusable CI
+name: CI
 
 on:
-  workflow_call:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
 
 permissions:
   contents: read
