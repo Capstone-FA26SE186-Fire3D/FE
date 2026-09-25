@@ -44,7 +44,11 @@ function errorMessage(payload: unknown, fallback: string): string {
     return payload.message;
   }
 
-  return typeof payload.detail === "string" ? payload.detail : fallback;
+  if (typeof payload.detail === "string") {
+    return payload.detail;
+  }
+
+  return typeof payload.title === "string" ? payload.title : fallback;
 }
 
 export const apiClient = {

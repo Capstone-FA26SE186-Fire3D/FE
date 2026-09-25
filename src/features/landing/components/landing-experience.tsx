@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowUpRight, Building2, Smartphone } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/layouts/site-header";
-import { useDemoSession } from "@/store/demo-session";
+import { useAuthSession } from "@/features/auth/auth-session";
 import { routes } from "@/configs/routes";
 import { setSceneHandoff } from "../handoff";
 import type { LandingBranch } from "../types";
@@ -21,7 +21,7 @@ const locations = ["Tầng trệt / hành lang phía đông", "Tầng trệt / k
 
 export function LandingExperience({ panels }: { panels: ReactNode[] }) {
   const router = useRouter();
-  const session = useDemoSession();
+  const session = useAuthSession();
   const journey = useRef<HTMLElement>(null);
   const input = useRef<JourneyInput>({ progress: 0, branch: null });
   const snapshot = useRef<(() => string) | null>(null);

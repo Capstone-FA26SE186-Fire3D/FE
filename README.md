@@ -11,6 +11,19 @@ pnpm dev
 
 Mở [http://localhost:5173](http://localhost:5173). RAG demo đọc `NEXT_PUBLIC_RAG_API_URL` từ `.env.local`; xem `.env.example` để bắt đầu.
 
+## Xác thực
+
+Mặc định web chạy `NEXT_PUBLIC_AUTH_MODE=mock`, dùng tài khoản trải nghiệm cục bộ và không gọi backend. Đây là chế độ phù hợp khi database chưa có tài khoản khởi tạo.
+
+Khi backend đã seed tài khoản, tạo `.env.local` với:
+
+```bash
+NEXT_PUBLIC_AUTH_MODE=api
+NEXT_PUBLIC_API_BASE_URL=https://fire3d-api-h3a5h2fgdvajfbcz.eastasia-01.azurewebsites.net
+```
+
+API mode gọi các endpoint Auth trong Swagger: login, refresh, logout, thông tin người dùng, quên mật khẩu và đặt lại mật khẩu. Frontend không có endpoint đăng ký và không thể tự tạo tài khoản được backend chấp nhận; PlatformAdmin đầu tiên phải do backend/database owner seed. Token chỉ được giữ trong `sessionStorage` của tab, không commit vào mã nguồn.
+
 ## Kiểm tra
 
 CI/CD và thiết lập GitHub/Vercel: [hướng dẫn triển khai](docs/ci-cd.md).
