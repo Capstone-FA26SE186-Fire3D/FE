@@ -151,6 +151,9 @@ button { cursor: pointer; }
 .account-detail p:first-child { color: var(--text); font-size: 17px; }
 .admin-card a { color: var(--ember); }
 .admin-card a:hover { text-decoration: underline; }
+.workspace-search { grid-template-columns: minmax(180px, 1fr) auto; align-items: end; margin-bottom: 18px; }
+.workspace-building-link { color: var(--text); font-weight: 600; }
+.workspace-building-link:hover { color: var(--ember); }
 
 @media (max-width: 900px) {
   .site-nav { display: none; }
@@ -180,7 +183,7 @@ button { cursor: pointer; }
   .login-panel { padding: 23px; }
   .hub-layout { grid-template-columns: 1fr; }
   .download-panel { padding: 20px; }
-  .admin-filters { grid-template-columns: 1fr; }
+  .admin-filters, .workspace-search { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
