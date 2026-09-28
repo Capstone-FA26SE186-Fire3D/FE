@@ -11,13 +11,26 @@ export type AuthUser = {
 export type TokenResponse = {
   accessToken: string;
   refreshToken: string;
-  accessTokenExpiresAt: string;
-  refreshTokenExpiresAt: string;
+  accessTokenExpiresAt?: string;
+  refreshTokenExpiresAt?: string;
   user: AuthUser;
 };
 
-export type RegisterInput = {
+type RegisterBaseInput = {
   email: string;
   password: string;
+  confirmPassword: string;
   fullName: string;
 };
+
+export type RegisterInput =
+  | (RegisterBaseInput & {
+      accountType: "trainee";
+      username: string;
+    })
+  | (RegisterBaseInput & {
+      accountType: "organization";
+      organizationName: string;
+      organizationAddress: string;
+      organizationPhoneNumber: string;
+    });

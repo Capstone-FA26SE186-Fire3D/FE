@@ -18,7 +18,13 @@ export function LoginForm() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [accountType, setAccountType] = useState<"trainee" | "organization">("trainee");
+  const [username, setUsername] = useState("");
+  const [organizationName, setOrganizationName] = useState("");
+  const [organizationAddress, setOrganizationAddress] = useState("");
+  const [organizationPhoneNumber, setOrganizationPhoneNumber] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -33,7 +39,13 @@ export function LoginForm() {
     setMessage("");
     setSubmitting(true);
     try {
-      if (mode === "register") await register({ email, password, fullName });
+      if (mode === "register") {
+        if (accountType === "organization") {
+          await register({ accountType, email, password, confirmPassword, fullName, organizationName, organizationAddress, organizationPhoneNumber });
+        } else {
+          await register({ accountType, email, password, confirmPassword, fullName, username: username.trim().toLowerCase() });
+        }
+      }
       else await login(email, password);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Không thể xác thực. Vui lòng thử lại.");
@@ -68,13 +80,21 @@ export function LoginForm() {
         <button type="button" role="tab" aria-selected={mode === "login"} onClick={() => { setMode("login"); setMessage(""); }}>Đăng nhập</button>
         <button type="button" role="tab" aria-selected={mode === "register"} onClick={() => { setMode("register"); setMessage(""); }}>Tạo tài khoản</button>
       </div>
-      <h1>{mode === "login" ? "Đăng nhập Firebase" : "Tạo tài khoản"}</h1>
-      <p id="auth-note">{mode === "login" ? "Dùng tài khoản Email/Password đã được bật trong Firebase Authentication." : "Mật khẩu cần từ 12 ký tự để đáp ứng yêu cầu của Fire3D."}</p>
-      {!hasFirebaseAuthConfig && <p className="auth-setup" role="status">Chưa cấu hình Firebase cho môi trường này.</p>}
-      {mode === "register" && <label className="form-field">Họ và tên<input required minLength={1} maxLength={200} value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" aria-invalid={!!message} /></label>}
+      <h1>{mode === "login" ? "Đăng nhập Fire3D" : "Tạo tài khoản"}</h1>
+      <p id="auth-note">{mode === "login" ? "Dùng email và mật khẩu Fire3D. Google là lựa chọn bổ sung khi môi trường đã cấu hình Firebase." : "Mật khẩu cần từ 12 ký tự để đáp ứng yêu cầu của Fire3D."}</p>
+      {mode === "register" && <>
+        <fieldset className="form-field"><legend>Loại tài khoản</legend><label><input type="radio" name="account-type" checked={accountType === "trainee"} onChange={() => setAccountType("trainee")} /> Học viên</label><label><input type="radio" name="account-type" checked={accountType === "organization"} onChange={() => setAccountType("organization")} /> Tổ chức</label></fieldset>
+        <label className="form-field">Họ và tên<input required minLength={1} maxLength={200} value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" aria-invalid={!!message} /></label>
+        {accountType === "trainee" ? <label className="form-field">Tên người dùng<input required minLength={3} maxLength={50} value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" aria-invalid={!!message} /></label> : <>
+          <label className="form-field">Tên tổ chức<input required maxLength={200} value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} aria-invalid={!!message} /></label>
+          <label className="form-field">Địa chỉ tổ chức<input required maxLength={500} value={organizationAddress} onChange={(event) => setOrganizationAddress(event.target.value)} aria-invalid={!!message} /></label>
+          <label className="form-field">Điện thoại tổ chức<input required maxLength={30} value={organizationPhoneNumber} onChange={(event) => setOrganizationPhoneNumber(event.target.value)} autoComplete="tel" aria-invalid={!!message} /></label>
+        </>}
+      </>}
       <label className="form-field">Email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" aria-invalid={!!message} /></label>
       <label className="form-field">Mật khẩu<input required minLength={12} maxLength={128} type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} aria-invalid={!!message} /></label>
-      <Button disabled={!ready || !hasFirebaseAuthConfig || submitting} className="form-submit" type="submit">{submitting ? "Đang xử lý…" : mode === "login" ? "Đăng nhập" : "Tạo tài khoản"}</Button>
+      {mode === "register" && <label className="form-field">Xác nhận mật khẩu<input required minLength={12} maxLength={128} type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" aria-invalid={!!message} /></label>}
+      <Button disabled={!ready || submitting} className="form-submit" type="submit">{submitting ? "Đang xử lý…" : mode === "login" ? "Đăng nhập" : "Tạo tài khoản"}</Button>
       {mode === "login" && <Button disabled={!ready || !hasFirebaseAuthConfig || submitting} className="google-sign-in" type="button" variant="secondary" onClick={() => void submitGoogle()}><GoogleIcon /> Tiếp tục với Google</Button>}
       {message && <p role="alert" aria-label="Lỗi xác thực" className="form-message">{message}</p>}
     </form>

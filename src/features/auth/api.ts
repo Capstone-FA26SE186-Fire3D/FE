@@ -6,11 +6,36 @@ function bearer(accessToken: string): HeadersInit {
 }
 
 export const authApi = {
+  login(email: string, password: string) {
+    return apiClient.request<TokenResponse>("/api/auth/login", { json: { email, password } });
+  },
   loginFirebase(firebaseIdToken: string) {
     return apiClient.request<TokenResponse>("/api/auth/login-firebase", { json: firebaseIdToken });
   },
   register(input: RegisterInput) {
-    return apiClient.request<AuthUser>("/api/auth/register", { json: input });
+    if (input.accountType === "organization") {
+      return apiClient.request<AuthUser>("/api/auth/register/organization", {
+        json: {
+          email: input.email,
+          password: input.password,
+          confirmPassword: input.confirmPassword,
+          fullName: input.fullName,
+          organizationName: input.organizationName,
+          organizationAddress: input.organizationAddress,
+          organizationPhoneNumber: input.organizationPhoneNumber,
+        },
+      });
+    }
+
+    return apiClient.request<AuthUser>("/api/auth/register/trainee", {
+      json: {
+        email: input.email,
+        password: input.password,
+        confirmPassword: input.confirmPassword,
+        fullName: input.fullName,
+        username: input.username,
+      },
+    });
   },
   refresh(refreshToken: string) {
     return apiClient.request<TokenResponse>("/api/auth/refresh", { json: { refreshToken } });

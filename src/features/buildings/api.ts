@@ -2,6 +2,7 @@ import { apiClient } from "@/api/client";
 
 import type {
   Building,
+  BimFactPage,
   BuildingFilters,
   BuildingInput,
   BuildingPage,
@@ -11,6 +12,10 @@ import type {
   InitiatedIfcUpload,
   InitiateIfcUploadInput,
   RevisionPage,
+  RevisionIssuePage,
+  ProcessingJobPage,
+  AnnotationItem,
+  AnnotationSnapshot,
 } from "./types";
 
 function headers(accessToken: string): HeadersInit {
@@ -68,6 +73,42 @@ export const buildingsApi = {
     return apiClient.request<EditorPreview>(`/api/buildings/${buildingId}/editor-preview`, {
       headers: headers(accessToken),
       query: { revisionId },
+    });
+  },
+  processRevision(accessToken: string, revisionId: string) {
+    return apiClient.request<void>(`/api/revisions/${revisionId}/process`, {
+      headers: headers(accessToken),
+      method: "POST",
+    });
+  },
+  listProcessingJobs(accessToken: string, revisionId: string) {
+    return apiClient.request<ProcessingJobPage>(`/api/revisions/${revisionId}/processing-jobs`, {
+      headers: headers(accessToken),
+      query: { page: 1, pageSize: 20 },
+    });
+  },
+  listIssues(accessToken: string, revisionId: string) {
+    return apiClient.request<RevisionIssuePage>(`/api/revisions/${revisionId}/issues`, {
+      headers: headers(accessToken),
+      query: { page: 1, pageSize: 50 },
+    });
+  },
+  listBimFacts(accessToken: string, revisionId: string) {
+    return apiClient.request<BimFactPage>(`/api/revisions/${revisionId}/bim-facts`, {
+      headers: headers(accessToken),
+      query: { page: 1, pageSize: 50 },
+    });
+  },
+  getAnnotations(accessToken: string, revisionId: string) {
+    return apiClient.request<AnnotationSnapshot>(`/api/revisions/${revisionId}/annotations`, {
+      headers: headers(accessToken),
+    });
+  },
+  saveAnnotations(accessToken: string, revisionId: string, items: AnnotationItem[], eTag: string) {
+    return apiClient.request<AnnotationSnapshot>(`/api/revisions/${revisionId}/annotations`, {
+      headers: { ...headers(accessToken), "If-Match": eTag },
+      json: { items },
+      method: "PUT",
     });
   },
 };

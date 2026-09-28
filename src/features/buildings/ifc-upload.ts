@@ -22,3 +22,52 @@ export async function putIfcObject(uploadUrl: string, file: File, fetchImpl: typ
     throw new Error("Không thể tải IFC lên kho lưu trữ.");
   }
 }
+
+type InitiatedUpload = {
+  revisionId: string;
+  uploadUrl: string;
+  objectKey: string;
+};
+
+type FinalizeUpload = {
+  objectKey: string;
+  fileSizeBytes: number;
+  mimeType: string;
+  sha256Hash: string;
+  originalFilename: string;
+};
+
+export async function uploadIfcRevision({
+  file,
+  versionLabel,
+  initiate,
+  finalize,
+  put = putIfcObject,
+}: {
+  file: File;
+  versionLabel: string;
+  initiate: (input: { fileSizeBytes: number; originalFilename: string; versionLabel: string }) => Promise<InitiatedUpload>;
+  finalize: (revisionId: string, input: FinalizeUpload) => Promise<void>;
+  put?: (uploadUrl: string, file: File) => Promise<void>;
+}): Promise<{ revisionId: string }> {
+  const fileError = validateIfcFile(file);
+  if (fileError) throw new Error(fileError);
+
+  const initiated = await initiate({
+    fileSizeBytes: file.size,
+    originalFilename: file.name,
+    versionLabel,
+  });
+  const sha256Hash = await sha256Hex(await file.arrayBuffer());
+
+  await put(initiated.uploadUrl, file);
+  await finalize(initiated.revisionId, {
+    objectKey: initiated.objectKey,
+    fileSizeBytes: file.size,
+    mimeType: file.type || "application/octet-stream",
+    sha256Hash,
+    originalFilename: file.name,
+  });
+
+  return { revisionId: initiated.revisionId };
+}

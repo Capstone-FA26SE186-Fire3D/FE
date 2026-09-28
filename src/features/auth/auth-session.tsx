@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ApiError } from "@/api/types/common";
 import { authApi } from "./api";
-import { signInWithFirebase, signInWithGoogle } from "./firebase";
+import { signInWithGoogle } from "./firebase";
 import type { AuthUser, RegisterInput, TokenResponse } from "./types";
 
 type StoredTokens = Pick<TokenResponse, "accessToken" | "refreshToken">;
@@ -107,8 +107,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     try {
-      const firebaseIdToken = await signInWithFirebase(email, password);
-      saveSession(await authApi.loginFirebase(firebaseIdToken));
+      saveSession(await authApi.login(email, password));
     } catch (error) {
       throw new Error(toMessage(error));
     }

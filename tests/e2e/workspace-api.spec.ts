@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { putIfcObject, sha256Hex, validateIfcFile } from "../../src/features/buildings/ifc-upload";
+import { putIfcObject, sha256Hex, uploadIfcRevision, validateIfcFile } from "../../src/features/buildings/ifc-upload";
 
 test("accepts a non-empty IFC file and produces lowercase SHA-256 hex", async () => {
   const file = new File(["IFC"], "school.ifc", { type: "application/octet-stream" });
@@ -30,4 +30,21 @@ test("rejects a failed signed upload", async () => {
   await expect(
     putIfcObject("https://storage.example/upload", new File(["IFC"], "school.ifc"), async () => new Response(null, { status: 403 })),
   ).rejects.toThrow("Không thể tải IFC lên kho lưu trữ.");
+});
+
+test("stops before finalize when the signed object upload fails", async () => {
+  const file = new File(["IFC"], "school.ifc", { type: "application/octet-stream" });
+  let finalized = false;
+
+  await expect(
+    uploadIfcRevision({
+      file,
+      versionLabel: "v1",
+      initiate: async () => ({ revisionId: "revision-1", uploadUrl: "https://storage.example/upload", objectKey: "private-key" }),
+      finalize: async () => { finalized = true; },
+      put: async () => { throw new Error("Không thể tải IFC lên kho lưu trữ."); },
+    }),
+  ).rejects.toThrow("Không thể tải IFC lên kho lưu trữ.");
+
+  expect(finalized).toBe(false);
 });

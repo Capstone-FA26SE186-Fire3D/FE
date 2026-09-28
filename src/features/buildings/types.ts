@@ -100,5 +100,59 @@ export type EditorPreview = {
   semanticMapping: unknown | null;
 };
 
+export type ProcessingJob = {
+  id: string;
+  revisionId: string;
+  sourceDocumentId: string;
+  scenarioVersionId: string | null;
+  kind: string;
+  status: string;
+  createdAt: string;
+};
+
+export type RevisionIssue = {
+  id: string;
+  revisionId: string;
+  issueCode: string;
+  severity: string;
+  status: string;
+  message: string;
+  isCurrentAttempt: boolean;
+  createdAt: string;
+};
+
+export type BimFact = {
+  id: string;
+  revisionId: string;
+  ifcGlobalId: string;
+  entityType: string;
+  propertyPath: string;
+  value: unknown;
+  sourceHash: string;
+  qualityFlags: unknown;
+  createdAt: string;
+};
+
+export type AnnotationItem = {
+  id: string;
+  ifcGlobalId: string;
+  label: string;
+  note: string | null;
+};
+
+export type AnnotationSnapshot = {
+  revisionId: string;
+  id: string | null;
+  version: number;
+  data: { items: AnnotationItem[] };
+  provenance: string | null;
+  createdBy: string | null;
+  createdAt: string | null;
+  eTag: string | null;
+};
+
 export type BuildingPage = PageResponse<BuildingSummary>;
 export type RevisionPage = PageResponse<BuildingRevision>;
+export type ProcessingJobPage = PageResponse<ProcessingJob>;
+export type RevisionIssuePage = PageResponse<RevisionIssue>;
+export type BimFactPage = PageResponse<BimFact>;
