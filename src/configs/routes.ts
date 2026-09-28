@@ -13,6 +13,7 @@ export const routes = {
   adminAccounts: "/admin/accounts",
   adminOrganizations: "/admin/organizations",
   workspaceBuildings: "/workspace/buildings",
+  workspaceIfc: "/workspace/ifc",
 } as const;
 
 export type RouteKey = keyof typeof routes;
