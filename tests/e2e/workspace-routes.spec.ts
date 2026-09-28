@@ -45,3 +45,19 @@ test("allows an OrganizationUser to open the browser-only IFC scanner", async ({
   await expect(page.getByLabel("Chọn tệp IFC")).toHaveAttribute("accept", ".ifc");
   await expect(page.getByText("File chỉ được xử lý trong trình duyệt này.")).toBeVisible();
 });
+
+test("keeps an OrganizationUser IFC file local before backend revisions exist", async ({ page }) => {
+  const token = "organization-access-token";
+  const user = { id: "organization-1", email: "owner@fire3d.test", fullName: "Organization User", role: 1, organizationId: "org-1" };
+  const apiRequests: string[] = [];
+  await page.addInitScript((stored) => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify(stored)), { accessToken: token, refreshToken: "refresh-token" });
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user }));
+  page.on("request", (request) => {
+    if (request.url().includes("/api/buildings") || request.url().includes("/revisions")) apiRequests.push(request.url());
+  });
+
+  await page.goto("/workspace/ifc");
+  await page.getByLabel("Chọn tệp IFC").setInputFiles({ name: "not-a-model.txt", mimeType: "text/plain", buffer: Buffer.from("not an IFC model") });
+  await expect(page.getByText("Hãy chọn một tệp IFC (.ifc) không rỗng.")).toBeVisible();
+  expect(apiRequests).toEqual([]);
+});
