@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Building2, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { hasFirebaseAuthConfig } from "@/configs/env";
 import { routes } from "@/configs/routes";
@@ -83,7 +84,21 @@ export function LoginForm() {
       <h1>{mode === "login" ? "Đăng nhập Fire3D" : "Tạo tài khoản"}</h1>
       <p id="auth-note">{mode === "login" ? "Dùng email và mật khẩu Fire3D. Google là lựa chọn bổ sung khi môi trường đã cấu hình Firebase." : "Mật khẩu cần từ 12 ký tự để đáp ứng yêu cầu của Fire3D."}</p>
       {mode === "register" && <>
-        <fieldset className="form-field"><legend>Loại tài khoản</legend><label><input type="radio" name="account-type" checked={accountType === "trainee"} onChange={() => setAccountType("trainee")} /> Học viên</label><label><input type="radio" name="account-type" checked={accountType === "organization"} onChange={() => setAccountType("organization")} /> Tổ chức</label></fieldset>
+        <fieldset className="account-type-fieldset">
+          <legend>Loại tài khoản</legend>
+          <div className="account-type-options">
+            <label className={`account-type-card ${accountType === "trainee" ? "is-selected" : ""}`}>
+              <UserRound aria-hidden="true" size={20} strokeWidth={1.7} />
+              <span className="account-type-copy"><strong>Học viên</strong><small>Học kiến thức và tham gia tập huấn.</small></span>
+              <input className="account-type-radio" type="radio" name="account-type" checked={accountType === "trainee"} onChange={() => setAccountType("trainee")} />
+            </label>
+            <label className={`account-type-card ${accountType === "organization" ? "is-selected" : ""}`}>
+              <Building2 aria-hidden="true" size={20} strokeWidth={1.7} />
+              <span className="account-type-copy"><strong>Tổ chức</strong><small>Quản lý BIM, IFC và kịch bản diễn tập.</small></span>
+              <input className="account-type-radio" type="radio" name="account-type" checked={accountType === "organization"} onChange={() => setAccountType("organization")} />
+            </label>
+          </div>
+        </fieldset>
         <label className="form-field">Họ và tên<input required minLength={1} maxLength={200} value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" aria-invalid={!!message} /></label>
         {accountType === "trainee" ? <label className="form-field">Tên người dùng<input required minLength={3} maxLength={50} value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" aria-invalid={!!message} /></label> : <>
           <label className="form-field">Tên tổ chức<input required maxLength={200} value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} aria-invalid={!!message} /></label>
