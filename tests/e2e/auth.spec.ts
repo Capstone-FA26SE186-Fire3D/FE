@@ -57,6 +57,18 @@ test("trainee registration uses the current VPS contract before creating a sessi
   });
 });
 
+test("registration presents account types as descriptive selection cards", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByRole("tab", { name: "Tạo tài khoản" }).click();
+
+  await expect(page.getByText("Học kiến thức và tham gia tập huấn.")).toBeVisible();
+  await expect(page.getByText("Quản lý BIM, IFC và kịch bản diễn tập.")).toBeVisible();
+  await expect(page.getByRole("radio", { name: /Học viên/ })).toBeChecked();
+
+  await page.getByRole("radio", { name: /Tổ chức/ }).check();
+  await expect(page.getByRole("radio", { name: /Tổ chức/ })).toBeChecked();
+});
+
 test("accounts administration is protected before rendering account data", async ({ page }) => {
   await page.goto("/admin/accounts");
 

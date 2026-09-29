@@ -97,6 +97,20 @@ button { cursor: pointer; }
 .form-field { display: grid; gap: 7px; margin: 13px 0; color: var(--muted); font-size: 12px; }
 .form-field input { min-height: 45px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-soft); color: var(--text); outline: 0; }
 .form-field input:focus { border-color: var(--ember); }
+.account-type-fieldset { margin: 20px 0 16px; padding: 0; border: 0; }
+.account-type-fieldset legend { padding: 0; margin-bottom: 10px; color: var(--muted); font-size: 12px; }
+.account-type-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.account-type-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: start; min-height: 106px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-soft); color: var(--muted); cursor: pointer; transition: border-color .2s ease, background-color .2s ease, transform .2s ease; }
+.account-type-card:hover { border-color: var(--line-strong); transform: translateY(-1px); }
+.account-type-card:focus-within { border-color: var(--ember); }
+.account-type-card.is-selected { border-color: var(--ember); background: linear-gradient(145deg, rgba(238,134,84,.14), transparent 72%), var(--bg-soft); }
+.account-type-card svg { margin-top: 1px; color: var(--muted); }
+.account-type-card.is-selected svg, .account-type-card.is-selected strong { color: var(--text); }
+.account-type-copy { display: grid; gap: 5px; min-width: 0; }
+.account-type-copy strong { color: var(--text); font-size: 14px; font-weight: 600; }
+.account-type-copy small { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.account-type-radio { appearance: none; width: 17px; height: 17px; margin: 1px 0 0; border: 1px solid var(--line-strong); border-radius: 50%; background: transparent; cursor: pointer; }
+.account-type-radio:checked { border: 5px solid var(--ember); }
 .form-submit { width: 100%; margin-top: 10px; }
 .google-sign-in { width: 100%; margin-top: 10px; }
 .google-icon { width: 18px; height: 18px; flex: 0 0 auto; }
@@ -182,6 +196,7 @@ button { cursor: pointer; }
   .article-body { font-size: 16px; }
   .login-shell { min-height: auto; padding-top: 25px; }
   .login-panel { padding: 23px; }
+  .account-type-options { grid-template-columns: 1fr; }
   .hub-layout { grid-template-columns: 1fr; }
   .download-panel { padding: 20px; }
   .admin-filters, .workspace-search { grid-template-columns: 1fr; }
