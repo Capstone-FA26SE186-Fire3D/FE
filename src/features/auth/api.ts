@@ -1,6 +1,11 @@
 import { apiClient } from "@/api/client";
 import type { AuthUser, RegisterInput, TokenResponse } from "./types";
 
+type FirebaseLoginResponse = {
+  status: "Authenticated" | "OnboardingRequired";
+  authentication: TokenResponse | null;
+};
+
 function bearer(accessToken: string): HeadersInit {
   return { Authorization: `Bearer ${accessToken}` };
 }
@@ -9,8 +14,10 @@ export const authApi = {
   login(email: string, password: string) {
     return apiClient.request<TokenResponse>("/api/auth/login", { json: { email, password } });
   },
-  loginFirebase(firebaseIdToken: string) {
-    return apiClient.request<TokenResponse>("/api/auth/login-firebase", { json: firebaseIdToken });
+  async loginFirebase(firebaseIdToken: string) {
+    const response = await apiClient.request<FirebaseLoginResponse>("/api/auth/login-firebase", { json: firebaseIdToken });
+    if (response.status === "Authenticated" && response.authentication) return response.authentication;
+    throw new Error(response.status);
   },
   register(input: RegisterInput) {
     if (input.accountType === "organization") {

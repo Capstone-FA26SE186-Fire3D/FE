@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { authApi } from "../../src/features/auth/api";
 
 test("login screen uses a Fire3D password session and keeps Google optional", async ({ page }) => {
   await page.goto("/login");
@@ -28,6 +29,69 @@ test("password login posts credentials directly to the Fire3D API", async ({ pag
   await page.getByRole("button", { name: "Đăng nhập" }).click();
 
   await expect.poll(() => payload).toEqual({ email: "owner@fire3d.test", password: "safe-password-123" });
+});
+
+test("login displays the backend ProblemDetails message unchanged", async ({ page }) => {
+  await page.route("**/api/auth/login", (route) => route.fulfill({
+    status: 403,
+    contentType: "application/problem+json",
+    body: JSON.stringify({
+      title: "Verify your email before signing in.",
+      detail: "Check the fields listed below.",
+      code: "EMAIL_NOT_VERIFIED",
+    }),
+  }));
+
+  await page.goto("/login");
+  await page.getByLabel("Email").fill("pending@fire3d.test");
+  await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
+  await page.getByRole("button", { name: "Đăng nhập" }).click();
+
+  await expect(page.getByText("Thông báo từ Fire3D")).toBeVisible();
+  await expect(page.getByRole("alert", { name: "Lỗi xác thực" })).toContainText("Verify your email before signing in.");
+  await expect
+    .poll(() => page.locator(".form-message").evaluate((node) => node.previousElementSibling?.id))
+    .toBe("auth-note");
+});
+
+test("header shows the personal account state for a restored Fire3D session", async ({ page }) => {
+  const user = {
+    id: "trainee-test",
+    email: "trainee@fire3d.test",
+    fullName: "Người dùng thử",
+    role: 2,
+    organizationId: null,
+  };
+
+  await page.addInitScript((tokens) => {
+    sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify(tokens));
+  }, { accessToken: "test-access-token", refreshToken: "test-refresh-token" });
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user }));
+
+  await page.goto("/learning-hub");
+
+  await expect(
+    page.getByRole("button", { name: "Mở menu tài khoản của Người dùng thử" }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: "Đăng nhập", exact: true })).toHaveCount(0);
+});
+
+test("Google login unwraps the authenticated session returned by Fire3D", async () => {
+  const authentication = {
+    accessToken: "access-token",
+    refreshToken: "refresh-token",
+    user: { id: "trainee-test", email: "trainee@fire3d.test", fullName: "Người dùng thử", role: 2 as const, organizationId: null },
+  };
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify({ status: "Authenticated", authentication }), {
+    headers: { "content-type": "application/json" },
+  });
+
+  try {
+    await expect(authApi.loginFirebase("firebase-id-token")).resolves.toEqual(authentication);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("trainee registration uses the current VPS contract before creating a session", async ({ page }) => {

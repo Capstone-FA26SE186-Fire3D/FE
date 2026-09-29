@@ -31,8 +31,8 @@ async function readResponseBody(response: Response): Promise<unknown> {
     return undefined;
   }
 
-  const contentType = response.headers.get("content-type") ?? "";
-  return contentType.includes("application/json") ? response.json() : response.text();
+  const mediaType = (response.headers.get("content-type") ?? "").split(";", 1)[0].trim().toLowerCase();
+  return mediaType === "application/json" || mediaType.endsWith("+json") ? response.json() : response.text();
 }
 
 function errorMessage(payload: unknown, fallback: string): string {
@@ -44,11 +44,11 @@ function errorMessage(payload: unknown, fallback: string): string {
     return payload.message;
   }
 
-  if (typeof payload.detail === "string") {
-    return payload.detail;
+  if (typeof payload.title === "string") {
+    return payload.title;
   }
 
-  return typeof payload.title === "string" ? payload.title : fallback;
+  return typeof payload.detail === "string" ? payload.detail : fallback;
 }
 
 export const apiClient = {
