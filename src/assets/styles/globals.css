@@ -114,7 +114,10 @@ button { cursor: pointer; }
 .form-submit { width: 100%; margin-top: 10px; }
 .google-sign-in { width: 100%; margin-top: 10px; }
 .google-icon { width: 18px; height: 18px; flex: 0 0 auto; }
-.form-message { margin: 14px 0 0; color: var(--ember); font-size: 12px; }
+.form-message { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; margin: 14px 0 0; padding: 12px; border: 1px solid rgba(238,134,84,.48); border-left: 3px solid var(--ember); border-radius: 8px; background: rgba(238,134,84,.09); color: var(--text); font-size: 13px; line-height: 1.5; }
+.form-message svg { margin-top: 1px; color: var(--ember); }
+.form-message strong { display: block; margin-bottom: 2px; color: var(--ember); font-size: 11px; letter-spacing: .05em; text-transform: uppercase; }
+.form-message p { margin: 0; }
 .hub-layout { display: grid; grid-template-columns: 1fr .75fr; gap: 18px; }
 .hub-main, .hub-side { display: grid; gap: 18px; align-content: start; }
 .hub-card { padding: 23px; }

@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Building2, UserRound } from "lucide-react";
+import { Building2, CircleAlert, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { hasFirebaseAuthConfig } from "@/configs/env";
 import { routes } from "@/configs/routes";
@@ -83,6 +83,7 @@ export function LoginForm() {
       </div>
       <h1>{mode === "login" ? "Đăng nhập Fire3D" : "Tạo tài khoản"}</h1>
       <p id="auth-note">{mode === "login" ? "Dùng email và mật khẩu Fire3D. Google là lựa chọn bổ sung khi môi trường đã cấu hình Firebase." : "Mật khẩu cần từ 12 ký tự để đáp ứng yêu cầu của Fire3D."}</p>
+      {message && <div role="alert" aria-label="Lỗi xác thực" className="form-message"><CircleAlert aria-hidden="true" size={18} /><div><strong>Thông báo từ Fire3D</strong><p>{message}</p></div></div>}
       {mode === "register" && <>
         <fieldset className="account-type-fieldset">
           <legend>Loại tài khoản</legend>
@@ -111,7 +112,6 @@ export function LoginForm() {
       {mode === "register" && <label className="form-field">Xác nhận mật khẩu<input required minLength={12} maxLength={128} type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" aria-invalid={!!message} /></label>}
       <Button disabled={!ready || submitting} className="form-submit" type="submit">{submitting ? "Đang xử lý…" : mode === "login" ? "Đăng nhập" : "Tạo tài khoản"}</Button>
       {mode === "login" && <Button disabled={!ready || !hasFirebaseAuthConfig || submitting} className="google-sign-in" type="button" variant="secondary" onClick={() => void submitGoogle()}><GoogleIcon /> Tiếp tục với Google</Button>}
-      {message && <p role="alert" aria-label="Lỗi xác thực" className="form-message">{message}</p>}
     </form>
   );
 }
