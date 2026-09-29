@@ -11,6 +11,9 @@ export const routes = {
   download: "/download",
   rag: "/demo/rag",
   adminAccounts: "/admin/accounts",
+  adminOrganizations: "/admin/organizations",
+  workspaceBuildings: "/workspace/buildings",
+  workspaceIfc: "/workspace/ifc",
 } as const;
 
 export type RouteKey = keyof typeof routes;

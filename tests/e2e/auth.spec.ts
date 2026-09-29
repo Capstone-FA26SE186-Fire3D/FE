@@ -1,11 +1,60 @@
 import { expect, test } from "@playwright/test";
 
-test("login screen removes demo credentials and exposes Google sign-in", async ({ page }) => {
+test("login screen uses a Fire3D password session and keeps Google optional", async ({ page }) => {
   await page.goto("/login");
 
-  await expect(page.getByText("Đăng nhập Firebase")).toBeVisible();
+  await expect(page.getByText("Đăng nhập Fire3D")).toBeVisible();
   await expect(page.getByText("Tài khoản trải nghiệm")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Tiếp tục với Google" })).toBeVisible();
+});
+
+test("password login posts credentials directly to the Fire3D API", async ({ page }) => {
+  let payload: unknown;
+
+  await page.route("**/api/auth/login", async (route) => {
+    payload = route.request().postDataJSON();
+    await route.fulfill({
+      json: {
+        accessToken: "access-token",
+        refreshToken: "refresh-token",
+        user: { id: "org-user", email: "owner@fire3d.test", fullName: "Owner", role: 1, organizationId: "org-1" },
+      },
+    });
+  });
+
+  await page.goto("/login?next=/workspace/buildings");
+  await page.getByLabel("Email").fill("owner@fire3d.test");
+  await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
+  await page.getByRole("button", { name: "Đăng nhập" }).click();
+
+  await expect.poll(() => payload).toEqual({ email: "owner@fire3d.test", password: "safe-password-123" });
+});
+
+test("trainee registration uses the current VPS contract before creating a session", async ({ page }) => {
+  let payload: unknown;
+
+  await page.route("**/api/auth/register/trainee", async (route) => {
+    payload = route.request().postDataJSON();
+    await route.fulfill({ status: 201, json: { id: "trainee-1" } });
+  });
+  await page.route("**/api/auth/login", (route) => route.fulfill({ json: { accessToken: "access", refreshToken: "refresh", user: { id: "trainee-1", email: "trainee@fire3d.test", fullName: "Trainee", role: 2, organizationId: null } } }));
+
+  await page.goto("/login");
+  await page.getByRole("tab", { name: "Tạo tài khoản" }).click();
+  await page.getByLabel("Họ và tên").fill("Trainee Test");
+  await page.getByLabel("Tên người dùng").fill("Trainee_Test");
+  await page.getByLabel("Email").fill("trainee@fire3d.test");
+  await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
+  await page.getByLabel("Xác nhận mật khẩu").fill("safe-password-123");
+  await page.getByRole("button", { name: "Tạo tài khoản" }).click();
+
+  await expect.poll(() => payload).toEqual({
+    email: "trainee@fire3d.test",
+    password: "safe-password-123",
+    confirmPassword: "safe-password-123",
+    fullName: "Trainee Test",
+    username: "trainee_test",
+  });
 });
 
 test("accounts administration is protected before rendering account data", async ({ page }) => {
