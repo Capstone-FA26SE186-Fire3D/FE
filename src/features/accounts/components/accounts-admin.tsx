@@ -24,7 +24,7 @@ function roleLabel(role: UserRole) {
   return roles.find((item) => item.value === role)?.label ?? "Không xác định";
 }
 
-export function AccountsAdmin() {
+export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizationId?: string }) {
   const { accessToken, isAuthenticated, ready, user } = useAuthSession();
   const [accounts, setAccounts] = useState<ManagedAccount[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -39,8 +39,8 @@ export function AccountsAdmin() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
-  const [newRole, setNewRole] = useState<UserRole>(2);
-  const [organizationId, setOrganizationId] = useState("");
+  const [newRole, setNewRole] = useState<UserRole>(() => initialOrganizationId ? 1 : 2);
+  const [organizationId, setOrganizationId] = useState(initialOrganizationId);
 
   const load = useCallback(async () => {
     if (!accessToken) return;

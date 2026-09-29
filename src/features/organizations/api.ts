@@ -19,6 +19,11 @@ export const organizationsApi = {
       json: input,
     });
   },
+  get(accessToken: string, id: string) {
+    return apiClient.request<Organization>(`/api/organizations/${id}`, {
+      headers: headers(accessToken),
+    });
+  },
   setStatus(accessToken: string, id: string, isActive: boolean) {
     return apiClient.request<Organization>(`/api/organizations/${id}/status`, {
       headers: headers(accessToken),
