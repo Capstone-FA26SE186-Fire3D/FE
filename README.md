@@ -26,6 +26,8 @@ API mode gọi các endpoint Auth trong Swagger: login, refresh, logout, thông 
 
 ## Kiểm tra
 
+CI/CD và thiết lập GitHub/Vercel: [hướng dẫn triển khai](docs/ci-cd.md).
+
 ```bash
 pnpm typecheck
 pnpm lint
