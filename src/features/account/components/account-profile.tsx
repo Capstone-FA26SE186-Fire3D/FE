@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormE
 import { Camera, CircleAlert, LogOut, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { PasswordInput } from "@/components/ui/password-input";
 import { routes } from "@/configs/routes";
 import { authApi } from "@/features/auth/api";
 import { useAuthSession } from "@/features/auth/auth-session";
@@ -202,9 +203,9 @@ export function AccountProfile() {
       <Button type="submit" disabled={savingOrganization || loading || !organizationEtag}>{savingOrganization ? "Đang lưu…" : "Lưu hồ sơ tổ chức"}</Button>
     </form></Card>}
     <Card className="account-card"><h2>Bảo mật</h2><p className="account-card-copy">Đổi mật khẩu sẽ thu hồi mọi phiên Fire3D, sau đó bạn sẽ đăng nhập lại.</p><form className="account-form" onSubmit={changePassword}>
-      <label>Mật khẩu hiện tại<input aria-label="Mật khẩu hiện tại" type="password" autoComplete="current-password" required maxLength={128} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} /></label>
-      <label>Mật khẩu mới<input aria-label="Mật khẩu mới" type="password" autoComplete="new-password" required minLength={6} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} /></label>
-      <label>Xác nhận mật khẩu mới<input aria-label="Xác nhận mật khẩu mới" type="password" autoComplete="new-password" required minLength={6} maxLength={128} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></label>
+      <label>Mật khẩu hiện tại<PasswordInput aria-label="Mật khẩu hiện tại" visibilityLabel="mật khẩu hiện tại" autoComplete="current-password" required maxLength={128} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} /></label>
+      <label>Mật khẩu mới<PasswordInput aria-label="Mật khẩu mới" visibilityLabel="mật khẩu mới" autoComplete="new-password" required minLength={6} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} /></label>
+      <label>Xác nhận mật khẩu mới<PasswordInput aria-label="Xác nhận mật khẩu mới" visibilityLabel="xác nhận mật khẩu mới" autoComplete="new-password" required minLength={6} maxLength={128} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></label>
       <Button type="submit" disabled={savingPassword}>{savingPassword ? "Đang đổi mật khẩu…" : "Đổi mật khẩu"}</Button>
     </form></Card>
     <Button variant="secondary" onClick={() => void logout()}><LogOut size={16} /> Đăng xuất</Button>

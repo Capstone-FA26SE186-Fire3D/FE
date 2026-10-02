@@ -120,7 +120,7 @@ test("trainee registration verifies an OTP before creating an account", async ({
   await page.getByLabel("Tên người dùng").fill("Trainee_Test");
   await page.getByLabel("Email", { exact: true }).fill("trainee@fire3d.test");
   await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
-  await page.getByLabel("Xác nhận mật khẩu").fill("safe-password-123");
+  await page.getByLabel("Xác nhận mật khẩu", { exact: true }).fill("safe-password-123");
   await page.getByRole("button", { name: "Gửi mã OTP" }).click();
 
   await expect.poll(() => otpRequestPayload).toEqual({ email: "trainee@fire3d.test" });
@@ -155,7 +155,7 @@ test("registration can resend an OTP and clears the previous code", async ({ pag
   await page.getByLabel("Tên người dùng").fill("trainee_test");
   await page.getByLabel("Email", { exact: true }).fill("trainee@fire3d.test");
   await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
-  await page.getByLabel("Xác nhận mật khẩu").fill("safe-password-123");
+  await page.getByLabel("Xác nhận mật khẩu", { exact: true }).fill("safe-password-123");
   await page.getByRole("button", { name: "Gửi mã OTP" }).click();
   await page.getByLabel("Mã OTP").fill("123456");
 
@@ -214,7 +214,7 @@ test("organization registration includes the verified OTP proof", async ({ page 
   await page.getByLabel("Điện thoại tổ chức").fill("+84123456789");
   await page.getByLabel("Email", { exact: true }).fill("owner@fire3d.test");
   await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
-  await page.getByLabel("Xác nhận mật khẩu").fill("safe-password-123");
+  await page.getByLabel("Xác nhận mật khẩu", { exact: true }).fill("safe-password-123");
   await page.getByRole("button", { name: "Gửi mã OTP" }).click();
   await page.getByLabel("Mã OTP").fill("123456");
   await page.getByRole("button", { name: "Xác minh mã" }).click();

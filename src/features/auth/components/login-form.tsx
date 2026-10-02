@@ -5,12 +5,13 @@ import { useEffect, useState } from "react";
 import { Building2, CircleAlert, UserRound } from "lucide-react";
 import { ApiError } from "@/api/types/common";
 import { Button } from "@/components/ui/button";
+import { PasswordInput } from "@/components/ui/password-input";
 import { hasFirebaseAuthConfig } from "@/configs/env";
 import { routes } from "@/configs/routes";
 import { useDemoSession } from "@/store/demo-session";
 import { authApi } from "../api";
 import { useAuthSession } from "../auth-session";
-import { safeNext } from "../redirect";
+import { postLoginRoute } from "../redirect";
 import { GoogleIcon } from "./google-icon";
 
 function errorCode(error: unknown) {
@@ -26,7 +27,7 @@ export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const { pendingAction } = useDemoSession();
-  const { isAuthenticated, login, loginWithGoogle, ready, register } = useAuthSession();
+  const { isAuthenticated, login, loginWithGoogle, ready, register, user } = useAuthSession();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,8 +50,8 @@ export function LoginForm() {
   const [resendPending, setResendPending] = useState(false);
 
   useEffect(() => {
-    if (ready && isAuthenticated) router.replace(safeNext(params.get("next")));
-  }, [isAuthenticated, params, ready, router]);
+    if (ready && isAuthenticated) router.replace(postLoginRoute(user, params.get("next")));
+  }, [isAuthenticated, params, ready, router, user]);
 
   if (ready && isAuthenticated) return <p className="auth-redirect" role="status">Bạn đã đăng nhập. Đang chuyển hướng…</p>;
 
@@ -147,16 +148,13 @@ export function LoginForm() {
       return;
     }
     setSubmitting(true);
+    let authenticatedUser = user;
     try {
-      if (mode === "register") {
-        if (accountType === "organization") {
-          await register({ accountType, email, password, confirmPassword, fullName, organizationName, organizationAddress, organizationPhoneNumber, registrationToken });
-        } else {
-          await register({ accountType, email, password, confirmPassword, fullName, username: username.trim().toLowerCase(), registrationToken });
-        }
-      } else {
-        await login(email, password);
-      }
+      authenticatedUser = mode === "register"
+        ? accountType === "organization"
+          ? await register({ accountType, email, password, confirmPassword, fullName, organizationName, organizationAddress, organizationPhoneNumber, registrationToken })
+          : await register({ accountType, email, password, confirmPassword, fullName, username: username.trim().toLowerCase(), registrationToken })
+        : await login(email, password);
     } catch (error) {
       if (mode === "login" && errorCode(error) === "EMAIL_NOT_VERIFIED") setPendingVerificationEmail(email.trim());
       if (mode === "register" && errorCode(error) === "EMAIL_VERIFICATION_REQUIRED") clearRegistrationProof();
@@ -166,15 +164,16 @@ export function LoginForm() {
     }
     const next = pendingAction?.type === "ask"
       ? `${routes.learningHub}?article=${encodeURIComponent(pendingAction.slug)}`
-      : pendingAction?.type === "save" ? `/learn/${pendingAction.slug}` : safeNext(params.get("next"));
+      : pendingAction?.type === "save" ? `/learn/${pendingAction.slug}` : postLoginRoute(authenticatedUser, params.get("next"));
     router.replace(next);
   };
 
   const submitGoogle = async () => {
     setMessage("");
     setSubmitting(true);
+    let authenticatedUser = user;
     try {
-      await loginWithGoogle();
+      authenticatedUser = await loginWithGoogle();
     } catch (error) {
       setMessage(errorMessage(error, "Không thể xác thực với Google. Vui lòng thử lại."));
       setSubmitting(false);
@@ -182,7 +181,7 @@ export function LoginForm() {
     }
     const next = pendingAction?.type === "ask"
       ? `${routes.learningHub}?article=${encodeURIComponent(pendingAction.slug)}`
-      : pendingAction?.type === "save" ? `/learn/${pendingAction.slug}` : safeNext(params.get("next"));
+      : pendingAction?.type === "save" ? `/learn/${pendingAction.slug}` : postLoginRoute(authenticatedUser, params.get("next"));
     router.replace(next);
   };
 
@@ -225,8 +224,8 @@ export function LoginForm() {
         </>}
       </>}
       <label className="form-field">Email<input required type="email" value={email} onChange={(event) => changeEmail(event.target.value)} autoComplete="email" aria-invalid={!!message} /></label>
-      <label className="form-field">Mật khẩu<input required minLength={12} maxLength={128} type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} aria-invalid={!!message} /></label>
-      {mode === "register" && <label className="form-field">Xác nhận mật khẩu<input required minLength={12} maxLength={128} type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" aria-invalid={!!message} /></label>}
+      <label className="form-field">Mật khẩu<PasswordInput visibilityLabel="mật khẩu" required minLength={12} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} aria-invalid={!!message} aria-label="Mật khẩu" /></label>
+      {mode === "register" && <label className="form-field">Xác nhận mật khẩu<PasswordInput visibilityLabel="xác nhận mật khẩu" required minLength={12} maxLength={128} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" aria-invalid={!!message} aria-label="Xác nhận mật khẩu" /></label>}
       {mode === "register" && !registrationToken && <section className="verification-panel" aria-labelledby="registration-verification-title">
         <h2 id="registration-verification-title">Xác minh email</h2>
         {!otpSent ? <Button type="button" variant="secondary" disabled={!ready || otpPending} onClick={(event) => void requestOtp(event)}>{otpPending ? "Đang gửi…" : "Gửi mã OTP"}</Button> : <>

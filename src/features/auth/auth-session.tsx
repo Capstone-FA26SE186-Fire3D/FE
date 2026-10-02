@@ -14,10 +14,10 @@ type AuthSessionContextValue = {
   pending: boolean;
   ready: boolean;
   user: AuthUser | null;
-  login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
+  login: (email: string, password: string) => Promise<AuthUser>;
+  loginWithGoogle: () => Promise<AuthUser>;
   logout: () => Promise<void>;
-  register: (input: RegisterInput) => Promise<void>;
+  register: (input: RegisterInput) => Promise<AuthUser>;
   requestPasswordReset: (email: string) => Promise<void>;
   resetPassword: (token: string, newPassword: string) => Promise<void>;
   updateUser: (user: AuthUser) => void;
@@ -108,7 +108,9 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     try {
-      saveSession(await authApi.login(email, password));
+      const response = await authApi.login(email, password);
+      saveSession(response);
+      return response.user;
     } catch (error) {
       if (error instanceof ApiError) throw error;
       throw new Error(toMessage(error));
@@ -118,7 +120,9 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const loginWithGoogle = useCallback(async () => {
     try {
       const firebaseIdToken = await signInWithGoogle();
-      saveSession(await authApi.loginFirebase(firebaseIdToken));
+      const response = await authApi.loginFirebase(firebaseIdToken);
+      saveSession(response);
+      return response.user;
     } catch (error) {
       throw new Error(toMessage(error));
     }
@@ -127,7 +131,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const register = useCallback(async (input: RegisterInput) => {
     try {
       await authApi.register(input);
-      await login(input.email, input.password);
+      return await login(input.email, input.password);
     } catch (error) {
       if (error instanceof ApiError) throw error;
       throw new Error(toMessage(error));

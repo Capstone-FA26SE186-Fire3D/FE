@@ -5,6 +5,8 @@ export const routes = {
   account: "/account",
   forgotPassword: "/forgot-password",
   resetPassword: "/reset-password",
+  traineeDashboard: "/dashboard/trainee",
+  organizationDashboard: "/dashboard/organization",
   learningHub: "/learning-hub",
   organizations: "/organizations",
   about: "/about",
