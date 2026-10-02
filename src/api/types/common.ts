@@ -14,6 +14,12 @@ export type ApiRequestOptions = {
   signal?: AbortSignal;
 };
 
+export type ApiResponse<T> = {
+  data: T;
+  headers: Headers;
+  status: number;
+};
+
 export class ApiError extends Error {
   readonly payload?: ApiErrorPayload;
   readonly status: number;

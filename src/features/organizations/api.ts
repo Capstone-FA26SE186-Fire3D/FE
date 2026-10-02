@@ -1,6 +1,6 @@
 import { apiClient } from "@/api/client";
 
-import type { CreateOrganizationInput, Organization, OrganizationFilters, PageResponse } from "./types";
+import type { CreateOrganizationInput, Organization, OrganizationFilters, OrganizationProfile, PageResponse, UpdateOrganizationProfileInput } from "./types";
 
 function headers(accessToken: string): HeadersInit {
   return { Authorization: `Bearer ${accessToken}` };
@@ -28,6 +28,18 @@ export const organizationsApi = {
     return apiClient.request<Organization>(`/api/organizations/${id}/status`, {
       headers: headers(accessToken),
       json: { isActive },
+      method: "PATCH",
+    });
+  },
+  getMine(accessToken: string) {
+    return apiClient.requestWithMeta<OrganizationProfile>("/api/organizations/me", {
+      headers: headers(accessToken),
+    });
+  },
+  updateMine(accessToken: string, etag: string, input: UpdateOrganizationProfileInput) {
+    return apiClient.requestWithMeta<OrganizationProfile>("/api/organizations/me", {
+      headers: { ...headers(accessToken), "If-Match": etag },
+      json: input,
       method: "PATCH",
     });
   },

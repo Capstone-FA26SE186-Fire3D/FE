@@ -20,6 +20,7 @@ type AuthSessionContextValue = {
   register: (input: RegisterInput) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
   resetPassword: (token: string, newPassword: string) => Promise<void>;
+  updateUser: (user: AuthUser) => void;
 };
 
 const storageKey = "fire3d-auth-tokens";
@@ -109,6 +110,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     try {
       saveSession(await authApi.login(email, password));
     } catch (error) {
+      if (error instanceof ApiError) throw error;
       throw new Error(toMessage(error));
     }
   }, [saveSession]);
@@ -127,6 +129,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       await authApi.register(input);
       await login(input.email, input.password);
     } catch (error) {
+      if (error instanceof ApiError) throw error;
       throw new Error(toMessage(error));
     }
   }, [login]);
@@ -164,6 +167,10 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     }
   }, [accessToken, clearSession]);
 
+  const updateUser = useCallback((nextUser: AuthUser) => {
+    setUser(nextUser);
+  }, []);
+
   const value = useMemo<AuthSessionContextValue>(() => ({
     accessToken,
     isAuthenticated: !!user,
@@ -176,7 +183,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     register,
     requestPasswordReset,
     resetPassword,
-  }), [accessToken, login, loginWithGoogle, logout, pending, ready, register, requestPasswordReset, resetPassword, user]);
+    updateUser,
+  }), [accessToken, login, loginWithGoogle, logout, pending, ready, register, requestPasswordReset, resetPassword, updateUser, user]);
 
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;
 }

@@ -14,6 +14,18 @@ export type Organization = {
   updatedAt: string;
 };
 
+export type OrganizationProfile = Organization & {
+  address: string | null;
+  phoneNumber: string | null;
+  profileRevision: number;
+};
+
+export type UpdateOrganizationProfileInput = {
+  name: string;
+  address: string | null;
+  phoneNumber: string | null;
+};
+
 export type CreateOrganizationInput = {
   name: string;
   slug: string;

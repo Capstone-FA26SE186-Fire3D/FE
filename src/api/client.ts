@@ -1,6 +1,6 @@
 import { env } from "@/configs/env";
 
-import { ApiError, type ApiErrorPayload, type ApiQueryParams, type ApiRequestOptions } from "./types/common";
+import { ApiError, type ApiErrorPayload, type ApiQueryParams, type ApiRequestOptions, type ApiResponse } from "./types/common";
 
 function buildUrl(path: string, query?: ApiQueryParams): string {
   const baseUrl = env.apiBaseUrl.replace(/\/+$/, "");
@@ -52,7 +52,7 @@ function errorMessage(payload: unknown, fallback: string): string {
 }
 
 export const apiClient = {
-  async request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+  async requestWithMeta<T>(path: string, options: ApiRequestOptions = {}): Promise<ApiResponse<T>> {
     if (options.body !== undefined && options.json !== undefined) {
       throw new TypeError("apiClient.request accepts either body or json, not both.");
     }
@@ -78,6 +78,9 @@ export const apiClient = {
       throw new ApiError(errorMessage(payload, fallback), response.status, isErrorPayload(payload) ? payload : undefined);
     }
 
-    return payload as T;
+    return { data: payload as T, headers: response.headers, status: response.status };
+  },
+  async request<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+    return (await this.requestWithMeta<T>(path, options)).data;
   },
 };
