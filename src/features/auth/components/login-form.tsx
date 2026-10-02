@@ -10,7 +10,7 @@ import { routes } from "@/configs/routes";
 import { useDemoSession } from "@/store/demo-session";
 import { authApi } from "../api";
 import { useAuthSession } from "../auth-session";
-import { safeNext } from "../redirect";
+import { postLoginRoute } from "../redirect";
 import { GoogleIcon } from "./google-icon";
 
 function errorCode(error: unknown) {
@@ -26,7 +26,7 @@ export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const { pendingAction } = useDemoSession();
-  const { isAuthenticated, login, loginWithGoogle, ready, register } = useAuthSession();
+  const { isAuthenticated, login, loginWithGoogle, ready, register, user } = useAuthSession();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,8 +49,8 @@ export function LoginForm() {
   const [resendPending, setResendPending] = useState(false);
 
   useEffect(() => {
-    if (ready && isAuthenticated) router.replace(safeNext(params.get("next")));
-  }, [isAuthenticated, params, ready, router]);
+    if (ready && isAuthenticated) router.replace(postLoginRoute(user, params.get("next")));
+  }, [isAuthenticated, params, ready, router, user]);
 
   if (ready && isAuthenticated) return <p className="auth-redirect" role="status">Bạn đã đăng nhập. Đang chuyển hướng…</p>;
 
@@ -147,16 +147,13 @@ export function LoginForm() {
       return;
     }
     setSubmitting(true);
+    let authenticatedUser = user;
     try {
-      if (mode === "register") {
-        if (accountType === "organization") {
-          await register({ accountType, email, password, confirmPassword, fullName, organizationName, organizationAddress, organizationPhoneNumber, registrationToken });
-        } else {
-          await register({ accountType, email, password, confirmPassword, fullName, username: username.trim().toLowerCase(), registrationToken });
-        }
-      } else {
-        await login(email, password);
-      }
+      authenticatedUser = mode === "register"
+        ? accountType === "organization"
+          ? await register({ accountType, email, password, confirmPassword, fullName, organizationName, organizationAddress, organizationPhoneNumber, registrationToken })
+          : await register({ accountType, email, password, confirmPassword, fullName, username: username.trim().toLowerCase(), registrationToken })
+        : await login(email, password);
     } catch (error) {
       if (mode === "login" && errorCode(error) === "EMAIL_NOT_VERIFIED") setPendingVerificationEmail(email.trim());
       if (mode === "register" && errorCode(error) === "EMAIL_VERIFICATION_REQUIRED") clearRegistrationProof();
@@ -166,15 +163,16 @@ export function LoginForm() {
     }
     const next = pendingAction?.type === "ask"
       ? `${routes.learningHub}?article=${encodeURIComponent(pendingAction.slug)}`
-      : pendingAction?.type === "save" ? `/learn/${pendingAction.slug}` : safeNext(params.get("next"));
+      : pendingAction?.type === "save" ? `/learn/${pendingAction.slug}` : postLoginRoute(authenticatedUser, params.get("next"));
     router.replace(next);
   };
 
   const submitGoogle = async () => {
     setMessage("");
     setSubmitting(true);
+    let authenticatedUser = user;
     try {
-      await loginWithGoogle();
+      authenticatedUser = await loginWithGoogle();
     } catch (error) {
       setMessage(errorMessage(error, "Không thể xác thực với Google. Vui lòng thử lại."));
       setSubmitting(false);
@@ -182,7 +180,7 @@ export function LoginForm() {
     }
     const next = pendingAction?.type === "ask"
       ? `${routes.learningHub}?article=${encodeURIComponent(pendingAction.slug)}`
-      : pendingAction?.type === "save" ? `/learn/${pendingAction.slug}` : safeNext(params.get("next"));
+      : pendingAction?.type === "save" ? `/learn/${pendingAction.slug}` : postLoginRoute(authenticatedUser, params.get("next"));
     router.replace(next);
   };
 
