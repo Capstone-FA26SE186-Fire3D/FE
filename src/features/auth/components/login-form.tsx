@@ -3,13 +3,24 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Building2, CircleAlert, UserRound } from "lucide-react";
+import { ApiError } from "@/api/types/common";
 import { Button } from "@/components/ui/button";
 import { hasFirebaseAuthConfig } from "@/configs/env";
 import { routes } from "@/configs/routes";
 import { useDemoSession } from "@/store/demo-session";
+import { authApi } from "../api";
 import { useAuthSession } from "../auth-session";
 import { safeNext } from "../redirect";
 import { GoogleIcon } from "./google-icon";
+
+function errorCode(error: unknown) {
+  const code = error instanceof ApiError ? error.payload?.code : undefined;
+  return typeof code === "string" ? code : undefined;
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
+}
 
 export function LoginForm() {
   const router = useRouter();
@@ -26,8 +37,16 @@ export function LoginForm() {
   const [organizationName, setOrganizationName] = useState("");
   const [organizationAddress, setOrganizationAddress] = useState("");
   const [organizationPhoneNumber, setOrganizationPhoneNumber] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [registrationToken, setRegistrationToken] = useState("");
+  const [otpNotice, setOtpNotice] = useState("");
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
+  const [resendNotice, setResendNotice] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [otpPending, setOtpPending] = useState(false);
+  const [resendPending, setResendPending] = useState(false);
 
   useEffect(() => {
     if (ready && isAuthenticated) router.replace(safeNext(params.get("next")));
@@ -35,21 +54,113 @@ export function LoginForm() {
 
   if (ready && isAuthenticated) return <p className="auth-redirect" role="status">Bạn đã đăng nhập. Đang chuyển hướng…</p>;
 
+  const clearRegistrationProof = () => {
+    setOtp("");
+    setOtpSent(false);
+    setRegistrationToken("");
+    setOtpNotice("");
+  };
+
+  const selectMode = (nextMode: "login" | "register") => {
+    setMode(nextMode);
+    setMessage("");
+    setPendingVerificationEmail("");
+    setResendNotice("");
+    if (nextMode === "login") clearRegistrationProof();
+  };
+
+  const changeEmail = (value: string) => {
+    setEmail(value);
+    clearRegistrationProof();
+    setPendingVerificationEmail("");
+    setResendNotice("");
+  };
+
+  const requestOtp = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (!event.currentTarget.form?.reportValidity()) return;
+    setMessage("");
+    setOtpNotice("");
+    setOtpPending(true);
+    try {
+      await authApi.requestRegistrationOtp(email.trim());
+      setOtpSent(true);
+      setOtp("");
+      setOtpNotice("Mã OTP đã được gửi. Nhập mã gồm 6 chữ số trong email của bạn.");
+    } catch (error) {
+      setMessage(errorMessage(error, "Không thể gửi mã OTP. Vui lòng thử lại."));
+    } finally {
+      setOtpPending(false);
+    }
+  };
+
+  const verifyOtp = async () => {
+    setMessage("");
+    setOtpNotice("");
+    setOtpPending(true);
+    try {
+      const proof = await authApi.verifyRegistrationOtp(email.trim(), otp.trim());
+      setRegistrationToken(proof.registrationToken);
+      setOtpNotice("Email đã được xác minh. Bạn có thể tạo tài khoản.");
+    } catch (error) {
+      setMessage(errorMessage(error, "Mã OTP không hợp lệ hoặc đã hết hạn."));
+    } finally {
+      setOtpPending(false);
+    }
+  };
+
+  const resendRegistrationOtp = async () => {
+    setMessage("");
+    setOtpNotice("");
+    setOtpPending(true);
+    try {
+      await authApi.resendVerification(email.trim());
+      setOtp("");
+      setRegistrationToken("");
+      setOtpSent(true);
+      setOtpNotice("Mã OTP mới đã được gửi. Mã và xác minh trước đó không còn hiệu lực.");
+    } catch (error) {
+      setMessage(errorMessage(error, "Không thể gửi lại mã OTP. Vui lòng thử lại."));
+    } finally {
+      setOtpPending(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    setMessage("");
+    setResendNotice("");
+    setResendPending(true);
+    try {
+      await authApi.resendVerification(pendingVerificationEmail);
+      setResendNotice("Mã OTP đã được yêu cầu. Hãy kiểm tra email của bạn.");
+    } catch (error) {
+      setMessage(errorMessage(error, "Không thể gửi lại mã OTP. Vui lòng thử lại."));
+    } finally {
+      setResendPending(false);
+    }
+  };
+
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage("");
+    if (mode === "register" && !registrationToken) {
+      setMessage("Hãy xác minh email bằng mã OTP trước khi tạo tài khoản.");
+      return;
+    }
     setSubmitting(true);
     try {
       if (mode === "register") {
         if (accountType === "organization") {
-          await register({ accountType, email, password, confirmPassword, fullName, organizationName, organizationAddress, organizationPhoneNumber });
+          await register({ accountType, email, password, confirmPassword, fullName, organizationName, organizationAddress, organizationPhoneNumber, registrationToken });
         } else {
-          await register({ accountType, email, password, confirmPassword, fullName, username: username.trim().toLowerCase() });
+          await register({ accountType, email, password, confirmPassword, fullName, username: username.trim().toLowerCase(), registrationToken });
         }
+      } else {
+        await login(email, password);
       }
-      else await login(email, password);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Không thể xác thực. Vui lòng thử lại.");
+      if (mode === "login" && errorCode(error) === "EMAIL_NOT_VERIFIED") setPendingVerificationEmail(email.trim());
+      if (mode === "register" && errorCode(error) === "EMAIL_VERIFICATION_REQUIRED") clearRegistrationProof();
+      setMessage(errorMessage(error, "Không thể xác thực. Vui lòng thử lại."));
       setSubmitting(false);
       return;
     }
@@ -65,7 +176,7 @@ export function LoginForm() {
     try {
       await loginWithGoogle();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Không thể xác thực với Google. Vui lòng thử lại.");
+      setMessage(errorMessage(error, "Không thể xác thực với Google. Vui lòng thử lại."));
       setSubmitting(false);
       return;
     }
@@ -78,12 +189,18 @@ export function LoginForm() {
   return (
     <form className="login-panel" onSubmit={submit} aria-describedby="auth-note">
       <div className="auth-tabs" role="tablist" aria-label="Xác thực">
-        <button type="button" role="tab" aria-selected={mode === "login"} onClick={() => { setMode("login"); setMessage(""); }}>Đăng nhập</button>
-        <button type="button" role="tab" aria-selected={mode === "register"} onClick={() => { setMode("register"); setMessage(""); }}>Tạo tài khoản</button>
+        <button type="button" role="tab" aria-selected={mode === "login"} onClick={() => selectMode("login")}>Đăng nhập</button>
+        <button type="button" role="tab" aria-selected={mode === "register"} onClick={() => selectMode("register")}>Tạo tài khoản</button>
       </div>
       <h1>{mode === "login" ? "Đăng nhập Fire3D" : "Tạo tài khoản"}</h1>
-      <p id="auth-note">{mode === "login" ? "Dùng email và mật khẩu Fire3D. Google là lựa chọn bổ sung khi môi trường đã cấu hình Firebase." : "Mật khẩu cần từ 12 ký tự để đáp ứng yêu cầu của Fire3D."}</p>
+      <p id="auth-note">{mode === "login" ? "Dùng email và mật khẩu Fire3D. Google là lựa chọn bổ sung khi môi trường đã cấu hình Firebase." : "Điền thông tin, xác minh email bằng OTP, rồi mới tạo tài khoản."}</p>
       {message && <div role="alert" aria-label="Lỗi xác thực" className="form-message"><CircleAlert aria-hidden="true" size={18} /><div><strong>Thông báo từ Fire3D</strong><p>{message}</p></div></div>}
+      {pendingVerificationEmail && mode === "login" && <section className="verification-panel" aria-labelledby="pending-verification-title">
+        <h2 id="pending-verification-title">Tài khoản chưa xác minh</h2>
+        <p>Email <strong>{pendingVerificationEmail}</strong> cần được xác minh trước khi đăng nhập.</p>
+        <Button type="button" variant="secondary" disabled={resendPending} onClick={() => void resendVerification()}>{resendPending ? "Đang gửi…" : "Gửi lại mã OTP"}</Button>
+        {resendNotice && <p className="verification-status" role="status">{resendNotice}</p>}
+      </section>}
       {mode === "register" && <>
         <fieldset className="account-type-fieldset">
           <legend>Loại tài khoản</legend>
@@ -107,10 +224,21 @@ export function LoginForm() {
           <label className="form-field">Điện thoại tổ chức<input required maxLength={30} value={organizationPhoneNumber} onChange={(event) => setOrganizationPhoneNumber(event.target.value)} autoComplete="tel" aria-invalid={!!message} /></label>
         </>}
       </>}
-      <label className="form-field">Email<input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" aria-invalid={!!message} /></label>
+      <label className="form-field">Email<input required type="email" value={email} onChange={(event) => changeEmail(event.target.value)} autoComplete="email" aria-invalid={!!message} /></label>
       <label className="form-field">Mật khẩu<input required minLength={12} maxLength={128} type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} aria-invalid={!!message} /></label>
       {mode === "register" && <label className="form-field">Xác nhận mật khẩu<input required minLength={12} maxLength={128} type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" aria-invalid={!!message} /></label>}
-      <Button disabled={!ready || submitting} className="form-submit" type="submit">{submitting ? "Đang xử lý…" : mode === "login" ? "Đăng nhập" : "Tạo tài khoản"}</Button>
+      {mode === "register" && !registrationToken && <section className="verification-panel" aria-labelledby="registration-verification-title">
+        <h2 id="registration-verification-title">Xác minh email</h2>
+        {!otpSent ? <Button type="button" variant="secondary" disabled={!ready || otpPending} onClick={(event) => void requestOtp(event)}>{otpPending ? "Đang gửi…" : "Gửi mã OTP"}</Button> : <>
+          <p>Nhập mã 6 chữ số đã gửi đến <strong>{email}</strong>.</p>
+          <label className="form-field">Mã OTP<input required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, ""))} autoComplete="one-time-code" /></label>
+          <Button type="button" variant="secondary" disabled={otpPending || otp.length !== 6} onClick={() => void verifyOtp()}>{otpPending ? "Đang xác minh…" : "Xác minh mã"}</Button>
+          <Button type="button" variant="secondary" disabled={otpPending} onClick={() => void resendRegistrationOtp()}>{otpPending ? "Đang gửi…" : "Gửi lại mã OTP"}</Button>
+        </>}
+        {otpNotice && <p className="verification-status" role="status">{otpNotice}</p>}
+      </section>}
+      {mode === "register" && registrationToken && <p className="verification-status" role="status">{otpNotice}</p>}
+      {(mode === "login" || !!registrationToken) && <Button disabled={!ready || submitting} className="form-submit" type="submit">{submitting ? "Đang xử lý…" : mode === "login" ? "Đăng nhập" : "Tạo tài khoản"}</Button>}
       {mode === "login" && <Button disabled={!ready || !hasFirebaseAuthConfig || submitting} className="google-sign-in" type="button" variant="secondary" onClick={() => void submitGoogle()}><GoogleIcon /> Tiếp tục với Google</Button>}
     </form>
   );

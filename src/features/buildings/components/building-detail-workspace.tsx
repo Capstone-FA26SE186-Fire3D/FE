@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { ApiError } from "@/api/types/common";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,13 @@ import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { uploadIfcRevision } from "../ifc-upload";
 import { buildingsApi } from "../api";
+import { hasRuntimePreview } from "../runtime-preview";
 import type { AnnotationItem, AnnotationSnapshot, BimFact, Building, BuildingRevision, EditorPreview, ProcessingJob, RevisionIssue } from "../types";
+
+const RuntimePreviewViewer = dynamic(
+  () => import("./runtime-preview-viewer").then((module) => module.RuntimePreviewViewer),
+  { ssr: false, loading: () => <p>Đang chuẩn bị preview 3D…</p> },
+);
 
 type RevisionDetails = {
   annotations: AnnotationSnapshot | null;
@@ -187,6 +194,7 @@ export function BuildingDetailWorkspace({ buildingId }: { buildingId: string }) 
   if (!canManageBuilding(user?.role, user?.organizationId)) return <Card className="admin-card"><h1>Không có quyền truy cập</h1><p>Chỉ OrganizationUser trong đúng tổ chức được quản lý Building và IFC.</p></Card>;
 
   return <div className="admin-layout">
+    <p className="workspace-scenario-link"><Link href={`${routes.workspaceBuildings}/${buildingId}/scenarios`}>Soạn kịch bản diễn tập từ revision IFC</Link></p>
     <header className="admin-heading"><p className="kicker"><span className="kicker-line" /> Không gian mô hình</p><h1>{building?.name ?? "Đang tải công trình…"}</h1><p>IFC được lưu private, xử lý bởi worker và chỉ có preview khi backend trả artifact đã có provenance.</p></header>
     {message && <p className="form-message" role="status">{message}</p>}
     <Card className="admin-card"><div className="admin-toolbar"><h2>Revision IFC</h2><Button type="button" variant="quiet" onClick={refresh}>Tải lại</Button></div>
@@ -197,7 +205,7 @@ export function BuildingDetailWorkspace({ buildingId }: { buildingId: string }) 
     {selectedRevision && details && <>
       <Card className="admin-card"><h2>QA và processing</h2><p>{details.jobs.length ? details.jobs.map((job) => `${job.kind}: ${job.status}`).join(" · ") : "Chưa có logical processing job."}</p><div className="account-table-wrap"><table><thead><tr><th>Mức độ</th><th>Mã</th><th>Nội dung</th></tr></thead><tbody>{details.issues.map((issue) => <tr key={issue.id}><td>{issue.severity}</td><td>{issue.issueCode}</td><td>{issue.message}</td></tr>)}{!details.issues.length && <tr><td colSpan={3}>Chưa có issue hiện hành.</td></tr>}</tbody></table></div></Card>
       <Card className="admin-card"><h2>BIM facts</h2><div className="account-table-wrap"><table><thead><tr><th>IFC GlobalId</th><th>Thực thể</th><th>Thuộc tính</th><th>Giá trị</th></tr></thead><tbody>{details.facts.slice(0, 20).map((fact) => <tr key={fact.id}><td>{fact.ifcGlobalId}</td><td>{fact.entityType}</td><td>{fact.propertyPath}</td><td>{typeof fact.value === "string" ? fact.value : JSON.stringify(fact.value)}</td></tr>)}{!details.facts.length && <tr><td colSpan={4}>Chưa có BIM facts từ worker.</td></tr>}</tbody></table></div></Card>
-      <Card className="admin-card"><h2>Preview worker</h2>{details.preview?.downloadUrl && details.preview.artifactId && details.preview.sha256Hash ? <p><a href={details.preview.downloadUrl} target="_blank" rel="noreferrer">Mở preview GLB đã xử lý</a> · SHA-256: {details.preview.sha256Hash}</p> : <p>Chưa có preview artifact đã sẵn sàng. Không dùng file IFC local thay cho artifact của revision.</p>}</Card>
+      <Card className="admin-card"><h2>Preview worker</h2>{hasRuntimePreview(details.preview) ? <><RuntimePreviewViewer downloadUrl={details.preview.downloadUrl} /><p><a href={details.preview.downloadUrl} target="_blank" rel="noreferrer">Mở artifact GLB đã xử lý</a> · SHA-256: {details.preview.sha256Hash}</p></> : <p>Chưa có preview artifact đã sẵn sàng. Không dùng file IFC local thay cho artifact của revision.</p>}</Card>
       {details.annotations && <AnnotationEditor key={`${selectedRevision.id}-${details.annotations.version}`} accessToken={accessToken!} revisionId={selectedRevision.id} snapshot={details.annotations} onSaved={refresh} />}
     </>}
   </div>;

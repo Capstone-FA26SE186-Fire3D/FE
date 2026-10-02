@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { putIfcObject, sha256Hex, uploadIfcRevision, validateIfcFile } from "../../src/features/buildings/ifc-upload";
+import { hasRuntimePreview } from "../../src/features/buildings/runtime-preview";
 
 test("accepts a non-empty IFC file and produces lowercase SHA-256 hex", async () => {
   const file = new File(["IFC"], "school.ifc", { type: "application/octet-stream" });
@@ -47,4 +48,9 @@ test("stops before finalize when the signed object upload fails", async () => {
   ).rejects.toThrow("Không thể tải IFC lên kho lưu trữ.");
 
   expect(finalized).toBe(false);
+});
+
+test("renders a runtime preview only when the server returns a complete provenance-backed artifact", () => {
+  expect(hasRuntimePreview({ artifactId: null, downloadUrl: "https://storage.test/model.glb", sha256Hash: "abc" })).toBe(false);
+  expect(hasRuntimePreview({ artifactId: "artifact-1", downloadUrl: "https://storage.test/model.glb", sha256Hash: "abc" })).toBe(true);
 });
