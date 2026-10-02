@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Building2, CircleAlert, UserRound } from "lucide-react";
 import { ApiError } from "@/api/types/common";
 import { Button } from "@/components/ui/button";
+import { PasswordInput } from "@/components/ui/password-input";
 import { hasFirebaseAuthConfig } from "@/configs/env";
 import { routes } from "@/configs/routes";
 import { useDemoSession } from "@/store/demo-session";
@@ -223,8 +224,8 @@ export function LoginForm() {
         </>}
       </>}
       <label className="form-field">Email<input required type="email" value={email} onChange={(event) => changeEmail(event.target.value)} autoComplete="email" aria-invalid={!!message} /></label>
-      <label className="form-field">Mật khẩu<input required minLength={12} maxLength={128} type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} aria-invalid={!!message} /></label>
-      {mode === "register" && <label className="form-field">Xác nhận mật khẩu<input required minLength={12} maxLength={128} type="password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" aria-invalid={!!message} /></label>}
+      <label className="form-field">Mật khẩu<PasswordInput visibilityLabel="mật khẩu" required minLength={12} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} aria-invalid={!!message} aria-label="Mật khẩu" /></label>
+      {mode === "register" && <label className="form-field">Xác nhận mật khẩu<PasswordInput visibilityLabel="xác nhận mật khẩu" required minLength={12} maxLength={128} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" aria-invalid={!!message} aria-label="Xác nhận mật khẩu" /></label>}
       {mode === "register" && !registrationToken && <section className="verification-panel" aria-labelledby="registration-verification-title">
         <h2 id="registration-verification-title">Xác minh email</h2>
         {!otpSent ? <Button type="button" variant="secondary" disabled={!ready || otpPending} onClick={(event) => void requestOtp(event)}>{otpPending ? "Đang gửi…" : "Gửi mã OTP"}</Button> : <>

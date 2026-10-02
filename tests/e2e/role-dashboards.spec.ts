@@ -38,7 +38,7 @@ test("password login without a next route redirects OrganizationUser to its dash
 
   await page.goto("/login");
   await page.getByLabel("Email").fill(user.email);
-  await page.getByLabel("Mật khẩu").fill("safe-password-123");
+  await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
   await page.getByRole("button", { name: "Đăng nhập" }).click();
 
   await expect(page).toHaveURL(/\/dashboard\/organization$/);
