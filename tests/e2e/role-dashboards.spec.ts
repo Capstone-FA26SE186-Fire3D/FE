@@ -32,11 +32,45 @@ test("OrganizationUser sees the BIM workspace dashboard", async ({ page }) => {
   await expect(page.getByRole("link", { name: "Quét mô hình IFC" })).toHaveAttribute("href", "/workspace/ifc");
 });
 
+test("restored OrganizationUser session accepts the string role returned by the API", async ({ page }) => {
+  const storedUser = { email: "owner@fire3d.test", fullName: "Owner", organizationId: "org-1", role: 1 };
+  await restoreSession(page, storedUser);
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: { id: "organization-user-1", ...storedUser, role: "OrganizationUser" } }));
+
+  await page.goto("/dashboard/organization");
+
+  await expect(page.getByRole("heading", { name: "Không gian tổ chức" })).toBeVisible();
+});
+
 test("password login without a next route redirects OrganizationUser to its dashboard", async ({ page }) => {
   const user = { id: "organization-user-1", email: "owner@fire3d.test", fullName: "Owner", organizationId: "org-1", role: 1 };
   await page.route("**/api/auth/login", (route) => route.fulfill({ json: { accessToken: "access", refreshToken: "refresh", user } }));
 
   await page.goto("/login");
+  await page.getByLabel("Email").fill(user.email);
+  await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
+  await page.getByRole("button", { name: "Đăng nhập" }).click();
+
+  await expect(page).toHaveURL(/\/dashboard\/organization$/);
+});
+
+test("string OrganizationUser role from the API opens the organization dashboard", async ({ page }) => {
+  const user = { id: "organization-user-1", email: "owner@fire3d.test", fullName: "Owner", organizationId: "org-1", role: "OrganizationUser" };
+  await page.route("**/api/auth/login", (route) => route.fulfill({ json: { accessToken: "access", refreshToken: "refresh", user } }));
+
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(user.email);
+  await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
+  await page.getByRole("button", { name: "Đăng nhập" }).click();
+
+  await expect(page).toHaveURL(/\/dashboard\/organization$/);
+});
+
+test("OrganizationUser cannot be redirected to the admin account page by next", async ({ page }) => {
+  const user = { id: "organization-user-1", email: "owner@fire3d.test", fullName: "Owner", organizationId: "org-1", role: "OrganizationUser" };
+  await page.route("**/api/auth/login", (route) => route.fulfill({ json: { accessToken: "access", refreshToken: "refresh", user } }));
+
+  await page.goto("/login?next=/admin/accounts");
   await page.getByLabel("Email").fill(user.email);
   await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
   await page.getByRole("button", { name: "Đăng nhập" }).click();
