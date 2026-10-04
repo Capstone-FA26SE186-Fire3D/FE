@@ -1,10 +1,23 @@
 # Context — FE
 
+## Contract sản phẩm hiện hành — Docs v7
+
+Nguồn chuẩn: [v7 contract](../../Docs/schema_v7_contract.md) và [requirements](../../Docs/fire_evacuation_requirements.md). Các đoạn contract cũ bên dưới đã được hiệu chỉnh theo v7; đây là thiết kế đích, không phải bằng chứng implementation hoặc deployment đã đạt.
+
+- Tách Organization console (Building/IFC, scenario, analytics, billing) khỏi Learn public; PlatformAdmin quản lý hệ thống, Learn và Organization Library. Library gồm template/rubric mẫu/metadata thiết bị hỗ trợ, không tự chia sẻ IFC/scenario riêng sang Learn.
+- Organization được tự soạn hoặc dùng template tùy chọn. UI gửi từng scenario/rubric version cho PlatformAdmin review, hiển thị lý do từ chối; submit đóng băng hash, sửa tạo version và duyệt lại. IFC QA/ConfirmForTraining không thay duyệt nội dung. Metadata thiết bị mới không tự bổ sung capability runtime.
+- Building Private mặc định; code tạo grant gắn account + `access_revision`. Đổi/thu hồi code hoặc visibility vô hiệu grant cũ; Public yêu cầu Trainee đăng nhập. QR không cấp quyền. API kiểm access trước list/package/prepare và recheck approval/publish, entitlement, runtime, learner seat tại online start.
+- Billing UI là gói Building 6/12 tháng (game, learner limit, AI quota), số Trainee khác nhau/kỳ và nâng cấp/gia hạn; chỉ start lần đầu tính suất, không tính login/list/prepare/playtest. Upgrade giữ kỳ/suất đã dùng, renewal kỳ mới. Quota AI Organization trả trước pooled, hết thì thanh toán top-up trước khi dùng tiếp; không overage, consent overage hoặc AI billing period trả sau. Trainee quota ngày riêng.
+- Learn Article/Tip/Video Published mở cho khách, bookmark/AI yêu cầu đăng nhập; khác Learn mode Unity. Trainee tự chọn Learn/Guided Drill/Assessment, không prerequisite/sprint, retry không giới hạn, không certificate. Kết quả do server trả `Passed|NotPassed|Incomplete|NotAssessed`, tách khỏi session completion; AI bị chặn trong Assessment.
+- Scenario RAG chỉ `name`, `objectives`, `instructions` approved/published và còn quyền/service; không draft/rubric/đáp án/IFC private. Hỏi Learn phải pin cả `learn_post_id` và published `learn_version_id`; Hidden chỉ có thể RAG theo quyền backend, không public. Sau mất quyền chỉ còn Common và giải thích kết quả cá nhân đã lưu, không retrieval Building mới.
+- Auth theo [BE authentication](../../BE/docs/authentication.md): form → request OTP → verify OTP nhận registrationToken → register tạo account → login riêng nhận JWT. Firebase chỉ Google; Google đã link đăng nhập, Google mới trả OnboardingRequired và completion/link API còn thiếu. Không coi mục tiêu onboarding hoặc prototype là đã tích hợp production.
+- Giá, lượng/đơn vị quota, expiry/rollover, chính sách giá nâng cấp và ngưỡng rubric chưa chốt; UI hiển thị cấu hình/snapshot backend, không hard-code quyết định sản phẩm.
+
 ## Hiện trạng đã kiểm tra
 
 - Next.js App Router + React + TypeScript strict; [package.json](../package.json) có scripts `dev`, `build`, `start`, `typecheck`, `lint`, `test:e2e` và giữ pnpm 10.28.2.
 - Route composition nằm trong [src/app](../src/app); feature code nằm trong [src/features](../src/features); style/token nền nằm trong [src/assets/styles/globals.css](../src/assets/styles/globals.css).
-- [RAG client](../src/features/rag/api.ts) hiện vẫn gọi trực tiếp `POST /chat` và `POST /documents` qua `NEXT_PUBLIC_RAG_API_URL`; production contract phải chuyển qua `.NET API`, nơi kiểm tra phiên FET3D (local hoặc Google exchange), tenant scope, quota/consent và idempotency. Firebase chỉ xác minh Google identity; không phải mọi phiên đều bắt buộc Google. Không xem prototype direct call là kiến trúc production.
+- [RAG client](../src/features/rag/api.ts) hiện vẫn gọi trực tiếp `POST /chat` và `POST /documents` qua `NEXT_PUBLIC_RAG_API_URL`; production contract phải chuyển qua `.NET API`, nơi kiểm tra phiên FET3D (local hoặc Google exchange), tenant scope, quota, source scope và idempotency. Firebase chỉ xác minh Google identity; không phải mọi phiên đều bắt buộc Google. Không xem prototype direct call là kiến trúc production.
 - Prototype hiện có Three.js landing với một `WebGLRenderer`, building/effects/camera/lifecycle tách module. Editor/preview tổ chức là kiến trúc đích chưa được chứng minh đầy đủ trong code; không gọi prototype landing là editor production. ThreeUI chỉ tham khảo; package runtime hiện không còn dependency ThreeUI.
 - Có [pnpm-lock.yaml](../pnpm-lock.yaml); dependency thay đổi phải đi cùng lockfile và xác minh lại bằng `pnpm install --frozen-lockfile`.
 
@@ -16,14 +29,14 @@
 - RAG production dùng Python/FastAPI với Supabase PostgreSQL + `pgvector`; LLM chọn một trong OpenAI hoặc Gemini qua provider adapter. UI không phụ thuộc payload riêng của provider.
 - Azure đã được chọn cho AI/RAG FastAPI service; compute cho BE, IFC/Blender worker và Unity worker vẫn phải spike/chốt riêng. Không hard-code public backend URL ngoài cấu hình môi trường.
 - Client production gọi API qua endpoint OneShield/OnePortal (iNET) → Nginx đã chốt; FE không gọi FastAPI trực tiếp. Base URL, TLS, edge policy và môi trường được lấy từ cấu hình triển khai; FE không phụ thuộc vào header edge để quyết định quyền.
-- Khu organization cần UI cho IFC upload/processing issues/preview, scenario editor, AI draft có citation, Building service/payment và AI usage (granted/used/remaining/overage/unit price/period/terms). FE không tự quyết định entitlement, quota, price hay publish.
+- Khu organization cần UI cho IFC upload/processing issues/preview, scenario editor, AI draft có citation, Building service/payment và AI usage (granted/reserved/used/remaining, top-up trả trước, validity và payment history). FE không tự quyết định entitlement, quota, price hay publish.
 - OrganizationUser có thể chạy thử draft/version riêng qua Mobile/Unity; FE chỉ tạo playtest request đúng tenant, để backend kiểm tra Trial quota hoặc Building entitlement Active ở bước start, và không đưa playtest vào learner analytics.
 - Web desktop không chạy full gameplay. Khi OrganizationUser bấm **Playtest**, FE gọi contract mục tiêu `POST /api/scenarios/{scenarioId}/playtests`, sau đó hiển thị trạng thái và một QR/deep link handoff ngắn hạn cho Mobile. QR/deep link chỉ mang mã opaque/one-time reference, không chứa credential, package hoặc quyền nghiệp vụ; FE không dùng QR Building của Trainee cho luồng này.
 - Mobile redeem handoff bằng session của OrganizationUser (yêu cầu đăng nhập nếu chưa có), gọi `POST /api/playtests/{playtestId}/start`; backend kiểm tra tenant, Trial/entitlement, package hash và runtime compatibility rồi cấp launch grant. Mobile chỉ cần màn hình xác nhận tối giản, mở Unity qua native bridge, đồng bộ event/result về backend; FE theo dõi trạng thái/result qua API. Nếu chưa có Mobile thì web chỉ preview/editor, không giả lập gameplay.
 - Đây là target contract cho web–Mobile–Unity; prototype FE hiện chưa chứng minh editor production, APK, QR/deep link hoặc các endpoint playtest đã triển khai.
-- QR landing là cấp Building: resolve → list bài đã publish → chọn bài → prepare/download/verify package → explicit online start → app session. Preparation không cấp quyền; start mới kiểm tra entitlement/QR/package/runtime và tạo launch grant. Hết hạn vẫn xem landing/status nhưng không tạo phiên mới; không hứa giữ deep link xuyên cài nếu chưa kiểm chứng.
-- AI Trainee ở web/mobile ngoài gameplay; không được đọc corpus riêng của organization. RAG UI hiện vẫn prototype/demo và chưa chứng minh production integration.
-- AI/RAG service chạy riêng trên Azure; Container Apps là phương án triển khai đề xuất. FE chỉ hiển thị response type/status, citations/source version, BIM anchors và usage kỹ thuật do backend trả. FE không tự tính overage/đơn giá hoặc retry thành request mới khi chưa tra cứu `GET /api/ai/requests/{requestId}`.
+- QR landing là cấp Building: resolve → list bài đã publish → chọn bài → prepare/download/verify package → explicit online start → app session. Preparation không cấp quyền; start mới recheck access, approval/publish, entitlement, learner seat và package/runtime và tạo launch grant. Hết hạn vẫn xem landing/status nhưng không tạo phiên mới; không hứa giữ deep link xuyên cài nếu chưa kiểm chứng.
+- AI Trainee ở web/mobile ngoài Assessment; chỉ đọc Learn/Common, giải thích kết quả cá nhân và snapshot scenario learner-safe được backend cấp quyền, không đọc kho nội bộ organization. RAG UI hiện vẫn prototype/demo và chưa chứng minh production integration.
+- AI/RAG service chạy riêng trên Azure; Container Apps là phương án triển khai đề xuất. FE chỉ hiển thị response type/status, citations/source version, BIM anchors và usage kỹ thuật do backend trả. FE không tự tính quota/đơn giá hoặc retry thành request mới khi chưa tra cứu `GET /api/ai/requests/{requestId}`.
 - Draft scenario từ AI có trạng thái `NeedsUserEdit`; câu trả lời kiến thức của Trainee/OrganizationUser là `KnowledgeAnswer` độc lập với citation nguồn chung. UI hiển thị source/scope, BIM anchors khi có, request/usage và trạng thái `InsufficientEvidence`/`RejectedBySafetyGate`.
 
 ## Chạy và kiểm tra
@@ -63,13 +76,13 @@ Khi Docs có cạnh repo, đọc requirements/features/workflows phù hợp. UI 
 
 ## Contract cập nhật — 2026-09-18
 
-- FE gọi `.NET API` cho AI production; không gọi FastAPI trực tiếp trong flow production. FE hiển thị request status/citations/usage kỹ thuật và tra cứu request khi timeout, không tự tính overage hoặc billing.
+- FE gọi `.NET API` cho AI production; không gọi FastAPI trực tiếp trong flow production. FE hiển thị request status/citations/usage kỹ thuật và tra cứu request khi timeout, không tự tính quota hoặc billing.
 - Editor/playtest và session UI phải hiển thị lỗi package compatibility khi manifest thiếu metadata hoặc runtime catalog không hỗ trợ. Retry cùng idempotency payload được replay; payload khác phải báo conflict.
 - Processing/billing status trong UI dùng trạng thái backend có mã ổn định (`Busy`, `AlreadyCompleted`, `NotClaimable`, `StaleAttempt`, `Conflict`), không suy diễn từ chuỗi lỗi SQL.
 
 ## Contract hardening — 2026-09-18
 
-- UI period AI chỉ hiển thị snapshot đã chốt; late/uncertain usage là adjustment riêng, không tự tính lại theo policy mới. FE không tự gắn quotation/payment hoặc đổi status.
+- UI AI hiển thị số dư/grant/usage và lịch sử mua quota trả trước từ backend. Usage chưa chắc xử lý theo request status/reconcile, không có UI hóa đơn AI cuối kỳ; FE không tự gắn payment/grant hoặc đổi status.
 - Package/artifact pinned không cho phép editor/publish flow thay tại chỗ; package compatibility phải fail-closed khi capability có phần tử sai kiểu/rỗng hoặc provenance/hash thiếu.
 - Processing UI hiển thị mã kết quả worker ổn định (`Claimed`, `Busy`, `AlreadyCompleted`, `NotClaimable`, `Conflict`, `StaleAttempt`) và dùng idempotency/reconcile; không suy diễn từ lỗi text.
 
@@ -90,7 +103,7 @@ Khi Docs có cạnh repo, đọc requirements/features/workflows phù hợp. UI 
 
 ## FET3D onboarding and commercial UI — 2026-09-19
 
-- Google mới hiển thị onboarding chọn Trainee hoặc OrganizationUser sau khi backend xác minh Firebase; account đã link đăng nhập theo role cũ. FE không tự cho chọn PlatformAdmin hoặc organization có sẵn.
+- Target khi completion API được triển khai: Google mới hiển thị onboarding chọn Trainee hoặc OrganizationUser sau khi backend xác minh Firebase; account đã link đăng nhập theo role cũ. FE không tự cho chọn PlatformAdmin hoặc organization có sẵn.
 - Organization UI quản lý nhiều Building, bắt buộc tên/địa chỉ trước checkout, chọn một/nhiều Building và thời hạn, hiển thị giá gốc/discount/tổng tiền theo quotation snapshot. Gói số lượng lớn dùng form liên hệ, chưa tạo payment.
 - Billing UI hiển thị entitlement từng Building, kỳ hết hạn và danh sách nhắc trước 5 ngày; gia hạn chọn lọc. FE chỉ gọi API, không tự tính entitlement/discount cuối cùng hoặc kết nối Redis.
 
