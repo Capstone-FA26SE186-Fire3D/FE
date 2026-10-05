@@ -120,9 +120,9 @@ test("changing a password ends the current local session", async ({ page }) => {
   });
 
   await page.goto("/account");
-  await page.getByLabel("Mật khẩu hiện tại").fill("old-password");
+  await page.getByLabel("Mật khẩu hiện tại", { exact: true }).fill("old-password");
   await page.getByLabel("Mật khẩu mới", { exact: true }).fill("new-password");
-  await page.getByLabel("Xác nhận mật khẩu mới").fill("new-password");
+  await page.getByLabel("Xác nhận mật khẩu mới", { exact: true }).fill("new-password");
   await page.getByRole("button", { name: "Đổi mật khẩu" }).click();
 
   await expect.poll(() => changePasswordPayload).toEqual({ currentPassword: "old-password", newPassword: "new-password" });

@@ -198,7 +198,33 @@ test("registration fields reflect the backend password and username limits", asy
 
   await expect(page.getByLabel("Mật khẩu", { exact: true })).toHaveAttribute("minlength", "6");
   await expect(page.getByLabel("Tên người dùng")).toHaveAttribute("maxlength", "30");
-  await expect(page.getByLabel("Tên người dùng")).toHaveAttribute("pattern", "[a-z0-9._-]{3,30}");
+  await expect(page.getByLabel("Tên người dùng")).toHaveAttribute("pattern", "[a-z0-9._\\-]{3,30}");
+});
+
+test("registration validates username and organization phone values in the browser", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByRole("tab", { name: "Tạo tài khoản" }).click();
+
+  const username = page.getByLabel("Tên người dùng");
+  for (const value of ["valid-user", "valid_user", "valid.user"]) {
+    await username.fill(value);
+    expect(await username.evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(true);
+  }
+  for (const value of ["bad!", "UPPERCASE", "ab"]) {
+    await username.fill(value);
+    expect(await username.evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(false);
+  }
+
+  await page.getByRole("radio", { name: /Tổ chức/ }).check();
+  const phone = page.getByLabel("Điện thoại tổ chức");
+  for (const value of ["+84123456789", "84123456789", "123456"]) {
+    await phone.fill(value);
+    expect(await phone.evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(true);
+  }
+  for (const value of ["12345", "+84abc123", "84 123456"]) {
+    await phone.fill(value);
+    expect(await phone.evaluate((input: HTMLInputElement) => input.checkValidity())).toBe(false);
+  }
 });
 
 test("registration keeps the successful-create outcome when the follow-up login fails", async ({ page }) => {
