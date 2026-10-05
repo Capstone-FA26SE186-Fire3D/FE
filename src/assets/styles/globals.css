@@ -395,3 +395,25 @@ button { cursor: pointer; }
   .learn-card, .learning-workspace * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
   .learn-card:hover { transform: none; }
 }
+
+/* Article reader: secondary reading beside the current article. */
+.reader-layout { display: grid; grid-template-columns: minmax(0, 780px) minmax(260px, 1fr); align-items: start; gap: 56px; }
+.reader-layout .article-reading { min-width: 0; }
+.reader-related { position: sticky; top: 32px; min-width: 0; }
+.reader-related h2 { margin: 0 0 10px; color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.reader-related-note { margin: 0 0 20px; color: var(--dim); font-size: 11px; }
+.reader-related ul { list-style: none; margin: 0; padding: 0; }
+.reader-related li + li { border-top: 1px solid var(--line); }
+.reader-related-link { display: flex; gap: 16px; align-items: flex-start; padding: 20px 0; }
+.reader-related li:first-child .reader-related-link { padding-top: 0; }
+.reader-related-cover { position: relative; display: grid; place-items: center; flex: 0 0 80px; width: 80px; height: 80px; overflow: hidden; border-radius: 12px; color: var(--muted); background-color: var(--surface); }
+.reader-related-cover img { object-fit: cover; }
+.reader-related-copy { display: grid; min-width: 0; gap: 8px; }
+.reader-related-copy strong { font-size: 14px; font-weight: 500; line-height: 1.6; }
+.reader-related-copy > span { color: var(--dim); font-size: 12px; }
+.reader-related-link:hover strong, .reader-related-all:hover { color: var(--ember); }
+.reader-related-all { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; margin-top: 8px; color: var(--muted); font-size: 12px; }
+@media (max-width: 1023px) {
+  .reader-layout { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+  .reader-related { position: static; padding-top: 28px; border-top: 1px solid var(--line); }
+}
