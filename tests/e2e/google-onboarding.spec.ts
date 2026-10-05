@@ -60,6 +60,7 @@ for (const accountType of ["trainee", "organization"] as const) {
     await expect.poll(() => page.evaluate(() => sessionStorage.getItem("fire3d-auth-tokens"))).toBe(JSON.stringify({ accessToken: "test-access", refreshToken: "test-refresh" }));
     expect(await page.evaluate(() => Object.values(sessionStorage).join(" "))).not.toContain("mock-onboarding-proof");
     expect(page.url()).not.toContain("mock-onboarding-proof");
+    await expect.poll(() => page.evaluate(() => (window as unknown as { googleTestDestinations: string[] }).googleTestDestinations.at(-1))).toBe(accountType === "trainee" ? "/learning-hub" : "/workspace/buildings");
   });
 }
 
