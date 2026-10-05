@@ -98,46 +98,51 @@ test("trainee registration verifies an OTP before creating an account", async ({
   let otpRequestPayload: unknown;
   let otpVerificationPayload: unknown;
   let registrationPayload: unknown;
+  const requestOrder: string[] = [];
 
   await page.route("**/api/auth/registration/request-otp", async (route) => {
     otpRequestPayload = route.request().postDataJSON();
     await route.fulfill({ status: 202 });
   });
   await page.route("**/api/auth/registration/verify-otp", async (route) => {
+    requestOrder.push("verify-otp");
     otpVerificationPayload = route.request().postDataJSON();
     await route.fulfill({ json: { registrationToken: "registration-proof", expiresAt: "2026-10-01T12:00:00Z" } });
   });
 
   await page.route("**/api/auth/register/trainee", async (route) => {
+    requestOrder.push("register");
     registrationPayload = route.request().postDataJSON();
-    await route.fulfill({ status: 201, json: { id: "trainee-1" } });
+    await route.fulfill({ status: 201, json: { id: "trainee-1", email: "trainee@fire3d.test", fullName: "Trainee", role: "Trainee", organizationId: null } });
   });
-  await page.route("**/api/auth/login", (route) => route.fulfill({ json: { accessToken: "access", refreshToken: "refresh", user: { id: "trainee-1", email: "trainee@fire3d.test", fullName: "Trainee", role: 2, organizationId: null } } }));
+  await page.route("**/api/auth/login", (route) => {
+    requestOrder.push("login");
+    return route.fulfill({ json: { accessToken: "access", refreshToken: "refresh", user: { id: "trainee-1", email: "trainee@fire3d.test", fullName: "Trainee", role: 2, organizationId: null } } });
+  });
 
   await page.goto("/login");
   await page.getByRole("tab", { name: "Tạo tài khoản" }).click();
   await page.getByLabel("Họ và tên").fill("Trainee Test");
-  await page.getByLabel("Tên người dùng").fill("Trainee_Test");
+  await page.getByLabel("Tên người dùng").fill("trainee_test");
   await page.getByLabel("Email", { exact: true }).fill("trainee@fire3d.test");
-  await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
-  await page.getByLabel("Xác nhận mật khẩu", { exact: true }).fill("safe-password-123");
+  await page.getByLabel("Mật khẩu", { exact: true }).fill("123456");
+  await page.getByLabel("Xác nhận mật khẩu", { exact: true }).fill("123456");
   await page.getByRole("button", { name: "Gửi mã OTP" }).click();
 
   await expect.poll(() => otpRequestPayload).toEqual({ email: "trainee@fire3d.test" });
   await page.getByLabel("Mã OTP").fill("123456");
-  await page.getByRole("button", { name: "Xác minh mã" }).click();
+  await page.getByRole("button", { name: "Xác thực và tạo tài khoản" }).click();
   await expect.poll(() => otpVerificationPayload).toEqual({ email: "trainee@fire3d.test", otp: "123456" });
-
-  await page.getByRole("button", { name: "Tạo tài khoản" }).click();
 
   await expect.poll(() => registrationPayload).toEqual({
     email: "trainee@fire3d.test",
-    password: "safe-password-123",
-    confirmPassword: "safe-password-123",
+    password: "123456",
+    confirmPassword: "123456",
     fullName: "Trainee Test",
     username: "trainee_test",
     registrationToken: "registration-proof",
   });
+  await expect.poll(() => requestOrder).toEqual(["verify-otp", "register", "login"]);
 });
 
 test("registration can resend an OTP and clears the previous code", async ({ page }) => {
@@ -163,30 +168,58 @@ test("registration can resend an OTP and clears the previous code", async ({ pag
 
   await expect.poll(() => resendPayload).toEqual({ email: "trainee@fire3d.test" });
   await expect(page.getByLabel("Mã OTP")).toHaveValue("");
-  await expect(page.getByRole("status")).toContainText("Mã OTP mới đã được gửi");
+  await expect(page.getByRole("status")).toContainText("Đã yêu cầu mã OTP mới");
 });
 
-test("pending accounts can request another OTP from the login screen", async ({ page }) => {
-  let resendPayload: unknown;
-
-  await page.route("**/api/auth/login", (route) => route.fulfill({
-    status: 403,
+test("registration presents an existing-email response and returns to login", async ({ page }) => {
+  await page.route("**/api/auth/registration/request-otp", (route) => route.fulfill({
+    status: 409,
     contentType: "application/problem+json",
-    body: JSON.stringify({ title: "Verify your email before signing in.", code: "EMAIL_NOT_VERIFIED" }),
+    body: JSON.stringify({ title: "Email already exists.", code: "EMAIL_EXISTS", errors: { email: ["Email already exists."] } }),
   }));
-  await page.route("**/api/auth/resend-verification", async (route) => {
-    resendPayload = route.request().postDataJSON();
-    await route.fulfill({ status: 202 });
-  });
 
   await page.goto("/login");
-  await page.getByLabel("Email").fill("pending@fire3d.test");
-  await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
-  await page.getByRole("button", { name: "Đăng nhập" }).click();
+  await page.getByRole("tab", { name: "Tạo tài khoản" }).click();
+  await page.getByLabel("Tên người dùng").fill("existing-user");
+  await page.getByLabel("Email", { exact: true }).fill("existing@fire3d.test");
+  await page.getByLabel("Mật khẩu", { exact: true }).fill("123456");
+  await page.getByLabel("Xác nhận mật khẩu", { exact: true }).fill("123456");
+  await page.getByRole("button", { name: "Gửi mã OTP" }).click();
 
-  await expect(page.getByRole("heading", { name: "Tài khoản chưa xác minh" })).toBeVisible();
-  await page.getByRole("button", { name: "Gửi lại mã OTP" }).click();
-  await expect.poll(() => resendPayload).toEqual({ email: "pending@fire3d.test" });
+  await expect(page.getByRole("alert", { name: "Lỗi xác thực" })).toContainText("Email already exists.");
+  await expect(page.getByRole("tab", { name: "Đăng nhập" })).toBeVisible();
+  await page.getByRole("tab", { name: "Đăng nhập" }).click();
+  await expect(page.getByRole("heading", { name: "Đăng nhập Fire3D" })).toBeVisible();
+});
+
+test("registration fields reflect the backend password and username limits", async ({ page }) => {
+  await page.goto("/login");
+  await page.getByRole("tab", { name: "Tạo tài khoản" }).click();
+
+  await expect(page.getByLabel("Mật khẩu", { exact: true })).toHaveAttribute("minlength", "6");
+  await expect(page.getByLabel("Tên người dùng")).toHaveAttribute("maxlength", "30");
+  await expect(page.getByLabel("Tên người dùng")).toHaveAttribute("pattern", "[a-z0-9._-]{3,30}");
+});
+
+test("registration keeps the successful-create outcome when the follow-up login fails", async ({ page }) => {
+  await page.route("**/api/auth/registration/request-otp", (route) => route.fulfill({ status: 202 }));
+  await page.route("**/api/auth/registration/verify-otp", (route) => route.fulfill({ json: { registrationToken: "registration-proof", expiresAt: "2026-10-01T12:00:00Z" } }));
+  await page.route("**/api/auth/register/trainee", (route) => route.fulfill({ status: 201, json: { id: "trainee-1", email: "trainee@fire3d.test", fullName: null, role: "Trainee", organizationId: null } }));
+  await page.route("**/api/auth/login", (route) => route.fulfill({ status: 401, contentType: "application/problem+json", body: JSON.stringify({ title: "Invalid credentials." }) }));
+
+  await page.goto("/login");
+  await page.getByRole("tab", { name: "Tạo tài khoản" }).click();
+  await page.getByLabel("Tên người dùng").fill("trainee_test");
+  await page.getByLabel("Email", { exact: true }).fill("trainee@fire3d.test");
+  await page.getByLabel("Mật khẩu", { exact: true }).fill("123456");
+  await page.getByLabel("Xác nhận mật khẩu", { exact: true }).fill("123456");
+  await page.getByRole("button", { name: "Gửi mã OTP" }).click();
+  await page.getByLabel("Mã OTP").fill("123456");
+  await page.getByRole("button", { name: "Xác thực và tạo tài khoản" }).click();
+
+  await expect(page.getByRole("tab", { name: "Đăng nhập" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("alert", { name: "Lỗi xác thực" })).toContainText("Tài khoản đã được tạo.");
+  await expect(page.getByLabel("Email")).toHaveValue("trainee@fire3d.test");
 });
 
 test("organization registration includes the verified OTP proof", async ({ page }) => {
@@ -198,7 +231,7 @@ test("organization registration includes the verified OTP proof", async ({ page 
   }));
   await page.route("**/api/auth/register/organization", async (route) => {
     registrationPayload = route.request().postDataJSON();
-    await route.fulfill({ status: 201, json: { id: "organization-owner-1" } });
+    await route.fulfill({ status: 201, json: { id: "organization-owner-1", email: "owner@fire3d.test", fullName: "Organization Owner", role: "OrganizationUser", organizationId: "org-1" } });
   });
   await page.route("**/api/auth/login", (route) => route.fulfill({ json: {
     accessToken: "access", refreshToken: "refresh",
@@ -217,8 +250,7 @@ test("organization registration includes the verified OTP proof", async ({ page 
   await page.getByLabel("Xác nhận mật khẩu", { exact: true }).fill("safe-password-123");
   await page.getByRole("button", { name: "Gửi mã OTP" }).click();
   await page.getByLabel("Mã OTP").fill("123456");
-  await page.getByRole("button", { name: "Xác minh mã" }).click();
-  await page.getByRole("button", { name: "Tạo tài khoản" }).click();
+  await page.getByRole("button", { name: "Xác thực và tạo tài khoản" }).click();
 
   await expect.poll(() => registrationPayload).toEqual({
     email: "owner@fire3d.test",

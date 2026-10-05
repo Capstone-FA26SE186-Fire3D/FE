@@ -97,6 +97,8 @@ button { cursor: pointer; }
 .form-field { display: grid; gap: 7px; margin: 13px 0; color: var(--muted); font-size: 12px; }
 .form-field input { min-height: 45px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-soft); color: var(--text); outline: 0; }
 .form-field input:focus { border-color: var(--ember); }
+.field-error { color: #ffad8a; font-size: 11px; line-height: 1.4; }
+.field-optional { color: var(--dim); }
 .password-input { position: relative; display: block; }.password-input > input { width: 100%; padding-right: 46px; }.password-toggle { position: absolute; top: 50%; right: 4px; display: inline-grid; width: 36px; height: 36px; place-items: center; transform: translateY(-50%); border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }.password-toggle:hover { color: var(--text); background: rgba(255,255,255,.06); }.password-toggle:focus-visible { outline: 2px solid var(--ember); outline-offset: 1px; }
 .account-type-fieldset { margin: 20px 0 16px; padding: 0; border: 0; }
 .account-type-fieldset legend { padding: 0; margin-bottom: 10px; color: var(--muted); font-size: 12px; }
