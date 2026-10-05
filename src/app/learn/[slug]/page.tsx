@@ -1,3 +1,4 @@
+import { RelatedArticles } from "@/features/learn/components/related-articles";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SiteFooter } from "@/layouts/site-footer";
@@ -17,5 +18,5 @@ export default async function ArticlePage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const article = getArticle(slug);
   if (!article) notFound();
-  return <div className="site-shell"><SiteHeader /><main className="page-main"><div className="article-reading"><div className="article-meta"><span>{article.category}</span><span>•</span><span>{article.readingTime}</span><span>•</span><span>{article.date}</span></div><h1>{article.title}</h1><p className="lede">{article.excerpt}</p><p className="source-note">Nguồn: {article.source}</p><ArticleActions slug={article.slug} /><div className="article-body">{article.body.map((section) => <section key={section.heading ?? section.paragraphs[0]}>{section.heading && <h2>{section.heading}</h2>}{section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</section>)}</div></div></main><SiteFooter /></div>;
+  return <div className="site-shell"><SiteHeader /><main className="page-main reader-layout"><div className="article-reading"><div className="article-meta"><span>{article.category}</span><span>•</span><span>{article.readingTime}</span><span>•</span><span>{article.date}</span></div><h1>{article.title}</h1><p className="lede">{article.excerpt}</p><p className="source-note">Nguồn: {article.source}</p><ArticleActions slug={article.slug} /><div className="article-body">{article.body.map((section) => <section key={section.heading ?? section.paragraphs[0]}>{section.heading && <h2>{section.heading}</h2>}{section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}</section>)}</div></div><RelatedArticles currentSlug={article.slug} /></main><SiteFooter /></div>;
 }
