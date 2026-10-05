@@ -12,7 +12,10 @@ import { useDemoSession } from "@/store/demo-session";
 import { authApi } from "../api";
 import { useAuthSession } from "../auth-session";
 import { postLoginRoute } from "../redirect";
+import type { RegisterInput } from "../types";
 import { GoogleIcon } from "./google-icon";
+
+type FieldErrors = Record<string, string>;
 
 function errorCode(error: unknown) {
   const code = error instanceof ApiError ? error.payload?.code : undefined;
@@ -21,6 +24,21 @@ function errorCode(error: unknown) {
 
 function errorMessage(error: unknown, fallback: string) {
   return error instanceof Error ? error.message : fallback;
+}
+
+function toFieldErrors(error: unknown): FieldErrors {
+  if (!(error instanceof ApiError)) return {};
+  const errors = error.payload?.errors;
+  if (typeof errors !== "object" || errors === null || Array.isArray(errors)) return {};
+
+  return Object.fromEntries(Object.entries(errors).flatMap(([key, value]) => {
+    const message = Array.isArray(value) ? value.find((item): item is string => typeof item === "string") : value;
+    return typeof message === "string" ? [[key.toLowerCase(), message]] : [];
+  }));
+}
+
+function FieldError({ message }: { message?: string }) {
+  return message ? <span className="field-error">{message}</span> : null;
 }
 
 export function LoginForm() {
@@ -40,14 +58,12 @@ export function LoginForm() {
   const [organizationPhoneNumber, setOrganizationPhoneNumber] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
-  const [registrationToken, setRegistrationToken] = useState("");
   const [otpNotice, setOtpNotice] = useState("");
-  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
-  const [resendNotice, setResendNotice] = useState("");
+  const [existingEmail, setExistingEmail] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [otpPending, setOtpPending] = useState(false);
-  const [resendPending, setResendPending] = useState(false);
 
   useEffect(() => {
     if (ready && isAuthenticated) router.replace(postLoginRoute(user, params.get("next")));
@@ -58,52 +74,40 @@ export function LoginForm() {
   const clearRegistrationProof = () => {
     setOtp("");
     setOtpSent(false);
-    setRegistrationToken("");
     setOtpNotice("");
   };
 
   const selectMode = (nextMode: "login" | "register") => {
     setMode(nextMode);
     setMessage("");
-    setPendingVerificationEmail("");
-    setResendNotice("");
+    setFieldErrors({});
+    setExistingEmail("");
     if (nextMode === "login") clearRegistrationProof();
   };
 
   const changeEmail = (value: string) => {
     setEmail(value);
     clearRegistrationProof();
-    setPendingVerificationEmail("");
-    setResendNotice("");
+    setExistingEmail("");
+    setFieldErrors((current) => ({ ...current, email: "" }));
   };
 
   const requestOtp = async (event: React.MouseEvent<HTMLButtonElement>) => {
     if (!event.currentTarget.form?.reportValidity()) return;
     setMessage("");
+    setFieldErrors({});
+    setExistingEmail("");
     setOtpNotice("");
     setOtpPending(true);
     try {
       await authApi.requestRegistrationOtp(email.trim());
       setOtpSent(true);
       setOtp("");
-      setOtpNotice("Mã OTP đã được gửi. Nhập mã gồm 6 chữ số trong email của bạn.");
+      setOtpNotice("Yêu cầu gửi mã OTP đã được tiếp nhận. Nhập mã gồm 6 chữ số trong email của bạn.");
     } catch (error) {
+      setFieldErrors(toFieldErrors(error));
+      if (errorCode(error) === "EMAIL_EXISTS") setExistingEmail(email.trim());
       setMessage(errorMessage(error, "Không thể gửi mã OTP. Vui lòng thử lại."));
-    } finally {
-      setOtpPending(false);
-    }
-  };
-
-  const verifyOtp = async () => {
-    setMessage("");
-    setOtpNotice("");
-    setOtpPending(true);
-    try {
-      const proof = await authApi.verifyRegistrationOtp(email.trim(), otp.trim());
-      setRegistrationToken(proof.registrationToken);
-      setOtpNotice("Email đã được xác minh. Bạn có thể tạo tài khoản.");
-    } catch (error) {
-      setMessage(errorMessage(error, "Mã OTP không hợp lệ hoặc đã hết hạn."));
     } finally {
       setOtpPending(false);
     }
@@ -111,78 +115,102 @@ export function LoginForm() {
 
   const resendRegistrationOtp = async () => {
     setMessage("");
+    setFieldErrors({});
+    setExistingEmail("");
     setOtpNotice("");
     setOtpPending(true);
     try {
       await authApi.resendVerification(email.trim());
       setOtp("");
-      setRegistrationToken("");
       setOtpSent(true);
-      setOtpNotice("Mã OTP mới đã được gửi. Mã và xác minh trước đó không còn hiệu lực.");
+      setOtpNotice("Đã yêu cầu mã OTP mới. Mã và xác minh trước đó không còn hiệu lực.");
     } catch (error) {
+      setFieldErrors(toFieldErrors(error));
+      if (errorCode(error) === "EMAIL_EXISTS") setExistingEmail(email.trim());
       setMessage(errorMessage(error, "Không thể gửi lại mã OTP. Vui lòng thử lại."));
     } finally {
       setOtpPending(false);
     }
   };
 
-  const resendVerification = async () => {
-    setMessage("");
-    setResendNotice("");
-    setResendPending(true);
-    try {
-      await authApi.resendVerification(pendingVerificationEmail);
-      setResendNotice("Mã OTP đã được yêu cầu. Hãy kiểm tra email của bạn.");
-    } catch (error) {
-      setMessage(errorMessage(error, "Không thể gửi lại mã OTP. Vui lòng thử lại."));
-    } finally {
-      setResendPending(false);
-    }
+  const registrationInput = (registrationToken: string): RegisterInput => {
+    const base = { email: email.trim(), password, confirmPassword, fullName: fullName.trim() || undefined, registrationToken };
+    return accountType === "organization"
+      ? { ...base, accountType, organizationName: organizationName.trim(), organizationAddress: organizationAddress.trim(), organizationPhoneNumber: organizationPhoneNumber.trim() }
+      : { ...base, accountType, username: username.trim().toLowerCase() };
+  };
+
+  const redirectAfterLogin = (authenticatedUser: NonNullable<typeof user>) => {
+    const next = pendingAction?.type === "ask"
+      ? `${routes.learningHub}?article=${encodeURIComponent(pendingAction.slug)}`
+      : pendingAction?.type === "save" ? `/learn/${pendingAction.slug}` : postLoginRoute(authenticatedUser, params.get("next"));
+    router.replace(next);
   };
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage("");
-    if (mode === "register" && !registrationToken) {
-      setMessage("Hãy xác minh email bằng mã OTP trước khi tạo tài khoản.");
+    setFieldErrors({});
+
+    if (mode === "login") {
+      setSubmitting(true);
+      try {
+        redirectAfterLogin(await login(email.trim(), password));
+      } catch (error) {
+        setFieldErrors(toFieldErrors(error));
+        setMessage(errorMessage(error, "Không thể đăng nhập. Vui lòng thử lại."));
+        setSubmitting(false);
+      }
       return;
     }
+
+    if (!otpSent || otp.length !== 6) {
+      setFieldErrors({ otp: "Nhập mã OTP gồm 6 chữ số trước khi tạo tài khoản." });
+      return;
+    }
+
     setSubmitting(true);
-    let authenticatedUser = user;
+    let registrationToken: string;
     try {
-      authenticatedUser = mode === "register"
-        ? accountType === "organization"
-          ? await register({ accountType, email, password, confirmPassword, fullName, organizationName, organizationAddress, organizationPhoneNumber, registrationToken })
-          : await register({ accountType, email, password, confirmPassword, fullName, username: username.trim().toLowerCase(), registrationToken })
-        : await login(email, password);
+      registrationToken = (await authApi.verifyRegistrationOtp(email.trim(), otp)).registrationToken;
     } catch (error) {
-      if (mode === "login" && errorCode(error) === "EMAIL_NOT_VERIFIED") setPendingVerificationEmail(email.trim());
-      if (mode === "register" && errorCode(error) === "EMAIL_VERIFICATION_REQUIRED") clearRegistrationProof();
-      setMessage(errorMessage(error, "Không thể xác thực. Vui lòng thử lại."));
+      setFieldErrors({ ...toFieldErrors(error), otp: errorMessage(error, "Mã OTP không hợp lệ hoặc đã hết hạn.") });
+      setMessage(errorMessage(error, "Mã OTP không hợp lệ hoặc đã hết hạn."));
       setSubmitting(false);
       return;
     }
-    const next = pendingAction?.type === "ask"
-      ? `${routes.learningHub}?article=${encodeURIComponent(pendingAction.slug)}`
-      : pendingAction?.type === "save" ? `/learn/${pendingAction.slug}` : postLoginRoute(authenticatedUser, params.get("next"));
-    router.replace(next);
+
+    try {
+      await register(registrationInput(registrationToken));
+    } catch (error) {
+      setFieldErrors(toFieldErrors(error));
+      setMessage(errorMessage(error, "Không thể tạo tài khoản. Vui lòng kiểm tra lại thông tin."));
+      setSubmitting(false);
+      return;
+    }
+
+    try {
+      redirectAfterLogin(await login(email.trim(), password));
+    } catch {
+      clearRegistrationProof();
+      setPassword("");
+      setConfirmPassword("");
+      setMode("login");
+      setMessage("Tài khoản đã được tạo. Đăng nhập tự động chưa thành công; hãy đăng nhập bằng email và mật khẩu vừa tạo.");
+      setSubmitting(false);
+    }
   };
 
   const submitGoogle = async () => {
     setMessage("");
+    setFieldErrors({});
     setSubmitting(true);
-    let authenticatedUser = user;
     try {
-      authenticatedUser = await loginWithGoogle();
+      redirectAfterLogin(await loginWithGoogle());
     } catch (error) {
       setMessage(errorMessage(error, "Không thể xác thực với Google. Vui lòng thử lại."));
       setSubmitting(false);
-      return;
     }
-    const next = pendingAction?.type === "ask"
-      ? `${routes.learningHub}?article=${encodeURIComponent(pendingAction.slug)}`
-      : pendingAction?.type === "save" ? `/learn/${pendingAction.slug}` : postLoginRoute(authenticatedUser, params.get("next"));
-    router.replace(next);
   };
 
   return (
@@ -194,12 +222,6 @@ export function LoginForm() {
       <h1>{mode === "login" ? "Đăng nhập Fire3D" : "Tạo tài khoản"}</h1>
       <p id="auth-note">{mode === "login" ? "Dùng email và mật khẩu Fire3D. Google là lựa chọn bổ sung khi môi trường đã cấu hình Firebase." : "Điền thông tin, xác minh email bằng OTP, rồi mới tạo tài khoản."}</p>
       {message && <div role="alert" aria-label="Lỗi xác thực" className="form-message"><CircleAlert aria-hidden="true" size={18} /><div><strong>Thông báo từ Fire3D</strong><p>{message}</p></div></div>}
-      {pendingVerificationEmail && mode === "login" && <section className="verification-panel" aria-labelledby="pending-verification-title">
-        <h2 id="pending-verification-title">Tài khoản chưa xác minh</h2>
-        <p>Email <strong>{pendingVerificationEmail}</strong> cần được xác minh trước khi đăng nhập.</p>
-        <Button type="button" variant="secondary" disabled={resendPending} onClick={() => void resendVerification()}>{resendPending ? "Đang gửi…" : "Gửi lại mã OTP"}</Button>
-        {resendNotice && <p className="verification-status" role="status">{resendNotice}</p>}
-      </section>}
       {mode === "register" && <>
         <fieldset className="account-type-fieldset">
           <legend>Loại tài khoản</legend>
@@ -216,28 +238,31 @@ export function LoginForm() {
             </label>
           </div>
         </fieldset>
-        <label className="form-field">Họ và tên<input required minLength={1} maxLength={200} value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" aria-invalid={!!message} /></label>
-        {accountType === "trainee" ? <label className="form-field">Tên người dùng<input required minLength={3} maxLength={50} value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" aria-invalid={!!message} /></label> : <>
-          <label className="form-field">Tên tổ chức<input required maxLength={200} value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} aria-invalid={!!message} /></label>
-          <label className="form-field">Địa chỉ tổ chức<input required maxLength={500} value={organizationAddress} onChange={(event) => setOrganizationAddress(event.target.value)} aria-invalid={!!message} /></label>
-          <label className="form-field">Điện thoại tổ chức<input required maxLength={30} value={organizationPhoneNumber} onChange={(event) => setOrganizationPhoneNumber(event.target.value)} autoComplete="tel" aria-invalid={!!message} /></label>
+        <label className="form-field">Họ và tên <span className="field-optional">(không bắt buộc)</span><input maxLength={200} value={fullName} onChange={(event) => setFullName(event.target.value)} autoComplete="name" aria-invalid={!!fieldErrors.fullname} /> <FieldError message={fieldErrors.fullname} /></label>
+        {accountType === "trainee" ? <label className="form-field">Tên người dùng<input required minLength={3} maxLength={30} pattern="[a-z0-9._\-]{3,30}" value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" aria-invalid={!!fieldErrors.username} /> <FieldError message={fieldErrors.username} /></label> : <>
+          <label className="form-field">Tên tổ chức<input required maxLength={200} value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} aria-invalid={!!fieldErrors.organizationname} /> <FieldError message={fieldErrors.organizationname} /></label>
+          <label className="form-field">Địa chỉ tổ chức<input required maxLength={500} value={organizationAddress} onChange={(event) => setOrganizationAddress(event.target.value)} aria-invalid={!!fieldErrors.organizationaddress} /> <FieldError message={fieldErrors.organizationaddress} /></label>
+          <label className="form-field">Điện thoại tổ chức<input required maxLength={16} pattern="\+?[0-9]{6,15}" value={organizationPhoneNumber} onChange={(event) => setOrganizationPhoneNumber(event.target.value)} autoComplete="tel" aria-invalid={!!fieldErrors.organizationphonenumber} /> <FieldError message={fieldErrors.organizationphonenumber} /></label>
         </>}
       </>}
-      <label className="form-field">Email<input required type="email" value={email} onChange={(event) => changeEmail(event.target.value)} autoComplete="email" aria-invalid={!!message} /></label>
-      <label className="form-field">Mật khẩu<PasswordInput visibilityLabel="mật khẩu" required minLength={12} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} aria-invalid={!!message} aria-label="Mật khẩu" /></label>
-      {mode === "register" && <label className="form-field">Xác nhận mật khẩu<PasswordInput visibilityLabel="xác nhận mật khẩu" required minLength={12} maxLength={128} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" aria-invalid={!!message} aria-label="Xác nhận mật khẩu" /></label>}
-      {mode === "register" && !registrationToken && <section className="verification-panel" aria-labelledby="registration-verification-title">
+      <label className="form-field">Email<input required type="email" maxLength={254} value={email} onChange={(event) => changeEmail(event.target.value)} autoComplete="email" aria-invalid={!!fieldErrors.email} /> <FieldError message={fieldErrors.email} /></label>
+      <label className="form-field">Mật khẩu<PasswordInput visibilityLabel="mật khẩu" required minLength={mode === "register" ? 6 : undefined} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} aria-invalid={!!fieldErrors.password} aria-label="Mật khẩu" /> <FieldError message={fieldErrors.password} /></label>
+      {mode === "register" && <label className="form-field">Xác nhận mật khẩu<PasswordInput visibilityLabel="xác nhận mật khẩu" required minLength={6} maxLength={128} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} autoComplete="new-password" aria-invalid={!!fieldErrors.confirmpassword} aria-label="Xác nhận mật khẩu" /> <FieldError message={fieldErrors.confirmpassword} /></label>}
+      {mode === "register" && <section className="verification-panel" aria-labelledby="registration-verification-title">
         <h2 id="registration-verification-title">Xác minh email</h2>
         {!otpSent ? <Button type="button" variant="secondary" disabled={!ready || otpPending} onClick={(event) => void requestOtp(event)}>{otpPending ? "Đang gửi…" : "Gửi mã OTP"}</Button> : <>
           <p>Nhập mã 6 chữ số đã gửi đến <strong>{email}</strong>.</p>
-          <label className="form-field">Mã OTP<input required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, ""))} autoComplete="one-time-code" /></label>
-          <Button type="button" variant="secondary" disabled={otpPending || otp.length !== 6} onClick={() => void verifyOtp()}>{otpPending ? "Đang xác minh…" : "Xác minh mã"}</Button>
+          <label className="form-field">Mã OTP<input required inputMode="numeric" pattern="[0-9]{6}" minLength={6} maxLength={6} value={otp} onChange={(event) => setOtp(event.target.value.replace(/\D/g, ""))} autoComplete="one-time-code" aria-invalid={!!fieldErrors.otp} /> <FieldError message={fieldErrors.otp} /></label>
           <Button type="button" variant="secondary" disabled={otpPending} onClick={() => void resendRegistrationOtp()}>{otpPending ? "Đang gửi…" : "Gửi lại mã OTP"}</Button>
         </>}
         {otpNotice && <p className="verification-status" role="status">{otpNotice}</p>}
       </section>}
-      {mode === "register" && registrationToken && <p className="verification-status" role="status">{otpNotice}</p>}
-      {(mode === "login" || !!registrationToken) && <Button disabled={!ready || submitting} className="form-submit" type="submit">{submitting ? "Đang xử lý…" : mode === "login" ? "Đăng nhập" : "Tạo tài khoản"}</Button>}
+      {existingEmail && mode === "register" && <section className="verification-panel" aria-labelledby="existing-email-title">
+        <h2 id="existing-email-title">Email đã có tài khoản</h2>
+        <p><strong>{existingEmail}</strong> đã được đăng ký. Hãy đăng nhập hoặc sử dụng chức năng quên mật khẩu.</p>
+        <Button type="button" variant="secondary" onClick={() => selectMode("login")}>Đăng nhập</Button>
+      </section>}
+      {(mode === "login" || otpSent) && <Button disabled={!ready || submitting || (mode === "register" && otp.length !== 6)} className="form-submit" type="submit">{submitting ? "Đang xử lý…" : mode === "login" ? "Đăng nhập" : "Xác thực và tạo tài khoản"}</Button>}
       {mode === "login" && <Button disabled={!ready || !hasFirebaseAuthConfig || submitting} className="google-sign-in" type="button" variant="secondary" onClick={() => void submitGoogle()}><GoogleIcon /> Tiếp tục với Google</Button>}
     </form>
   );

@@ -17,7 +17,7 @@ type AuthSessionContextValue = {
   login: (email: string, password: string) => Promise<AuthUser>;
   loginWithGoogle: () => Promise<AuthUser>;
   logout: () => Promise<void>;
-  register: (input: RegisterInput) => Promise<AuthUser>;
+  register: (input: RegisterInput) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
   resetPassword: (token: string, newPassword: string) => Promise<void>;
   updateUser: (user: AuthUser) => void;
@@ -131,12 +131,11 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const register = useCallback(async (input: RegisterInput) => {
     try {
       await authApi.register(input);
-      return await login(input.email, input.password);
     } catch (error) {
       if (error instanceof ApiError) throw error;
       throw new Error(toMessage(error));
     }
-  }, [login]);
+  }, []);
 
   const requestPasswordReset = useCallback(async (email: string) => {
     setPending(true);
