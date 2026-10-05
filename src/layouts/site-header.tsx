@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, ChevronDown, LogOut, UserRound } from "lucide-react";
+import { ArrowUpRight, ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Iconsax } from "@/components/ui/iconsax";
 import { FET3DLogo } from "@/components/brand/fet3d-logo";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
@@ -59,9 +60,9 @@ export function SiteHeader() {
             {accountOpen && <div className="account-popover" role="menu" aria-label="Tài khoản">
               <p className="account-popover-name">{displayName}</p>
               <p className="account-popover-email">{user.email}</p>
-              <Link href={dashboardHref} role="menuitem" onClick={() => setAccountOpen(false)}><UserRound size={16} /> Không gian của tôi</Link>
-              <Link href={routes.account} role="menuitem" onClick={() => setAccountOpen(false)}><UserRound size={16} /> Chi tiết tài khoản</Link>
-              <button type="button" role="menuitem" onClick={() => { setAccountOpen(false); void logout(); }}><LogOut size={16} /> Đăng xuất</button>
+              <Link href={dashboardHref} role="menuitem" onClick={() => setAccountOpen(false)}><Iconsax name="user" size={16} /> Không gian của tôi</Link>
+              <Link href={routes.account} role="menuitem" onClick={() => setAccountOpen(false)}><Iconsax name="user" size={16} /> Chi tiết tài khoản</Link>
+              <button type="button" role="menuitem" onClick={() => { setAccountOpen(false); void logout(); }}><Iconsax name="logout" size={16} /> Đăng xuất</button>
             </div>}
           </div>
         ) : <Link className="header-login" href={routes.login}>Đăng nhập</Link>}
