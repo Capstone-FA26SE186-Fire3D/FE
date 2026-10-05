@@ -88,7 +88,7 @@ test("Google login unwraps the authenticated session returned by Fire3D", async 
   });
 
   try {
-    await expect(authApi.loginFirebase("firebase-id-token")).resolves.toEqual(authentication);
+    await expect(authApi.loginFirebase("firebase-id-token")).resolves.toEqual({ status: "Authenticated", authentication });
   } finally {
     globalThis.fetch = originalFetch;
   }

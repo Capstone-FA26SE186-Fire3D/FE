@@ -1,10 +1,13 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { ApiError } from "@/api/types/common";
+import { routes } from "@/configs/routes";
+import { useDemoSession } from "@/store/demo-session";
 import { authApi } from "./api";
 import { signInWithGoogle } from "./firebase";
-import type { AuthUser, RegisterInput, TokenResponse } from "./types";
+import type { AuthUser, RegisterInput, TokenResponse, GoogleLoginResult, GoogleOnboardingInput } from "./types";
 
 type StoredTokens = Pick<TokenResponse, "accessToken" | "refreshToken">;
 
@@ -15,7 +18,8 @@ type AuthSessionContextValue = {
   ready: boolean;
   user: AuthUser | null;
   login: (email: string, password: string) => Promise<AuthUser>;
-  loginWithGoogle: () => Promise<AuthUser>;
+  loginWithGoogle: () => Promise<GoogleLoginResult>;
+  completeGoogleOnboarding: (input: GoogleOnboardingInput) => Promise<AuthUser>;
   logout: () => Promise<void>;
   register: (input: RegisterInput) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
@@ -57,6 +61,8 @@ function toMessage(error: unknown) {
 }
 
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const { reset: resetDemo } = useDemoSession();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [pending, setPending] = useState(false);
@@ -121,11 +127,17 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     try {
       const firebaseIdToken = await signInWithGoogle();
       const response = await authApi.loginFirebase(firebaseIdToken);
-      saveSession(response);
-      return response.user;
+      if (response.status === "Authenticated") saveSession(response.authentication);
+      return response;
     } catch (error) {
-      throw new Error(toMessage(error));
+      throw error;
     }
+  }, [saveSession]);
+
+  const completeGoogleOnboarding = useCallback(async (input: GoogleOnboardingInput) => {
+    const response = await authApi.completeGoogleOnboarding(input);
+    saveSession(response);
+    return response.user;
   }, [saveSession]);
 
   const register = useCallback(async (input: RegisterInput) => {
@@ -162,13 +174,15 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     const token = accessToken;
     clearSession();
+    resetDemo();
+    router.replace(routes.home);
     if (!token) return;
     try {
       await authApi.logout(token);
     } catch {
       // A local logout must succeed even if an expired token is rejected by the API.
     }
-  }, [accessToken, clearSession]);
+  }, [accessToken, clearSession, resetDemo, router]);
 
   const updateUser = useCallback((nextUser: AuthUser) => {
     setUser(nextUser);
@@ -182,12 +196,13 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     user,
     login,
     loginWithGoogle,
+    completeGoogleOnboarding,
     logout,
     register,
     requestPasswordReset,
     resetPassword,
     updateUser,
-  }), [accessToken, login, loginWithGoogle, logout, pending, ready, register, requestPasswordReset, resetPassword, updateUser, user]);
+  }), [accessToken, completeGoogleOnboarding, login, loginWithGoogle, logout, pending, ready, register, requestPasswordReset, resetPassword, updateUser, user]);
 
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;
 }

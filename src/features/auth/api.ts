@@ -1,4 +1,6 @@
 import { apiClient } from "@/api/client";
+import { ApiError } from "@/api/types/common";
+import type { GoogleLoginResult, GoogleOnboardingInput, GoogleOnboardingProof } from "./types";
 import type { AuthUser, AvatarResponse, RegisterInput, RegistrationOtpVerification, TokenResponse, UpdateProfileInput } from "./types";
 
 type ApiUserRole = AuthUser["role"] | "PlatformAdmin" | "OrganizationUser" | "Trainee";
@@ -6,7 +8,8 @@ type ApiAuthUser = Omit<AuthUser, "role"> & { role: ApiUserRole };
 type ApiTokenResponse = Omit<TokenResponse, "user"> & { user: ApiAuthUser };
 
 type FirebaseLoginResponse = {
-  status: "Authenticated" | "OnboardingRequired";
+  status: "Authenticated" | "OnboardingRequired" | "ACCOUNT_LINK_REQUIRED";
+  onboarding?: GoogleOnboardingProof;
   authentication: ApiTokenResponse | null;
 };
 
@@ -18,11 +21,12 @@ const roleByApiName = {
 
 function normalizeUser(user: ApiAuthUser): AuthUser {
   const role = typeof user.role === "number" ? user.role : roleByApiName[user.role];
-  if (role === undefined) throw new Error("Máy chủ trả về vai trò tài khoản không hợp lệ.");
+  if (role !== 0 && role !== 1 && role !== 2) throw new Error("Máy chủ trả về vai trò tài khoản không hợp lệ.");
   return { ...user, role };
 }
 
 function normalizeTokenResponse(response: ApiTokenResponse): TokenResponse {
+  if (typeof response?.accessToken !== "string" || !response.accessToken.trim() || typeof response.refreshToken !== "string" || !response.refreshToken.trim() || !response.user) throw new Error("Máy chủ chưa trả phiên đăng nhập hợp lệ.");
   return { ...response, user: normalizeUser(response.user) };
 }
 
@@ -34,10 +38,18 @@ export const authApi = {
   async login(email: string, password: string) {
     return normalizeTokenResponse(await apiClient.request<ApiTokenResponse>("/api/auth/login", { json: { email, password } }));
   },
-  async loginFirebase(firebaseIdToken: string) {
-    const response = await apiClient.request<FirebaseLoginResponse>("/api/auth/login-firebase", { json: firebaseIdToken });
-    if (response.status === "Authenticated" && response.authentication) return normalizeTokenResponse(response.authentication);
-    throw new Error(response.status);
+  async loginFirebase(firebaseIdToken: string): Promise<GoogleLoginResult> {
+    try {
+      return googleResult(await apiClient.request<FirebaseLoginResponse>("/api/auth/login-firebase", { json: firebaseIdToken }));
+    } catch (error) {
+      if (error instanceof ApiError && error.payload?.code === "ACCOUNT_LINK_REQUIRED") return { status: "AccountLinkRequired" };
+      throw error;
+    }
+  },
+  async completeGoogleOnboarding(input: GoogleOnboardingInput) {
+    const result = googleResult(await apiClient.request<FirebaseLoginResponse>("/api/auth/google/onboarding/complete", { json: input }));
+    if (result.status !== "Authenticated") throw new Error("Máy chủ chưa hoàn tất tài khoản. Hãy thử lại Google.");
+    return result.authentication;
   },
   register(input: RegisterInput) {
     if (input.accountType === "organization") {
@@ -124,3 +136,14 @@ export const authApi = {
     return apiClient.request<void>("/api/auth/reset-password", { method: "POST", json: { token, newPassword } });
   },
 };
+
+function googleResult(response: FirebaseLoginResponse): GoogleLoginResult {
+  if (response.status === "Authenticated" && response.authentication) return { status: "Authenticated", authentication: normalizeTokenResponse(response.authentication) };
+  if (response.status === "ACCOUNT_LINK_REQUIRED") return { status: "AccountLinkRequired" };
+  if (response.status === "OnboardingRequired") {
+    const proof = response.onboarding;
+    const valid = proof && typeof proof.token === "string" && !!proof.token.trim() && typeof proof.email === "string" && !!proof.email.trim() && typeof proof.displayName === "string" && typeof proof.expiresAt === "string" && Number.isFinite(Date.parse(proof.expiresAt));
+    return { status: "OnboardingRequired", onboarding: valid ? proof : null };
+  }
+  throw new Error("Máy chủ trả trạng thái Google không hợp lệ. Hãy thử lại.");
+}
