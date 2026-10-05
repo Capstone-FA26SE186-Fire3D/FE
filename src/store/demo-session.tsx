@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getArticle } from "@/features/learn/data/articles";
 
 type PendingAction = { type: "save" | "ask"; slug: string } | null;
@@ -16,6 +16,7 @@ type SessionContextValue = DemoSession & {
   ready: boolean;
   storageAvailable: boolean;
   reset: () => void;
+  resumePendingAction: () => void;
   toggleBookmark: (slug: string) => void;
   setPendingAction: (action: PendingAction) => void;
   askQuestion: (question: string, articleSlug: string | null) => void;
@@ -53,6 +54,19 @@ export function DemoSessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [storageAvailable, setStorageAvailable] = useState(true);
 
+  const resumePendingAction = useCallback(() => {
+    setSession((current) => {
+      const action = current.pendingAction;
+      if (!action) return current;
+      return {
+        ...current,
+        pendingAction: null,
+        bookmarks: action.type === "save" && !current.bookmarks.includes(action.slug)
+          ? [...current.bookmarks, action.slug] : current.bookmarks,
+      };
+    });
+  }, []);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
@@ -77,6 +91,7 @@ export function DemoSessionProvider({ children }: { children: ReactNode }) {
     ...session,
     ready,
     storageAvailable,
+    resumePendingAction,
     reset: () => setSession(initialSession),
     toggleBookmark: (slug) => setSession((current) => !ready || !validSlug(slug) ? current : ({
       ...current,
@@ -91,7 +106,7 @@ export function DemoSessionProvider({ children }: { children: ReactNode }) {
       const exchange = { id: crypto.randomUUID(), question: trimmed, articleSlug, createdAt: new Date().toISOString() };
       setSession((current) => ({ ...current, chat: [...current.chat, exchange].slice(-50) }));
     },
-  }), [ready, session, storageAvailable]);
+  }), [ready, resumePendingAction, session, storageAvailable]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
