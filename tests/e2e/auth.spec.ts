@@ -68,11 +68,13 @@ test("header shows the personal account state for a restored Fire3D session", as
   }, { accessToken: "test-access-token", refreshToken: "test-refresh-token" });
   await page.route("**/api/auth/me", (route) => route.fulfill({ json: user }));
 
-  await page.goto("/learning-hub");
+  await page.goto("/learn");
 
   await expect(
     page.getByRole("button", { name: "Mở menu tài khoản của Người dùng thử" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Mở menu tài khoản của Người dùng thử" }).click();
+  await expect(page.getByRole("menuitem", { name: "Không gian của tôi" })).toHaveAttribute("href", "/learning-hub");
   await expect(page.getByRole("link", { name: "Đăng nhập", exact: true })).toHaveCount(0);
 });
 

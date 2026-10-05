@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, Check } from "lucide-react";
+import { Iconsax } from "@/components/ui/iconsax";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/configs/routes";
@@ -22,5 +22,5 @@ export function SaveArticleButton({ slug, compact = false }: { slug: string; com
     toggleBookmark(slug);
   };
 
-  return <Button disabled={!ready} onClick={save} variant={saved ? "secondary" : "quiet"} size="md" aria-pressed={saved} aria-label={saved ? "Bỏ lưu bài viết" : "Lưu bài viết"}>{saved ? <Check size={16} /> : <Bookmark size={16} />}{!compact && (saved ? "Đã lưu" : "Lưu bài viết")}</Button>;
+  return <Button disabled={!ready} onClick={save} variant={saved ? "secondary" : "quiet"} size="md" aria-pressed={saved} aria-label={saved ? "Bỏ lưu bài viết" : "Lưu bài viết"}><Iconsax name="archive-book" size={16} />{!compact && (saved ? "Đã lưu" : "Lưu bài viết")}</Button>;
 }

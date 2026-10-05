@@ -62,7 +62,7 @@ function toMessage(error: unknown) {
 
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const { reset: resetDemo } = useDemoSession();
+  const { reset: resetDemo, resumePendingAction } = useDemoSession();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [pending, setPending] = useState(false);
@@ -72,7 +72,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     setAccessToken(response.accessToken);
     setUser(response.user);
     persistTokens({ accessToken: response.accessToken, refreshToken: response.refreshToken });
-  }, []);
+    resumePendingAction();
+  }, [resumePendingAction]);
 
   const clearSession = useCallback(() => {
     setAccessToken(null);
