@@ -1,6 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { authApi } from "../../src/features/auth/api";
 
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/buildings?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 50 } }));
+});
+
 test("login screen uses a Fire3D password session and keeps Google optional", async ({ page }) => {
   await page.goto("/login");
 

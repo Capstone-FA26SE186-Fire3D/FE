@@ -23,12 +23,14 @@ function safeErrorMessage(error: unknown) {
 }
 
 type IfcScanWorkspaceProps = {
+  embedded?: boolean;
   eyebrow?: string;
   title?: string;
   description?: string;
 };
 
 export function IfcScanWorkspace({
+  embedded = false,
   eyebrow = "IFC / local prototype",
   title = "Quét mô hình IFC",
   description = "Đọc mô hình thực ngay trên máy của bạn, nhận diện các điểm neo và kiểm tra mức sẵn sàng cho kịch bản thoát nạn mẫu.",
@@ -70,7 +72,7 @@ export function IfcScanWorkspace({
   const percent = progress && progress.total ? Math.round((progress.completed / progress.total) * 100) : 0;
   const selectedElement = scan?.elements.find((element) => element.expressID === selectedExpressID) ?? null;
 
-  return <section className={styles.workspace}>
+  return <section className={`${styles.workspace} ${embedded ? styles.embedded : ""}`}>
     <header className={styles.hero}>
       <p className="kicker"><span className="kicker-line" /> {eyebrow}</p>
       <h1>{title}</h1>

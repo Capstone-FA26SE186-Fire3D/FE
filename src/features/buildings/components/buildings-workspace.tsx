@@ -24,6 +24,7 @@ export function BuildingsWorkspace() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -43,7 +44,8 @@ export function BuildingsWorkspace() {
 
   useEffect(() => {
     if (!ready || user?.role === 2 || (user?.role === 0 && !user.organizationId)) return;
-    void load();
+    const timer = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timer);
   }, [load, ready, user?.organizationId, user?.role]);
 
   const createBuilding = async (event: FormEvent<HTMLFormElement>) => {
@@ -81,9 +83,16 @@ export function BuildingsWorkspace() {
   if (user?.role === 0 && !user.organizationId) return <Card className="admin-card"><h1>Công trình theo tổ chức</h1><p>PlatformAdmin hãy tạo tổ chức, cấp tài khoản OrganizationUser, rồi đăng nhập bằng tài khoản đó để tạo công trình.</p><Button asChild variant="secondary"><Link href={routes.adminOrganizations}>Quản lý tổ chức</Link></Button></Card>;
 
   return <div className="admin-layout">
-    <header className="admin-heading"><p className="kicker"><span className="kicker-line" /> Không gian mô hình</p><h1>Công trình</h1><p>Tạo công trình thuộc tổ chức của bạn, sau đó thêm revision IFC để theo dõi trạng thái xử lý.</p></header>
+    <header className="admin-heading"><h1>Công trình</h1><p>Quản lý công trình và các phiên bản mô hình IFC của tổ chức.</p></header>
     {error && <p className="form-message" role="alert">{error}</p>}
-    <div className="admin-grid">
+    <Card className="admin-card"><div className="admin-toolbar"><h2>Danh sách công trình</h2><div className="workspace-list-actions"><Button type="button" aria-expanded={createOpen} aria-controls="create-building-panel" onClick={() => setCreateOpen((open) => !open)}>{createOpen ? "Đóng form tạo" : "Tạo công trình"}</Button><Button variant="quiet" onClick={() => void load()} disabled={loading}>{loading ? "Đang tải…" : "Tải lại"}</Button></div></div>
+      <form className="admin-filters workspace-search" onSubmit={(event) => { event.preventDefault(); void load(); }}><label>Tìm công trình<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tên công trình" /></label><Button type="submit" variant="secondary" disabled={loading}>Tìm</Button></form>
+      {loading ? <p role="status">Đang tải danh sách công trình…</p> : <div className="account-table-wrap"><table><thead><tr><th>Công trình</th><th>Loại</th><th>Số tầng</th><th>Trạng thái</th></tr></thead><tbody>
+        {buildings.map((building) => <tr key={building.id}><td><Link className="workspace-building-link" href={`${routes.workspaceBuildings}/${building.id}`}>{building.name}</Link></td><td>{building.buildingType || "Chưa phân loại"}</td><td>{building.totalFloors}</td><td>{building.isActive ? "Hoạt động" : "Đã lưu trữ"}</td></tr>)}
+        {!buildings.length && <tr><td colSpan={4}>Chưa có công trình phù hợp.</td></tr>}
+      </tbody></table></div>}
+    </Card>
+    {createOpen && (<div className="admin-grid" id="create-building-panel">
       <Card className="admin-card"><h2>Tạo công trình</h2><form className="admin-form" onSubmit={createBuilding}>
         <label>Tên công trình<input required maxLength={200} value={name} onChange={(event) => setName(event.target.value)} /></label>
         <label>Loại công trình<input maxLength={200} value={buildingType} onChange={(event) => setBuildingType(event.target.value)} placeholder="Chung cư, trường học…" /></label>
@@ -91,13 +100,6 @@ export function BuildingsWorkspace() {
         <Button type="submit" disabled={creating}>{creating ? "Đang tạo…" : "Tạo và thêm IFC"}</Button>
       </form></Card>
       <Card className="admin-card"><h2>Lưu ý</h2><p>Mỗi công trình chỉ thuộc tổ chức đã gắn trong tài khoản. Bạn không thể chọn hoặc thay đổi tổ chức từ trình duyệt.</p></Card>
-    </div>
-    <Card className="admin-card"><div className="admin-toolbar"><h2>Danh sách công trình</h2><Button variant="quiet" onClick={() => void load()} disabled={loading}>{loading ? "Đang tải…" : "Tải lại"}</Button></div>
-      <form className="admin-filters workspace-search" onSubmit={(event) => { event.preventDefault(); void load(); }}><label>Tìm công trình<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Tên công trình" /></label><Button type="submit" variant="secondary" disabled={loading}>Tìm</Button></form>
-      {loading ? <p role="status">Đang tải danh sách công trình…</p> : <div className="account-table-wrap"><table><thead><tr><th>Công trình</th><th>Loại</th><th>Số tầng</th><th>Trạng thái</th></tr></thead><tbody>
-        {buildings.map((building) => <tr key={building.id}><td><Link className="workspace-building-link" href={`${routes.workspaceBuildings}/${building.id}`}>{building.name}</Link></td><td>{building.buildingType || "Chưa phân loại"}</td><td>{building.totalFloors}</td><td>{building.isActive ? "Hoạt động" : "Đã lưu trữ"}</td></tr>)}
-        {!buildings.length && <tr><td colSpan={4}>Chưa có công trình phù hợp.</td></tr>}
-      </tbody></table></div>}
-    </Card>
+    </div>)}
   </div>;
 }

@@ -195,7 +195,7 @@ export function BuildingDetailWorkspace({ buildingId }: { buildingId: string }) 
 
   return <div className="admin-layout">
     <p className="workspace-scenario-link"><Link href={`${routes.workspaceBuildings}/${buildingId}/scenarios`}>Soạn kịch bản diễn tập từ revision IFC</Link></p>
-    <header className="admin-heading"><p className="kicker"><span className="kicker-line" /> Không gian mô hình</p><h1>{building?.name ?? "Đang tải công trình…"}</h1><p>IFC được lưu private, xử lý bởi worker và chỉ có preview khi backend trả artifact đã có provenance.</p></header>
+    <header className="admin-heading"><p className="kicker"><span className="kicker-line" /> Không gian mô hình</p><h1>{building?.name ?? "Đang tải công trình…"}</h1><p>Theo dõi phiên bản IFC, trạng thái xử lý và mô hình xem trước của công trình.</p></header>
     {message && <p className="form-message" role="status">{message}</p>}
     <Card className="admin-card"><div className="admin-toolbar"><h2>Revision IFC</h2><Button type="button" variant="quiet" onClick={refresh}>Tải lại</Button></div>
       {revisions.length ? <label className="form-field">Chọn revision<select value={selectedRevision?.id ?? ""} onChange={(event) => setSelectedRevisionId(event.target.value)}>{revisions.map((revision) => <option key={revision.id} value={revision.id}>{revision.versionLabel} · {revision.status}</option>)}</select></label> : <p>Chưa có revision IFC.</p>}
