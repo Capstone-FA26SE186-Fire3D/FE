@@ -37,6 +37,18 @@ export type TokenResponse = {
   user: AuthUser;
 };
 
+// Proposed AUTH-02 contract: https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/40
+// Proof is never a Fire3D session.
+export type GoogleOnboardingProof = { token: string; expiresAt: string; email: string; displayName: string };
+export type GoogleLoginResult =
+  | { status: "Authenticated"; authentication: TokenResponse }
+  | { status: "OnboardingRequired"; onboarding: GoogleOnboardingProof | null }
+  | { status: "AccountLinkRequired" };
+export type GoogleOnboardingInput = { onboardingToken: string } & (
+  | { accountType: "trainee"; username: string }
+  | { accountType: "organization"; organizationName: string; organizationAddress: string; organizationPhoneNumber: string }
+);
+
 type RegisterBaseInput = {
   email: string;
   password: string;
