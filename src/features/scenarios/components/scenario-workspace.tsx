@@ -188,7 +188,7 @@ export function ScenarioWorkspace({ buildingId }: { buildingId: string }) {
   if (!canManageScenario(user?.role, user?.organizationId)) return <Card className="admin-card"><h1>Không có quyền truy cập</h1><p>Chỉ OrganizationUser trong đúng tổ chức được tạo scenario draft.</p></Card>;
 
   return <div className="admin-layout">
-    <header className="admin-heading"><p className="kicker"><span className="kicker-line" /> Thiết kế diễn tập</p><h1>Kịch bản diễn tập</h1><p>Draft bám theo một BIM revision. Kiểm tra tại đây chỉ xác nhận cấu trúc dữ liệu; không xác nhận geometry, không chứng nhận PCCC và không publish hoặc khởi chạy playtest.</p></header>
+    <header className="admin-heading"><p className="kicker"><span className="kicker-line" /> Thiết kế diễn tập</p><h1>Kịch bản diễn tập</h1><p>Soạn và kiểm tra bản nháp diễn tập theo phiên bản IFC đã chọn.</p></header>
     {message && <p className="form-message" role="status">{message}</p>}
     <Card className="admin-card"><h2>Tạo scenario</h2><form className="admin-form" onSubmit={createScenarioAndDraft}>
       <label>Revision IFC<select value={selectedRevision?.id ?? ""} onChange={(event) => setRevisionId(event.target.value)} disabled={!revisions.length}>{revisions.length ? revisions.map((revision) => <option key={revision.id} value={revision.id}>{revision.versionLabel} · {revision.status}</option>) : <option>Chưa có revision IFC</option>}</select></label>

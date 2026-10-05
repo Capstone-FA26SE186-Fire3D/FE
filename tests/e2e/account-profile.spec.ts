@@ -82,7 +82,7 @@ test("account profile uses the latest ETags to update a user and its organizatio
     });
   });
 
-  await page.goto("/account");
+  await page.goto("/workspace/profile");
   await expect(page.getByRole("heading", { name: "Tài khoản của bạn" })).toBeVisible();
 
   await page.getByLabel("Họ và tên").fill("Nguyen Van B");

@@ -3,7 +3,7 @@ import type { AuthUser } from "./types";
 
 export function dashboardRouteFor(user: Pick<AuthUser, "role"> | null | undefined) {
   if (user?.role === 0) return "/admin/accounts";
-  if (user?.role === 1) return "/dashboard/organization";
+  if (user?.role === 1) return "/workspace/buildings";
   if (user?.role === 2) return "/learning-hub";
   return "/learning-hub";
 }
@@ -15,20 +15,25 @@ function canOpenRoleRoute(user: Pick<AuthUser, "role"> | null | undefined, path:
   return true;
 }
 
-export function safeNext(value: string | null): string {
-  if (!value || !value.startsWith("/") || /[\\\s%]/.test(value.split("?")[0])) return "/learning-hub";
+function validatedNext(value: string | null): string | null {
+  if (!value || !value.startsWith("/") || /[\\\s%]/.test(value.split("?")[0])) return null;
   try {
     const url = new URL(value, "https://fire3d.local");
-    if (url.origin !== "https://fire3d.local") return "/learning-hub";
-    const allowed = ["/learning-hub", "/learn", "/organizations", "/about", "/download", "/admin/accounts", "/dashboard/trainee", "/dashboard/organization", "/workspace/buildings", "/workspace/ifc"];
-    if (!allowed.includes(url.pathname) && !(url.pathname.startsWith("/learn/") && getArticle(url.pathname.slice(7)))) return "/learning-hub";
+    if (url.origin !== "https://fire3d.local") return null;
+    const allowed = ["/learning-hub", "/learn", "/organizations", "/about", "/download", "/admin/accounts", "/dashboard/trainee", "/dashboard/organization", "/workspace/buildings", "/workspace/ifc", "/workspace/profile"];
+    const buildingRoute = /^\/workspace\/buildings\/[a-zA-Z0-9_-]+(?:\/scenarios)?$/.test(url.pathname);
+    if (!allowed.includes(url.pathname) && !buildingRoute && !(url.pathname.startsWith("/learn/") && getArticle(url.pathname.slice(7)))) return null;
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
-    return "/learning-hub";
+    return null;
   }
 }
 
+export function safeNext(value: string | null): string {
+  return validatedNext(value) ?? "/learning-hub";
+}
+
 export function postLoginRoute(user: Pick<AuthUser, "role"> | null | undefined, next: string | null): string {
-  const destination = next ? safeNext(next) : null;
+  const destination = validatedNext(next);
   return destination && canOpenRoleRoute(user, destination) ? destination : dashboardRouteFor(user);
 }

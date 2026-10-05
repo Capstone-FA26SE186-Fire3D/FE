@@ -1,5 +1,9 @@
 import { expect, test } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/buildings?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 50 } }));
+});
+
 function restoreSession(page: import("@playwright/test").Page, user: { email: string; fullName: string; organizationId: string | null; role: number }) {
   return page.addInitScript((stored) => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify(stored)), {
     accessToken: "dashboard-access-token",
@@ -26,8 +30,9 @@ test("OrganizationUser sees the BIM workspace dashboard", async ({ page }) => {
 
   await page.goto("/dashboard/organization");
 
-  await expect(page.getByRole("heading", { name: "Không gian tổ chức" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Quản lý công trình" })).toHaveAttribute("href", "/workspace/buildings");
+  await expect(page).toHaveURL(/\/workspace\/buildings$/);
+  await expect(page.getByRole("heading", { name: "Công trình", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Công trình", exact: true })).toHaveAttribute("href", "/workspace/buildings");
   await expect(page.getByRole("link", { name: "Quét mô hình IFC" })).toHaveAttribute("href", "/workspace/ifc");
 });
 
@@ -38,7 +43,8 @@ test("restored OrganizationUser session accepts the string role returned by the 
 
   await page.goto("/dashboard/organization");
 
-  await expect(page.getByRole("heading", { name: "Không gian tổ chức" })).toBeVisible();
+  await expect(page).toHaveURL(/\/workspace\/buildings$/);
+  await expect(page.getByRole("heading", { name: "Công trình", exact: true })).toBeVisible();
 });
 
 test("password login without a next route redirects OrganizationUser to its dashboard", async ({ page }) => {
@@ -50,7 +56,7 @@ test("password login without a next route redirects OrganizationUser to its dash
   await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
   await page.getByRole("button", { name: "Đăng nhập" }).click();
 
-  await expect(page).toHaveURL(/\/dashboard\/organization$/);
+  await expect(page).toHaveURL(/\/workspace\/buildings$/);
 });
 
 test("string OrganizationUser role from the API opens the organization dashboard", async ({ page }) => {
@@ -62,7 +68,7 @@ test("string OrganizationUser role from the API opens the organization dashboard
   await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
   await page.getByRole("button", { name: "Đăng nhập" }).click();
 
-  await expect(page).toHaveURL(/\/dashboard\/organization$/);
+  await expect(page).toHaveURL(/\/workspace\/buildings$/);
 });
 
 test("OrganizationUser cannot be redirected to the admin account page by next", async ({ page }) => {
@@ -74,7 +80,7 @@ test("OrganizationUser cannot be redirected to the admin account page by next", 
   await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
   await page.getByRole("button", { name: "Đăng nhập" }).click();
 
-  await expect(page).toHaveURL(/\/dashboard\/organization$/);
+  await expect(page).toHaveURL(/\/workspace\/buildings$/);
 });
 
 for (const [role, destination] of [[2, "/learning-hub"], [0, "/admin/accounts"]] as const) {
