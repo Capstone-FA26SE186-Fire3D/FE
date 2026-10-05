@@ -65,7 +65,7 @@ for (const accountType of ["trainee", "organization"] as const) {
 
 test("linked Google authenticates and checks the role before redirecting", async ({ page }) => {
   await openFixture(page, { status: "Authenticated", authentication }, "?next=/admin/accounts");
-  await expect.poll(() => page.evaluate(() => (window as unknown as { googleTestDestinations: string[] }).googleTestDestinations.at(-1))).toBe("/dashboard/trainee");
+  await expect.poll(() => page.evaluate(() => (window as unknown as { googleTestDestinations: string[] }).googleTestDestinations.at(-1))).toBe("/learning-hub");
 });
 
 test("expired proof disables completion and can be refreshed by retrying Google", async ({ page }) => {

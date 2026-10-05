@@ -15,9 +15,8 @@ test("Trainee sees a learning dashboard after opening their role page", async ({
 
   await page.goto("/dashboard/trainee");
 
-  await expect(page.getByRole("heading", { name: "Không gian học tập" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Mở Góc học tập" })).toHaveAttribute("href", "/learning-hub");
-  await expect(page.getByRole("link", { name: "Xem hồ sơ" })).toHaveAttribute("href", "/account");
+  await expect(page).toHaveURL(/\/learning-hub$/);
+  await expect(page.getByRole("heading", { name: "Bài đã lưu", exact: true })).toBeVisible();
 });
 
 test("OrganizationUser sees the BIM workspace dashboard", async ({ page }) => {
@@ -77,3 +76,15 @@ test("OrganizationUser cannot be redirected to the admin account page by next", 
 
   await expect(page).toHaveURL(/\/dashboard\/organization$/);
 });
+
+for (const [role, destination] of [[2, "/learning-hub"], [0, "/admin/accounts"]] as const) {
+  test(`password login role ${role} opens destination directly`, async ({ page }) => {
+    const user = { id: "role-user", email: "role@fire3d.test", fullName: "Role", organizationId: null, role };
+    await page.route("**/api/auth/login", (route) => route.fulfill({ json: { accessToken: "access", refreshToken: "refresh", user } }));
+    await page.goto("/login");
+    await page.getByLabel("Email", { exact: true }).fill(user.email);
+    await page.getByLabel("Mật khẩu", { exact: true }).fill("123456");
+    await page.getByRole("button", { name: "Đăng nhập", exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(destination + "$"));
+  });
+}
