@@ -42,9 +42,9 @@ for (const accountType of ["trainee", "organization"] as const) {
     let request: unknown;
     await page.route("**/api/auth/google/onboarding/complete", async (route) => {
       request = route.request().postDataJSON();
-      await route.fulfill({ json: { status: "Authenticated", authentication: { ...authentication, user: { ...authentication.user, role: accountType === "trainee" ? "Trainee" : "OrganizationUser", organizationId: accountType === "organization" ? "org-1" : null } } } });
+      await route.fulfill({ status: 201, json: { status: "Authenticated", authentication: { ...authentication, user: { ...authentication.user, role: accountType === "trainee" ? "Trainee" : "OrganizationUser", organizationId: accountType === "organization" ? "org-1" : null } } } });
     });
-    await openFixture(page, { status: "OnboardingRequired", onboarding: proof() }, "?next=https://evil.test");
+    await openFixture(page, { status: "OnboardingRequired", onboarding: { ...proof(), displayName: null } }, "?next=https://evil.test");
     await noSession(page);
     if (accountType === "trainee") await page.getByLabel("Tên người dùng").fill("google_user");
     else {
@@ -118,7 +118,8 @@ test("invalid proof fails closed and completion network failure can retry", asyn
   await page.route("**/api/auth/google/onboarding/complete", (route) => route.abort("internetdisconnected"));
   await page.getByRole("button", { name: "Hoàn tất tài khoản" }).click();
   await expect(page.getByRole("alert")).toContainText("Kiểm tra mạng");
-  await expect(page.getByRole("button", { name: "Hoàn tất tài khoản" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Hoàn tất tài khoản" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Tiếp tục với Google", exact: true })).toBeEnabled();
   await noSession(page);
 });
 
@@ -149,3 +150,144 @@ test("completion without valid authentication never creates a session", async ({
   await expect(page.getByRole("alert")).toContainText("phiên đăng nhập hợp lệ");
   await noSession(page);
 });
+
+for (const failure of ["ONBOARDING_ALREADY_COMPLETED", "IDEMPOTENCY_KEY_CONFLICT", "lost-response"] as const) {
+  test(`${failure} recovers after a Google click without another completion`, async ({ page }) => {
+    let calls = 0;
+    await openFixture(page, { status: "OnboardingRequired", onboarding: proof() }, "?next=/learn/tu-bai-doc-den-luot-tap");
+    await page.getByLabel("Tên người dùng").fill("recovery_user");
+    await page.route("**/api/auth/google/onboarding/complete", (route) => {
+      calls++;
+      return failure === "lost-response" ? route.abort("internetdisconnected") : route.fulfill({ status: 409, json: { code: failure, title: "Complete conflict" } });
+    });
+    await page.getByRole("button", { name: "Hoàn tất tài khoản" }).click();
+    await expect(page.getByRole("button", { name: "Hoàn tất tài khoản" })).toBeDisabled();
+    await noSession(page);
+    await page.route("**/api/auth/login-firebase", (route) => route.fulfill({ json: { status: "Authenticated", authentication } }));
+    await page.getByRole("button", { name: "Tiếp tục với Google", exact: true }).click();
+    await expect.poll(() => page.evaluate(() => sessionStorage.getItem("fire3d-auth-tokens"))).not.toBeNull();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { googleTestDestinations: string[] }).googleTestDestinations.at(-1))).toBe("/learn/tu-bai-doc-den-luot-tap");
+    expect(calls).toBe(1);
+  });
+}
+
+for (const [code, status, header, seconds] of [
+  ["ONBOARDING_RETRY_REQUIRED", 503, "2", 2],
+  ["ONBOARDING_RETRY_REQUIRED", 503, "invalid", 1],
+  ["GOOGLE_ONBOARDING_RATE_LIMITED", 429, "2", 2],
+  ["GOOGLE_ONBOARDING_RATE_LIMITED", 429, undefined, 60],
+] as const) {
+  test(`${code} waits ${seconds}s with Retry-After ${header}`, async ({ page }) => {
+    await page.clock.install();
+    await openFixture(page, { status: "OnboardingRequired", onboarding: { ...proof(), expiresAt: new Date(Date.now() + 120_000).toISOString() } });
+    await page.getByLabel("Tên người dùng").fill("waiting_user");
+    let calls = 0;
+    await page.route("**/api/auth/google/onboarding/complete", (route) => {
+      calls++;
+      return route.fulfill({ status, headers: header ? { "Retry-After": header } : {}, json: { code, title: "Wait" } });
+    });
+    await page.getByRole("button", { name: "Hoàn tất tài khoản" }).click();
+    await expect(page.getByText(`Có thể thử lại sau ${seconds} giây.`)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Hoàn tất tài khoản" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Thử lại Google" })).toBeDisabled();
+    await page.clock.fastForward(seconds * 1000 + 300);
+    await expect(page.getByRole("button", { name: "Hoàn tất tài khoản" })).toBeEnabled();
+    await expect(page.getByLabel("Tên người dùng")).toHaveValue("waiting_user");
+    expect(calls).toBe(1);
+    await noSession(page);
+  });
+}
+
+test("recovery cancellation keeps Google available and a new identity clears the form", async ({ page }) => {
+  await openFixture(page, { status: "OnboardingRequired", onboarding: proof() });
+  await page.getByLabel("Tên người dùng").fill("old_user");
+  await page.route("**/api/auth/google/onboarding/complete", (route) => route.fulfill({ status: 409, json: { code: "ONBOARDING_ALREADY_COMPLETED" } }));
+  await page.getByRole("button", { name: "Hoàn tất tài khoản" }).click();
+  await page.evaluate(() => history.replaceState(null, "", "?providerError=auth%2Fpopup-closed-by-user"));
+  await page.getByRole("button", { name: "Tiếp tục với Google", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("hủy đăng nhập");
+  await expect(page.getByRole("button", { name: "Tiếp tục với Google", exact: true })).toBeEnabled();
+  await page.evaluate(() => history.replaceState(null, "", "/google-test"));
+  await page.route("**/api/auth/login-firebase", (route) => route.fulfill({ json: { status: "OnboardingRequired", onboarding: { ...proof(), email: "other@fire3d.test" } } }));
+  await page.getByRole("button", { name: "Tiếp tục với Google", exact: true }).click();
+  await expect(page.getByText("Đang hoàn thiện cho other@fire3d.test")).toBeVisible();
+  await expect(page.getByLabel("Tên người dùng")).toHaveValue("");
+  await noSession(page);
+});
+
+test("proof expiry during cooldown still requires Google verification", async ({ page }) => {
+  await page.clock.install();
+  await openFixture(page, { status: "OnboardingRequired", onboarding: { ...proof(), expiresAt: new Date(Date.now() + 3000).toISOString() } });
+  await page.getByLabel("Tên người dùng").fill("expiry_user");
+  await page.route("**/api/auth/google/onboarding/complete", (route) => route.fulfill({ status: 503, headers: { "Retry-After": "5" }, json: { code: "ONBOARDING_RETRY_REQUIRED" } }));
+  await page.getByRole("button", { name: "Hoàn tất tài khoản" }).click();
+  await page.clock.fastForward(5500);
+  await expect(page.getByRole("button", { name: "Hoàn tất tài khoản" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Thử lại Google" })).toBeEnabled();
+  await noSession(page);
+});
+
+test("pending completion blocks duplicate submissions and disabled accounts never save a session", async ({ page }) => {
+  await openFixture(page, { status: "OnboardingRequired", onboarding: proof() });
+  await page.getByLabel("Tên người dùng").fill("pending_user");
+  let calls = 0;
+  let release!: () => void;
+  const blocked = new Promise<void>((resolve) => { release = resolve; });
+  await page.route("**/api/auth/google/onboarding/complete", async (route) => {
+    calls++;
+    await blocked;
+    await route.fulfill({ status: 403, json: { code: "ACCOUNT_DISABLED" } });
+  });
+  await page.getByRole("button", { name: "Hoàn tất tài khoản" }).click();
+  await expect.poll(() => calls).toBe(1);
+  await page.locator("form").evaluate((form) => {
+    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  });
+  release();
+  await expect(page.getByRole("alert")).toContainText("đã bị khóa");
+  expect(calls).toBe(1);
+  await noSession(page);
+});
+
+test("Google exchange rate limiting waits before another popup", async ({ page }) => {
+  await page.clock.install();
+  await openFixture(page, { status: "OnboardingRequired", onboarding: proof() });
+  let calls = 0;
+  await page.route("**/api/auth/login-firebase", (route) => {
+    calls++;
+    return route.fulfill({ status: 429, headers: { "Retry-After": "3" }, json: { code: "GOOGLE_ONBOARDING_RATE_LIMITED" } });
+  });
+  await page.getByRole("button", { name: "Thử lại Google" }).click();
+  await expect(page.getByText("Có thể thử lại sau 3 giây.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Thử lại Google" })).toBeDisabled();
+  await page.clock.fastForward(3500);
+  await expect(page.getByRole("button", { name: "Thử lại Google" })).toBeEnabled();
+  expect(calls).toBe(1);
+  await noSession(page);
+});
+
+for (const width of [1440, 375]) {
+  test(`recovery is accessible without horizontal overflow at ${width}px`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 800 });
+    await openFixture(page, { status: "OnboardingRequired", onboarding: proof() });
+    const loginHtml = await (await page.request.get("/login")).text();
+    const stylesheets = [...loginHtml.matchAll(/href="([^"]+\.css(?:\?[^"]*)?)"/g)].map((match) => match[1].replaceAll("&amp;", "&"));
+    expect(stylesheets.length).toBeGreaterThan(0);
+    for (const url of stylesheets) await page.addStyleTag({ url });
+    await page.locator("#root").evaluate((root) => {
+      root.className = "page-main login-page-main";
+      root.style.display = "grid";
+      root.style.justifyItems = "center";
+    });
+    await page.getByLabel("Tên người dùng").fill("visual_user");
+    await page.route("**/api/auth/google/onboarding/complete", (route) => route.fulfill({ status: 409, json: { code: "ONBOARDING_ALREADY_COMPLETED" } }));
+    await page.getByRole("button", { name: "Hoàn tất tài khoản" }).click();
+    const recover = page.getByRole("button", { name: "Tiếp tục với Google", exact: true });
+    await recover.scrollIntoViewIfNeeded();
+    await recover.focus();
+    await expect(recover).toBeFocused();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    await page.screenshot({ path: testInfo.outputPath(`recovery-${width}.png`), fullPage: true });
+  });
+}
