@@ -49,7 +49,7 @@ export function LoginForm() {
   const params = useSearchParams();
   const { pendingAction } = useDemoSession();
   const { isAuthenticated, login, loginWithGoogle, completeGoogleOnboarding, ready, register, user } = useAuthSession();
-  const [googleOnboarding, setGoogleOnboarding] = useState<{ proof: GoogleOnboardingProof | null } | null>(null);
+  const [googleOnboarding, setGoogleOnboarding] = useState<{ proof: GoogleOnboardingProof | null; recovery?: boolean } | null>(null);
   const [proofExpired, setProofExpired] = useState(false);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
@@ -69,6 +69,8 @@ export function LoginForm() {
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [otpPending, setOtpPending] = useState(false);
+  const [googleWait, setGoogleWait] = useState<{ until: number; seconds: number } | null>(null);
+  const googleRequestRef = useRef(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const initialStage = useRef(true);
   const requestedNext = pendingAction?.type === "ask"
@@ -91,6 +93,27 @@ export function LoginForm() {
     if (ready && isAuthenticated) router.replace(postLoginRoute(user, requestedNext));
   }, [isAuthenticated, requestedNext, ready, router, user]);
 
+  const googleWaitUntil = googleWait?.until;
+  useEffect(() => {
+    if (!googleWaitUntil) return;
+    const timer = window.setInterval(() => {
+      setGoogleWait((wait) => {
+        if (!wait) return null;
+        const seconds = Math.max(0, Math.ceil((wait.until - Date.now()) / 1000));
+        return seconds ? { ...wait, seconds } : null;
+      });
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [googleWaitUntil]);
+
+  const waitForGoogle = (error: unknown) => {
+    if (!(error instanceof ApiError)) return;
+    const code = errorCode(error);
+    if (code !== "ONBOARDING_RETRY_REQUIRED" && error.status !== 429) return;
+    const seconds = error.retryAfterSeconds ?? (code === "ONBOARDING_RETRY_REQUIRED" ? 1 : 60);
+    setGoogleWait(seconds ? { until: Date.now() + seconds * 1000, seconds } : null);
+  };
+
   if (ready && isAuthenticated) return <p className="auth-redirect" role="status">Bạn đã đăng nhập. Đang chuyển hướng…</p>;
 
   const clearRegistrationProof = () => {
@@ -101,6 +124,7 @@ export function LoginForm() {
 
   const selectMode = (nextMode: "login" | "register") => {
     setGoogleOnboarding(null);
+    setGoogleWait(null);
     setProofExpired(false);
     setMode(nextMode);
     setMessage("");
@@ -187,7 +211,9 @@ export function LoginForm() {
 
     if (googleOnboarding) {
       const proof = googleOnboarding.proof;
+      if (googleRequestRef.current || googleWait) return;
       if (!proof || proofExpired || Date.parse(proof.expiresAt) <= Date.now()) { setProofExpired(!!proof); return; }
+      googleRequestRef.current = true;
       setSubmitting(true);
       try {
         const input = accountType === "trainee"
@@ -197,10 +223,16 @@ export function LoginForm() {
         setGoogleOnboarding(null);
       } catch (error) {
         setFieldErrors(toFieldErrors(error));
-        setMessage(googleErrorMessage(error));
+        const code = errorCode(error);
+        const recovery = !(error instanceof ApiError) || ["ONBOARDING_ALREADY_COMPLETED", "IDEMPOTENCY_KEY_CONFLICT"].includes(code ?? "");
+        setMessage(recovery && !(error instanceof ApiError)
+          ? `${googleErrorMessage(error)} Chưa xác định được kết quả tạo tài khoản. Bấm Tiếp tục với Google để kiểm tra và đăng nhập.`
+          : googleErrorMessage(error));
+        if (recovery) setGoogleOnboarding({ proof: null, recovery: true });
+        waitForGoogle(error);
         if (["ONBOARDING_TOKEN_EXPIRED", "ONBOARDING_TOKEN_INVALID"].includes(errorCode(error) ?? "")) { setProofExpired(true); setGoogleOnboarding({ proof: null }); }
         if (["ACCOUNT_LINK_REQUIRED", "EMAIL_EXISTS"].includes(errorCode(error) ?? "")) setExistingEmail(proof.email);
-      } finally { setSubmitting(false); }
+      } finally { googleRequestRef.current = false; setSubmitting(false); }
       return;
     }
 
@@ -243,11 +275,13 @@ export function LoginForm() {
   };
 
   const submitGoogle = async () => {
+    if (googleRequestRef.current || googleWait) return;
+    googleRequestRef.current = true;
     setMessage("");
     setFieldErrors({});
     setSubmitting(true);
     try {
-      if (googleOnboarding) setGoogleOnboarding({ proof: null });
+      if (googleOnboarding) setGoogleOnboarding({ proof: null, recovery: googleOnboarding.recovery });
       const result = await loginWithGoogle();
       if (result.status === "Authenticated") { setGoogleOnboarding(null); redirectAfterLogin(result.authentication.user); }
       else if (result.status === "OnboardingRequired") {
@@ -264,7 +298,8 @@ export function LoginForm() {
       }
     } catch (error) {
       setMessage(googleErrorMessage(error));
-    } finally { setSubmitting(false); }
+      waitForGoogle(error);
+    } finally { googleRequestRef.current = false; setSubmitting(false); }
   };
 
   return (
@@ -276,7 +311,8 @@ export function LoginForm() {
       <h1 ref={headingRef} tabIndex={-1}>{googleOnboarding ? "Hoàn thiện tài khoản Google" : mode === "login" ? "Đăng nhập Fire3D" : "Tạo tài khoản"}</h1>
       <p id="auth-note">{googleOnboarding ? "Chọn loại tài khoản và hoàn thiện thông tin để tiếp tục." : mode === "login" ? "Tiếp tục học với tài khoản của bạn." : otpSent ? "Bước 2 / 2 · Xác minh email" : "Bước 1 / 2 · Thông tin tài khoản"}</p>
       {message && <div role="alert" aria-label="Lỗi xác thực" className="form-message"><CircleAlert aria-hidden="true" size={18} /><div><strong>Thông báo từ Fire3D</strong><p>{message}</p><button type="button" disabled={submitting} onClick={() => { setMessage(""); headingRef.current?.focus(); }}>Kiểm tra thông tin và thử lại</button></div></div>}
-      {googleOnboarding && <div className="verification-panel" role="status"><p>{!googleOnboarding.proof ? "Hiện chưa thể tạo tài khoản Google vì dịch vụ chưa cung cấp xác minh cần thiết. Bạn có thể thử lại Google hoặc đăng ký bằng email." : proofExpired ? "Xác minh đã hết hạn. Hãy thử lại Google." : `Đang hoàn thiện cho ${googleOnboarding.proof.email}`}</p></div>}
+      {googleOnboarding && <div className="verification-panel" role="status"><p>{googleOnboarding.recovery ? "Bấm Tiếp tục với Google để kiểm tra tài khoản và nhận phiên đăng nhập." : !googleOnboarding.proof ? "Hiện chưa thể tạo tài khoản Google vì dịch vụ chưa cung cấp xác minh cần thiết. Bạn có thể thử lại Google hoặc đăng ký bằng email." : proofExpired ? "Xác minh đã hết hạn. Hãy thử lại Google." : `Đang hoàn thiện cho ${googleOnboarding.proof.email}`}</p></div>}
+      {googleWait && <p className="verification-status" role="status">Có thể thử lại sau {googleWait.seconds} giây.</p>}
       <fieldset className="auth-fields" disabled={submitting || otpPending} hidden={mode === "register" && otpSent && !googleOnboarding}>
       {mode === "register" && <>
         <fieldset className="account-type-fieldset">
@@ -323,8 +359,8 @@ export function LoginForm() {
         <Button type="button" variant="secondary" onClick={() => selectMode("login")}>Đăng nhập</Button>
       </section>}
       {!googleOnboarding && (mode === "login" || otpSent) && <Button disabled={!ready || submitting || (mode === "register" && otp.length !== 6)} className="form-submit" type="submit">{submitting ? "Đang xử lý…" : mode === "login" ? "Đăng nhập" : "Xác thực và tạo tài khoản"}</Button>}
-      {googleOnboarding && <><Button className="form-submit" type="submit" disabled={submitting || !googleOnboarding.proof || proofExpired}>{submitting ? "Đang hoàn tất…" : "Hoàn tất tài khoản"}</Button><Button type="button" variant="secondary" disabled={submitting} onClick={() => void submitGoogle()}><GoogleIcon /> Thử lại Google</Button><Button type="button" variant="quiet" disabled={submitting} onClick={() => selectMode("register")}>Đăng ký bằng email</Button><Button type="button" variant="quiet" disabled={submitting} onClick={() => selectMode("login")}><Iconsax name="arrow-left" size={16} /> Đăng nhập bằng email</Button></>}
-      {mode === "login" && <Button disabled={!ready || !hasFirebaseAuthConfig || submitting} className="google-sign-in" type="button" variant="secondary" onClick={() => void submitGoogle()}><GoogleIcon /> Tiếp tục với Google</Button>}
+      {googleOnboarding && <><Button className="form-submit" type="submit" disabled={submitting || !!googleWait || !googleOnboarding.proof || proofExpired}>{submitting ? "Đang hoàn tất…" : "Hoàn tất tài khoản"}</Button><Button type="button" variant="secondary" disabled={submitting || !!googleWait} onClick={() => void submitGoogle()}><GoogleIcon /> {googleOnboarding.recovery ? "Tiếp tục với Google" : "Thử lại Google"}</Button><Button type="button" variant="quiet" disabled={submitting} onClick={() => selectMode("register")}>Đăng ký bằng email</Button><Button type="button" variant="quiet" disabled={submitting} onClick={() => selectMode("login")}><Iconsax name="arrow-left" size={16} /> Đăng nhập bằng email</Button></>}
+      {mode === "login" && <Button disabled={!ready || !hasFirebaseAuthConfig || submitting || !!googleWait} className="google-sign-in" type="button" variant="secondary" onClick={() => void submitGoogle()}><GoogleIcon /> Tiếp tục với Google</Button>}
     </form>
   );
 }

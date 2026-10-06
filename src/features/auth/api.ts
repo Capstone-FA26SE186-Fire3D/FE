@@ -142,7 +142,7 @@ function googleResult(response: FirebaseLoginResponse): GoogleLoginResult {
   if (response.status === "ACCOUNT_LINK_REQUIRED") return { status: "AccountLinkRequired" };
   if (response.status === "OnboardingRequired") {
     const proof = response.onboarding;
-    const valid = proof && typeof proof.token === "string" && !!proof.token.trim() && typeof proof.email === "string" && !!proof.email.trim() && typeof proof.displayName === "string" && typeof proof.expiresAt === "string" && Number.isFinite(Date.parse(proof.expiresAt));
+    const valid = proof && typeof proof.token === "string" && !!proof.token.trim() && typeof proof.email === "string" && !!proof.email.trim() && (proof.displayName === null || typeof proof.displayName === "string") && typeof proof.expiresAt === "string" && Number.isFinite(Date.parse(proof.expiresAt));
     return { status: "OnboardingRequired", onboarding: valid ? proof : null };
   }
   throw new Error("Máy chủ trả trạng thái Google không hợp lệ. Hãy thử lại.");

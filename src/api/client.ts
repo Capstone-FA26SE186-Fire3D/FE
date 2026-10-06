@@ -75,7 +75,10 @@ export const apiClient = {
 
     if (!response.ok) {
       const fallback = response.statusText || `Request failed with status ${response.status}.`;
-      throw new ApiError(errorMessage(payload, fallback), response.status, isErrorPayload(payload) ? payload : undefined);
+      const retryAfter = response.headers.get("Retry-After");
+      const seconds = retryAfter && /^\d+$/.test(retryAfter.trim()) ? Number(retryAfter) : NaN;
+      const retryAfterSeconds = Number.isSafeInteger(seconds) && seconds >= 0 ? seconds : undefined;
+      throw new ApiError(errorMessage(payload, fallback), response.status, isErrorPayload(payload) ? payload : undefined, retryAfterSeconds);
     }
 
     return { data: payload as T, headers: response.headers, status: response.status };

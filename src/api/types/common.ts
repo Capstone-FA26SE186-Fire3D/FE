@@ -23,11 +23,13 @@ export type ApiResponse<T> = {
 export class ApiError extends Error {
   readonly payload?: ApiErrorPayload;
   readonly status: number;
+  readonly retryAfterSeconds?: number;
 
-  constructor(message: string, status: number, payload?: ApiErrorPayload) {
+  constructor(message: string, status: number, payload?: ApiErrorPayload, retryAfterSeconds?: number) {
     super(message);
     this.name = "ApiError";
     this.payload = payload;
     this.status = status;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
 }
