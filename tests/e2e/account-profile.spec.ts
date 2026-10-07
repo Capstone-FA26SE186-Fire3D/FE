@@ -109,6 +109,33 @@ test("account profile uses the latest ETags to update a user and its organizatio
   }]);
 });
 
+test("account profile maps the gender enum name returned by the API to its selected option", async ({ page }) => {
+  let updateBody: unknown;
+
+  await restoreSession(page);
+  await page.route("**/api/auth/me", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({ headers: { etag: '"7"' }, json: { ...organizationUser, gender: "PreferNotToSay" } });
+      return;
+    }
+    updateBody = route.request().postDataJSON();
+    await route.fulfill({ headers: { etag: '"8"' }, json: { ...organizationUser, gender: "PreferNotToSay", profileRevision: 8 } });
+  });
+  await page.route("**/api/organizations/me", (route) => route.fulfill({
+    headers: { etag: '"4"' },
+    json: {
+      id: "organization-1", name: "Fire3D Studio", slug: "fire3d-studio", address: "Da Nang", phoneNumber: "+842361234567",
+      isActive: true, profileRevision: 4, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z",
+    },
+  }));
+
+  await page.goto("/workspace/profile");
+  await expect(page.getByLabel("Giới tính")).toHaveValue("3");
+  await page.getByRole("button", { name: "Lưu hồ sơ cá nhân" }).click();
+
+  await expect.poll(() => updateBody).toMatchObject({ gender: 3 });
+});
+
 test("changing a password ends the current local session", async ({ page }) => {
   let changePasswordPayload: unknown;
 
