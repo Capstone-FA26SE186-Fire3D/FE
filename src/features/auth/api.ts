@@ -1,7 +1,7 @@
 import { apiClient } from "@/api/client";
 import { ApiError } from "@/api/types/common";
 import type { GoogleLoginResult, GoogleOnboardingInput, GoogleOnboardingProof } from "./types";
-import type { AuthUser, AvatarResponse, RegisterInput, RegistrationOtpVerification, TokenResponse, UpdateProfileInput } from "./types";
+import type { AuthUser, AvatarResponse, AvatarUploadIntent, RegisterInput, RegistrationOtpVerification, TokenResponse, UpdateProfileInput } from "./types";
 
 type ApiUserRole = AuthUser["role"] | "PlatformAdmin" | "OrganizationUser" | "Trainee";
 type ApiAuthUser = Omit<AuthUser, "role"> & { role: ApiUserRole };
@@ -32,6 +32,18 @@ function normalizeTokenResponse(response: ApiTokenResponse): TokenResponse {
 
 function bearer(accessToken: string): HeadersInit {
   return { Authorization: `Bearer ${accessToken}` };
+}
+
+async function putAvatarObject(uploadUrl: string, file: File): Promise<void> {
+  const response = await fetch(uploadUrl, {
+    body: file,
+    headers: { "Content-Type": file.type },
+    method: "PUT",
+  });
+
+  if (!response.ok) {
+    throw new Error("Không thể tải ảnh lên kho lưu trữ. Vui lòng thử lại.");
+  }
 }
 
 export const authApi = {
@@ -114,13 +126,15 @@ export const authApi = {
       json: { currentPassword, newPassword },
     });
   },
-  uploadAvatar(accessToken: string, etag: string, file: File) {
-    const form = new FormData();
-    form.append("file", file);
-    return apiClient.requestWithMeta<AvatarResponse>("/api/me/avatar/upload", {
-      body: form,
+  async uploadAvatar(accessToken: string, etag: string, file: File) {
+    const intent = await apiClient.request<AvatarUploadIntent>("/api/me/avatar/upload-intent", {
+      headers: bearer(accessToken),
+      json: { contentType: file.type, contentLength: file.size },
+    });
+    await putAvatarObject(intent.uploadUrl, file);
+    return apiClient.requestWithMeta<AvatarResponse>("/api/me/avatar/complete", {
       headers: { ...bearer(accessToken), "If-Match": etag },
-      method: "POST",
+      json: { uploadId: intent.uploadId },
     });
   },
   deleteAvatar(accessToken: string, etag: string) {
