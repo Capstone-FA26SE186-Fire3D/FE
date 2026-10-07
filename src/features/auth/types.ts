@@ -1,5 +1,5 @@
 export type UserRole = 0 | 1 | 2;
-export type UserGender = 0 | 1 | 2;
+export type UserGender = 0 | 1 | 2 | 3;
 
 export type AuthUser = {
   id: string;

@@ -4,7 +4,8 @@ import type { GoogleLoginResult, GoogleOnboardingInput, GoogleOnboardingProof } 
 import type { AuthUser, AvatarResponse, AvatarUploadIntent, RegisterInput, RegistrationOtpVerification, TokenResponse, UpdateProfileInput } from "./types";
 
 type ApiUserRole = AuthUser["role"] | "PlatformAdmin" | "OrganizationUser" | "Trainee";
-type ApiAuthUser = Omit<AuthUser, "role"> & { role: ApiUserRole };
+type ApiUserGender = AuthUser["gender"] | "Male" | "Female" | "Other" | "PreferNotToSay";
+type ApiAuthUser = Omit<AuthUser, "role" | "gender"> & { role: ApiUserRole; gender?: ApiUserGender };
 type ApiTokenResponse = Omit<TokenResponse, "user"> & { user: ApiAuthUser };
 
 type FirebaseLoginResponse = {
@@ -19,10 +20,19 @@ const roleByApiName = {
   Trainee: 2,
 } as const;
 
+const genderByApiName = {
+  Male: 0,
+  Female: 1,
+  Other: 2,
+  PreferNotToSay: 3,
+} as const;
+
 function normalizeUser(user: ApiAuthUser): AuthUser {
   const role = typeof user.role === "number" ? user.role : roleByApiName[user.role];
   if (role !== 0 && role !== 1 && role !== 2) throw new Error("Máy chủ trả về vai trò tài khoản không hợp lệ.");
-  return { ...user, role };
+  const gender = typeof user.gender === "string" ? genderByApiName[user.gender] : user.gender;
+  if (gender !== undefined && gender !== null && gender !== 0 && gender !== 1 && gender !== 2 && gender !== 3) throw new Error("Máy chủ trả về giới tính không hợp lệ.");
+  return { ...user, role, gender };
 }
 
 function normalizeTokenResponse(response: ApiTokenResponse): TokenResponse {
