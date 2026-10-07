@@ -29,6 +29,12 @@ export type AvatarResponse = {
   profileRevision: number;
 };
 
+export type AvatarUploadIntent = {
+  uploadId: string;
+  uploadUrl: string;
+  expiresAt: string;
+};
+
 export type TokenResponse = {
   accessToken: string;
   refreshToken: string;

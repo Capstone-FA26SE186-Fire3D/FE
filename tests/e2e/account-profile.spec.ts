@@ -128,3 +128,43 @@ test("changing a password ends the current local session", async ({ page }) => {
   await expect.poll(() => changePasswordPayload).toEqual({ currentPassword: "old-password", newPassword: "new-password" });
   await expect(page.getByRole("heading", { name: "Đăng nhập Fire3D" })).toBeVisible();
 });
+
+test("avatar upload creates an intent, sends the image to storage, then completes with the current profile ETag", async ({ page }) => {
+  const requests: { step: string; body?: unknown; contentType?: string | undefined; ifMatch?: string | undefined }[] = [];
+
+  await restoreSession(page);
+  await page.route("**/api/auth/me", (route) => route.fulfill({ headers: { etag: '"7"' }, json: organizationUser }));
+  await page.route("**/api/organizations/me", (route) => route.fulfill({
+    headers: { etag: '"4"' },
+    json: {
+      id: "organization-1", name: "Fire3D Studio", slug: "fire3d-studio", address: "Da Nang", phoneNumber: "+842361234567",
+      isActive: true, profileRevision: 4, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z",
+    },
+  }));
+  await page.route("**/api/me/avatar/upload-intent", async (route) => {
+    requests.push({ step: "intent", body: route.request().postDataJSON() });
+    await route.fulfill({ json: { uploadId: "avatar-upload-1", uploadUrl: "https://storage.fire3d.test/avatar-upload-1", expiresAt: "2026-10-07T10:00:00Z" } });
+  });
+  await page.route("https://storage.fire3d.test/avatar-upload-1", async (route) => {
+    requests.push({ step: "storage", contentType: await route.request().headerValue("content-type") });
+    await route.fulfill({ status: 200 });
+  });
+  await page.route("**/api/me/avatar/complete", async (route) => {
+    requests.push({ step: "complete", body: route.request().postDataJSON(), ifMatch: await route.request().headerValue("if-match") });
+    await route.fulfill({
+      headers: { etag: '"8"' },
+      json: { url: "https://download.fire3d.test/avatar-1", expiresAt: "2026-10-07T10:05:00Z", profileRevision: 8 },
+    });
+  });
+
+  await page.goto("/workspace/profile");
+  await page.locator('input[type="file"]').setInputFiles({ name: "avatar.png", mimeType: "image/png", buffer: Buffer.from([137, 80, 78, 71]) });
+
+  await expect.poll(() => requests).toEqual([
+    { step: "intent", body: { contentType: "image/png", contentLength: 4 } },
+    { step: "storage", contentType: "image/png" },
+    { step: "complete", body: { uploadId: "avatar-upload-1" }, ifMatch: '"7"' },
+  ]);
+  await expect(page.getByText("Đã cập nhật ảnh đại diện.")).toBeVisible();
+  await expect(page.getByAltText("Ảnh đại diện hiện tại")).toHaveAttribute("src", "https://download.fire3d.test/avatar-1");
+});
