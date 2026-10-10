@@ -54,7 +54,8 @@ test("Accounts form receives Organization scope from the admin handoff", async (
 
   await page.goto("/admin/accounts?organizationId=org-1");
 
-  const form = page.locator(".admin-form");
+  await page.getByRole("button", { name: "Tạo tài khoản", exact: true }).click();
+  const form = page.getByRole("dialog", { name: "Tạo tài khoản" });
   await expect(form.getByLabel("Vai trò")).toHaveValue("1");
-  await expect(form.getByRole("combobox").nth(1)).toHaveValue("org-1");
+  await expect(form.getByLabel("Tổ chức")).toHaveValue("org-1");
 });

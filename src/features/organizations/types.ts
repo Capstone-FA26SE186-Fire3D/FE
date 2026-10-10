@@ -1,9 +1,6 @@
-export type PageResponse<T> = {
-  items: T[];
-  totalCount: number;
-  page: number;
-  pageSize: number;
-};
+import type { PageResponse } from "@/api/types/common";
+
+export type { PageResponse };
 
 export type Organization = {
   id: string;

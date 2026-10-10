@@ -16,8 +16,8 @@ export type AccountFilters = {
 };
 
 export const accountsApi = {
-  list(accessToken: string, filters: AccountFilters) {
-    return apiClient.request<PageResponse<ManagedAccount>>("/api/accounts", { headers: headers(accessToken), query: filters });
+  list(accessToken: string, filters: AccountFilters, signal?: AbortSignal) {
+    return apiClient.request<PageResponse<ManagedAccount>>("/api/accounts", { headers: headers(accessToken), query: filters, signal });
   },
   create(accessToken: string, input: CreateAccountInput) {
     return apiClient.request("/api/accounts", { headers: headers(accessToken), json: input });

@@ -12,10 +12,17 @@ export const routes = {
   about: "/about",
   download: "/download",
   rag: "/demo/rag",
+  adminOverview: "/admin/overview",
   adminAccounts: "/admin/accounts",
   adminOrganizations: "/admin/organizations",
+  adminReviews: "/admin/reviews",
+  adminLearn: "/admin/learn",
+  adminLibrary: "/admin/library",
+  adminCommerce: "/admin/commerce",
+  adminSupport: "/admin/support",
   workspaceBuildings: "/workspace/buildings",
   workspaceIfc: "/workspace/ifc",
+  workspaceSupport: "/workspace/support",
   workspaceProfile: "/workspace/profile",
 } as const;
 

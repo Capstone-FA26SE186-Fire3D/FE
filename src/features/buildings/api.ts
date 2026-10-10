@@ -23,10 +23,11 @@ function headers(accessToken: string): HeadersInit {
 }
 
 export const buildingsApi = {
-  list(accessToken: string, filters: BuildingFilters) {
+  list(accessToken: string, filters: BuildingFilters, signal?: AbortSignal) {
     return apiClient.request<BuildingPage>("/api/buildings", {
       headers: headers(accessToken),
       query: filters,
+      signal,
     });
   },
   create(accessToken: string, input: BuildingInput) {

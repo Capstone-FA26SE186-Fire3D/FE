@@ -8,7 +8,8 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: "bg-[var(--ember)] text-[var(--ember-foreground)] hover:bg-[#ff9b6c]",
+        primary: "bg-[var(--ember)] text-[var(--ember-foreground)] hover:bg-[var(--ember-hover,#ff9b6c)]",
+        danger: "bg-[var(--danger,#ff8f8f)] text-[var(--ember-foreground)] hover:opacity-90",
         secondary: "border border-[var(--line-strong)] bg-[var(--surface)] text-[var(--text)] hover:border-[var(--ember)]",
         ghost: "text-[var(--muted)] hover:bg-[var(--surface)] hover:text-[var(--text)]",
         quiet: "border border-[var(--line)] text-[var(--muted)] hover:border-[var(--line-strong)] hover:text-[var(--text)]",
@@ -17,6 +18,7 @@ const buttonVariants = cva(
         sm: "min-h-11 px-3 text-xs",
         md: "min-h-11",
         lg: "min-h-12 px-5 text-base",
+        icon: "min-h-10 w-10 px-0",
       },
     },
     defaultVariants: { variant: "primary", size: "md" },
