@@ -20,3 +20,14 @@ Chỉ lưu kiến thức đã xác minh và cần cho team. Nhật ký lỗi, th
 
 - `npm run build` đạt sau khi chạy ngoài sandbox; lỗi `spawn EPERM` ở sandbox là giới hạn môi trường, không phải lỗi build hiện tại.
 - UI/UX Pro Max installer báo High Risk; chỉ copy skill, không bật hook. Review `SKILL.md` và script trước khi chạy.
+
+## 2026-10-10 — Khu vận hành và kiểm thử với API thật
+
+- **Mock không đủ làm bằng chứng tích hợp.** Chạy giao diện với API thật sớm: mock trả vai trò dạng số nên cột Vai trò hiện "Không xác định" với dữ liệu thật; request tạo tài khoản gửi số bị API từ chối. Ghi bằng chứng mock và API thật riêng.
+- **Build test phải dùng `NEXT_PUBLIC_API_BASE_URL=` (rỗng).** Nếu `.env` trỏ API thật, mock Playwright thành khác origin và trình duyệt giấu `ETag`/`Retry-After`, làm vỡ test 412 và đếm ngược Retry-After dù code đúng. Build rồi mới chạy `next start`; không rebuild khi suite đang chạy.
+- **Dữ liệu tải muộn không được ghi đè nội dung đang gõ.** Form hồ sơ từng bị ghi đè khi dữ liệu tổ chức về sau lúc người dùng đã nhập, rồi nút Lưu bật lên với giá trị của server. Khóa form tới khi mọi nguồn dữ liệu đã tải xong (không chỉ nguồn đầu tiên).
+- **Test hẹn giờ thật nhạy với tải máy.** `google-onboarding:218` dùng proof hết hạn sau 3 giây thật nên lỗi khi máy chạy nhiều tiến trình; pass 10/10 khi rảnh. Dùng đồng hồ giả cho cả hạn proof thay vì thời gian thật.
+- **Đối chiếu tài liệu với source/API thật trước khi chặn tính năng.** Tài liệu BE cũ nói PlatformAdmin chưa có API công trình, nhưng API thật cho PlatformAdmin liệt kê/tạo/sửa Building qua `organizationId` (query hoặc body); giao diện từng chặn admin vì tài liệu lỗi thời.
+- **Đừng `git add -A` khi có thư mục công cụ trình duyệt.** `.playwright-mcp/` chứa snapshot có dữ liệu thật (email người dùng) và ảnh chụp; thêm vào ignore trước khi commit. Kiểm `git status` và `git show --stat` trước khi push.
+- **Windows: xóa worktree.** `git worktree remove` có thể để lại thư mục (đường dẫn quá dài, node_modules). Xác nhận git không còn đăng ký worktree rồi xóa bằng PowerShell với tiền tố `\\?\`; sao lưu ghi chú `.codex/local` của worktree trước khi xóa.
+- **Landing — đo hiệu năng:** headless mặc định dùng SwiftShader (~1 FPS) nên không dùng để so FPS; dùng ANGLE D3D11 (`--use-angle=d3d11`) và đo "sync ms" bằng `readPixels`, A/B xen kẽ vì máy dùng chung nhiễu 20–40%. Nút thắt chính là fill-rate theo pixel ratio và overdraw của sprite lửa/khói full-res; pixel ratio thích ứng có hysteresis và lửa instanced trong pass half-res giảm rõ nhất ở màn hình độ phân giải cao, còn ở DPR 1 chỉ khiêm tốn. Giảm bước raymarch của khói tường làm hiện hạt nhiễu, đã hoàn nguyên.
