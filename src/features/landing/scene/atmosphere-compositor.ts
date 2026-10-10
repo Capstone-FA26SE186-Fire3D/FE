@@ -51,6 +51,8 @@ export function createAtmosphereCompositor(renderer: THREE.WebGLRenderer, atmosp
   const drawingSize = new THREE.Vector2(), clearColor = new THREE.Color();
 
   return {
+    /** Everything added here is drawn in the half-resolution, depth-aware pass. */
+    volumeScene,
     draw(scene: THREE.Scene, camera: THREE.PerspectiveCamera, destination: THREE.WebGLRenderTarget | null) {
       const pair = destination ? buffers.phone : buffers.main;
       if (destination) drawingSize.set(destination.width, destination.height);

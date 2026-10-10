@@ -3,10 +3,11 @@ import { atmosphereFragment, atmosphereVertex } from "./room-atmosphere-shader";
 import { roomFireTimeline } from "./fire-timeline";
 import { bayFall, collapseBay } from "./collapse-timeline";
 import { sampleFireWeather } from "./fire-weather";
+import { createAtmosphereView, type AtmosphereView } from "./atmosphere-view";
 
 // Art-directed fire spread, not a fire-dynamics or evacuation simulation.
 
-export function createRoomAtmosphere(mobile: boolean) {
+export function createRoomAtmosphere(mobile: boolean, view: AtmosphereView = createAtmosphereView()) {
   const group = new THREE.Group(); group.name = "wall-ceiling-fire-and-smoke-volume";
   const geometry = new THREE.BoxGeometry(1, 1, 1);
   // One shared 3D noise field. Hardware interpolation replaces hundreds of
@@ -23,18 +24,14 @@ export function createRoomAtmosphere(mobile: boolean) {
   noiseTexture.wrapS = noiseTexture.wrapT = noiseTexture.wrapR = THREE.RepeatWrapping;
   noiseTexture.unpackAlignment = 1; noiseTexture.needsUpdate = true;
   const materials: THREE.ShaderMaterial[] = [];
-  const view = {
-    uDepth: { value: null as THREE.DepthTexture | null },
-    uResolution: { value: new THREE.Vector2(1, 1) },
-    uInverseProjection: { value: new THREE.Matrix4() },
-    uCameraWorld: { value: new THREE.Matrix4() },
-    uJunctionClearance: { value: 1 },
-  };
-  const rooms: { root: THREE.Group; time: { value: number }; growth: { value: number }; smoke: { value: number }; onset: number; level: number }[] = [];
+  // Per-volume values that never change after creation: collapse level/bay.
+  type Volume = { material: THREE.ShaderMaterial; level: number; bay: number };
+  const rooms: { root: THREE.Group; time: { value: number }; growth: { value: number }; smoke: { value: number }; onset: number; level: number; seed: number; volumes: Volume[] }[] = [];
   for (let level = 0; level < 3; level++) for (const side of [-1, 1]) for (let room = 0; room < 3; room++) {
     const timeline = roomFireTimeline(level, side, room);
     const { seed, strength } = timeline;
     const onset = timeline.ignition;
+    const volumes: Volume[] = [];
     const root = new THREE.Group(); group.add(root);
     const y = level * 3.6, z = [5,-1,-7][room];
     const time = { value: 0 }, growth = { value: 0 }, smoke = { value: 0 };
@@ -63,6 +60,7 @@ export function createRoomAtmosphere(mobile: boolean) {
       mesh.name = ceiling ? "ceiling-rollover-smoke-volume" : "wall-fire-volume";
       mesh.position.copy(center); mesh.scale.copy(size);
       root.add(mesh); materials.push(material);
+      volumes.push({ material, level: THREE.MathUtils.clamp(Math.floor((center.y - half.y) / 3.6), 0, 2), bay: collapseBay(center.z) });
     };
     // Both regions share world-space turbulence, rather than two unrelated UV sheets.
     // Their bounds stay inside the room, on the visible side of the solid partition.
@@ -165,10 +163,10 @@ export function createRoomAtmosphere(mobile: boolean) {
       roofTile(z-3,facadeLength,timeline.roof);
       if (room === 2) roofTile(-17,7,timeline.roof+8);
     }
-    rooms.push({root,time,growth,smoke,onset,level});
+    rooms.push({root,time,growth,smoke,onset,level,seed,volumes});
   }
   return {
-    group,
+    group, view,
     configureView(depth: THREE.DepthTexture, camera: THREE.PerspectiveCamera, width: number, height: number) {
       view.uDepth.value = depth; view.uResolution.value.set(width, height);
       view.uInverseProjection.value.copy(camera.projectionMatrixInverse);
@@ -178,23 +176,23 @@ export function createRoomAtmosphere(mobile: boolean) {
       view.uJunctionClearance.value = 1-THREE.MathUtils.smoothstep(cutaway,0,.65);
       for(const room of rooms){
         room.root.visible=room.level===0||cutaway>.01;
+        // Hidden storeys are not drawn: skip their uniform work entirely.
+        if(!room.root.visible) continue;
         const age=Math.max(0,time-room.onset);
         room.time.value=time;
         room.growth.value=THREE.MathUtils.smoothstep(age,0,32);
         // Accumulation saturates instead of looping back to clean air.
         room.smoke.value=1-Math.exp(-age/20);
+        // One weather sample per room instead of one per volume.
+        const weather = sampleFireWeather(time, room.seed);
+        for(const { material, level, bay } of room.volumes){
+          const uniforms = material.uniforms;
+          uniforms.uWind.value.set(weather.windX, weather.windZ);
+          uniforms.uGust.value = weather.gust;
+          uniforms.uFlare.value = weather.flare;
+          uniforms.uOpacity.value = 1-THREE.MathUtils.smoothstep(bayFall(damageTime,level,bay),0,.85);
+        }
       }
-      materials.forEach(material => {
-        const weather = sampleFireWeather(time, material.uniforms.uSeed.value);
-        material.uniforms.uWind.value.set(weather.windX, weather.windZ);
-        material.uniforms.uGust.value = weather.gust;
-        material.uniforms.uFlare.value = weather.flare;
-        const min = material.uniforms.uMin.value as THREE.Vector3;
-        const max = material.uniforms.uMax.value as THREE.Vector3;
-        const level = THREE.MathUtils.clamp(Math.floor(min.y/3.6),0,2);
-        const fall = bayFall(damageTime,level,collapseBay((min.z+max.z)/2));
-        material.uniforms.uOpacity.value = 1-THREE.MathUtils.smoothstep(fall,0,.85);
-      });
     },
     dispose(){geometry.dispose();noiseTexture.dispose();materials.forEach(m=>m.dispose());group.clear();},
   };

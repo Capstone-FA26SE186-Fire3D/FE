@@ -7,23 +7,35 @@ import { createOccupants } from "./occupants";
 import { createJunction } from "./junction";
 import { createRoomAtmosphere } from "./room-atmosphere";
 import { createAtmosphereCompositor } from "./atmosphere-compositor";
+import { createAtmosphereView } from "./atmosphere-view";
+import { createQualityController } from "./quality";
 import { roomFireTimeline } from "./fire-timeline";
 import type { LandingBranch } from "../types";
 
 export type SceneReport = { organization: number; phone: number; settled: boolean; position: THREE.Vector3; hitAreas: ReturnType<ReturnType<typeof createJunction>["hitAreas"]> };
 export type LandingRuntime = ReturnType<typeof createLandingRuntime>;
 
+const FOG_DENSITY = .026;
+
 export function createLandingRuntime(canvas: HTMLCanvasElement, mobile: boolean) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !mobile, powerPreference: "high-performance" });
   renderer.debug.onShaderError = (gl, program, vertex, fragment) => {
     throw new Error(`WebGL shader: ${gl.getProgramInfoLog(program)} ${gl.getShaderInfoLog(vertex)} ${gl.getShaderInfoLog(fragment)}`);
   };
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, mobile ? 1.25 : 1.6));
+  // Frame cost is dominated by shaded pixels, so the pixel ratio is adaptive:
+  // it starts at a tier cap and steps down (with hysteresis) when frames are slow.
+  const quality = createQualityController({ mobile, devicePixelRatio: window.devicePixelRatio });
+  renderer.setPixelRatio(quality.ratio);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = !mobile; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // The one shadow-casting light is a point light: a cube map, i.e. six extra
+  // passes over the whole scene (measured ~300 draw calls, ~150k triangles).
+  renderer.shadowMap.autoUpdate = false;
   const scene = new THREE.Scene(); scene.background = new THREE.Color(0x141719);
-  scene.fog = new THREE.FogExp2(0x222a29, .026);
+  // Fog stays attached and only its density changes: swapping scene.fog in and
+  // out changes the shader program key of every lit material.
+  const fog = new THREE.FogExp2(0x222a29, FOG_DENSITY); scene.fog = fog;
   const camera = new THREE.PerspectiveCamera(mobile ? 62 : 60, 1, .06, 140);
   const building = createBuilding();
   const junction = createJunction(); building.group.add(junction.group); junction.layout(mobile);
@@ -46,12 +58,17 @@ export function createLandingRuntime(canvas: HTMLCanvasElement, mobile: boolean)
     ignition: roomFireTimeline(0,1,2).wall+12+i*5,
     size: [.9,.9] as [number,number],
   }));
-  const effects = createFireEffects([...building.fireSources,...junctionSources,...edgeSources], mobile);
-  const atmosphere = createRoomAtmosphere(mobile);
+  // Flames, smoke and embers are drawn with the volumes (half resolution, depth
+  // aware, one draw call per kind); only the real fire lights live in the scene.
+  const view = createAtmosphereView();
+  const effects = createFireEffects([...building.fireSources,...junctionSources,...edgeSources], mobile, view);
+  const atmosphere = createRoomAtmosphere(mobile, view);
   const compositor = createAtmosphereCompositor(renderer, atmosphere, mobile);
-  const occupants = createOccupants(mobile); scene.add(occupants.group, occupants.renderGroup, occupants.effectsGroup);
+  compositor.volumeScene.add(effects.sprites);
+  const occupants = createOccupants(mobile, view); scene.add(occupants.group, occupants.renderGroup);
+  compositor.volumeScene.add(occupants.effectsSprites);
   const gameCamera = new THREE.PerspectiveCamera(58, .492, .06, 100);
-  scene.add(building.group, effects.group, new THREE.HemisphereLight(0xb3c7c8, 0x24251f, .75));
+  scene.add(building.group, effects.lights, new THREE.HemisphereLight(0xb3c7c8, 0x24251f, .75));
   const exteriorLight = new THREE.DirectionalLight(0xd7e9e7, 2); exteriorLight.position.set(5, 20, 15); scene.add(exteriorLight);
   const cameraController = createJourneyCamera(camera);
   const target = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: true, type: THREE.HalfFloatType });
@@ -65,6 +82,9 @@ export function createLandingRuntime(canvas: HTMLCanvasElement, mobile: boolean)
   let phoneReveal = 0;
   let damageTime = 0;
   let disposed = false;
+  const hitAreas = junction.hitAreas(camera);
+  const report: SceneReport = { organization: 0, phone: 0, settled: false, position: camera.position, hitAreas };
+  const diagnostics = { collapse: "", damageTime: "" };
 
   function draw(phoneAmount: number) {
     renderer.info.reset();
@@ -83,12 +103,16 @@ export function createLandingRuntime(canvas: HTMLCanvasElement, mobile: boolean)
       renderer.autoClear = false; renderer.clearDepth(); renderer.render(phone.scene, phone.camera); renderer.autoClear = true;
     }
   }
+  function applySize() {
+    renderer.setSize(width, height, false);
+    canvas.dataset.pixelRatio = renderer.getPixelRatio().toFixed(2);
+  }
   return {
     renderer,
     resize(w: number, h: number) {
       if (disposed) return;
       width = Math.max(1, w); height = Math.max(1, h);
-      camera.aspect = width / height; camera.updateProjectionMatrix(); renderer.setSize(width, height, false);
+      camera.aspect = width / height; camera.updateProjectionMatrix(); applySize();
       // At the settled junction, left sits just inside the frame while right
       // straddles the edge. Both roots stay on the floor, including on mobile.
       const edgeHalfWidth=3.45*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))*camera.aspect;
@@ -96,30 +120,46 @@ export function createLandingRuntime(canvas: HTMLCanvasElement, mobile: boolean)
       edgeSources[1].position.x=edgeHalfWidth;
       target.setSize(mobile ? 384 : 512, mobile ? 780 : 1040);
     },
+    /** `delta` is the time since the previous rendered frame, in seconds. */
     update(delta: number, progress: number, branch: LandingBranch, orbit?: { yaw: number; pitch: number }): SceneReport {
       time += delta;
-      const report = cameraController.update(progress, branch, delta, mobile, orbit);
-      building.reveal(report.organization);
-      occupants.update(time, report.phone > .01);
-      if (branch === "organization" && report.organization > .995) damageTime += delta;
+      const next = quality.update(delta * 1000);
+      if (next !== null) { renderer.setPixelRatio(next); applySize(); }
+      const camReport = cameraController.update(progress, branch, delta, mobile, orbit);
+      building.reveal(camReport.organization);
+      occupants.update(time, camReport.phone > .01);
+      if (branch === "organization" && camReport.organization > .995) damageTime += delta;
       else if (branch !== "organization") damageTime = 0;
       const collapse = building.updateDamage(damageTime);
-      effects.update(time, report.organization, damageTime);
-      atmosphere.update(time, report.organization, damageTime);
-      occupants.renderGroup.visible = collapse < .01;
-      occupants.effectsGroup.visible = collapse < .01;
-      canvas.dataset.collapse = collapse.toFixed(3);
-      canvas.dataset.damageTime = damageTime.toFixed(2);
-      canvas.dataset.npcs = String(occupants.group.children.length);
-      scene.fog = report.organization > .1 ? null : scene.fog ?? new THREE.FogExp2(0x222a29, .026);
-      phoneReveal = report.phone < .001 ? 0 : Math.max(phoneReveal, report.phone);
-      lastPhoneAmount = report.phone; draw(report.phone); frameCount++;
+      effects.update(time, camReport.organization, damageTime);
+      atmosphere.update(time, camReport.organization, damageTime);
+      const people = collapse < .01;
+      occupants.renderGroup.visible = people;
+      occupants.effectsSprites.visible = people;
+      fog.density = camReport.organization > .1 ? 0 : FOG_DENSITY;
+      phoneReveal = camReport.phone < .001 ? 0 : Math.max(phoneReveal, camReport.phone);
+      // Refreshing a cube shadow every Nth frame makes a visible stutter, so it is
+      // all or nothing: every frame in the walk-through, none in the far cutaway
+      // overview where the one shadowed light is a small room fire.
+      if (camReport.organization < .05 || frameCount < 3) renderer.shadowMap.needsUpdate = true;
+      lastPhoneAmount = camReport.phone; draw(camReport.phone); frameCount++;
+      report.organization = camReport.organization; report.phone = camReport.phone; report.settled = camReport.settled;
+      junction.hitAreas(camera);
       // Read-only diagnostics report rendered state, not just the requested scroll target.
-      canvas.dataset.frames = String(frameCount); canvas.dataset.ambientTime = time.toFixed(3);
-      canvas.dataset.camera = report.position.toArray().map(n => n.toFixed(3)).join(",");
-      canvas.dataset.phone = report.phone.toFixed(3); canvas.dataset.cutaway = report.organization.toFixed(3);
-      canvas.dataset.drawCalls = String(renderer.info.render.calls);
-      return { ...report, hitAreas: junction.hitAreas(camera) };
+      // Written every few frames (and the frame counter on every one): attribute
+      // writes are cheap but not free and nothing needs them at 60 Hz.
+      const data = canvas.dataset;
+      data.frames = String(frameCount); data.ambientTime = time.toFixed(3);
+      if (frameCount % 3 === 1 || camReport.settled) {
+        const collapseText = collapse.toFixed(3), damageText = damageTime.toFixed(2);
+        if (diagnostics.collapse !== collapseText) { diagnostics.collapse = collapseText; data.collapse = collapseText; }
+        if (diagnostics.damageTime !== damageText) { diagnostics.damageTime = damageText; data.damageTime = damageText; }
+        data.npcs = String(occupants.group.children.length);
+        data.camera = report.position.x.toFixed(3) + "," + report.position.y.toFixed(3) + "," + report.position.z.toFixed(3);
+        data.phone = camReport.phone.toFixed(3); data.cutaway = camReport.organization.toFixed(3);
+        data.drawCalls = String(renderer.info.render.calls);
+      }
+      return report;
     },
     snapshot() {
       if (disposed) return "";
