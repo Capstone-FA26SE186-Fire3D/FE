@@ -509,13 +509,8 @@ export class EditorSceneController {
       const isSelected = selection?.kind === kind && selection.index === index;
       const ring = marker.getObjectByName("selection-ring");
       if (ring) ring.visible = isSelected;
-      marker.traverse((child) => {
-        if (child instanceof THREE.Mesh && child.name !== "selection-ring") {
-          const material = child.material as THREE.Material;
-          material.opacity = material.userData.baseOpacity ?? material.opacity;
-        }
-      });
-      marker.scale.setScalar(this.markerScale * (dormant ? 0.82 : 1));
+      marker.userData.dormant = dormant;
+      marker.scale.setScalar(this.markerScale * (dormant ? 0.6 : 1));
     };
     spawns.forEach((position, index) => sync("spawn", index, position, "Spawn", false));
     hazards.forEach((hazard, index) => sync("hazard", index, hazard.position, hazard.type, hazard.activationTime > previewTime));
@@ -550,7 +545,7 @@ export class EditorSceneController {
     const next = Math.max(1, distance / 16);
     if (Math.abs(next - this.markerScale) < 0.02) return;
     this.markerScale = next;
-    this.markers.forEach((marker) => marker.scale.setScalar(this.markerScale));
+    this.markers.forEach((marker) => marker.scale.setScalar(this.markerScale * (marker.userData.dormant ? 0.6 : 1)));
   }
 
   // ───────── gizmo ─────────
@@ -568,7 +563,9 @@ export class EditorSceneController {
   private readonly onObjectChange = () => {
     const marker = this.transform.object as THREE.Group | undefined;
     if (!marker) return;
-    const degrees = ((marker.rotation.y / DEG) % 360 + 360) % 360;
+    const q = marker.quaternion;
+    const yaw = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
+    const degrees = ((yaw / DEG) % 360 + 360) % 360;
     this.callbacks.onTransform(marker.userData.kind as ObjectKind, marker.userData.index as number, {
       x: round3(marker.position.x), y: round3(marker.position.y), z: round3(marker.position.z), rotation: round3(degrees),
     }, "change");

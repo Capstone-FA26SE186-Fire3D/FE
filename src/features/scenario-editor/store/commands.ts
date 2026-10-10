@@ -178,17 +178,26 @@ export function deleteCommand(draft: JsonObject, id: number, kind: ObjectKind, i
   };
 }
 
-/** Append/remove a string in a string-list field (objectives, routes…). */
-export function listItemCommand(draft: JsonObject, id: number, key: string, action: { type: "add"; value: string } | { type: "remove"; index: number }, at: number, label: string): Command | null {
-  const current = draft[key];
-  const length = Array.isArray(current) ? current.length : 0;
-  const patches: Patch[] = [];
-  if (action.type === "add") {
-    if (!Array.isArray(current)) patches.push({ op: "set", path: [key], before: current as Json | undefined, after: [] });
-    patches.push({ op: "insert", path: [key], index: length, value: action.value });
-  } else {
-    if (!Array.isArray(current) || action.index < 0 || action.index >= length) return null;
-    patches.push({ op: "remove", path: [key], index: action.index, value: current[action.index] });
+/** Patches that make `path` an array (creating missing ancestors as objects), so undo removes the created branch again. */
+function ensureArray(draft: JsonObject, path: Path): Patch[] {
+  if (Array.isArray(getIn(draft, path))) return [];
+  for (let i = 1; i <= path.length; i++) {
+    const existing = getIn(draft, path.slice(0, i));
+    if (existing === undefined || existing === null) {
+      return [{ op: "set", path: path.slice(0, i), before: undefined, after: nested(path.slice(i), []) }];
+    }
   }
-  return { id, patches, at, label };
+  // A non-array value is in the way: replace it (the editor owns this field).
+  return [{ op: "set", path, before: getIn(draft, path) as Json, after: [] }];
+}
+
+/** Append/remove an item of an array field at `path` (strings for objectives/routes, objects for rubric criteria). */
+export function arrayItemCommand(draft: JsonObject, id: number, path: Path, action: { type: "add"; value: Json } | { type: "remove"; index: number }, at: number, label: string): Command | null {
+  const current = getIn(draft, path);
+  const length = Array.isArray(current) ? current.length : 0;
+  if (action.type === "add") {
+    return { id, at, label, patches: [...ensureArray(draft, path), { op: "insert", path, index: length, value: action.value }] };
+  }
+  if (!Array.isArray(current) || action.index < 0 || action.index >= length) return null;
+  return { id, at, label, patches: [{ op: "remove", path, index: action.index, value: current[action.index] }] };
 }
