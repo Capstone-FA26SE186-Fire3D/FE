@@ -22,7 +22,7 @@ function validatedNext(value: string | null): string | null {
     if (url.origin !== "https://fire3d.local") return null;
     const allowed = ["/learning-hub", "/learn", "/organizations", "/about", "/download", "/dashboard/trainee", "/dashboard/organization", "/workspace/buildings", "/workspace/ifc", "/workspace/support", "/workspace/profile"];
     const adminRoute = /^\/admin\/(overview|accounts|organizations|reviews|learn|library|commerce|support)(?:\/[a-zA-Z0-9_-]+)?$/.test(url.pathname);
-    const buildingRoute = /^\/workspace\/buildings\/[a-zA-Z0-9_-]+(?:\/scenarios(?:\/[a-zA-Z0-9_-]+)?)?$/.test(url.pathname);
+    const buildingRoute = /^\/workspace\/buildings\/[a-zA-Z0-9_-]+(?:\/scenarios(?:\/[a-zA-Z0-9_-]+(?:\/versions)?)?)?$/.test(url.pathname);
     if (!allowed.includes(url.pathname) && !adminRoute && !buildingRoute && !(url.pathname.startsWith("/learn/") && getArticle(url.pathname.slice(7)))) return null;
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {

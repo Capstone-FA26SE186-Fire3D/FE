@@ -40,3 +40,4 @@ Cập nhật bảng này khi hoàn thành từng đợt.
 | Org | Danh sách công trình | Đã tích hợp (mock test) | Bảng/thẻ, URL filter, tạo/sửa/lưu trữ |
 | Admin | Tài khoản | Đã tích hợp (mock test) | URL filter/pagination, tạo, khóa/mở |
 | Foundation | Theme sáng/tối/hệ thống, shell, primitives | Đã tích hợp | Token chỉ áp dụng khu vận hành |
+| Org | Phiên bản & readiness của kịch bản (`/workspace/buildings/[id]/scenarios/[scenarioId]/versions`) | Đã tích hợp một phần (mock test) | Snapshot (Idempotency-Key + If-Match, 412 giữ nội dung), package build + polling 3s, QA/issue Error/Critical + confirm-for-training, gửi duyệt, release Built, Phát hành hiện 503 `PUBLISH_GATE_UNAVAILABLE` (BE#51). Trạng thái duyệt/release/xác nhận sau reload **Chưa có dữ liệu (chờ BE)** (BE#52, BE#53): chỉ nhớ theo tab (sessionStorage), không suy đoán. Status job/QA suy từ SQL, chưa có enum công bố |
