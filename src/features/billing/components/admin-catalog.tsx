@@ -103,7 +103,7 @@ export function PackagesSection({ accessToken }: { accessToken: string }) {
   return <div className="ops-stack">
     <div className="bill-row"><p className="bill-muted">Đơn giá tính theo tháng cho mỗi công trình. Giá một dòng = đơn giá × thời hạn; báo giá chốt bản chụp khi phát hành.</p><div className="ops-actions"><Button variant="quiet" onClick={list.reload} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />Tải lại</Button><Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo gói</Button></div></div>
     {list.error !== undefined && <Alert tone="danger" title="Không tải được gói" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert>}
-    <Table caption="Danh sách gói dịch vụ">
+    <Table className="bill-table" caption="Danh sách gói dịch vụ">
       <thead><tr><th>Gói</th><th className="bill-money">Đơn giá/tháng</th><th>Thời hạn</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr></thead>
       <tbody>
         {list.loading && !list.data && <TableMessage colSpan={5}><SkeletonRows rows={4} label="Đang tải gói…" /></TableMessage>}
@@ -218,7 +218,7 @@ export function DiscountsSection({ accessToken }: { accessToken: string }) {
   return <div className="ops-stack">
     <div className="bill-row"><p className="bill-muted">Mỗi báo giá áp dụng một quy tắc có mức giảm lớn nhất, không cộng dồn. Phần trăm làm tròn VND ở máy chủ.</p><div className="ops-actions"><Button variant="quiet" onClick={list.reload} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />Tải lại</Button><Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo quy tắc</Button></div></div>
     {list.error !== undefined && <Alert tone="danger" title="Không tải được quy tắc giảm giá" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert>}
-    <Table caption="Quy tắc giảm giá">
+    <Table className="bill-table" caption="Quy tắc giảm giá">
       <thead><tr><th>Quy tắc</th><th>Mức giảm</th><th>Điều kiện</th><th>Hiệu lực</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr></thead>
       <tbody>
         {list.loading && !list.data && <TableMessage colSpan={6}><SkeletonRows rows={4} label="Đang tải quy tắc…" /></TableMessage>}

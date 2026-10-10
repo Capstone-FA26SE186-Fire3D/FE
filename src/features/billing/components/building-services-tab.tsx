@@ -37,7 +37,7 @@ function Check({ ok, children }: { ok: boolean; children: string }) {
 }
 
 function EntitlementTable({ items }: { items: Entitlement[] }) {
-  return <Table caption="Các kỳ dịch vụ của công trình">
+  return <Table className="bill-table" caption="Các kỳ dịch vụ của công trình">
     <thead><tr><th>Kỳ dịch vụ</th><th>Trạng thái</th><th>Hiệu lực hiện tại</th></tr></thead>
     <tbody>{items.map((item) => <tr key={item.id}>
       <td><span className="ops-cell-primary">{formatDate(item.startsAt)} – {formatDate(item.endsAt)}<span className="ops-cell-sub">{item.paymentTransactionId ? "Đã thanh toán" : "Không qua thanh toán (dùng thử/cấp tay)"}</span></span></td>
@@ -204,7 +204,7 @@ export function BuildingServicesTab({ buildingId }: { buildingId: string }) {
       {quotations.error !== undefined && <Alert tone="danger" title="Không tải được báo giá" action={<Button size="sm" variant="secondary" className="mt-3" onClick={quotations.reload}>Thử lại</Button>}>{billingErrorText(quotations.error)}</Alert>}
       {quotations.loading && !quotations.data && <Skeleton style={{ height: 90 }} />}
       {quotations.data && mine.length === 0 && <EmptyState icon={FileText} title="Chưa có báo giá cho công trình này" description="Tạo báo giá ở bước trên. Sau khi PlatformAdmin phát hành, bạn chấp nhận và thanh toán tại đây." />}
-      {mine.length > 0 && <Table caption="Báo giá của công trình">
+      {mine.length > 0 && <Table className="bill-table" caption="Báo giá của công trình">
         <thead><tr><th>Báo giá</th><th>Trạng thái</th><th>Hiệu lực đến</th><th className="bill-money">Tổng thanh toán</th><th aria-label="Thao tác" /></tr></thead>
         <tbody>{mine.map((item) => <tr key={item.id} aria-selected={item.id === selectedId}>
           <td><span className="ops-cell-primary bill-wrap">{item.quotationNumber}<span className="ops-cell-sub">{item.items.length} công trình</span></span></td>

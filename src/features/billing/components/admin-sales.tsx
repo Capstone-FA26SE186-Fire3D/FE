@@ -86,7 +86,7 @@ export function QuotationsSection({ accessToken }: { accessToken: string }) {
   return <div className="ops-stack">
     <div className="bill-row"><p className="bill-muted">Báo giá của mọi tổ chức. Phát hành báo giá nháp để tổ chức chấp nhận và thanh toán.</p><Button variant="quiet" onClick={list.reload} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />Tải lại</Button></div>
     {list.error !== undefined && <Alert tone="danger" title="Không tải được báo giá" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert>}
-    <Table caption="Báo giá của mọi tổ chức">
+    <Table className="bill-table" caption="Báo giá của mọi tổ chức">
       <thead><tr><th>Báo giá</th><th>Tổ chức</th><th>Trạng thái</th><th>Hiệu lực đến</th><th className="bill-money">Tổng thanh toán</th><th aria-label="Thao tác" /></tr></thead>
       <tbody>
         {list.loading && !list.data && <TableMessage colSpan={6}><SkeletonRows rows={5} label="Đang tải báo giá…" /></TableMessage>}
@@ -185,7 +185,7 @@ export function EnterpriseAdminSection({ accessToken }: { accessToken: string })
       Hiện chỉ đọc được danh sách. BE chưa có API đổi trạng thái hay chuyển yêu cầu thành báo giá, nên chưa xử lý được tại đây. Theo dõi tại <a href={BILLING_V7_ISSUE} target="_blank" rel="noreferrer" style={{ color: "var(--ember)" }}>BE #56</a>.
     </Alert>
     {list.error !== undefined && <Alert tone="danger" title="Không tải được yêu cầu" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert>}
-    <Table caption="Yêu cầu báo giá số lượng lớn">
+    <Table className="bill-table" caption="Yêu cầu báo giá số lượng lớn">
       <thead><tr><th>Tổ chức</th><th>Nhu cầu</th><th>Liên hệ</th><th>Trạng thái</th></tr></thead>
       <tbody>
         {list.loading && !list.data && <TableMessage colSpan={4}><SkeletonRows rows={4} label="Đang tải yêu cầu…" /></TableMessage>}

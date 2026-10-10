@@ -38,7 +38,7 @@ export function QuotationSnapshot({ quotation, organizationName }: { quotation: 
       <div className="ops-actions"><QuotationStatusBadge status={quotation.status} />{expired && <StatusBadge tone="danger">Đã quá hạn</StatusBadge>}</div>
     </div>
 
-    <Table caption={`Các dòng của báo giá ${quotation.quotationNumber}`}>
+    <Table className="bill-table" caption={`Các dòng của báo giá ${quotation.quotationNumber}`}>
       <thead><tr><th>Công trình</th><th>Gói / kỳ</th><th className="bill-money">Đơn giá/tháng</th><th className="bill-money">Tạm tính</th><th className="bill-money">Giảm giá</th><th className="bill-money">Thành tiền</th></tr></thead>
       <tbody>
         {quotation.items.map((line) => <tr key={line.id}>

@@ -71,3 +71,7 @@
 }
 
 .ops-drawer.bill-wide-drawer { width: min(840px, 100vw); }
+
+.bill-table { min-width: 640px; }
+.bill-form-grid, .ops-drawer .ops-form-grid { align-items: start; }
+.bill-totals dd { white-space: nowrap; }
