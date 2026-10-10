@@ -4,6 +4,8 @@ Theo dõi từng màn hình: **Đã tích hợp** (gọi API thật, có test v�
 
 Nguồn kiểm tra BE: `main` @ `b6a7d74` (đọc source; chưa kiểm chứng deployment). Bằng chứng mock (Playwright route) và kiểm thử API thật được ghi riêng — mock không phải bằng chứng tích hợp.
 
+Riêng BE#59/#66 đã đối chiếu lại source `origin/main` @ `3726c14`: analytics trả `isActive`, gói v7 giới hạn 6/12 tháng, quotation đã kiểm tên/địa chỉ; annotation có cả body `eTag` và header `ETag`. Đây là hiệu chỉnh trạng thái issue theo source, chưa xác nhận deployment hoặc tích hợp toàn bộ API mới.
+
 ## Issue BE đã mở (2026-10-10)
 
 | # | Nội dung | Loại | Chặn FE |
@@ -16,13 +18,13 @@ Nguồn kiểm tra BE: `main` @ `b6a7d74` (đọc source; chưa kiểm chứng d
 | [#56](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/56) | Billing v7 + quota AI trả trước | P1 | Upgrade, learner capacity, quota AI, top-up |
 | [#57](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/57) | Learn CMS + Organization Library | P2 | CMS bài Learn, thư viện template/rubric/thiết bị |
 | [#58](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/58) | AI Organization, learner analytics | P2 | Biểu đồ plays/completion, usage AI |
-| [#59](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/59) | Lệch nhẹ: CORS expose, Retry-After 429, analytics key, OpenAPI, duration 6/12 | Lệch contract | — (có workaround) |
+| [#59](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/59) | CORS expose, Retry-After administration 429, OpenAPI hash, bảng lỗi draft và điều kiện quotation; analytics/duration đã sửa trong source | Lệch contract/docs | — (có workaround; deployment chưa kiểm lại) |
 | [#60](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/60) | Response organization/account thiếu field, chưa có PATCH organization | Lệch contract | Hồ sơ tổ chức trong Admin |
 | [#61](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/61) | Docs mâu thuẫn với source | Docs | — |
 
 | [#64](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/64) | Nhiều endpoint trả 500 trên deploy (tạo/đọc công trình, revisions, scenarios, billing, catalog) | Bug | Chi tiết công trình, tạo công trình, billing, editor trên API thật |
 | [#65](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/65) | OpenAPI thiếu enum job/QA, Idempotency-Key bắt buộc, vị trí requestId | Docs/contract | — (FE đang suy từ SQL) |
-| [#66](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/66) | API gộp job+QA theo revision, run lịch sử, annotations eTag, validate dry-run, draft rỗng | Enhancement | Giảm 3 request/lần poll; editor validate state chưa lưu |
+| [#66](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/66) | API gộp job+QA, run lịch sử, validate dry-run và contract draft khởi tạo; annotation ETag đã có | Enhancement | Cải thiện polling/dry-run; không chặn lưu rồi validate an toàn |
 | [#67](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/67) | Ticket/feedback thiếu người tạo & tổ chức; audit chỉ GUID | Enhancement | Hộp thư Admin hiển thị ai/tổ chức nào gửi |
 | [#68](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/68) | Billing v6.7: hủy báo giá, danh sách payment, nhắc hết hạn, enterprise request | Enhancement | Thương mại (Admin) |
 | [#69](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/69) | Learn/Library: danh mục nguồn/tình huống, rubric schema_version | Enhancement | Learn CMS prototype |
@@ -34,6 +36,7 @@ Còn mở từ trước: [#40](https://github.com/Capstone-FA26SE186-Fire3D/BE/i
 - Lỗi: ProblemDetails (`title`, `status`, extension `code`, `errors` = map field → string[]); riêng `POST /api/scenario-drafts/{id}/validate` trả `issues[{code,path,message}]`. FE parse cả hai (`src/api/errors.ts`).
 - Phân trang có 3 envelope: `{items,totalCount,page,pageSize}` (building, org, account, scenario, revision), `{items,total,page,pageSize}` (support, billing), audit thêm `from`/`to`.
 - ETag theo từng resource: `"N"` (auth/me, org profile, annotations), `"access-N"`, `"support-N"`, `"billing-<guid>-<rev>"`, draft `"<xmin>"`; Building không có ETag. 412 → giữ nội dung đang nhập, tải bản mới để đối chiếu, không ghi đè.
+- Annotation chỉ mở form từ snapshot đúng revision; đổi revision tải lại cả form. Nội dung nhập/xóa trong lúc PUT chờ vẫn được đánh dấu chưa lưu và lần lưu tiếp dùng version BE vừa trả.
 - `Idempotency-Key` bắt buộc ở: IFC upload initiate, scenario create/draft/snapshot/package-build, billing/PayOS, support create/message, playtest. Một key cho mỗi ý định, giữ nguyên khi retry cùng payload; khác payload → `409 IDEMPOTENCY_KEY_CONFLICT`.
 - 202 ≠ hoàn tất (process, retry, package-build, payos/create). Job `Succeeded` ≠ QA `Passed` (đọc `validationRun`). Release `Built` ≠ `Published`. `Paid` ≠ provisioned (poll `provisioningStatus`).
 - PlatformAdmin liệt kê/tạo/sửa/lưu trữ Building qua tham số `organizationId`.
@@ -91,6 +94,7 @@ Code: `src/features/scenario-editor/` (`store/` thuần, `scene/` Three.js, `pan
 - BE bỏ field ngoài DTO khi PUT (`ScenarioDraftStateDto`): editor giữ mọi field lạ trong bộ nhớ và gửi lại nguyên tham chiếu, nhưng **không lưu bền được field ngoài DTO** (cả top-level lẫn bên trong spawn/hazard). `goals/npcs/blockedElements/modePolicy/safetyThresholds` (JSON thô trong DTO) được bảo toàn nguyên vẹn, không diễn giải.
 - Draft mới tạo có `state = {}`; DTO có thành viên không-nullable nên khi lưu bổ sung `spawnPoints/hazards = []`, `evacuationRoutes = []` và số chấm điểm chưa nhập = 0 (validate báo `TIME_LIMIT_INVALID`…). Không đặt sẵn ngưỡng đạt, trọng số hay chính sách chấm.
 - Validate của BE kiểm bản **đã lưu**: nút Kiểm tra lưu trước khi gọi (nhãn "Lưu và kiểm tra" khi có thay đổi). Validate client chỉ phản chiếu `ScenarioDraftStructuralValidator`; neo đối tượng/năng lực runtime chỉ BE kiểm được.
+- Kết quả validate gắn snapshot và ETag đã xác nhận, không gắn draft mới nhập trong lúc chờ. Sửa trong lúc lưu/kiểm tra làm kết quả trở thành cũ; version hoặc draftId không khớp bị từ chối. Đổi draft/rời editor hủy request đang chờ. Dry-run ở BE#66 là cải tiến riêng, không phải điều kiện cho cơ chế này.
 
 **Khóa theo cờ** (`src/features/scenario-editor/config.ts`, mặc định `false`; chỉ bật khi BE công bố schema có phiên bản + validator):
 

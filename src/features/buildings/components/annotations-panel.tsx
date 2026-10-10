@@ -24,6 +24,10 @@ function itemsOf(snapshot: AnnotationSnapshot): Row[] {
   return snapshot.data.items.map((item) => ({ ...item, note: item.note ?? null }));
 }
 
+function normalizeRows(rows: Row[]): AnnotationItem[] {
+  return rows.map((row) => ({ id: row.id, ifcGlobalId: row.ifcGlobalId.trim(), label: row.label.trim(), note: row.note?.trim() || null }));
+}
+
 function rowErrors(rows: Row[]) {
   const errors = new Map<string, { ifcGlobalId?: string; label?: string; note?: string }>();
   for (const row of rows) {
@@ -43,7 +47,7 @@ function Editor({ accessToken, revisionId, snapshot }: { accessToken: string; re
   const saving = useRef(false);
   const [rows, setRows] = useState<Row[]>(() => itemsOf(snapshot));
   const [baseVersion, setBaseVersion] = useState(snapshot.version);
-  const [dirty, setDirty] = useState(false);
+  const [savedItems, setSavedItems] = useState(() => normalizeRows(itemsOf(snapshot)));
   const [showErrors, setShowErrors] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -51,7 +55,8 @@ function Editor({ accessToken, revisionId, snapshot }: { accessToken: string; re
   const [loadingLatest, setLoadingLatest] = useState(false);
 
   const errors = rowErrors(rows);
-  const update = (id: string, patch: Partial<Row>) => { setRows((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row))); setDirty(true); };
+  const dirty = JSON.stringify(normalizeRows(rows)) !== JSON.stringify(savedItems);
+  const update = (id: string, patch: Partial<Row>) => { setRows((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row))); };
 
   const save = async () => {
     if (saving.current) return;
@@ -60,10 +65,11 @@ function Editor({ accessToken, revisionId, snapshot }: { accessToken: string; re
     saving.current = true;
     setBusy(true);
     setError("");
+    const payload = normalizeRows(rows);
     try {
-      const saved = await buildingsApi.saveAnnotations(accessToken, revisionId, rows.map((row) => ({ ...row, ifcGlobalId: row.ifcGlobalId.trim(), label: row.label.trim(), note: row.note?.trim() ? row.note.trim() : null })), baseVersion);
+      const saved = await buildingsApi.saveAnnotations(accessToken, revisionId, payload, baseVersion);
       setBaseVersion(saved.version);
-      setDirty(false);
+      setSavedItems(payload);
       setConflict(null);
       toast.notify({ tone: "success", title: "Đã lưu annotation", description: `Phiên bản ${saved.version}.` });
     } catch (cause) {
@@ -85,7 +91,7 @@ function Editor({ accessToken, revisionId, snapshot }: { accessToken: string; re
     setRows(itemsOf(conflict));
     setBaseVersion(conflict.version);
     setConflict(null);
-    setDirty(false);
+    setSavedItems(normalizeRows(itemsOf(conflict)));
     setShowErrors(false);
   };
   const keepMine = () => {
@@ -106,20 +112,20 @@ function Editor({ accessToken, revisionId, snapshot }: { accessToken: string; re
     {loadingLatest && <p className="ops-muted" role="status">Đang tải bản mới nhất…</p>}
     {error && <Alert tone="danger">{error}</Alert>}
 
-    {rows.length === 0 ? <EmptyState icon={MessageSquarePlus} title="Chưa có annotation" description="Gắn ghi chú vào cấu kiện theo IFC GlobalId. Annotation nằm ngoài hình học và không thay đổi mô hình." action={<Button variant="secondary" onClick={() => { setRows([{ id: newIdempotencyKey(), ifcGlobalId: "", label: "", note: null }]); setDirty(true); }}><Plus size={16} aria-hidden="true" />Thêm annotation</Button>} /> : <div>
+    {rows.length === 0 ? <EmptyState icon={MessageSquarePlus} title="Chưa có annotation" description="Gắn ghi chú vào cấu kiện theo IFC GlobalId. Annotation nằm ngoài hình học và không thay đổi mô hình." action={<Button variant="secondary" onClick={() => { setRows([{ id: newIdempotencyKey(), ifcGlobalId: "", label: "", note: null }]); }}><Plus size={16} aria-hidden="true" />Thêm annotation</Button>} /> : <div>
       {rows.map((row, index) => {
         const e = showErrors ? errors.get(row.id) : undefined;
         return <div className="ops-annotation-row" key={row.id}>
           <Field label={`IFC GlobalId #${index + 1}`} required error={e?.ifcGlobalId}>{(p) => <Input {...p} className="ops-mono" value={row.ifcGlobalId} maxLength={300} onChange={(event) => update(row.id, { ifcGlobalId: event.target.value })} />}</Field>
           <Field label={`Nhãn #${index + 1}`} required error={e?.label}>{(p) => <Input {...p} value={row.label} maxLength={220} onChange={(event) => update(row.id, { label: event.target.value })} />}</Field>
           <Field label={`Ghi chú #${index + 1}`} error={e?.note}>{(p) => <Textarea {...p} rows={1} style={{ minHeight: 42, padding: "10px 12px" }} value={row.note ?? ""} maxLength={2100} onChange={(event) => update(row.id, { note: event.target.value })} />}</Field>
-          <Button variant="quiet" size="icon" aria-label={`Xóa annotation ${index + 1}`} onClick={() => { setRows((current) => current.filter((item) => item.id !== row.id)); setDirty(true); }}><Trash2 size={16} aria-hidden="true" /></Button>
+          <Button variant="quiet" size="icon" aria-label={`Xóa annotation ${index + 1}`} onClick={() => { setRows((current) => current.filter((item) => item.id !== row.id)); }}><Trash2 size={16} aria-hidden="true" /></Button>
         </div>;
       })}
     </div>}
 
     <div className="ops-actions">
-      <Button variant="secondary" disabled={rows.length >= MAX_ITEMS || busy} onClick={() => { setRows((current) => [...current, { id: newIdempotencyKey(), ifcGlobalId: "", label: "", note: null }]); setDirty(true); }}><Plus size={16} aria-hidden="true" />Thêm annotation</Button>
+      <Button variant="secondary" disabled={rows.length >= MAX_ITEMS || busy} onClick={() => { setRows((current) => [...current, { id: newIdempotencyKey(), ifcGlobalId: "", label: "", note: null }]); }}><Plus size={16} aria-hidden="true" />Thêm annotation</Button>
       <Button onClick={() => void save()} disabled={busy || !dirty || conflict !== null}><Save size={16} aria-hidden="true" />{busy ? "Đang lưu…" : "Lưu annotation"}</Button>
       <span className="ops-muted">{rows.length}/{MAX_ITEMS} · phiên bản {baseVersion}{dirty ? " · có thay đổi chưa lưu" : ""}</span>
     </div>
@@ -128,7 +134,15 @@ function Editor({ accessToken, revisionId, snapshot }: { accessToken: string; re
 
 /** Annotation overlay: edited as a list. PUT uses If-Match "<version>"; on 412 the draft is kept and the newer version is offered. */
 export function AnnotationsPanel({ accessToken, revisionId }: { accessToken: string; revisionId: string }) {
-  const annotations = useAsyncData(`annotations:${revisionId}`, (signal) => buildingsApi.getAnnotations(accessToken, revisionId, signal));
+  return <RevisionAnnotations key={revisionId} accessToken={accessToken} revisionId={revisionId} />;
+}
+
+function RevisionAnnotations({ accessToken, revisionId }: { accessToken: string; revisionId: string }) {
+  const annotations = useAsyncData(`annotations:${revisionId}`, async (signal) => {
+    const snapshot = await buildingsApi.getAnnotations(accessToken, revisionId, signal);
+    if (snapshot.revisionId !== revisionId) throw new Error("Annotation trả về không thuộc revision đang chọn. Hãy thử tải lại.");
+    return snapshot;
+  });
   const { data, error, loading, reload } = annotations;
 
   return <Panel title="Annotation overlay" description="Ghi chú bám theo IFC GlobalId, tách khỏi hình học. Lưu bằng phiên bản (If-Match) để không ghi đè thay đổi mới hơn.">

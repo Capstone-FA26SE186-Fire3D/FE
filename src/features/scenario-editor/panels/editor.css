@@ -85,6 +85,8 @@
 .se-form-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .se-form-head h3 { margin: 0; font-size: 16px; font-weight: 600; }
 .se-form-head p { margin: 4px 0 0; color: var(--dim); font-size: 12px; line-height: 1.5; }
+.se-validation-head { flex-direction: column; }
+.se-validation-head > button { min-height: 44px; white-space: nowrap; }
 .se-group { padding: 0; }
 .se-group > legend, .se-form .ops-fieldset > legend { display: flex; align-items: center; gap: 8px; }
 .se-coord-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
