@@ -370,3 +370,10 @@ select.ops-input { appearance: none; padding-right: 34px; background-image: line
 }
 .ops-table .ops-mono { overflow-wrap: normal; white-space: nowrap; }
 .ops-panel-head .ops-actions button, .ops-panel-head .ops-actions a { white-space: nowrap; }
+/* Ops components embedded in a public page (e.g. /account): no full-page background */
+.ops-theme.ops-inline { min-height: 0; background: transparent; }
+.ops-file-button { position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; }
+.ops-file-button:hover { border-color: var(--ember); }
+.ops-file-button:focus-within { outline: 2px solid var(--ember); outline-offset: 3px; }
+.ops-file-button[data-disabled="true"] { opacity: .45; cursor: not-allowed; pointer-events: none; }
+.ops-file-button input { position: absolute; width: 1px; height: 1px; opacity: 0; }

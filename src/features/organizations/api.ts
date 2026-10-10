@@ -7,10 +7,11 @@ function headers(accessToken: string): HeadersInit {
 }
 
 export const organizationsApi = {
-  list(accessToken: string, filters: OrganizationFilters) {
+  list(accessToken: string, filters: OrganizationFilters, signal?: AbortSignal) {
     return apiClient.request<PageResponse<Organization>>("/api/organizations", {
       headers: headers(accessToken),
       query: filters,
+      signal,
     });
   },
   create(accessToken: string, input: CreateOrganizationInput) {
@@ -19,9 +20,10 @@ export const organizationsApi = {
       json: input,
     });
   },
-  get(accessToken: string, id: string) {
+  get(accessToken: string, id: string, signal?: AbortSignal) {
     return apiClient.request<Organization>(`/api/organizations/${id}`, {
       headers: headers(accessToken),
+      signal,
     });
   },
   setStatus(accessToken: string, id: string, isActive: boolean) {
