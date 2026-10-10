@@ -44,12 +44,10 @@ export function ConflictDialog({ open, conflict, onLoad, onApply, onClose }: {
   return <Modal open={open} onOpenChange={(next) => { if (!next) onClose(); }} title="Bản nháp đã được thay đổi ở nơi khác"
     description="Nội dung bạn đang nhập vẫn được giữ. Tải bản mới để đối chiếu rồi chọn phần nào giữ lại; chưa có gì bị ghi đè."
     className="se-conflict"
-    footer={conflict?.theirs
-      ? <>
-        <Button type="button" variant="quiet" onClick={onClose}>Giữ bản của tôi, quyết định sau</Button>
-        <Button type="button" data-testid="apply-merge" onClick={() => onApply(choices)}>Áp dụng lựa chọn (chưa lưu)</Button>
-      </>
-      : <Button type="button" variant="quiet" onClick={onClose}>Đóng</Button>}>
+    footer={<>
+      <Button type="button" variant="quiet" onClick={onClose}>Giữ bản của tôi, quyết định sau</Button>
+      {conflict?.theirs && <Button type="button" data-testid="apply-merge" onClick={() => onApply(choices)}>Áp dụng lựa chọn (chưa lưu)</Button>}
+    </>}>
     {!conflict && <div className="ops-stack">
       <Alert tone="warning" title="Xung đột phiên bản (412)">Một người khác, hoặc một tab khác của bạn, đã lưu bản nháp này sau lần bạn tải gần nhất.</Alert>
       <div><Button type="button" onClick={onLoad} data-testid="load-theirs"><RefreshCw size={16} aria-hidden="true" /> Tải bản mới để đối chiếu</Button></div>

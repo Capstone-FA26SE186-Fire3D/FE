@@ -62,7 +62,7 @@ export function EditorToolbar({ tool, onTool, gizmoEnabled, canUndo, canRedo, on
     <span className="se-toolbar-spacer" />
     <StatusBadge tone={st.tone} data-testid="save-status" role="status" aria-live="polite">{st.label}</StatusBadge>
     <Button type="button" variant="secondary" disabled={validating} onClick={onValidate} data-testid="validate"><ShieldCheck size={16} aria-hidden="true" /><span className="se-label">{validating ? "Đang kiểm tra…" : "Kiểm tra"}</span></Button>
-    <Button type="button" disabled={saveDisabled} onClick={onSave} data-testid="save" title="Lưu (Ctrl/Cmd+S)"><Save size={16} aria-hidden="true" /><span className="se-label">{status === "saving" ? "Đang lưu…" : "Lưu"}</span></Button>
+    <Button type="button" disabled={saveDisabled} onClick={onSave} data-testid="save" title="Lưu (Ctrl/Cmd+S)"><Save size={16} aria-hidden="true" /><span className="se-label se-keep">{status === "saving" ? "Đang lưu…" : "Lưu"}</span></Button>
     <Button asChild variant="quiet"><Link href={versionsHref} data-testid="versions-link"><History size={16} aria-hidden="true" /><span className="se-label">Phiên bản</span></Link></Button>
     <Button type="button" variant="quiet" disabled={!EDITOR_CAPABILITIES.playtest} aria-disabled={!EDITOR_CAPABILITIES.playtest} title={`Chờ ${BE_ISSUES.playtest.label}: chưa có luồng playtest handoff`} data-testid="playtest"><Play size={16} aria-hidden="true" /><span className="se-label">Playtest</span><StatusBadge tone="warning" className="se-pending">Chờ BE #55</StatusBadge></Button>
   </div>;

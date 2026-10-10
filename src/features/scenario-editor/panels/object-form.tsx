@@ -15,7 +15,7 @@ import { NumberField, TextField } from "./fields";
 
 const AXES: Array<{ axis: keyof Position; label: string; unit: string }> = [
   { axis: "x", label: "X", unit: "m" },
-  { axis: "y", label: "Y (cao)", unit: "m" },
+  { axis: "y", label: "Y cao độ", unit: "m" },
   { axis: "z", label: "Z", unit: "m" },
   { axis: "rotation", label: "Hướng xoay", unit: ROTATION_UNIT === "degrees" ? "độ" : "rad" },
 ];

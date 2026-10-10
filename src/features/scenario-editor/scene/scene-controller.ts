@@ -183,7 +183,9 @@ export class EditorSceneController {
     const memory = this.renderer.info.memory;
     const afterDispose = { geometries: memory.geometries, textures: memory.textures };
     this.renderer.dispose();
-    this.renderer.forceContextLoss(); // release the GPU context now instead of waiting for GC (browsers cap live contexts)
+    // Release the GPU context now instead of waiting for GC (browsers cap live contexts). Skipped when already lost:
+    // WEBGL_lose_context is unavailable on a lost context and three.js would warn.
+    if (!this.lost) this.renderer.forceContextLoss();
     canvas.remove();
     this.listeners.forEach((off) => off());
     const log = (window as unknown as { __fire3dEditorLog?: unknown[] }).__fire3dEditorLog;
@@ -376,9 +378,13 @@ export class EditorSceneController {
   resetCamera() {
     const center = this.bounds.getCenter(new THREE.Vector3());
     const size = this.bounds.getSize(new THREE.Vector3());
-    const distance = Math.max(size.length() * 0.95, 10);
+    const radius = Math.max(size.length() / 2, 5);
+    // Fit the bounding sphere into the narrower of the vertical/horizontal field of view.
+    const vFov = THREE.MathUtils.degToRad(this.camera.fov);
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * this.camera.aspect);
+    const distance = (radius / Math.sin(Math.min(vFov, hFov) / 2)) * 1.05;
     this.orbit.target.copy(center);
-    this.camera.position.copy(center).add(new THREE.Vector3(distance * 0.75, distance * 0.55, distance * 0.75));
+    this.camera.position.copy(center).add(new THREE.Vector3(0.55, 0.85, 0.75).normalize().multiplyScalar(distance));
     this.camera.near = Math.max(distance / 1000, 0.05);
     this.camera.far = Math.max(distance * 30, 200);
     this.camera.updateProjectionMatrix();
@@ -427,7 +433,8 @@ export class EditorSceneController {
         existing.emissive.set(color);
         return;
       }
-      this.materials[key] = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: emissive, transparent: opacity < 1, opacity, roughness: 0.6, metalness: 0.05 });
+      // Markers ignore depth so walls never hide them: placement would be guesswork otherwise.
+      this.materials[key] = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: emissive, transparent: opacity < 1, opacity, roughness: 0.6, metalness: 0.05, depthTest: false });
     };
     make("spawn", p.spawn);
     make("fire", p.fire, 1, 0.5);
@@ -436,7 +443,7 @@ export class EditorSceneController {
     make("other", p.other);
     const ring = this.materials.ring as THREE.MeshBasicMaterial | undefined;
     if (ring) ring.color.set(p.selected);
-    else this.materials.ring = new THREE.MeshBasicMaterial({ color: p.selected, side: THREE.DoubleSide, transparent: true, opacity: 0.95 });
+    else this.materials.ring = new THREE.MeshBasicMaterial({ color: p.selected, side: THREE.DoubleSide, transparent: true, opacity: 0.95, depthTest: false });
     const plane = this.materials.floor as THREE.MeshBasicMaterial | undefined;
     if (plane) plane.color.set(p.floorPlane);
   }
@@ -449,6 +456,7 @@ export class EditorSceneController {
     const group = new THREE.Group();
     const mesh = (geometryKey: string, create: () => THREE.BufferGeometry, material: string, setup?: (m: THREE.Mesh) => void) => {
       const m = new THREE.Mesh(this.geometry(geometryKey, create), this.materials[material]);
+      m.renderOrder = 10;
       setup?.(m);
       group.add(m);
       return m;
@@ -644,6 +652,8 @@ export class EditorSceneController {
       this.debug = false;
     }
     if (!this.debug) return;
+    // Must be fetched while the context is alive: getExtension returns null on a lost context.
+    const loseExt = this.renderer.getContext().getExtension("WEBGL_lose_context");
     const w = window as unknown as Record<string, unknown>;
     w.__fire3dEditorLog = w.__fire3dEditorLog ?? [];
     w.__fire3dEditorScene = {
@@ -656,8 +666,8 @@ export class EditorSceneController {
         const rect = this.renderer.domElement.getBoundingClientRect();
         return { x: rect.left + ((p.x + 1) / 2) * rect.width, y: rect.top + ((1 - p.y) / 2) * rect.height };
       },
-      loseContext: () => this.renderer.getContext().getExtension("WEBGL_lose_context")?.loseContext(),
-      restoreContext: () => this.renderer.getContext().getExtension("WEBGL_lose_context")?.restoreContext(),
+      loseContext: () => loseExt?.loseContext(),
+      restoreContext: () => loseExt?.restoreContext(),
       markerPosition: (kind: ObjectKind, index: number) => this.markers.get(`${kind}:${index}`)?.position.toArray() ?? null,
       clipConstant: () => this.clipPlane.constant,
       gizmoAttached: () => Boolean(this.transform.object),

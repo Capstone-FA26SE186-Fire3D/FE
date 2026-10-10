@@ -17,17 +17,18 @@ export function TimelineBar({ hazards, timeLimit, time, onTime, onSelect, select
 }) {
   const latest = hazards.reduce((max, hazard) => Math.max(max, hazard.activationTime), 0);
   const span = Math.max(timeLimit ?? 0, latest, 30);
+  const shown = Math.min(time, span);
   const pct = (value: number) => `${Math.min(100, Math.max(0, (value / span) * 100))}%`;
   return <div className="se-timeline" data-testid="timeline">
     <div className="se-timeline-head">
       <label htmlFor="se-time">Dòng thời gian xem trước</label>
-      <output htmlFor="se-time">{Math.round(time)} / {Math.round(span)} giây</output>
+      <output htmlFor="se-time">{Math.round(shown)} / {Math.round(span)} giây</output>
     </div>
     <div className="se-timeline-track">
-      <input id="se-time" type="range" min={0} max={Math.round(span)} step={1} value={Math.min(time, span)} onChange={(event) => onTime(Number(event.target.value))} aria-valuetext={`${Math.round(time)} giây`} />
+      <input id="se-time" type="range" min={0} max={Math.round(span)} step={1} value={shown} onChange={(event) => onTime(Number(event.target.value))} aria-valuetext={`${Math.round(shown)} giây`} />
       <ul aria-label="Thời điểm kích hoạt nguy cơ">
         {hazards.map((hazard, index) => <li key={index} style={{ left: pct(hazard.activationTime) }}>
-          <button type="button" aria-label={`${hazard.id || `Nguy cơ ${index + 1}`}, kích hoạt lúc ${Math.round(hazard.activationTime)} giây`} aria-pressed={selectedIndex === index} data-active={hazard.activationTime <= time} onClick={() => onSelect(index)} />
+          <button type="button" aria-label={`${hazard.id || `Nguy cơ ${index + 1}`}, kích hoạt lúc ${Math.round(hazard.activationTime)} giây`} aria-pressed={selectedIndex === index} data-active={hazard.activationTime <= shown} onClick={() => onSelect(index)} />
         </li>)}
       </ul>
     </div>

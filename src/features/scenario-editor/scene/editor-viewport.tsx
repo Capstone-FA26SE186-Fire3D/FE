@@ -70,7 +70,8 @@ export default function EditorViewport({ ref, spawns, hazards, selection, tool, 
   const [lost, setLost] = useState(false);
   const [unsupported, setUnsupported] = useState(false);
   const [status, setStatus] = useState<ModelStatus>({ phase: "none" });
-  const autoRefreshedKey = useRef<string | null>(null);
+  const autoRefreshes = useRef(0);
+  const MAX_AUTO_REFRESH = 2;
 
   useEffect(() => {
     latest.current = { spawns, hazards, selection, tool, previewTime, gizmoEnabled, model, activeFloor, showModel, layerVisibility, onSelect, onPlace, onTransform, onModelPick, onModelStatus, onUrlExpired };
@@ -138,12 +139,10 @@ export default function EditorViewport({ ref, spawns, hazards, selection, tool, 
     const abort = new AbortController();
     const expired = request.expiresAt ? Date.parse(request.expiresAt) <= Date.now() + 2000 : false;
     const run = async () => {
-      if (expired) {
-        if (autoRefreshedKey.current !== request.key) {
-          autoRefreshedKey.current = request.key;
-          latest.current.onUrlExpired();
-        }
+      if (expired && autoRefreshes.current < MAX_AUTO_REFRESH) {
+        autoRefreshes.current += 1;
         publishStatus({ phase: "error", message: "Liên kết tải mô hình đã hết hạn. Đang lấy liên kết mới…", expired: true });
+        latest.current.onUrlExpired();
         return;
       }
       publishStatus({ phase: "loading", progress: null });
@@ -151,12 +150,15 @@ export default function EditorViewport({ ref, spawns, hazards, selection, tool, 
         const info = await controller.loadModel(request.url, request, (progress) => {
           if (!abort.signal.aborted) publishStatus({ phase: "loading", progress });
         }, abort.signal);
-        if (!abort.signal.aborted) publishStatus({ phase: "loaded", info });
+        if (!abort.signal.aborted) {
+          autoRefreshes.current = 0;
+          publishStatus({ phase: "loaded", info });
+        }
       } catch (cause) {
         if (abort.signal.aborted || (cause instanceof DOMException && cause.name === "AbortError")) return;
         const isExpired = cause instanceof ModelLoadError && cause.status !== undefined && EXPIRED_STATUSES.has(cause.status);
-        if (isExpired && autoRefreshedKey.current !== request.key) {
-          autoRefreshedKey.current = request.key;
+        if (isExpired && autoRefreshes.current < MAX_AUTO_REFRESH) {
+          autoRefreshes.current += 1;
           publishStatus({ phase: "error", message: "Liên kết tải mô hình đã hết hạn. Đang lấy liên kết mới…", expired: true });
           latest.current.onUrlExpired();
           return;
@@ -177,8 +179,8 @@ export default function EditorViewport({ ref, spawns, hazards, selection, tool, 
     {status.phase === "loading" && <div className="se-overlay-chip" role="status"><Skeleton style={{ width: 14, height: 14, borderRadius: 999 }} /> Đang tải mô hình{status.progress !== null ? ` ${Math.round(status.progress * 100)}%` : "…"}</div>}
     {status.phase === "error" && !lost && <div className="se-overlay-card" role="alert">
       <TriangleAlert size={20} aria-hidden="true" />
-      <div><strong>Không tải được mô hình</strong><p>{status.message}</p></div>
-      <Button type="button" variant="secondary" size="sm" onClick={() => { autoRefreshedKey.current = null; latest.current.onUrlExpired(); }}><RotateCcw size={14} aria-hidden="true" /> Tải lại mô hình</Button>
+      <div><strong>{status.expired ? "Liên kết tải mô hình đã hết hạn" : "Không tải được mô hình"}</strong><p>{status.message}</p></div>
+      <Button type="button" variant="secondary" size="sm" onClick={() => { autoRefreshes.current = 0; latest.current.onUrlExpired(); }}><RotateCcw size={14} aria-hidden="true" /> Tải lại mô hình</Button>
     </div>}
     {unsupported && <div className="se-overlay-full" role="alert">
       <TriangleAlert size={28} aria-hidden="true" />

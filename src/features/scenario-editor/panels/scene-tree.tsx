@@ -88,7 +88,7 @@ export function SceneTree({ floors, floorsNote, activeFloor, onFloor, spawns, ha
           </button></li>;
         })}
       </ul>
-      <Button type="button" variant="quiet" size="sm" data-testid="add-spawn" onClick={() => onAdd("spawn")}><Plus size={14} aria-hidden="true" /> Thêm điểm xuất phát</Button>
+      <Button type="button" variant="quiet" size="sm" className="se-add" data-testid="add-spawn" onClick={() => onAdd("spawn")}><Plus size={14} aria-hidden="true" /> Thêm điểm xuất phát</Button>
     </section>
 
     <section aria-labelledby="se-hazards-title">
@@ -101,7 +101,7 @@ export function SceneTree({ floors, floorsNote, activeFloor, onFloor, spawns, ha
           </button></li>;
         })}
       </ul>
-      <Button type="button" variant="quiet" size="sm" data-testid="add-hazard" onClick={() => onAdd("hazard")}><Plus size={14} aria-hidden="true" /> Thêm nguy cơ</Button>
+      <Button type="button" variant="quiet" size="sm" className="se-add" data-testid="add-hazard" onClick={() => onAdd("hazard")}><Plus size={14} aria-hidden="true" /> Thêm nguy cơ</Button>
     </section>
   </div>;
 }

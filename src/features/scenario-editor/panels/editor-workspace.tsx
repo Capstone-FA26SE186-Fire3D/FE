@@ -58,7 +58,7 @@ export function EditorWorkspace({ accessToken, buildingId, scenarioId, editor }:
   const [activeFloor, setActiveFloor] = useState<string | null>(null);
   const [modelVisible, setModelVisible] = useState(true);
   const [layerVisibility, setLayerVisibility] = useState<Record<string, boolean>>({});
-  const [previewTime, setPreviewTime] = useState(0);
+  const [previewTime, setPreviewTime] = useState(Number.POSITIVE_INFINITY);
   const [modelStatus, setModelStatus] = useState<ModelStatus>({ phase: "none" });
   const [pick, setPick] = useState<{ name: string; point: { x: number; y: number; z: number } } | null>(null);
   const isMobile = useMediaQuery("(max-width: 767px)");
@@ -91,8 +91,10 @@ export function EditorWorkspace({ accessToken, buildingId, scenarioId, editor }:
   }, [editor, toast]);
 
   const onValidate = useCallback(async () => {
+    setPanelTab("issues");
+    if (isMobile) setMobileTab("props");
     await editor.validate();
-  }, [editor]);
+  }, [editor, isMobile]);
 
   const place = useCallback((kind: ObjectKind, position: Position) => {
     actions.place(kind, position);
