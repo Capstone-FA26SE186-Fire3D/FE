@@ -163,7 +163,7 @@
 .ops-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .ops-grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .ops-grid-main { grid-template-columns: minmax(0, 1fr) 360px; align-items: start; }
-.ops-stack { display: grid; gap: 16px; }
+.ops-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .ops-stat { padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .ops-stat span { color: var(--dim); font-size: 12px; }
 .ops-stat strong { display: block; margin-top: 6px; font-size: 28px; font-weight: 600; letter-spacing: -.03em; }

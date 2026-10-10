@@ -40,3 +40,17 @@ Cập nhật bảng này khi hoàn thành từng đợt.
 | Org | Danh sách công trình | Đã tích hợp (mock test) | Bảng/thẻ, URL filter, tạo/sửa/lưu trữ |
 | Admin | Tài khoản | Đã tích hợp (mock test) | URL filter/pagination, tạo, khóa/mở |
 | Foundation | Theme sáng/tối/hệ thống, shell, primitives | Đã tích hợp | Token chỉ áp dụng khu vận hành |
+| Admin | Duyệt kịch bản `/admin/reviews` | Chờ BE + Prototype (dev) | Production chỉ nêu blocker/điều kiện mở/contract. Mở khi BE có GET hàng chờ + chi tiết (trạng thái, hash, readiness, nội dung, rubric, lý do) và test cách ly tenant ([BE#52](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/52)); phát hành còn chờ [BE#51](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/51). Client `approve`/`reject` (Idempotency-Key, `{contentHash,rubricHash,reason?}`) đã viết theo controller, chưa gắn vào UI thật. Không cho nhập tay versionId/hash. |
+| Admin | Learn CMS `/admin/learn` | Chờ BE + Prototype (dev) | Mở khi BE có CRUD bài/phiên bản, publish/hide/show/delete/restore với ETag + Idempotency-Key, media descriptor theo allowlist YouTube/Facebook/TikTok, đọc công khai chỉ Published ([BE#57](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/57)). Route trong `features/admin-learn/api.ts` là ĐỀ XUẤT, không phải contract. |
+| Admin | Thư viện tổ chức `/admin/library` | Chờ BE + Prototype (dev) | Mở khi chốt route + schema (Docs mới có bảng, chưa có route) rồi BE triển khai ([BE#57](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/57)). Metadata thiết bị mới không tự thêm capability runtime. Chưa có client HTTP vì chưa có route. |
+
+### Quy ước prototype (dev)
+
+- Cờ: `isPrototypeEnabled()` (`src/features/dev-prototype/flag.ts`) = `process.env.NODE_ENV !== "production"`. Các module nạp prototype qua `dynamic()` sau điều kiện NODE_ENV viết trực tiếp để bundler loại nhánh khỏi production.
+- Mọi prototype có banner "Dữ liệu mẫu · chỉ môi trường phát triển", dữ liệu cục bộ (`sample-store.ts`), không gọi API thật; đặt lại khi tải lại trang. Đây không phải bằng chứng tích hợp.
+- Kiểm tra: `tests/e2e/ops-pending-modules.spec.ts` (chạy trên bản production: không banner, không nút "Duyệt", bundle không chứa chuỗi dữ liệu mẫu) và `ops-pending-modules-dev.spec.ts` (chạy trên `pnpm dev`, đặt `PLAYWRIGHT_DEV_URL`).
+
+## Hạng mục tương lai
+
+- **Cookie session để gate role phía server.** Token đang ở `sessionStorage` nên việc chặn theo role (`/admin/*`, `/workspace/*`) chỉ xảy ra phía client sau khi tải; khách chưa đủ quyền vẫn nhận được bundle trang. Cần BE phát hành phiên bằng cookie HttpOnly/SameSite để `proxy`/middleware Next kiểm tra role trước khi trả trang. Việc ẩn UI không thay thế kiểm tra quyền ở API (BE đã kiểm tra mỗi lệnh).
+- Khi BE#52/#57 xong: bỏ nhánh prototype, thay `PendingModule` bằng màn thật dùng `contentReviewsApi` và `createLearnCmsApi`, đối chiếu route thực tế.
