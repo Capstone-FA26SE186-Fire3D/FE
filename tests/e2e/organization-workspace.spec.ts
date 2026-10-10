@@ -44,10 +44,11 @@ for (const width of [1440, 820, 375]) {
     await expect(page.getByRole("link", { name: building.name })).toBeVisible();
     await page.screenshot({ path: testInfo.outputPath(`buildings-${width}.png`), fullPage: true });
     if (width < 768) {
-      const toggle = page.getByRole("button", { name: "Mở menu tổ chức" });
+      const toggle = page.getByRole("button", { name: "Mở điều hướng" });
       await toggle.click();
-      await expect(page.getByRole("link", { name: "Công trình", exact: true })).toBeFocused();
+      await expect(page.getByRole("dialog", { name: "Điều hướng" })).toBeVisible();
       await page.keyboard.press("Escape");
+      await expect(page.getByRole("dialog")).toBeHidden();
       await expect(toggle).toBeFocused();
       await toggle.click();
     }
@@ -60,7 +61,7 @@ for (const width of [1440, 820, 375]) {
     await page.goForward();
     await page.reload();
     await expect(page.getByLabel("Chọn tệp IFC")).toBeVisible();
-    if (width < 768) await page.getByRole("button", { name: "Mở menu tổ chức" }).click();
+    if (width < 768) await page.getByRole("button", { name: "Mở điều hướng" }).click();
     await page.getByRole("link", { name: "Hồ sơ tổ chức", exact: true }).click();
     await expect(page.getByLabel("Tên tổ chức", { exact: true })).toHaveValue("FET3D Lab");
     await page.getByRole("button", { name: "Đổi mật khẩu", exact: true }).scrollIntoViewIfNeeded();
@@ -103,6 +104,6 @@ test("next permits workspace details, scenarios and profile while rejecting unre
   for (const path of ["https://evil.test", "//evil.test/workspace/profile", "/workspace/buildings/building-1/admin", "/workspace/other"]) expect(safeNext(path)).toBe("/learning-hub");
   expect(postLoginRoute({ role: 2 }, "/workspace/profile")).toBe("/learning-hub");
   expect(postLoginRoute({ role: 1 }, "https://evil.test")).toBe("/workspace/buildings");
-  expect(postLoginRoute({ role: 0 }, "https://evil.test")).toBe("/admin/accounts");
+  expect(postLoginRoute({ role: 0 }, "https://evil.test")).toBe("/admin/overview");
   expect(postLoginRoute({ role: 1 }, "/workspace/buildings/building-1/scenarios")).toBe("/workspace/buildings/building-1/scenarios");
 });

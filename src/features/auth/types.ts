@@ -1,5 +1,5 @@
 export type UserRole = 0 | 1 | 2;
-export type UserGender = 0 | 1 | 2;
+export type UserGender = 0 | 1 | 2 | 3;
 
 export type AuthUser = {
   id: string;
@@ -27,6 +27,12 @@ export type AvatarResponse = {
   url: string;
   expiresAt: string;
   profileRevision: number;
+};
+
+export type AvatarUploadIntent = {
+  uploadId: string;
+  uploadUrl: string;
+  expiresAt: string;
 };
 
 export type TokenResponse = {
