@@ -40,3 +40,9 @@ Cập nhật bảng này khi hoàn thành từng đợt.
 | Org | Danh sách công trình | Đã tích hợp (mock test) | Bảng/thẻ, URL filter, tạo/sửa/lưu trữ |
 | Admin | Tài khoản | Đã tích hợp (mock test) | URL filter/pagination, tạo, khóa/mở |
 | Foundation | Theme sáng/tối/hệ thống, shell, primitives | Đã tích hợp | Token chỉ áp dụng khu vận hành |
+| Org | Chi tiết công trình: Tổng quan, sửa nhanh | Đã tích hợp (mock test) | `/workspace/buildings/[id]?tab=&revision=`; admin mở cùng trang (PUT kèm `organizationId` của công trình) |
+| Org | Chi tiết công trình: IFC & xử lý | Đã tích hợp (mock test) | Stepper upload (Idempotency-Key, SHA-256 chunked, XHR progress, retry giữ key, URL ký hết hạn), polling job 3s, QA tách khỏi job Succeeded, issues theo mức độ, logs/artifacts/BIM facts, annotations dạng danh sách (If-Match, 412 giữ nội dung), preview GLB (NotReady, URL hết hạn, WebGL lost, theme), confirm-for-training (chỉ sẵn sàng kỹ thuật). Chưa thử với API thật |
+| Org | Chi tiết công trình: Kịch bản | Đã tích hợp (mock test) | Danh sách + tạo (Idempotency-Key) + link tới editor `/scenarios/[scenarioId]` (editor do agent khác); `/scenarios` mở tab này |
+| Org | Chi tiết công trình: Quyền tham gia | Đã tích hợp (mock test) | `access` GET/PATCH + rotate/revoke, If-Match `"access-N"`, mã mới hiện một lần, Modal xác nhận tác động, 412 |
+| Org | Chi tiết công trình: Dịch vụ | Placeholder | `building-services-tab.tsx` là bản tạm, agent billing thay thế |
+| Admin | Công trình theo tổ chức | Đã tích hợp (mock test) | `/admin/organizations/[organizationId]/buildings` và `/workspace/buildings?org=`; `organizationId` ở query (list/update/archive) và body (create); OrganizationUser không gửi |

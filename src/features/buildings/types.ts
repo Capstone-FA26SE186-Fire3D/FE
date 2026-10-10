@@ -46,6 +46,8 @@ export type BuildingFilters = {
   isActive?: boolean;
   page?: number;
   pageSize?: number;
+  /** PlatformAdmin only (required for it). OrganizationUser must NOT send it. */
+  organizationId?: string;
 };
 
 export type SourceDocument = {
@@ -69,6 +71,8 @@ export type InitiateIfcUploadInput = {
   fileSizeBytes: number;
   originalFilename: string;
   versionLabel: string;
+  /** Lowercase hex SHA-256 of the file. BE rejects initiate without it (VALIDATION_ERROR sha256Hash). */
+  sha256Hash: string;
 };
 
 export type InitiatedIfcUpload = {
@@ -85,11 +89,13 @@ export type FinalizeIfcUploadInput = {
   originalFilename: string;
 };
 
+export type EditorPreviewStatus = "Ready" | "NotReady" | (string & {});
+
 export type EditorPreview = {
   buildingId: string;
   revisionId: string;
   revisionStatus: string;
-  status: string;
+  status: EditorPreviewStatus;
   artifactId: string | null;
   attemptId: string | null;
   sha256Hash: string | null;
@@ -106,19 +112,92 @@ export type ProcessingJob = {
   sourceDocumentId: string;
   scenarioVersionId: string | null;
   kind: string;
+  /** Queued | Running | Succeeded | Failed | Cancelled. `Succeeded` is NOT a QA verdict. */
   status: string;
   createdAt: string;
 };
 
+export type ProcessingAttempt = {
+  id: string;
+  attemptNumber: number;
+  /** Running | Succeeded | Failed | Expired */
+  status: string;
+  toolchainVersion: string;
+  startedAt: string;
+  finishedAt: string | null;
+  outputHash: string | null;
+};
+
+export type ProcessingJobDetail = {
+  job: ProcessingJob;
+  inputHash: string;
+  currentAttemptId: string | null;
+  currentAttempt: ProcessingAttempt | null;
+};
+
+export type ValidationRun = {
+  id: string;
+  revisionId: string;
+  processingJobId: string;
+  processingAttemptId: string;
+  artifactId: string | null;
+  scenarioVersionId: string | null;
+  scope: string;
+  validatorVersion: string;
+  /** Worker result (Passed | Failed | …). Read together with the current issues. */
+  status: string;
+  summary: unknown;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+};
+
+export type JobQa = {
+  jobId: string;
+  currentAttemptId: string | null;
+  validationRuns: PageResponse<ValidationRun>;
+};
+
+export type IssueSeverity = "Info" | "Warning" | "Error" | "Critical";
+
 export type RevisionIssue = {
   id: string;
   revisionId: string;
+  validationRunId: string;
+  processingAttemptId: string;
+  artifactId: string | null;
   issueCode: string;
-  severity: string;
+  severity: IssueSeverity | (string & {});
   status: string;
   message: string;
+  evidence: unknown;
   isCurrentAttempt: boolean;
   createdAt: string;
+};
+
+export type RevisionArtifact = {
+  id: string;
+  revisionId: string;
+  jobId: string;
+  attemptId: string;
+  artifactType: string;
+  sha256Hash: string;
+  metadata: unknown;
+  isRuntimeReady: boolean;
+  isCurrentAttempt: boolean;
+  createdAt: string;
+};
+
+export type ProcessingLog = {
+  id: string;
+  revisionId: string;
+  jobId: string;
+  step: string;
+  status: string;
+  message: string | null;
+  durationMs: number | null;
+  attemptNumber: number;
+  loggedAt: string;
 };
 
 export type BimFact = {
@@ -143,12 +222,49 @@ export type AnnotationItem = {
 export type AnnotationSnapshot = {
   revisionId: string;
   id: string | null;
+  /** Version 0 = empty overlay. The next PUT sends If-Match `"<version>"`. */
   version: number;
   data: { items: AnnotationItem[] };
   provenance: string | null;
   createdBy: string | null;
   createdAt: string | null;
-  eTag: string | null;
+  eTag?: string | null;
+};
+
+export type ProcessRevisionResult = { jobId: string };
+export type RetryJobResult = { jobId: string; outcome: string };
+
+export type ConfirmTrainingInput = {
+  scenarioVersionId: string;
+  validationRunId: string;
+  annotationSetId?: string | null;
+};
+
+export type BuildingVisibility = "Private" | "Public";
+
+export type BuildingAccess = {
+  buildingId: string;
+  visibility: BuildingVisibility | (string & {});
+  /** Drives the ETag `"access-<n>"` used in If-Match. */
+  accessRevision: number;
+  hasParticipationCode: boolean;
+  /** Present ONLY in the rotate response. Never fetched again; show once. */
+  code?: string | null;
+};
+
+export type ScenarioVersionSummary = {
+  id: string;
+  scenarioId: string;
+  revisionId: string;
+  buildingId: string;
+  organizationId: string;
+  versionNumber: number;
+  name: string;
+  schemaVersion: string;
+  algorithmVersion: string;
+  timeLimitSeconds: number;
+  scenarioHash: string;
+  createdAt: string;
 };
 
 export type BuildingPage = PageResponse<BuildingSummary>;
@@ -156,3 +272,6 @@ export type RevisionPage = PageResponse<BuildingRevision>;
 export type ProcessingJobPage = PageResponse<ProcessingJob>;
 export type RevisionIssuePage = PageResponse<RevisionIssue>;
 export type BimFactPage = PageResponse<BimFact>;
+export type RevisionArtifactPage = PageResponse<RevisionArtifact>;
+export type ProcessingLogPage = PageResponse<ProcessingLog>;
+export type ScenarioVersionPage = PageResponse<ScenarioVersionSummary>;
