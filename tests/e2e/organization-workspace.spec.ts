@@ -104,6 +104,6 @@ test("next permits workspace details, scenarios and profile while rejecting unre
   for (const path of ["https://evil.test", "//evil.test/workspace/profile", "/workspace/buildings/building-1/admin", "/workspace/other"]) expect(safeNext(path)).toBe("/learning-hub");
   expect(postLoginRoute({ role: 2 }, "/workspace/profile")).toBe("/learning-hub");
   expect(postLoginRoute({ role: 1 }, "https://evil.test")).toBe("/workspace/buildings");
-  expect(postLoginRoute({ role: 0 }, "https://evil.test")).toBe("/admin/accounts");
+  expect(postLoginRoute({ role: 0 }, "https://evil.test")).toBe("/admin/overview");
   expect(postLoginRoute({ role: 1 }, "/workspace/buildings/building-1/scenarios")).toBe("/workspace/buildings/building-1/scenarios");
 });

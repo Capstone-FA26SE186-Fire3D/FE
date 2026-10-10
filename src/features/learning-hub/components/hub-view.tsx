@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { routes } from "@/configs/routes";
 import { AccountProfile } from "@/features/account/components/account-profile";
+import { PublicOpsScope } from "@/features/account/components/public-ops-scope";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { articles } from "@/features/learn/data/articles";
 import { LearnBrowser } from "@/features/learn/components/learn-browser";
@@ -115,7 +116,7 @@ export function HubView() {
           {chat.length ? <ul>{[...chat].reverse().map((item) => <li key={item.id}><Link href={`/learning-hub?view=questions${item.articleSlug ? "&article=" + item.articleSlug : ""}#exchange-${item.id}`} onClick={() => setQuestion("")}>{item.question}<span>{articles.find((entry) => entry.slug === item.articleSlug)?.title ?? "Hỏi đáp chung"}</span></Link><time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString("vi-VN")}</time></li>)}</ul> : <p>Chưa có câu hỏi trong phiên.</p>}
           <div className="learning-reset">{confirmReset ? <><p role="alert">Xóa toàn bộ bài đã lưu và lịch sử minh họa trong tab này?</p><Button variant="quiet" onClick={() => { reset(); setConfirmReset(false); }}>Xác nhận xóa dữ liệu demo</Button><Button variant="ghost" onClick={() => setConfirmReset(false)}>Hủy</Button></> : <Button variant="quiet" onClick={() => setConfirmReset(true)}>Xóa dữ liệu demo</Button>}</div>
         </section>}
-        {view === "profile" && <AccountProfile />}
+        {view === "profile" && <PublicOpsScope><AccountProfile /></PublicOpsScope>}
       </main>
     </div>
   </div>;

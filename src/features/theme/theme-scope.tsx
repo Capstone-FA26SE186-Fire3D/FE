@@ -36,8 +36,9 @@ export function usePortalContainer() {
  * "system" is resolved in CSS (`prefers-color-scheme`), so the first paint needs no script;
  * `resolved` is only for JS consumers such as the 3D viewport clear color.
  */
-export function ThemeScope({ children, className = "" }: { children: ReactNode; className?: string }) {
-  const [mode, setMode] = useLocalPreference<ThemeMode>(STORAGE_KEY, "system", isThemeMode);
+export function ThemeScope({ children, className = "", forcedMode }: { children: ReactNode; className?: string; /** Pin the theme (e.g. dark for a page that lives in the public site). */ forcedMode?: ThemeMode }) {
+  const [storedMode, setMode] = useLocalPreference<ThemeMode>(STORAGE_KEY, "system", isThemeMode);
+  const mode = forcedMode ?? storedMode;
   const systemDark = useSyncExternalStore(subscribeSystem, () => window.matchMedia(DARK_QUERY).matches, () => true);
   const resolved: ResolvedTheme = mode === "system" ? (systemDark ? "dark" : "light") : mode;
   const [container, setContainer] = useState<HTMLElement | null>(null);

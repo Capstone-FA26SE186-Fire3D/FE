@@ -83,7 +83,7 @@ test("OrganizationUser cannot be redirected to the admin account page by next", 
   await expect(page).toHaveURL(/\/workspace\/buildings$/);
 });
 
-for (const [role, destination] of [[2, "/learning-hub"], [0, "/admin/accounts"]] as const) {
+for (const [role, destination] of [[2, "/learning-hub"], [0, "/admin/overview"]] as const) {
   test(`password login role ${role} opens destination directly`, async ({ page }) => {
     const user = { id: "role-user", email: "role@fire3d.test", fullName: "Role", organizationId: null, role };
     await page.route("**/api/auth/login", (route) => route.fulfill({ json: { accessToken: "access", refreshToken: "refresh", user } }));

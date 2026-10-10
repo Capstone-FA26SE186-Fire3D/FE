@@ -311,8 +311,8 @@ test("registration presents account types as descriptive selection cards", async
 test("accounts administration is protected before rendering account data", async ({ page }) => {
   await page.goto("/admin/accounts");
 
-  await expect(page.getByRole("heading", { name: "Quản lý tài khoản" })).toBeVisible();
-  await expect(page.getByRole("main").getByRole("link", { name: "Đăng nhập" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Quản trị hệ thống" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("link", { name: "Đăng nhập" })).toHaveAttribute("href", "/login?next=%2Fadmin%2Faccounts");
   await expect(page.getByText("Không có tài khoản phù hợp.")).toHaveCount(0);
 });
 
@@ -338,14 +338,16 @@ test("platform admin loads and manages accounts through Fire3D endpoints", async
   });
 
   await page.goto("/admin/accounts");
-  await expect(page.getByRole("heading", { name: "Accounts" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Trainee" })).toBeVisible();
-  await page.getByRole("button", { name: "Trainee" }).click();
+  await expect(page.getByRole("heading", { name: "Tài khoản", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /^Trainee/ }).click();
   await expect(page.getByText(/Đăng nhập gần nhất/)).toBeVisible();
-  await page.getByLabel("Email").fill("member@fire3d.test");
-  await page.getByLabel("Mật khẩu").fill("long-enough-password");
-  await page.getByLabel("Họ và tên").fill("New Member");
-  await page.getByRole("button", { name: "Tạo tài khoản" }).click();
-  await expect(page.getByText("Đã tạo tài khoản. Danh sách đã được tải lại.")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Tạo tài khoản", exact: true }).click();
+  const form = page.getByRole("dialog", { name: "Tạo tài khoản" });
+  await form.getByLabel("Email").fill("member@fire3d.test");
+  await form.getByLabel("Mật khẩu").fill("long-enough-password");
+  await form.getByLabel("Họ và tên").fill("New Member");
+  await form.getByRole("button", { name: "Tạo tài khoản" }).click();
+  await expect(page.getByText("Đã tạo tài khoản", { exact: true })).toBeVisible();
   expect(createPayload).toMatchObject({ email: "member@fire3d.test", password: "long-enough-password", fullName: "New Member", role: 2, organizationId: null });
 });

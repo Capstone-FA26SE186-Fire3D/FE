@@ -2,7 +2,7 @@ import { getArticle } from "@/features/learn/data/articles";
 import type { AuthUser } from "./types";
 
 export function dashboardRouteFor(user: Pick<AuthUser, "role"> | null | undefined) {
-  if (user?.role === 0) return "/admin/accounts";
+  if (user?.role === 0) return "/admin/overview";
   if (user?.role === 1) return "/workspace/buildings";
   if (user?.role === 2) return "/learning-hub";
   return "/learning-hub";
