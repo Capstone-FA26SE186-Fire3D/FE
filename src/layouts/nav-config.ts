@@ -1,4 +1,4 @@
-import { BookOpen, Building2, ClipboardCheck, CreditCard, Landmark, LayoutDashboard, LifeBuoy, Library, ScanLine, UserRound, Users, type LucideIcon } from "lucide-react";
+import { BookOpen, Building2, ClipboardCheck, CreditCard, Landmark, LayoutDashboard, LifeBuoy, Library, Receipt, ScanLine, UserRound, Users, type LucideIcon } from "lucide-react";
 import type { UserRole } from "@/features/auth/types";
 import { routes } from "@/configs/routes";
 
@@ -34,6 +34,7 @@ export const organizationArea: OperationsArea = {
   deniedLabel: "Mở thư viện cá nhân",
   nav: [
     { href: routes.workspaceBuildings, label: "Công trình", icon: Building2 },
+    { href: routes.workspaceBilling, label: "Dịch vụ & thanh toán", icon: Receipt },
     { href: routes.workspaceIfc, label: "Quét mô hình IFC", icon: ScanLine },
     { href: routes.workspaceSupport, label: "Hỗ trợ & phản hồi", icon: LifeBuoy },
     { href: routes.workspaceProfile, label: "Hồ sơ tổ chức", icon: UserRound },
