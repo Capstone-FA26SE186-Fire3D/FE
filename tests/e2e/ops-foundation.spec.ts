@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { parseFieldErrors, parseRetryAfter } from "../../src/api/errors";
 import { stableStringify } from "../../src/api/idempotency";
+import { normalizeRole, roleToApiName } from "../../src/features/auth/roles";
 import { nextPollDelay } from "../../src/api/use-polling";
 
 const owner = { id: "owner", email: "owner@fire3d.test", fullName: "Nguyễn Văn A", username: "nguyen.van.a", role: 1, organizationId: "org-1", profileRevision: 1 };
@@ -50,6 +51,35 @@ test.describe("API helpers", () => {
     expect(nextPollDelay(3000, 9, 30000)).toBe(30000);
     expect(nextPollDelay(3000, 1, 30000, 45)).toBe(45000);
     expect(nextPollDelay(3000, 1, 30000, 1)).toBe(3000);
+  });
+});
+
+test.describe("roles from the real API", () => {
+  test("accepts role names (what the API returns) and numbers (legacy/mocks)", () => {
+    expect(normalizeRole("PlatformAdmin")).toBe(0);
+    expect(normalizeRole("OrganizationUser")).toBe(1);
+    expect(normalizeRole("Trainee")).toBe(2);
+    expect(normalizeRole(1)).toBe(1);
+    expect(() => normalizeRole("Owner")).toThrow();
+    expect(() => normalizeRole(undefined)).toThrow();
+  });
+
+  test("request bodies use role names because the API rejects numeric enums", () => {
+    expect([0, 1, 2].map((role) => roleToApiName(role as 0 | 1 | 2))).toEqual(["PlatformAdmin", "OrganizationUser", "Trainee"]);
+  });
+
+  test("account list renders API role names", async ({ page }) => {
+    await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "a", refreshToken: "r" })));
+    await page.route("**/api/auth/me", (route) => route.fulfill({ json: { id: "admin", email: "admin@fire3d.test", fullName: "Admin", role: "PlatformAdmin", organizationId: null, profileRevision: 1 } }));
+    await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 100 } }));
+    await page.route("**/api/accounts?*", (route) => route.fulfill({ json: { items: [
+      { id: "1", email: "org@fire3d.test", fullName: "Org", role: "OrganizationUser", organizationId: null, isActive: true, lastLoginAt: null },
+      { id: "2", email: "learner@fire3d.test", fullName: "Learner", role: "Trainee", organizationId: null, isActive: true, lastLoginAt: null },
+    ], totalCount: 2, page: 1, pageSize: 20 } }));
+    await page.goto("/admin/accounts");
+    await expect(page.getByRole("cell", { name: "Thành viên tổ chức" })).toBeVisible();
+    await expect(page.getByRole("cell", { name: "Học viên" })).toBeVisible();
+    await expect(page.getByText("Không xác định")).toHaveCount(0);
   });
 });
 
