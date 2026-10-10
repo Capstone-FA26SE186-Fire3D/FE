@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { BUILDING_ID, DRAFT_ID, SCENARIO_ID } from "../fixtures/scenario-editor/fixture-building";
+import { BUILDING_ID, DRAFT_ID, REVISION_ID, SCENARIO_ID } from "../fixtures/scenario-editor/fixture-building";
 import { EDITOR_URL, installEditorMocks, newMock, sampleDraftState, watchConsole, type MockState } from "../fixtures/scenario-editor/mock-api";
 
 /**
@@ -350,6 +350,86 @@ test("validate saves first, merges server issues with client issues and jumps to
   await expect(page.getByText(/có thể đã cũ/)).toBeVisible();
 });
 
+for (const pending of ["save", "validate"] as const) {
+  test(`validation stays tied to the stored snapshot when editing during ${pending}`, async ({ page }) => {
+    const mock = newMock();
+    await open(page, mock);
+    const started = Promise.withResolvers<void>();
+    const response = Promise.withResolvers<void>();
+    if (pending === "save") {
+      await page.route(`**/api/scenario-drafts/${DRAFT_ID}`, async (route) => {
+        if (route.request().method() !== "PUT") return route.fallback();
+        started.resolve();
+        await response.promise;
+        return route.fallback();
+      });
+      await page.getByTestId("add-spawn").click();
+    } else {
+      await page.route(`**/api/scenario-drafts/${DRAFT_ID}/validate`, async (route) => {
+        started.resolve();
+        await response.promise;
+        return route.fallback();
+      });
+    }
+    await page.getByTestId("validate").evaluate((node) => { (node as HTMLButtonElement).click(); (node as HTMLButtonElement).click(); });
+    await started.promise;
+    await page.getByTestId("add-spawn").click();
+    response.resolve();
+    await page.getByTestId("tab-issues").click();
+    await expect(page.getByText("Máy chủ xác nhận bản đã lưu trước đó hợp lệ", { exact: true })).toBeVisible();
+    await expect(page.getByText("Bạn đã sửa sau lần kiểm tra này; kiểm tra lại để chắc chắn.", { exact: true })).toBeVisible();
+    await expect(status(page)).toHaveText("Chưa lưu");
+    expect(mock.puts).toHaveLength(pending === "save" ? 1 : 0);
+    expect(mock.validateCalls).toBe(1);
+
+    await page.getByTestId("validate-inline").click();
+    await expect(page.getByText("Máy chủ xác nhận bản nháp hợp lệ về cấu trúc", { exact: true })).toBeVisible();
+    await expect(status(page)).toHaveText("Đã lưu");
+    expect(mock.validateCalls).toBe(2);
+  });
+}
+
+test("validation accepts an unchanged snapshot and rejects a different server version", async ({ page }) => {
+  const mock = newMock();
+  await open(page, mock);
+  await page.getByTestId("validate").click();
+  await expect(page.getByText("Máy chủ xác nhận bản nháp hợp lệ về cấu trúc", { exact: true })).toBeVisible();
+  expect(mock.puts).toHaveLength(0);
+  await page.route(`**/api/scenario-drafts/${DRAFT_ID}/validate`, (route) => route.fulfill({ json: { draftId: DRAFT_ID, version: mock.version + 1, isValid: true, issues: [] } }));
+  await page.getByTestId("validate-inline").click();
+  await expect(page.getByText(/Kết quả kiểm tra thuộc phiên bản khác/)).toBeVisible();
+  await expect(page.getByText("Máy chủ xác nhận bản nháp hợp lệ về cấu trúc", { exact: true })).toHaveCount(0);
+  await expect(status(page)).toHaveText("Đã lưu");
+});
+
+test("changing drafts aborts a pending validation and does not apply its result to the new draft", async ({ page }) => {
+  const mock = newMock();
+  await open(page, mock);
+  const started = Promise.withResolvers<void>();
+  const response = Promise.withResolvers<void>();
+  const finished = Promise.withResolvers<void>();
+  await page.route(`**/api/scenario-drafts/${DRAFT_ID}/validate`, async (route) => {
+    started.resolve();
+    await response.promise;
+    await route.fulfill({ json: { draftId: DRAFT_ID, version: mock.version, isValid: false, issues: [{ code: "OLD_DRAFT", path: "$.objectAnchors", message: "Old draft response" }] } });
+    finished.resolve();
+  });
+  const nextId = "11111111-1111-4111-8111-111111111112";
+  await page.route(`**/api/scenario-drafts/${nextId}`, (route) => route.fulfill({ json: { id: nextId, scenarioId: SCENARIO_ID, buildingId: BUILDING_ID, revisionId: REVISION_ID, draftNumber: 4, state: sampleDraftState(), source: "Manual", version: 86 }, headers: { ETag: '"86"' } }));
+  await page.getByTestId("validate").click();
+  await started.promise;
+  const aborted = page.waitForEvent("requestfailed", { predicate: (request) => request.url().endsWith(`/${DRAFT_ID}/validate`) });
+  await page.evaluate((url) => window.history.pushState(null, "", url), EDITOR_URL.replace(DRAFT_ID, nextId));
+  await aborted;
+  await expect(page.getByText("Bản nháp #4", { exact: true })).toBeVisible();
+  response.resolve();
+  await finished.promise;
+  await page.getByTestId("tab-issues").click();
+  await expect(page.getByTestId("issue-item")).toHaveCount(0);
+  await expect(page.getByText("Old draft response", { exact: true })).toHaveCount(0);
+  await expect(page.getByTestId("validate-inline")).toBeEnabled();
+});
+
 test("client validation flags an empty rubric/objectives without presetting any policy", async ({ page }) => {
   const mock = newMock();
   mock.state = { spawnPoints: [], hazards: [] }; // a freshly created draft body
@@ -515,6 +595,22 @@ for (const theme of ["light", "dark"] as const) {
         await page.screenshot({ path: testInfo.outputPath(`editor-${width}-${theme}-props.png`), fullPage: true });
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(375);
       }
+      await page.getByRole("tab", { name: "Kịch bản", exact: true }).click();
+      await page.getByTestId("learner-instructions").fill("Nội dung chưa lưu để kiểm tra bố cục nút.");
+      await page.getByTestId("tab-issues").click();
+      const validate = page.getByTestId("validate-inline");
+      await expect(validate).toHaveText("Lưu và kiểm tra");
+      const layout = await validate.evaluate((node) => {
+        const button = node.getBoundingClientRect();
+        const panel = node.closest(".se-form")!.getBoundingClientRect();
+        const text = Array.from(node.childNodes).find((child) => child.nodeType === Node.TEXT_NODE && child.textContent?.trim());
+        const range = document.createRange();
+        range.selectNodeContents(text!);
+        return { height: button.height, inside: button.left >= panel.left && button.right <= panel.right, lines: range.getClientRects().length };
+      });
+      expect(layout).toEqual({ height: 44, inside: true, lines: 1 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      await page.screenshot({ path: testInfo.outputPath(`editor-${width}-${theme}-validation.png`) });
       // the viewport clear colour follows the resolved theme (read back from the canvas centre is unreliable under SwiftShader, so assert the token)
       await expect(page.locator(".ops-theme")).toHaveAttribute("data-resolved-theme", theme);
       expect(log.relevant()).toEqual([]);

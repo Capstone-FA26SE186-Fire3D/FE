@@ -32,7 +32,7 @@ async function mockBuilding(page: Page, mock: Mock = {}) {
   await page.route("**/api/revisions/*/processing-logs?*", (route) => route.fulfill({ json: page1([]) }));
   await page.route("**/api/revisions/*/artifacts?*", (route) => route.fulfill({ json: page1([]) }));
   await page.route("**/api/revisions/*/bim-facts?*", (route) => route.fulfill({ json: page1([]) }));
-  await page.route("**/api/revisions/*/annotations", (route) => route.fulfill({ json: { revisionId: "rev-2", id: null, version: 0, data: { items: [] }, provenance: null, createdBy: null, createdAt: null } }));
+  await page.route("**/api/revisions/*/annotations", (route) => route.fulfill({ json: { revisionId: new URL(route.request().url()).pathname.split("/")[3], id: null, version: 0, data: { items: [] }, provenance: null, createdBy: null, createdAt: null } }));
   await page.route("**/api/buildings/building-1/editor-preview?*", (route) => route.fulfill({ json: mock.preview ?? { buildingId: "building-1", revisionId: "rev-2", revisionStatus: "Uploaded", status: "NotReady", artifactId: null, attemptId: null, sha256Hash: null, downloadUrl: null, expiresAt: null, coordinateTransform: null, floors: null, semanticMapping: null } }));
   await page.route("**/api/buildings/building-1/access", (route) => route.fulfill({ json: { buildingId: "building-1", visibility: "Private", accessRevision: 3, hasParticipationCode: true }, headers: { ETag: '"access-3"' } }));
 }
@@ -312,6 +312,118 @@ test.describe("preview", () => {
 });
 
 test.describe("annotations", () => {
+  const item = { id: "11111111-1111-4111-8111-111111111111", ifcGlobalId: "shared-anchor", label: "Revision A", note: null };
+  const snapshot = (revisionId: string, label: string) => ({ revisionId, version: 3, data: { items: [{ ...item, label }] } });
+
+  test("revision switch saves only the selected revision even when versions match", async ({ page }) => {
+    await signIn(page);
+    await mockBuilding(page);
+    const started = Promise.withResolvers<void>();
+    const response = Promise.withResolvers<void>();
+    const writes: Array<{ revision: string; body: unknown; etag?: string }> = [];
+    await page.route("**/api/revisions/*/annotations", async (route) => {
+      const request = route.request();
+      const revision = new URL(request.url()).pathname.split("/")[3];
+      if (request.method() === "PUT") {
+        writes.push({ revision, body: request.postDataJSON(), etag: request.headers()["if-match"] });
+        return route.fulfill({ json: { ...snapshot(revision, "Revision B"), version: 4 } });
+      }
+      if (revision === "rev-2") { started.resolve(); await response.promise; }
+      return route.fulfill({ json: snapshot(revision, revision === "rev-1" ? "Revision A" : "Revision B") });
+    });
+    await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-1");
+    await expect(page.getByLabel("Nhãn #1")).toHaveValue("Revision A");
+    await page.getByLabel("Revision IFC đang xem").selectOption("rev-2");
+    await started.promise;
+    await expect(page.getByLabel("Nhãn #1")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Lưu annotation", exact: true })).toHaveCount(0);
+    response.resolve();
+    await expect(page.getByLabel("Nhãn #1")).toHaveValue("Revision B");
+    await page.getByLabel("Ghi chú #1").fill("For revision B");
+    await page.getByRole("button", { name: "Lưu annotation", exact: true }).click();
+    await expect(page.getByText("Đã lưu annotation", { exact: true })).toBeVisible();
+    expect(writes).toEqual([{ revision: "rev-2", etag: '"3"', body: { items: [{ ...item, label: "Revision B", note: "For revision B" }] } }]);
+  });
+
+  for (const failure of ["server-error", "wrong-revision"] as const) {
+    test(`revision switch never opens an old annotation form after ${failure}`, async ({ page }) => {
+      await signIn(page);
+      await mockBuilding(page);
+      let retry = false;
+      await page.route("**/api/revisions/*/annotations", (route) => {
+        const revision = new URL(route.request().url()).pathname.split("/")[3];
+        if (revision === "rev-2" && !retry) return route.fulfill(failure === "server-error"
+          ? { status: 500, json: { title: "Temporary error" } }
+          : { json: snapshot("rev-1", "Revision A") });
+        return route.fulfill({ json: snapshot(revision, revision === "rev-1" ? "Revision A" : "Revision B") });
+      });
+      await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-1");
+      await expect(page.getByLabel("Nhãn #1")).toHaveValue("Revision A");
+      await page.getByLabel("Revision IFC đang xem").selectOption("rev-2");
+      const panel = page.locator("section").filter({ has: page.getByRole("heading", { name: "Annotation overlay", exact: true }) });
+      await expect(panel.getByText("Không tải được annotation", { exact: true })).toBeVisible();
+      await expect(page.getByLabel("Nhãn #1")).toHaveCount(0);
+      retry = true;
+      await panel.getByRole("button", { name: "Thử lại", exact: true }).click();
+      await expect(page.getByLabel("Nhãn #1")).toHaveValue("Revision B");
+    });
+  }
+
+  test("late annotation response cannot replace the revision selected afterwards", async ({ page }) => {
+    await signIn(page);
+    await mockBuilding(page);
+    const started = Promise.withResolvers<void>();
+    const response = Promise.withResolvers<void>();
+    const finished = Promise.withResolvers<void>();
+    await page.route("**/api/revisions/*/annotations", async (route) => {
+      const revision = new URL(route.request().url()).pathname.split("/")[3];
+      if (revision === "rev-2") { started.resolve(); await response.promise; }
+      await route.fulfill({ json: snapshot(revision, revision === "rev-1" ? "Revision A" : "Revision B") });
+      if (revision === "rev-2") finished.resolve();
+    });
+    await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-1");
+    await expect(page.getByLabel("Nhãn #1")).toHaveValue("Revision A");
+    await page.getByLabel("Revision IFC đang xem").selectOption("rev-2");
+    await started.promise;
+    await page.getByLabel("Revision IFC đang xem").selectOption("rev-1");
+    await expect(page.getByLabel("Nhãn #1")).toHaveValue("Revision A");
+    response.resolve();
+    await finished.promise;
+    await expect(page.getByLabel("Nhãn #1")).toHaveValue("Revision A");
+  });
+
+  for (const edit of ["typing", "deleting"] as const) {
+    test(`annotation changes made by ${edit} during save remain unsaved with the new version`, async ({ page }) => {
+      await signIn(page);
+      await mockBuilding(page);
+      const started = Promise.withResolvers<void>();
+      const response = Promise.withResolvers<void>();
+      const writes: Array<{ body: { items: unknown[] }; etag?: string }> = [];
+      await page.route("**/api/revisions/rev-2/annotations", async (route) => {
+        const request = route.request();
+        if (request.method() !== "PUT") return route.fulfill({ json: snapshot("rev-2", "Revision B") });
+        writes.push({ body: request.postDataJSON(), etag: request.headers()["if-match"] });
+        if (writes.length === 1) { started.resolve(); await response.promise; }
+        return route.fulfill({ json: { revisionId: "rev-2", version: 3 + writes.length, data: writes.at(-1)!.body } });
+      });
+      await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-2");
+      await page.getByLabel("Ghi chú #1").fill("Sent content");
+      await page.getByRole("button", { name: "Lưu annotation", exact: true }).click();
+      await started.promise;
+      if (edit === "typing") await page.getByLabel("Ghi chú #1").fill("  New content  ");
+      else await page.getByRole("button", { name: "Xóa annotation 1", exact: true }).click();
+      response.resolve();
+      const save = page.getByRole("button", { name: "Lưu annotation", exact: true });
+      await expect(save).toBeEnabled();
+      await expect(page.getByText(/có thay đổi chưa lưu/)).toBeVisible();
+      await save.click();
+      await expect(save).toBeDisabled();
+      expect(writes[0]).toEqual({ etag: '"3"', body: { items: [{ ...item, label: "Revision B", note: "Sent content" }] } });
+      expect(writes[1]).toEqual({ etag: '"4"', body: { items: edit === "typing" ? [{ ...item, label: "Revision B", note: "New content" }] : [] } });
+      await expect(page.getByText(/có thay đổi chưa lưu/)).toHaveCount(0);
+    });
+  }
+
   test("a 412 keeps what the user typed and offers the newer version", async ({ page }) => {
     await signIn(page);
     await mockBuilding(page);

@@ -86,8 +86,8 @@ export function EditorWorkspace({ accessToken, buildingId, scenarioId, editor }:
 
   const onSave = useCallback(async () => {
     const result = await editor.save();
-    if (result === "saved") toast.notify({ tone: "success", title: "Đã lưu bản nháp" });
-    if (result === "conflict") setConflictOpen(true);
+    if (result.status === "saved") toast.notify({ tone: "success", title: "Đã lưu bản nháp" });
+    if (result.status === "conflict") setConflictOpen(true);
   }, [editor, toast]);
 
   const onValidate = useCallback(async () => {

@@ -10,7 +10,8 @@ import { editorReducer, initialEditorState, isDirty, saveStatus, type EditorStat
 import { compareDrafts, resolveMerge, type MergeChoice, type MergeUnit } from "./store/merge";
 import { prepareForSave, type Selection } from "./store/model";
 import { mergeIssues, normalizeServerIssues, validateDraftState, type Issue } from "./store/validation";
-import { isObject, type JsonObject } from "./store/json";
+import { deepEqual, isObject, type JsonObject } from "./store/json";
+import { normalizeEtag } from "./store/etag";
 
 export type LoadState = { phase: "loading" } | { phase: "ready" } | { phase: "error"; status?: number; message: string };
 
@@ -21,7 +22,9 @@ export type ConflictState = {
   units: MergeUnit[];
 };
 
-export type SaveResult = "saved" | "conflict" | "error" | "skipped";
+export type SaveResult =
+  | { status: "saved"; snapshot: JsonObject; etag: string }
+  | { status: "conflict" | "error" | "skipped" };
 
 export type EditorMeta = Pick<DraftResponse, "id" | "scenarioId" | "revisionId" | "buildingId" | "draftNumber" | "source" | "updatedAt">;
 
@@ -57,6 +60,8 @@ export function useScenarioEditor(accessToken: string | null, draftId: string | 
   const [reloadToken, setReloadToken] = useState(0);
   const stateRef = useRef<EditorState>(state);
   const savingRef = useRef(false);
+  const validatingRef = useRef(false);
+  const requestScope = useRef<AbortController | null>(null);
   const clock = useRef(() => Date.now());
 
   useEffect(() => {
@@ -66,8 +71,13 @@ export function useScenarioEditor(accessToken: string | null, draftId: string | 
   useEffect(() => {
     if (!accessToken || !draftId) return;
     const controller = new AbortController();
+    requestScope.current = controller;
+    savingRef.current = false;
+    validatingRef.current = false;
     const timer = window.setTimeout(() => {
       setLoad({ phase: "loading" });
+      setValidating(false);
+      setValidateError(null);
       scenarioEditorApi.getDraft(accessToken, draftId, controller.signal)
         .then(({ draft, etag }) => {
           if (controller.signal.aborted) return;
@@ -101,52 +111,76 @@ export function useScenarioEditor(accessToken: string | null, draftId: string | 
 
   const save = useCallback(async (): Promise<SaveResult> => {
     const current = stateRef.current;
-    if (!accessToken || !draftId || !current.etag || savingRef.current) return "skipped";
-    if (!isDirty(current)) return "saved";
+    const scope = requestScope.current;
+    if (!accessToken || !draftId || !current.etag || savingRef.current || !scope || scope.signal.aborted) return { status: "skipped" };
+    if (!isDirty(current)) return { status: "saved", snapshot: current.baseline, etag: current.etag };
     savingRef.current = true;
     const payload = prepareForSave(current.draft);
     dispatch({ type: "save-start" });
     try {
-      const { etag } = await scenarioEditorApi.putDraft(accessToken, draftId, payload, current.etag);
+      const { etag } = await scenarioEditorApi.putDraft(accessToken, draftId, payload, current.etag, scope.signal);
       let next = etag;
+      let snapshot = payload;
       if (!next) {
         // 204 without a readable ETag (proxy stripped it): the revision must come from the server, never be guessed.
-        next = (await scenarioEditorApi.getDraft(accessToken, draftId)).etag;
+        const loaded = await scenarioEditorApi.getDraft(accessToken, draftId, scope.signal);
+        next = loaded.etag;
+        snapshot = prepareForSave(loaded.draft.state);
       }
-      dispatch({ type: "save-ok", payload, etag: next });
-      return "saved";
+      if (scope.signal.aborted) return { status: "skipped" };
+      dispatch({ type: "save-ok", payload: snapshot, etag: next });
+      return { status: "saved", snapshot, etag: next };
     } catch (cause) {
+      if (scope.signal.aborted) return { status: "skipped" };
       const { message, conflict: isConflict } = describeSaveError(cause);
       dispatch({ type: "save-fail", message, conflict: isConflict });
-      return isConflict ? "conflict" : "error";
+      return { status: isConflict ? "conflict" : "error" };
     } finally {
-      savingRef.current = false;
+      if (!scope.signal.aborted) savingRef.current = false;
     }
   }, [accessToken, draftId]);
 
   const validate = useCallback(async () => {
-    if (!accessToken || !draftId) return;
+    const scope = requestScope.current;
+    if (!accessToken || !draftId || validatingRef.current || !scope || scope.signal.aborted) return;
+    validatingRef.current = true;
     setValidateError(null);
     setValidating(true);
+    setLastValidation(null);
+    setServerIssues([]);
+    setValidatedSnapshot(null);
     try {
       // The BE validates the STORED draft, so unsaved edits are saved first (explicit in the button label).
-      if (isDirty(stateRef.current) && (await save()) !== "saved") {
+      const saved = await save();
+      if (scope.signal.aborted) return;
+      if (saved.status !== "saved") {
         setValidateError("Không thể kiểm tra vì chưa lưu được bản nháp.");
         return;
       }
-      const result = await scenarioEditorApi.validate(accessToken, draftId);
+      const result = await scenarioEditorApi.validate(accessToken, draftId, scope.signal);
+      if (scope.signal.aborted) return;
+      if (result.draftId !== draftId || normalizeEtag(String(result.version)) !== saved.etag) {
+        setValidateError("Kết quả kiểm tra thuộc phiên bản khác của bản nháp. Hãy kiểm tra lại trước khi sử dụng kết quả.");
+        return;
+      }
       setServerIssues(normalizeServerIssues(result.issues));
-      setValidatedSnapshot(stateRef.current.draft);
+      setValidatedSnapshot(saved.snapshot);
       setLastValidation({ isValid: result.isValid, version: result.version });
     } catch (cause) {
+      if (scope.signal.aborted) return;
       setValidateError(errorMessage(cause, "Không thể kiểm tra bản nháp."));
     } finally {
-      setValidating(false);
+      if (!scope.signal.aborted) {
+        validatingRef.current = false;
+        setValidating(false);
+      }
     }
   }, [accessToken, draftId, save]);
 
   const clientIssues = useMemo(() => validateDraftState(prepareForSave(state.draft)), [state.draft]);
-  const serverStale = validatedSnapshot !== null && validatedSnapshot !== state.draft;
+  const serverStale = validatedSnapshot !== null && (
+    !deepEqual(validatedSnapshot, prepareForSave(state.draft)) || normalizeEtag(String(lastValidation?.version)) !== state.etag
+  );
   const issues = useMemo(() => mergeIssues(clientIssues, serverIssues), [clientIssues, serverIssues]);
 
   /** Fetches the server's current draft and diffs it against the author's. Nothing is written. */
