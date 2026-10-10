@@ -70,3 +70,31 @@ Cập nhật bảng này khi hoàn thành từng đợt.
 | Org | Hỗ trợ & phản hồi `/workspace/support` | Đã tích hợp (mock test) | Tạo ticket (Idempotency-Key giữ khi retry), danh sách, lịch sử trao đổi, tin nhắn, feedback; chỉ OrganizationUser (creator-owned) |
 | Admin | Tổ chức `/admin/organizations` | Đã tích hợp (mock test) | Bảng + drawer chi tiết/tạo, filter/phân trang URL, khóa/mở có xác nhận, link tạo owner và `/admin/organizations/{id}/buildings` (trang do task khác). Chờ BE: địa chỉ/SĐT, sửa hồ sơ từ admin (BE#60) |
 | Org | Hồ sơ `/workspace/profile` (+ `/account` dùng chung) | Đã tích hợp (mock test) | Field/Alert/toast, ETag `"N"`, 412 giữ nội dung + tải bản mới, lỗi field từ API; `/account` bọc `PublicOpsScope` (tối cố định) |
+| Org | Editor kịch bản 3D `/workspace/buildings/[id]/scenarios/[scenarioId]?draft=` | Đã tích hợp một phần (mock test) | Spawn/hazard (kể cả `activationTime`), mục tiêu/hướng dẫn/rubric/chấm điểm/tuyến/runtime, undo/redo, lưu `If-Match`, 412 đối chiếu theo field, validate. Goal/NPC/blocked element/thiết bị: **Chờ BE #54** (khóa). Playtest: **Chờ BE #55** (khóa). Mở lại draft theo scenario: **Chờ BE #53** (hiện dùng `?draft=` hoặc tạo mới) |
+
+### Editor kịch bản 3D — giả định, giới hạn và điều kiện mở khóa
+
+Code: `src/features/scenario-editor/` (`store/` thuần, `scene/` Three.js, `panels/` UI). Test: `tests/e2e/scenario-editor-store.spec.ts` (logic thuần), `tests/e2e/scenario-editor.spec.ts` (UI + WebGL, route mock). Toàn bộ là **bằng chứng mock**; chưa chạy với BE/worker thật.
+
+**Giả định có chủ đích (chưa có trong BE, phải xác nhận ở BE#54)** — gom ở `scene/coordinate.ts`, `scene/preview-model.ts` và `store/model.ts`:
+- `coordinateTransform`: 16 số, **column-major** (translation ở phần tử 12–14), áp lên root của GLB, affine (hàng cuối 0,0,0,1). Không affine/suy biến/thiếu thì báo lý do và KHÔNG áp dụng; tỉ lệ lệch 1 rất lớn thì cảnh báo nghi sai đơn vị. Đã kiểm bằng fixture tự dựng, chưa với artifact thật.
+- Vị trí spawn/hazard: mét, trục Y hướng lên, cùng không gian với GLB sau transform; `rotation` = **độ** quanh trục đứng.
+- `floors`: `[ {id|guid, name|label, elevation|level|z (m)} ]`; chọn tầng cắt mô hình từ cao độ tầng đến cao độ tầng kế. Cao độ nằm ngoài khung mô hình thì không cắt và có ghi chú. Thiếu/không nhận ra thì danh sách tầng trống, không bịa.
+- `semanticMapping`: đoán hai dạng `{ nhóm: [tên node glTF] }` hoặc `{ tên node: nhóm }`; lớp chỉ hiện khi tìm thấy node trùng tên trong GLB.
+- BE bỏ field ngoài DTO khi PUT (`ScenarioDraftStateDto`): editor giữ mọi field lạ trong bộ nhớ và gửi lại nguyên tham chiếu, nhưng **không lưu bền được field ngoài DTO** (cả top-level lẫn bên trong spawn/hazard). `goals/npcs/blockedElements/modePolicy/safetyThresholds` (JSON thô trong DTO) được bảo toàn nguyên vẹn, không diễn giải.
+- Draft mới tạo có `state = {}`; DTO có thành viên không-nullable nên khi lưu bổ sung `spawnPoints/hazards = []`, `evacuationRoutes = []` và số chấm điểm chưa nhập = 0 (validate báo `TIME_LIMIT_INVALID`…). Không đặt sẵn ngưỡng đạt, trọng số hay chính sách chấm.
+- Validate của BE kiểm bản **đã lưu**: nút Kiểm tra lưu trước khi gọi (nhãn "Lưu và kiểm tra" khi có thay đổi). Validate client chỉ phản chiếu `ScenarioDraftStructuralValidator`; neo đối tượng/năng lực runtime chỉ BE kiểm được.
+
+**Khóa theo cờ** (`src/features/scenario-editor/config.ts`, mặc định `false`; chỉ bật khi BE công bố schema có phiên bản + validator):
+
+| Cờ | Điều kiện mở | Issue |
+|---|---|---|
+| `goals`, `npcs`, `blockedElements` | Schema JSON có version cho từng loại, mã lỗi cho field lạ (bảo toàn hay từ chối), validator trả `{code,path,message}` | BE#54 |
+| `devices` | Catalog `scenario-interactions/catalog` có schema tham số thiết bị | BE#54 |
+| `playtest` | `GET /api/playtests/{id}`, cấp lại grant khi hết hạn, mã opaque cho QR/deep link | BE#55 |
+
+**Signed URL/preview**: `NotReady` (200, `downloadUrl: null`) được poll 5 s, tối đa 24 lần (tạm dừng khi tab ẩn) rồi có nút "Kiểm tra lại". URL ký không cache; `expiresAt` đã qua hoặc storage trả 400/401/403/404/410 thì lấy lại URL, tối đa 2 lần tự động rồi nút tải lại thủ công.
+
+**Giới hạn đo hiệu năng**: headless Chromium dùng SwiftShader (CPU) nên số renders/thời gian khung hình KHÔNG phản ánh GPU thật. Test chỉ chứng minh vòng đời tài nguyên (`renderer.info.memory` về 0 sau unmount, lặp 2 lần), render-on-demand, context loss/restore. Cảnh báo driver `GPU stall due to ReadPixels` xuất hiện khi chụp ảnh và bị lọc khỏi kiểm tra console. Fixture GLB chỉ 144 tam giác; chưa thử mô hình IFC lớn thật, chưa đo bộ nhớ/FPS trên thiết bị tầm trung. Cần đo với artifact worker thật trước khi tuyên bố đạt hiệu năng.
+
+**Chưa làm**: chọn phần tử IFC để gán `objectAnchors` từ viewport (cần ánh xạ node glTF ↔ IFC GUID từ BE#54; hiện nhập tay), tuyến thoát hiểm vẽ trên mô hình (BE chỉ lưu danh sách chuỗi), gizmo trên cảm ứng nhỏ (phone chỉnh bằng form).

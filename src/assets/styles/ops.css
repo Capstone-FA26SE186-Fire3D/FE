@@ -377,3 +377,7 @@ select.ops-input { appearance: none; padding-right: 34px; background-image: line
 .ops-file-button:focus-within { outline: 2px solid var(--ember); outline-offset: 3px; }
 .ops-file-button[data-disabled="true"] { opacity: .45; cursor: not-allowed; pointer-events: none; }
 .ops-file-button input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+/* Compact "Chờ BE" badge so it is never clipped in the sidebar */
+.ops-nav-text .ops-badge { flex: 0 0 auto; min-height: 20px; padding: 0 6px; font-size: 10.5px; }
+.ops-nav-text .ops-badge::before { display: none; }
