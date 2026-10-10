@@ -20,7 +20,7 @@ export function IssuesPanel({ issues, serverStale, validating, validateError, la
 }) {
   const server = issues.filter((issue) => issue.source === "server");
   return <div className="se-form" data-testid="issues-panel">
-    <div className="se-form-head">
+    <div className="se-form-head se-validation-head">
       <div><h3>Kiểm tra bản nháp</h3><p>Lỗi hiện ngay trong trình duyệt; nút Kiểm tra nhờ máy chủ xác nhận, gồm neo đối tượng và năng lực runtime.</p></div>
       <Button type="button" variant="secondary" size="sm" disabled={validating} onClick={onValidate} data-testid="validate-inline"><ShieldCheck size={14} aria-hidden="true" /> {validating ? "Đang kiểm tra…" : dirty ? "Lưu và kiểm tra" : "Kiểm tra"}</Button>
     </div>
