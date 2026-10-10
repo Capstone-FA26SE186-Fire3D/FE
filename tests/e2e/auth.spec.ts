@@ -349,5 +349,5 @@ test("platform admin loads and manages accounts through Fire3D endpoints", async
   await form.getByLabel("Họ và tên").fill("New Member");
   await form.getByRole("button", { name: "Tạo tài khoản" }).click();
   await expect(page.getByText("Đã tạo tài khoản", { exact: true })).toBeVisible();
-  expect(createPayload).toMatchObject({ email: "member@fire3d.test", password: "long-enough-password", fullName: "New Member", role: 2, organizationId: null });
+  expect(createPayload).toMatchObject({ email: "member@fire3d.test", password: "long-enough-password", fullName: "New Member", role: "Trainee", organizationId: null });
 });

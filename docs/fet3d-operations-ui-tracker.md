@@ -20,6 +20,13 @@ Nguồn kiểm tra BE: `main` @ `b6a7d74` (đọc source; chưa kiểm chứng d
 | [#60](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/60) | Response organization/account thiếu field, chưa có PATCH organization | Lệch contract | Hồ sơ tổ chức trong Admin |
 | [#61](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/61) | Docs mâu thuẫn với source | Docs | — |
 
+| [#64](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/64) | Nhiều endpoint trả 500 trên deploy (tạo/đọc công trình, revisions, scenarios, billing, catalog) | Bug | Chi tiết công trình, tạo công trình, billing, editor trên API thật |
+| [#65](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/65) | OpenAPI thiếu enum job/QA, Idempotency-Key bắt buộc, vị trí requestId | Docs/contract | — (FE đang suy từ SQL) |
+| [#66](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/66) | API gộp job+QA theo revision, run lịch sử, annotations eTag, validate dry-run, draft rỗng | Enhancement | Giảm 3 request/lần poll; editor validate state chưa lưu |
+| [#67](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/67) | Ticket/feedback thiếu người tạo & tổ chức; audit chỉ GUID | Enhancement | Hộp thư Admin hiển thị ai/tổ chức nào gửi |
+| [#68](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/68) | Billing v6.7: hủy báo giá, danh sách payment, nhắc hết hạn, enterprise request | Enhancement | Thương mại (Admin) |
+| [#69](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/69) | Learn/Library: danh mục nguồn/tình huống, rubric schema_version | Enhancement | Learn CMS prototype |
+
 Còn mở từ trước: [#40](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/40) (Google onboarding đã có API, nên đóng), [#46](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/46).
 
 ## Quy ước tích hợp (từ source BE)
@@ -98,3 +105,22 @@ Code: `src/features/scenario-editor/` (`store/` thuần, `scene/` Three.js, `pan
 **Giới hạn đo hiệu năng**: headless Chromium dùng SwiftShader (CPU) nên số renders/thời gian khung hình KHÔNG phản ánh GPU thật. Test chỉ chứng minh vòng đời tài nguyên (`renderer.info.memory` về 0 sau unmount, lặp 2 lần), render-on-demand, context loss/restore. Cảnh báo driver `GPU stall due to ReadPixels` xuất hiện khi chụp ảnh và bị lọc khỏi kiểm tra console. Fixture GLB chỉ 144 tam giác; chưa thử mô hình IFC lớn thật, chưa đo bộ nhớ/FPS trên thiết bị tầm trung. Cần đo với artifact worker thật trước khi tuyên bố đạt hiệu năng.
 
 **Chưa làm**: chọn phần tử IFC để gán `objectAnchors` từ viewport (cần ánh xạ node glTF ↔ IFC GUID từ BE#54; hiện nhập tay), tuyến thoát hiểm vẽ trên mô hình (BE chỉ lưu danh sách chuỗi), gizmo trên cảm ứng nhỏ (phone chỉnh bằng form).
+
+## Kiểm thử với API thật (2026-10-10)
+
+Đã chạy giao diện (dev server + proxy `FET3D_DEV_API_PROXY=https://api.fet3d.io.vn`, `NEXT_PUBLIC_API_BASE_URL=` rỗng) với PlatformAdmin thật. Chỉ đọc, ngoại trừ các lần thử tạo công trình (thất bại 500, không tạo gì).
+
+| Màn hình | Kết quả với API thật |
+|---|---|
+| Tài khoản | Chạy. Phát hiện/sửa: API trả role dạng tên (`"OrganizationUser"`), FE chỉ hiểu số → mọi vai trò hiện "Không xác định"; tạo tài khoản phải gửi role bằng tên (API từ chối số, `allowIntegerValues:false`). |
+| Tổng quan | Chạy, số liệu khớp (12 tài khoản = 1+6+5; 2 công trình). |
+| Tổ chức, Hỗ trợ, Audit | Chạy (danh sách rỗng/đọc được). |
+| Công trình theo tổ chức | Danh sách và `access` chạy; tạo công trình, chi tiết, revisions, scenarios trả 500 → BE#64. |
+| Thương mại, editor catalog | 500 → BE#64. |
+| Chưa kiểm | IFC upload, editor, thanh toán PayOS, review/release (bị chặn bởi BE#64 hoặc chưa an toàn để chạy trên dữ liệu thật). |
+
+## Cách chạy test
+
+- `pnpm build` phải chạy với `NEXT_PUBLIC_API_BASE_URL=` (rỗng) để mock Playwright cùng origin. Nếu `.env` trỏ tới API thật, trình duyệt coi mock là khác origin và giấu header `ETag`/`Retry-After` → các test 412/Retry-After sẽ lỗi.
+- Playwright: `PLAYWRIGHT_BASE_URL=http://localhost:<cổng> pnpm exec playwright test` sau khi `next start` bản build đó. Spec `*-dev.spec.ts` (prototype) chỉ chạy khi đặt `PLAYWRIGHT_DEV_URL`.
+- Mock không phải bằng chứng tích hợp; bảng trên là bằng chứng API thật.

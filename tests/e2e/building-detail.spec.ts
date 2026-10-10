@@ -65,14 +65,14 @@ test.describe("tabs and URL", () => {
     await expect(page.getByRole("navigation", { name: "Đường dẫn" })).toContainText("Công trình");
   });
 
-  test("the old scenarios route opens the scenarios tab, and the services tab is a placeholder", async ({ page }) => {
+  test("the old scenarios route opens the scenarios tab, and the services tab opens", async ({ page }) => {
     await signIn(page);
     await mockBuilding(page, { scenarios: [{ id: "sc-1", buildingId: "building-1", name: "Thoát hiểm tầng 1", createdAt: "2026-10-03T00:00:00Z" }] });
     await page.goto("/workspace/buildings/building-1/scenarios");
     await expect(page.getByRole("tab", { name: "Kịch bản" })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("link", { name: "Thoát hiểm tầng 1", exact: true })).toHaveAttribute("href", "/workspace/buildings/building-1/scenarios/sc-1");
     await page.getByRole("tab", { name: "Dịch vụ" }).click();
-    await expect(page.getByText("Đang phát triển")).toBeVisible();
+    await expect(page.getByRole("tabpanel", { name: "Dịch vụ" })).toBeVisible(); // real billing tab (see billing-building-tab.spec)
   });
 
   test("shows a not-found state with no retry loop", async ({ page }) => {

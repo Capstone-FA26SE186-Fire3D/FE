@@ -79,6 +79,7 @@ export function AccountProfile() {
   const [problems, setProblems] = useState<Partial<Record<FormKey, FormProblem>>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const [saving, setSaving] = useState<Partial<Record<FormKey, boolean>>>({});
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -112,6 +113,7 @@ export function AccountProfile() {
       setLoadError(cause instanceof Error ? cause.message : "Không tải được hồ sơ.");
     } finally {
       setLoading(false);
+      setInitialized(true);
     }
   }, [accessToken, updateUser]);
 
@@ -120,6 +122,8 @@ export function AccountProfile() {
     return () => window.clearTimeout(task);
   }, [loadProfile]);
 
+  // Until the first load finishes the fields stay locked, so late data cannot overwrite what someone already typed.
+  const initialLoad = !initialized;
   const displayUser = profile ?? user;
   const displayName = displayUser?.fullName?.trim() || displayUser?.email || "Tài khoản Fire3D";
   const initials = useMemo(() => displayName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(), [displayName]);
@@ -237,7 +241,7 @@ export function AccountProfile() {
       </Panel>
 
       <Panel title="Thông tin cá nhân" description="Các trường này dùng ETag để không ghi đè thay đổi từ nơi khác.">
-        <form onSubmit={saveProfile} noValidate className="ops-stack">
+        <form onSubmit={saveProfile} noValidate className="ops-stack"><fieldset disabled={initialLoad} className="ops-fieldset" style={{ minWidth: 0 }}>
           <div className="ops-form-grid">
             <Field label="Họ và tên" required error={fieldError("profile", "fullName")}>{(p) => <Input {...p} required maxLength={200} value={profileForm.fullName} onChange={(event) => setProfileForm((value) => ({ ...value, fullName: event.target.value }))} />}</Field>
             <Field label="Tên người dùng" error={fieldError("profile", "username")}>{(p) => <Input {...p} minLength={3} maxLength={30} value={profileForm.username} onChange={(event) => setProfileForm((value) => ({ ...value, username: event.target.value }))} placeholder="nguyen.van.a" />}</Field>
@@ -248,11 +252,11 @@ export function AccountProfile() {
           <p className="ops-field-hint" style={{ margin: 0 }}>Email đăng nhập: <strong style={{ color: "var(--text)" }}>{displayUser?.email}</strong></p>
           {errorAlert("profile", reloadKeepingInput("profile"))}
           <div><Button type="submit" disabled={saving.profile || loading || !profileEtag}>{saving.profile ? "Đang lưu…" : "Lưu hồ sơ cá nhân"}</Button></div>
-        </form>
+        </fieldset></form>
       </Panel>
 
       {displayUser?.role === 1 && <Panel title="Hồ sơ tổ chức" description="Chỉ người dùng tổ chức hiện tại mới có thể cập nhật thông tin của tổ chức mình.">
-        <form onSubmit={saveOrganization} noValidate className="ops-stack">
+        <form onSubmit={saveOrganization} noValidate className="ops-stack"><fieldset disabled={initialLoad} className="ops-fieldset" style={{ minWidth: 0 }}>
           <div className="ops-form-grid">
             <Field label="Tên tổ chức" required error={fieldError("organization", "name")} className="ops-span-all">{(p) => <Input {...p} required maxLength={200} value={organizationForm.name} onChange={(event) => setOrganizationForm((value) => ({ ...value, name: event.target.value }))} />}</Field>
             <Field label="Địa chỉ tổ chức" error={fieldError("organization", "address")}>{(p) => <Input {...p} maxLength={500} value={organizationForm.address} onChange={(event) => setOrganizationForm((value) => ({ ...value, address: event.target.value }))} />}</Field>
@@ -260,7 +264,7 @@ export function AccountProfile() {
           </div>
           {errorAlert("organization", reloadKeepingInput("organization"))}
           <div><Button type="submit" disabled={saving.organization || loading || !organizationEtag}>{saving.organization ? "Đang lưu…" : "Lưu hồ sơ tổ chức"}</Button></div>
-        </form>
+        </fieldset></form>
       </Panel>}
 
       <Panel title="Bảo mật" description="Đổi mật khẩu sẽ thu hồi mọi phiên Fire3D, sau đó bạn sẽ đăng nhập lại.">
