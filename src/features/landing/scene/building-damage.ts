@@ -27,10 +27,18 @@ export function createBuildingDamage(levels: THREE.Group[], parent: THREE.Group,
   rubble.castShadow = rubble.receiveShadow = true; parent.add(rubble);
   const pose = new THREE.Object3D(), char = new THREE.Color(0x171513);
   const tilt = new THREE.Quaternion(), angles = new THREE.Euler(), offset = new THREE.Vector3();
+  // Before the sooting starts nothing moves or changes colour. Once the pieces
+  // are back at rest (time 0 / any time before the first bay starts to fall)
+  // the per-piece pose and material work is skipped; the first change or reset
+  // still runs the full pass, so replay and return-to-POV stay exact.
+  let atRest = false;
   return {
     update(time: number) {
       const soot = THREE.MathUtils.smoothstep(time, 65, 105);
       const collapse = THREE.MathUtils.smoothstep(time, 110, 143);
+      const resting = soot === 0 && collapse === 0;
+      if (resting && atRest) return 0;
+      atRest = resting;
       originals.forEach((original, item) => {
         const colored = item as THREE.MeshStandardMaterial;
         colored.color.copy(original.color).lerp(char, soot * .94);

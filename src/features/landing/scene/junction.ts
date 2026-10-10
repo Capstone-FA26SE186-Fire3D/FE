@@ -41,6 +41,8 @@ export function createJunction() {
     const mesh = new THREE.Mesh(geometry, material); mesh.position.set(index ? 1.55 : -1.55, 1.8, -16.895); group.add(mesh);
     return { branch, mesh };
   });
+  const corner = new THREE.Vector3();
+  const areas = signs.map(({ branch }) => ({ branch, left: 0, top: 0, width: 0, height: 0 }));
   return {
     group,
     layout(mobile: boolean) {
@@ -50,13 +52,22 @@ export function createJunction() {
       });
       group.updateMatrixWorld(true);
     },
+    /** Screen rectangles (0..1) of the painted signs. The returned objects are reused every call. */
     hitAreas(camera: THREE.Camera) {
-      return signs.map(({ branch, mesh }) => {
-        const corners = [[-1.325, -.575], [1.325, -.575], [-1.325, .575], [1.325, .575]].map(([x, y]) => mesh.localToWorld(new THREE.Vector3(x, y, 0)).project(camera));
-        const left = Math.min(...corners.map(p => (p.x + 1) / 2)), right = Math.max(...corners.map(p => (p.x + 1) / 2));
-        const top = Math.min(...corners.map(p => (1 - p.y) / 2)), bottom = Math.max(...corners.map(p => (1 - p.y) / 2));
-        return { branch, left, top, width: right - left, height: bottom - top };
-      });
+      for (let s = 0; s < signs.length; s++) {
+        const { mesh } = signs[s];
+        let left = Infinity, right = -Infinity, top = Infinity, bottom = -Infinity;
+        for (let c = 0; c < 4; c++) {
+          corner.set(c % 2 ? 1.325 : -1.325, c < 2 ? -.575 : .575, 0);
+          mesh.localToWorld(corner).project(camera);
+          const x = (corner.x + 1) / 2, y = (1 - corner.y) / 2;
+          if (x < left) left = x; if (x > right) right = x;
+          if (y < top) top = y; if (y > bottom) bottom = y;
+        }
+        const area = areas[s];
+        area.left = left; area.top = top; area.width = right - left; area.height = bottom - top;
+      }
+      return areas;
     },
     dispose() { geometry.dispose(); textures.forEach(t => t.dispose()); materials.forEach(m => m.dispose()); group.clear(); },
   };

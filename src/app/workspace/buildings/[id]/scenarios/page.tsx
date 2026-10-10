@@ -1,6 +1,9 @@
-import { ScenarioWorkspace } from "@/features/scenarios/components/scenario-workspace";
+import { BuildingDetailWorkspace } from "@/features/buildings/components/building-detail-workspace";
 
-export default async function ScenarioWorkspacePage({ params }: { params: Promise<{ id: string }> }) {
+export const metadata = { title: "Kịch bản của công trình" };
+
+/** Kept so existing links do not 404: it opens the building detail on the scenarios tab. */
+export default async function BuildingScenariosPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <ScenarioWorkspace buildingId={id} />;
+  return <BuildingDetailWorkspace buildingId={id} defaultTab="scenarios" />;
 }

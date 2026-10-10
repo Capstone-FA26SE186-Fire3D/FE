@@ -1,3 +1,4 @@
+import type { PageResponse } from "@/api/types/common";
 import type { UserRole } from "@/features/auth/types";
 
 export type ManagedAccount = {
@@ -21,12 +22,7 @@ export type Organization = {
   updatedAt: string;
 };
 
-export type PageResponse<T> = {
-  items: T[];
-  totalCount: number;
-  page: number;
-  pageSize: number;
-};
+export type { PageResponse };
 
 export type CreateAccountInput = {
   email: string;

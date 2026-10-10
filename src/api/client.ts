@@ -1,5 +1,6 @@
 import { env } from "@/configs/env";
 
+import { parseErrorCode, parseErrorMessage, parseFieldErrors, parseRetryAfter } from "./errors";
 import { ApiError, type ApiErrorPayload, type ApiQueryParams, type ApiRequestOptions, type ApiResponse } from "./types/common";
 
 function buildUrl(path: string, query?: ApiQueryParams): string {
@@ -26,29 +27,26 @@ function isErrorPayload(value: unknown): value is ApiErrorPayload {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/**
+ * 204/empty bodies resolve to undefined. A body that claims JSON but is not (proxy HTML error page,
+ * truncated response) falls back to text so error handling still gets a status and a message.
+ */
 async function readResponseBody(response: Response): Promise<unknown> {
-  if (response.status === 204 || response.headers.get("content-length") === "0") {
+  if (response.status === 204 || response.status === 205 || response.headers.get("content-length") === "0") {
     return undefined;
   }
 
   const mediaType = (response.headers.get("content-type") ?? "").split(";", 1)[0].trim().toLowerCase();
-  return mediaType === "application/json" || mediaType.endsWith("+json") ? response.json() : response.text();
-}
-
-function errorMessage(payload: unknown, fallback: string): string {
-  if (!isErrorPayload(payload)) {
-    return fallback;
+  if (mediaType === "application/json" || mediaType.endsWith("+json")) {
+    const raw = await response.text();
+    if (!raw) return undefined;
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return raw;
+    }
   }
-
-  if (typeof payload.message === "string") {
-    return payload.message;
-  }
-
-  if (typeof payload.title === "string") {
-    return payload.title;
-  }
-
-  return typeof payload.detail === "string" ? payload.detail : fallback;
+  return response.text();
 }
 
 export const apiClient = {
@@ -59,6 +57,8 @@ export const apiClient = {
 
     const headers = new Headers(options.headers);
     headers.set("Accept", headers.get("Accept") ?? "application/json");
+    if (options.idempotencyKey) headers.set("Idempotency-Key", options.idempotencyKey);
+    if (options.ifMatch) headers.set("If-Match", options.ifMatch);
 
     const hasJsonBody = options.json !== undefined;
     if (hasJsonBody) {
@@ -75,10 +75,14 @@ export const apiClient = {
 
     if (!response.ok) {
       const fallback = response.statusText || `Request failed with status ${response.status}.`;
-      const retryAfter = response.headers.get("Retry-After");
-      const seconds = retryAfter && /^\d+$/.test(retryAfter.trim()) ? Number(retryAfter) : NaN;
-      const retryAfterSeconds = Number.isSafeInteger(seconds) && seconds >= 0 ? seconds : undefined;
-      throw new ApiError(errorMessage(payload, fallback), response.status, isErrorPayload(payload) ? payload : undefined, retryAfterSeconds);
+      throw new ApiError(
+        parseErrorMessage(payload, fallback),
+        response.status,
+        isErrorPayload(payload) ? payload : undefined,
+        parseRetryAfter(response.headers.get("Retry-After")),
+        parseErrorCode(payload),
+        parseFieldErrors(payload),
+      );
     }
 
     return { data: payload as T, headers: response.headers, status: response.status };

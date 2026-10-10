@@ -22,7 +22,7 @@ export function SiteHeader() {
   const { logout, user } = useAuthSession();
   const [accountOpen, setAccountOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
-  const navigation = user?.role === 0 ? [...links, { href: routes.adminAccounts, label: "Quản trị" }] : links;
+  const navigation = user?.role === 0 ? [...links, { href: routes.adminOverview, label: "Quản trị" }] : links;
 
   useEffect(() => {
     const closeOnOutsideClick = (event: MouseEvent) => {

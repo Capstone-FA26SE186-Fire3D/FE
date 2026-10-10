@@ -1,0 +1,26 @@
+.range { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 14px 16px; }
+.presets { display: inline-flex; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-soft); }
+.presets button { min-height: 34px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
+.presets button:hover { color: var(--text); }
+.presets button[aria-pressed="true"] { background: var(--surface); color: var(--ember); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); }
+.dates { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; }
+.dates > div { width: 160px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 12px 2px 18px; color: var(--muted); font-size: 13px; }
+.meta strong { color: var(--text); font-weight: 600; }
+
+.rows { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; font-size: 14px; }
+.row > span:first-child { display: inline-flex; align-items: center; gap: 8px; min-width: 0; color: var(--text); overflow-wrap: anywhere; }
+.row > strong { font-variant-numeric: tabular-nums; font-weight: 600; }
+.bar { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--hover); overflow: hidden; }
+.bar > span { display: block; height: 100%; border-radius: inherit; background: var(--ember); min-width: 2px; }
+.bar[data-tone="success"] > span { background: var(--success); }
+.bar[data-tone="danger"] > span { background: var(--danger); }
+.bar[data-tone="warning"] > span { background: var(--warning); }
+.bar[data-tone="info"] > span { background: var(--info); }
+
+.pending { display: grid; gap: 8px; padding: 16px; border: 1px dashed var(--line-strong); border-radius: 12px; background: var(--bg-soft); }
+.pending h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.pending p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.pending a { color: var(--ember); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+.pendingHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }

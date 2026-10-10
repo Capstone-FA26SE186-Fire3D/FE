@@ -2,171 +2,192 @@ import * as THREE from "three";
 import type { FireSource } from "./building";
 import { bayFall, collapseBay } from "./collapse-timeline";
 import { sampleFireWeather } from "./fire-weather";
+import { fireFlicker } from "./fire-flicker";
+import { createFireNoiseTexture } from "./fire-noise";
+import { createAtmosphereView, type AtmosphereView } from "./atmosphere-view";
+import { emberFragment, emberVertex, flameFragment, flameVertex, smokeFragment, smokeVertex } from "./fire-sprite-shaders";
 
-const noise = `
-float hash(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
-float noise(vec2 p) { vec2 i=floor(p),f=fract(p); f=f*f*(3.-2.*f); return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+1.),f.x),f.y); }
-float fbm(vec2 p) { return .57*noise(p)+.28*noise(p*2.03)+.15*noise(p*4.07); }
-`;
-const vertex = `
-uniform float uCameraFacing;
-uniform float uTime; uniform float uSeed; uniform vec2 uDrift; uniform vec2 uWind;
-uniform float uSoftFloor;
-varying vec2 vUv;
-void main(){
-  vUv=uv; vec3 p=position;
-  float tip=uv.y*uv.y;
-  p.x += tip*sin(uTime*2.1+uv.y*5.+uSeed)*.035;
-  p.z += tip*cos(uTime*1.7+uv.y*4.+uSeed)*.03;
-  p.y += tip*sin(uTime*3.2+uSeed+uv.x*8.)*.12;
-  vec4 world=modelMatrix*vec4(p,1.);
-  if(uCameraFacing>.5){
-    // Vertical camera-facing layers eliminate the visible crossed-card wings.
-    vec3 right=normalize(vec3(viewMatrix[0][0],0.,viewMatrix[2][0]));
-    world=modelMatrix*vec4(0.,0.,0.,1.);
-    world.xyz+=right*p.x*length(modelMatrix[0].xyz);
-    world.y+=p.y*length(modelMatrix[1].xyz);
-  }
-  world.xz+=uWind*tip*.55;
-  gl_Position=projectionMatrix*viewMatrix*world;
-}`;
-const flame = `
-uniform float uTime; uniform float uSeed; varying vec2 vUv;
-uniform float uSoftFloor;
-${noise}
-void main() {
-  vec2 p=vUv;
-  float n=fbm(vec2(p.x*5.+uSeed,p.y*4.-uTime*2.4));
-  float curl=fbm(vec2(p.x*7.+uSeed+uTime*.25,p.y*5.-uTime*1.8));
-  float width=pow(1.-p.y,.48)*(.28+n*.35);
-  float edge=abs(p.x-.5+(curl-.5)*.5*p.y);
-  float tongues=fbm(vec2(p.x*10.+uSeed*1.7-uTime*1.1,p.y*7.-uTime*.55));
-  float shape=1.-smoothstep(width*.35,width+.03,edge+(tongues-.5)*.12*p.y);
-  float top=1.-smoothstep(.46+n*.3,.96,p.y+(curl-.5)*.18);
-  float alpha=shape*top*smoothstep(0.,.06,p.y)*smoothstep(.25,.58,n+curl*.2)*mix(.62,1.,smoothstep(.34,.72,tongues));
-  vec3 col=mix(vec3(1.,.12,.015),vec3(1.,.68,.16),clamp((1.-p.y)*shape,0.,1.));
-  col=mix(col,vec3(1.,.91,.59),pow(shape,5.)*(1.-p.y)*.2);
-  if(uSoftFloor>.5){
-    // Broad, overlapping lobes with slow independent variation and soft edges.
-    // Noise bends the silhouette rather than breaking it into grainy specks.
-    float mass=0.;
-    for(int i=0;i<3;i++){
-      float s=uSeed+float(i)*7.31;
-      float phase=noise(vec2(s,uTime*.9));
-      float h=.38+phase*.42;
-      float centre=.22+float(i)*.28+(curl-.5)*.38*p.y;
-      float radius=.18+noise(vec2(s+4.,uTime*.37))*.12;
-      vec2 q=vec2((p.x-centre)/radius,(p.y-.1+(n-.5)*.28)/(h*.83));
-      mass+=exp(-dot(q,q)*1.5);
-    }
-    float rolling=fbm(vec2(p.x*5.+uSeed+(curl-.5)*1.8,p.y*5.-uTime*1.8));
-    float field=mass*(.5+rolling*.75)+(rolling-.5)*.65*p.y;
-    float rim=smoothstep(.12,.55,field);
-    float boundary=smoothstep(0.,.08,p.x)*(1.-smoothstep(.92,1.,p.x));
-    alpha=rim*boundary*smoothstep(0.,.09,p.y)*(1.-smoothstep(.82,1.,p.y))*.95;
-    float heat=clamp(field*.48+rolling*.38+(1.-p.y)*.12,0.,1.);
-    col=mix(vec3(.8,.055,.005),vec3(1.,.49,.055),smoothstep(.1,.7,heat));
-    col=mix(col,vec3(1.,.83,.32),smoothstep(.65,1.,heat)*(1.-p.y)*.8);
-  }
-  gl_FragColor=vec4(pow(col,vec3(2.2)),alpha*.9);
-}`;
-const smokeVertex = `
-uniform float uTime; uniform vec2 uDrift; uniform vec2 uWind; attribute float aSeed; varying vec2 vUv; varying float vLife; varying float vSeed;
-void main(){
-  vUv=uv; vSeed=aSeed; float life=fract(aSeed+uTime*(.065+.025*fract(aSeed*17.))); vLife=life;
-  vec3 centre=vec3(sin(aSeed*73.+life*3.)*(.15+life*.65),life*2.65,cos(aSeed*47.)*(.15+life*.7));
-  centre.xz += (uDrift+uWind*.65)*life*life*2.;
-  vec4 mv=modelViewMatrix*vec4(centre,1.);
-  float angle=aSeed*39.+life*.6;
-  mat2 turn=mat2(cos(angle),-sin(angle),sin(angle),cos(angle));
-  vec2 shape=vec2(.8+.4*fract(aSeed*31.),1.+.5*fract(aSeed*13.));
-  mv.xy+=turn*(position.xy*shape)*(.38+life*1.6);
-  gl_Position=projectionMatrix*mv;
-}`;
-const smokeFragment = `
-uniform float uTime; varying vec2 vUv; varying float vLife; varying float vSeed;
-${noise}
-void main(){
-  vec2 flow=vUv*4.+vec2(vSeed*37.,-uTime*.12);
-  vec2 warp=vec2(fbm(flow),fbm(flow+vec2(7.3,3.1)))-.5;
-  float cloud=fbm(flow+warp*2.);
-  float radial=1.-smoothstep(.08,.48,length(vUv-.5+warp*.3));
-  // Irregular wispy edges, with an independent fade at the sprite boundary.
-  vec2 edge=min(vUv,1.-vUv);
-  float boundary=smoothstep(0.,.14,edge.x)*smoothstep(0.,.14,edge.y);
-  float life=smoothstep(0.,.15,vLife)*(1.-smoothstep(.72,1.,vLife));
-  float alpha=boundary*radial*life*smoothstep(.18,.75,cloud)*.65;
-  vec3 color=mix(vec3(.018,.021,.023),vec3(.10,.095,.09),cloud*.5+(1.-vLife)*.15);
-  gl_FragColor=vec4(pow(color,vec3(2.2)),alpha);
-}`;
+/** Sources that own a real light. Everything else is lit by sprites and wall volumes. */
+const LIGHT_SOURCES = 2;
 
-export function createFireEffects(sources: FireSource[], mobile: boolean) {
+type Layer = {
+  mesh: THREE.Mesh;
+  geometry: THREE.InstancedBufferGeometry;
+  material: THREE.ShaderMaterial;
+  position: THREE.InstancedBufferAttribute;
+  shape: THREE.InstancedBufferAttribute;
+  drift: THREE.InstancedBufferAttribute | null;
+  first: number[]; // first instance index per source
+  count: number[]; // instances per source
+};
+
+const premultiplied = {
+  transparent: true, depthTest: false, depthWrite: false, side: THREE.DoubleSide,
+  blending: THREE.CustomBlending, blendEquation: THREE.AddEquation,
+  blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
+  blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
+} as const;
+
+/**
+ * Source-bound fire: instanced flame tongues, smoke puffs and embers.
+ *
+ * `sprites` belongs in the compositor's half-resolution volume scene, where it
+ * can read scene depth for soft contact and occlusion; the two real lights in
+ * `lights` belong in the main scene. `group` only holds per-source anchor
+ * objects (position/visibility), never drawn, so callers and tests can read
+ * each source's state. All sources of a kind share one draw call, one material
+ * and one noise tile.
+ */
+export function createFireEffects(sources: FireSource[], mobile: boolean, view: AtmosphereView = createAtmosphereView()) {
   const group = new THREE.Group(); group.name = "source-bound-fire-smoke";
-  const geometries: THREE.BufferGeometry[] = [], materials: THREE.ShaderMaterial[] = [];
-  const lights: Array<THREE.PointLight | null> = [];
+  const sprites = new THREE.Group(); sprites.name = "fire-sprites";
+  const lightGroup = new THREE.Group(); lightGroup.name = "fire-lights";
+  const noise = createFireNoiseTexture();
+  const shared = { uTime: { value: 0 }, uWind: { value: new THREE.Vector2() }, uNoise: { value: noise }, ...view };
   const roots: THREE.Group[] = [];
-  const wind = { value: new THREE.Vector2() };
-  for (const [index, source] of sources.entries()) {
-    const root = new THREE.Group(); root.position.copy(source.position); group.add(root);
-    roots.push(root);
-    const drift = new THREE.Vector2(...(source.drift ?? [.2 * Math.sin(index), .2 * Math.cos(index)]));
-    const geometry = new THREE.PlaneGeometry(.78, 1.75, 6, 12); geometry.translate(0, .875, 0); geometries.push(geometry);
-    for (let sheet = 0; sheet < (source.softFloor ? 2 : 3); sheet++) {
-      const material = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uSeed: { value: index * 4 + sheet * 9 }, uSoftFloor: { value: source.softFloor ? 1 : 0 }, uDrift: { value: drift }, uWind: wind }, vertexShader: vertex, fragmentShader: flame, transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.NormalBlending });
-      const mesh = new THREE.Mesh(geometry, material); mesh.rotation.y = sheet * Math.PI / 3; mesh.frustumCulled = false;
-      material.uniforms.uCameraFacing = { value: source.softFloor || source.cameraFacing ? 1 : 0 };
-      mesh.position.set(Math.sin(index * 2.7 + sheet) * .17, 0, Math.cos(index * 1.9 + sheet) * .16);
-      mesh.scale.y = .78 + .25 * Math.sin(index * 2.3 + sheet * 2.1); root.add(mesh); materials.push(material);
-    }
-    const smokeGeometry = new THREE.InstancedBufferGeometry();
-    const plane = new THREE.PlaneGeometry(1, 1);
-    smokeGeometry.index = plane.index;
-    smokeGeometry.attributes.position = plane.attributes.position;
-    smokeGeometry.attributes.uv = plane.attributes.uv;
-    const count = index < 2 ? (mobile ? 14 : 26) : (mobile ? 5 : 9);
-    smokeGeometry.instanceCount = count;
-    smokeGeometry.setAttribute("aSeed", new THREE.InstancedBufferAttribute(Float32Array.from({ length: count }, (_, i) => i / count), 1));
-    geometries.push(smokeGeometry);
-    const smokeMaterial = new THREE.ShaderMaterial({ uniforms: { uTime: { value: 0 }, uDrift: { value: drift }, uWind: wind }, vertexShader: smokeVertex, fragmentShader: smokeFragment, transparent: true, depthWrite: false, side: THREE.DoubleSide });
-    const smoke = new THREE.Mesh(smokeGeometry, smokeMaterial); smoke.frustumCulled = false; smoke.position.y = .35;
-    smoke.name = "depth-tested-smoke"; root.add(smoke); materials.push(smokeMaterial);
-    const light = source.intensity > 0 && (index < 2 || index === 8) ? new THREE.PointLight(source.color, 26 * source.intensity, 9, 2) : null;
+  const lights: Array<THREE.PointLight | null> = [];
+  const quad = new THREE.PlaneGeometry(1, 1);
+
+  const drifts = sources.map((source, index) => new THREE.Vector2(...(source.drift ?? [.2 * Math.sin(index), .2 * Math.cos(index)])));
+  for (const source of sources) {
+    const root = new THREE.Group(); root.position.copy(source.position); group.add(root); roots.push(root);
+  }
+
+  // Per-source tongue layout; identical for every frame.
+  const tongues = sources.map((source, index) => Array.from({ length: source.softFloor ? 2 : 3 }, (_, sheet) => ({
+    x: Math.sin(index * 2.7 + sheet) * .17, z: Math.cos(index * 1.9 + sheet) * .16,
+    width: [1, .78, .62][sheet], height: (.78 + .25 * Math.sin(index * 2.3 + sheet * 2.1)) * [1, .82, .94][sheet],
+    seed: index * 4 + sheet * 9 + 1,
+  })));
+  const smokeCount = sources.map((_, index) => index < 2 ? (mobile ? 14 : 26) : (mobile ? 5 : 9));
+  const emberCount = sources.map(source => source.activity !== undefined ? 0 : mobile ? 1 : 3);
+
+  function layer(name: string, vertexShader: string, fragmentShader: string, counts: number[], seeds: (source: number, i: number) => number, order: number, withDrift: boolean): Layer {
+    const total = counts.reduce((sum, n) => sum + n, 0);
+    const geometry = new THREE.InstancedBufferGeometry();
+    geometry.index = quad.index;
+    geometry.setAttribute("position", quad.getAttribute("position"));
+    geometry.setAttribute("uv", quad.getAttribute("uv"));
+    geometry.instanceCount = total;
+    const position = new THREE.InstancedBufferAttribute(new Float32Array(total * 4), 4).setUsage(THREE.DynamicDrawUsage);
+    const shape = new THREE.InstancedBufferAttribute(new Float32Array(total * 4), 4).setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute("aPos", position); geometry.setAttribute("aShape", shape);
+    let drift: THREE.InstancedBufferAttribute | null = null;
+    if (withDrift) { drift = new THREE.InstancedBufferAttribute(new Float32Array(total * 2), 2).setUsage(THREE.DynamicDrawUsage); geometry.setAttribute("aDrift", drift); }
+    const first: number[] = [];
+    let cursor = 0;
+    counts.forEach((n, source) => {
+      first.push(cursor);
+      for (let i = 0; i < n; i++) {
+        shape.setX(cursor + i, seeds(source, i));
+        if (drift) drift.setXY(cursor + i, drifts[source].x, drifts[source].y);
+      }
+      cursor += n;
+    });
+    const material = new THREE.ShaderMaterial({ uniforms: { ...shared }, vertexShader, fragmentShader, ...premultiplied });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.frustumCulled = false; mesh.renderOrder = order; mesh.name = name;
+    sprites.add(mesh);
+    return { mesh, geometry, material, position, shape, drift, first, count: counts };
+  }
+
+  // Smoke first, flames over it, embers on top: a fixed order inside the pass.
+  // The smoke seed spreads particles evenly through their life cycle.
+  const smoke = layer("depth-aware-smoke", smokeVertex, smokeFragment, smokeCount, (s, i) => i / smokeCount[s] + (s % 7) * .013, 20, true);
+  const flames = layer("flame-tongues", flameVertex, flameFragment, tongues.map(t => t.length), (s, i) => tongues[s][i].seed, 21, false);
+  const embers = layer("embers", emberVertex, emberFragment, emberCount, (s, i) => ((s * 7 + i * 3) % 29 + 1) / 29 + i * .31, 22, true);
+  smoke.shape.needsUpdate = flames.shape.needsUpdate = embers.shape.needsUpdate = true;
+  if (smoke.drift) smoke.drift.needsUpdate = true;
+  if (embers.drift) embers.drift.needsUpdate = true;
+
+  sources.forEach((source, index) => {
+    // Always created and never toggled: changing the light count recompiles every lit material.
+    const light = source.intensity > 0 && index < LIGHT_SOURCES ? new THREE.PointLight(source.color, 0, 9, 2) : null;
     if (light) {
-    light.position.copy(source.position).add(new THREE.Vector3(0, .5, 0));
-    light.castShadow = !mobile && index === 0;
-    light.shadow.mapSize.set(512, 512); light.shadow.bias = -.001; light.shadow.normalBias = .035;
-      group.add(light);
+      light.castShadow = !mobile && index === 0;
+      light.shadow.mapSize.set(512, 512); light.shadow.bias = -.001; light.shadow.normalBias = .035;
+      lightGroup.add(light);
     }
     lights.push(light);
+  });
+
+  const hidden = sources.map(() => true);
+  function clear(layerState: Layer, source: number) {
+    const start = layerState.first[source];
+    for (let i = 0; i < layerState.count[source]; i++) layerState.position.setW(start + i, 0);
+    layerState.position.needsUpdate = true;
   }
+
   return {
-    group,
+    group, sprites, lights: lightGroup,
     update(time: number, exterior = 0, damageTime = 0) {
       const weather = sampleFireWeather(time);
-      wind.value.set(weather.windX, weather.windZ);
-      materials.forEach(m => { m.uniforms.uTime.value = time; });
-      lights.forEach((light, i) => {
-        const source = sources[i];
-        const fall = bayFall(damageTime,THREE.MathUtils.clamp(Math.floor(source.position.y/3.6),0,2),collapseBay(source.position.z));
+      shared.uWind.value.set(weather.windX, weather.windZ);
+      shared.uTime.value = time;
+      for (let i = 0; i < sources.length; i++) {
+        const source = sources[i], root = roots[i], light = lights[i];
+        const fall = bayFall(damageTime, THREE.MathUtils.clamp(Math.floor(source.position.y / 3.6), 0, 2), collapseBay(source.position.z));
         const growth = source.ignition === undefined ? 1 : THREE.MathUtils.smoothstep(time, source.ignition, source.ignition + 5);
         const visible = growth * (source.exterior ? exterior : 1) * (source.activity ?? 1);
-        roots[i].position.copy(source.position);
-        roots[i].position.y = THREE.MathUtils.lerp(source.position.y,.25,fall);
-        roots[i].visible = visible > .01;
+        root.position.copy(source.position);
+        root.position.y = THREE.MathUtils.lerp(source.position.y, .25, fall);
+        root.visible = visible > .01;
+        if (!root.visible) {
+          if (!hidden[i]) { clear(smoke, i); clear(flames, i); clear(embers, i); hidden[i] = true; if (light) light.intensity = 0; }
+          continue;
+        }
+        hidden[i] = false;
         // A room source may describe a spreading footprint, but the visible
         // flame stays a cluster so the surface behind it remains readable.
         const breadth = Math.min(source.size?.[0] ?? 1.15, 1.3);
         const height = (source.size?.[1] ?? 1) * (source.size ? .65 : 1);
         // Keep non-graphic character flames small; gusts enhance building sources.
         const burst = source.activity === undefined ? (sampleFireWeather(time, i + 3).flare * .85 + weather.gust * .5) * (1 - fall) : 0;
-        roots[i].scale.set((.5 + growth * .5) * breadth * (1 + burst * .2), Math.max(.01, visible) * height * (1 + burst), (.5 + growth * .5) * breadth * (1 + burst * .2));
-        if (light) {
-          light.position.copy(roots[i].position).y += .5;
-          light.intensity = visible * source.intensity * (1 + burst * .35) * (40 + Math.sin(time * 6.1 + i) * 3 + Math.sin(time * 9.7) * 1.8);
-          light.visible = visible > .01;
+        const scaleX = (.5 + growth * .5) * breadth * (1 + burst * .2);
+        const scaleY = Math.max(.01, visible) * height * (1 + burst);
+        root.scale.set(scaleX, scaleY, scaleX);
+        const flicker = fireFlicker(time, i * .73);
+        const px = root.position.x, py = root.position.y, pz = root.position.z;
+
+        const tongue = tongues[i], flameStart = flames.first[i];
+        for (let j = 0; j < tongue.length; j++) {
+          const t = tongue[j];
+          // Each tongue has its own flicker phase so the cluster never pulses as one.
+          const local = fireFlicker(time, i * .73 + (j + 1) * 1.9);
+          const k = flameStart + j;
+          flames.position.setXYZW(k, px + t.x * scaleX, py, pz + t.z * scaleX, Math.min(1.2, visible * 1.25) * (.55 + local * .5));
+          flames.shape.setXYZW(k, t.seed, .78 * scaleX * t.width, 1.75 * scaleY * t.height, source.softFloor ? 1 : 0);
         }
-      });
+        const smokeStart = smoke.first[i];
+        const smokeAmount = visible * (.6 + .4 * Math.min(1, growth));
+        for (let j = 0; j < smoke.count[i]; j++) {
+          const k = smokeStart + j;
+          smoke.position.setXYZW(k, px, py, pz, smokeAmount);
+          smoke.shape.setY(k, scaleX); smoke.shape.setZ(k, scaleY);
+        }
+        const emberStart = embers.first[i];
+        const sparks = THREE.MathUtils.smoothstep(visible, .35, .9) * (1 - fall);
+        for (let j = 0; j < embers.count[i]; j++) {
+          const k = emberStart + j;
+          embers.position.setXYZW(k, px, py + .1 * scaleY, pz, sparks);
+          embers.shape.setY(k, scaleX); embers.shape.setZ(k, scaleY);
+        }
+
+        if (light) {
+          light.position.set(px, py + .5, pz);
+          // Same driver as the flames, so light and sprites flicker together.
+          light.intensity = visible * source.intensity * (1 + burst * .35) * 40 * (1 + (flicker - .9) * .75);
+        }
+      }
+      smoke.position.needsUpdate = smoke.shape.needsUpdate = true;
+      flames.position.needsUpdate = flames.shape.needsUpdate = true;
+      embers.position.needsUpdate = embers.shape.needsUpdate = true;
     },
-    dispose() { geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); lights.forEach(l => l?.dispose()); group.clear(); },
+    dispose() {
+      for (const l of [smoke, flames, embers]) { l.geometry.dispose(); l.material.dispose(); }
+      quad.dispose(); noise.dispose();
+      lights.forEach(l => l?.dispose());
+      group.clear(); sprites.clear(); lightGroup.clear();
+    },
   };
 }
