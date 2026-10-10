@@ -11,12 +11,17 @@ const marks = [
   { at: 1, z: -12.9, x: 0, lookX: 0 },
 ];
 
+const noOrbit = { yaw: 0, pitch: 0 };
+
 export function createJourneyCamera(camera: THREE.PerspectiveCamera) {
   const targetPosition = new THREE.Vector3(),
     targetLook = new THREE.Vector3(),
     look = new THREE.Vector3(0, 1.65, 0);
   const exterior = new THREE.Vector3(),
-    exteriorLook = new THREE.Vector3();
+    exteriorLook = new THREE.Vector3(),
+    phoneLook = new THREE.Vector3(0, 1.65, 3),
+    up = new THREE.Vector3(0, 1, 0);
+  const report = { organization: 0, phone: 0, settled: false, position: camera.position };
   let initialized = false,
     organization = 0,
     phone = 0;
@@ -26,7 +31,7 @@ export function createJourneyCamera(camera: THREE.PerspectiveCamera) {
       branch: LandingBranch,
       delta: number,
       mobile: boolean,
-      orbit = { yaw: 0, pitch: 0 },
+      orbit = noOrbit,
     ) {
       const p = THREE.MathUtils.clamp(progress / 0.86, 0, 1);
       const index = Math.max(
@@ -65,9 +70,9 @@ export function createJourneyCamera(camera: THREE.PerspectiveCamera) {
         .set(1, 0.5 + orbit.pitch * 0.55, 1.15)
         .normalize()
         .multiplyScalar(distance);
-      exterior.applyAxisAngle(new THREE.Vector3(0, 1, 0), orbit.yaw);
+      exterior.applyAxisAngle(up, orbit.yaw);
       exterior.add(exteriorLook);
-      targetLook.lerp(new THREE.Vector3(0, 1.65, 3), phone);
+      targetLook.lerp(phoneLook, phone);
       targetPosition.lerp(exterior, organization);
       targetLook.lerp(exteriorLook, organization);
       const settle = initialized ? 1 - Math.exp(-delta * 10) : 1;
@@ -81,14 +86,13 @@ export function createJourneyCamera(camera: THREE.PerspectiveCamera) {
           : branch === "trainee"
             ? phone
             : 1 - Math.max(organization, phone);
-      return {
-        organization,
-        phone,
-        settled:
-          targetAmount > 0.995 &&
-          camera.position.distanceTo(targetPosition) < 0.045,
-        position: camera.position,
-      };
+      // One report object is reused every frame (read it, do not keep it).
+      report.organization = organization;
+      report.phone = phone;
+      report.settled =
+        targetAmount > 0.995 &&
+        camera.position.distanceTo(targetPosition) < 0.045;
+      return report;
     },
   };
 }

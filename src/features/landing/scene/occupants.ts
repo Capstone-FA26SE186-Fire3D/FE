@@ -3,11 +3,12 @@ import { stairs } from "./building-layout";
 import { roundWalkingPath } from "./walking-path";
 import { createOccupantInstances } from "./occupant-instances";
 import { createFireEffects } from "./fire-effects";
+import type { AtmosphereView } from "./atmosphere-view";
 import type { FireSource } from "./building";
 import { sampleReaction, type ReactionKind } from "./occupant-reactions";
 
 /** Authored demonstration paths, not an evacuation solver. Distances drive gait and speed. */
-export function createOccupants(mobile: boolean) {
+export function createOccupants(mobile: boolean, view?: AtmosphereView) {
   const group = new THREE.Group(); group.name = "evacuation-demo-occupants";
   const geometry = new THREE.CapsuleGeometry(.085, .3, 3, 6);
   const headGeometry = new THREE.SphereGeometry(.11, 8, 6);
@@ -105,7 +106,7 @@ export function createOccupants(mobile: boolean) {
     position: new THREE.Vector3(), color: new THREE.Color(0xff802c),
     intensity: 0, activity: 0, size: [.28, .38],
   }));
-  const clothingFire = createFireEffects(clothingSources, mobile);
+  const clothingFire = createFireEffects(clothingSources, mobile, view);
   clothingFire.group.name = "non-graphic-clothing-flames";
   const direction = new THREE.Vector3();
   const footPosition = new THREE.Vector3();
@@ -132,7 +133,7 @@ export function createOccupants(mobile: boolean) {
     actor.root.position.y += Math.max(0, surface - lowest);
   }
   return {
-    group, renderGroup: instances.group, effectsGroup: clothingFire.group, player: player.root,
+    group, renderGroup: instances.group, effectsGroup: clothingFire.group, effectsSprites: clothingFire.sprites, player: player.root,
     update(time: number, showPlayer: boolean) {
       for (const agent of agents) {
         const length = agent.distances.at(-1)!;
