@@ -11,6 +11,8 @@ export type PollingOptions<T> = {
   enabled?: boolean;
   intervalMs?: number;
   maxBackoffMs?: number;
+  /** Change to restart polling for a different resource (e.g. another revision). */
+  resetKey?: string;
 };
 
 /** Delay before the next attempt: base interval, doubled per consecutive failure, or server Retry-After. */
@@ -24,10 +26,11 @@ export function nextPollDelay(baseMs: number, failures: number, maxBackoffMs: nu
  * Polls while the page is visible and the component is mounted. Starts at `intervalMs` (3s), backs off on
  * errors, honors Retry-After, pauses in background tabs and stops on a final state.
  */
-export function usePolling<T>({ fetcher, isDone, enabled = true, intervalMs = 3000, maxBackoffMs = 30_000 }: PollingOptions<T>) {
+export function usePolling<T>({ fetcher, isDone, enabled = true, intervalMs = 3000, maxBackoffMs = 30_000, resetKey = "" }: PollingOptions<T>) {
   const [data, setData] = useState<T | undefined>();
   const [error, setError] = useState<unknown>();
-  const [finished, setFinished] = useState(false);
+  const [finishedFor, setFinishedFor] = useState<string | null>(null);
+  const finished = finishedFor === resetKey;
   const [reloadToken, setReloadToken] = useState(0);
   const fetcherRef = useRef(fetcher);
   const isDoneRef = useRef(isDone);
@@ -62,7 +65,7 @@ export function usePolling<T>({ fetcher, isDone, enabled = true, intervalMs = 30
         setData(value);
         setError(undefined);
         if (isDoneRef.current(value)) {
-          setFinished(true);
+          setFinishedFor(resetKey);
           return;
         }
         schedule(intervalMs);
@@ -89,10 +92,10 @@ export function usePolling<T>({ fetcher, isDone, enabled = true, intervalMs = 30
       window.clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [enabled, intervalMs, maxBackoffMs, reloadToken]);
+  }, [enabled, intervalMs, maxBackoffMs, reloadToken, resetKey]);
 
   const refresh = useCallback(() => {
-    setFinished(false);
+    setFinishedFor(null);
     setReloadToken((token) => token + 1);
   }, []);
 

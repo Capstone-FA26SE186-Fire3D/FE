@@ -331,3 +331,42 @@ select.ops-input { appearance: none; padding-right: 34px; background-image: line
 .ops-theme .admin-card { border-radius: 12px; }
 .ops-theme .account-table-wrap th, .ops-theme .account-table-wrap td { color: var(--muted); }
 .ops-theme .account-table-wrap th { color: var(--dim); }
+
+/* Building detail: stepper, progress, key/value lists, code box, preview */
+.ops-muted { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.ops-stepper { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ops-stepper li { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--dim); font-size: 13px; }
+.ops-stepper-dot { display: inline-grid; flex: 0 0 auto; place-items: center; width: 26px; height: 26px; border: 1px solid var(--line-strong); border-radius: 50%; font-size: 12px; font-weight: 650; }
+.ops-stepper-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ops-stepper li[data-state="done"] { color: var(--text); }
+.ops-stepper li[data-state="done"] .ops-stepper-dot { border-color: var(--success); color: var(--success); background: var(--success-soft); }
+.ops-stepper li[data-state="active"] { color: var(--text); font-weight: 600; }
+.ops-stepper li[data-state="active"] .ops-stepper-dot { border-color: var(--ember); color: var(--ember); background: var(--ember-soft); }
+.ops-stepper li[data-state="error"] { color: var(--danger); font-weight: 600; }
+.ops-stepper li[data-state="error"] .ops-stepper-dot { border-color: var(--danger); color: var(--danger); background: var(--danger-soft); }
+.ops-progress-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; color: var(--muted); font-size: 13px; }
+.ops-progress-row > label { grid-column: 1 / -1; color: var(--text); font-weight: 600; }
+.ops-progress-row progress { width: 100%; height: 8px; border: 0; border-radius: 999px; overflow: hidden; background: var(--line); accent-color: var(--ember); }
+.ops-progress-row progress::-webkit-progress-bar { background: var(--line); }
+.ops-progress-row progress::-webkit-progress-value { background: var(--ember); }
+.ops-progress-row progress::-moz-progress-bar { background: var(--ember); }
+.ops-kv { display: grid; grid-template-columns: minmax(110px, 160px) minmax(0, 1fr); gap: 10px 16px; margin: 0; font-size: 14px; }
+.ops-kv dt { color: var(--dim); }
+.ops-kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; color: var(--text); }
+.ops-code-box { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 14px; border: 1px dashed var(--warning); border-radius: 9px; background: var(--warning-soft); }
+.ops-code-box code { flex: 1 1 220px; min-width: 0; overflow-wrap: anywhere; color: var(--text); font-size: 14px; font-weight: 650; }
+.ops-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; overflow-wrap: anywhere; }
+.ops-revision-bar { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin-bottom: 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.ops-revision-bar .ops-field { min-width: min(100%, 260px); flex: 1 1 260px; }
+.ops-annotation-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr) auto; gap: 10px; align-items: end; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.ops-preview { position: relative; height: min(52vw, 460px); min-height: 280px; overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-soft); }
+.ops-preview canvas { display: block; width: 100%; height: 100%; }
+.ops-preview-overlay { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; padding: 20px; text-align: center; background: color-mix(in srgb, var(--bg-soft) 88%, transparent); }
+@media (max-width: 767px) {
+  .ops-stepper { grid-template-columns: minmax(0, 1fr); }
+  .ops-kv { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .ops-kv dd { margin-bottom: 10px; }
+  .ops-annotation-row { grid-template-columns: minmax(0, 1fr); }
+}
+.ops-table .ops-mono { overflow-wrap: normal; white-space: nowrap; }
+.ops-panel-head .ops-actions button, .ops-panel-head .ops-actions a { white-space: nowrap; }

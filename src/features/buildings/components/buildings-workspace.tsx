@@ -3,15 +3,15 @@
 import { Archive, Building2, LayoutGrid, List, Pencil, Plus, RefreshCw, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams, useUrlSearch } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Drawer, Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, Input, Select } from "@/components/ui/field";
-import { PageHeader } from "@/components/ui/page-header";
+import { Input, Select } from "@/components/ui/field";
+import { PageHeader, type Crumb } from "@/components/ui/page-header";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Pagination, Table, TableMessage } from "@/components/ui/table";
@@ -19,7 +19,9 @@ import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { buildingsApi } from "../api";
-import type { Building, BuildingInput, BuildingSummary } from "../types";
+import { organizationsApi } from "@/features/organizations/api";
+import type { Building, BuildingSummary } from "../types";
+import { BuildingForm, buildingFormToInput, emptyForm, formFromBuilding, validateBuildingForm, type FormState } from "./building-form";
 
 const PAGE_SIZE = 20;
 type StatusFilter = "active" | "archived" | "all";
@@ -36,74 +38,12 @@ function statusToFilter(status: StatusFilter) {
   return status === "all" ? undefined : status === "active";
 }
 
-type FormState = { name: string; buildingType: string; totalFloors: string; address: string; city: string; district: string };
-const emptyForm: FormState = { name: "", buildingType: "", totalFloors: "1", address: "", city: "", district: "" };
-
-function formFromBuilding(building: Building): FormState {
-  return {
-    name: building.name,
-    buildingType: building.buildingType ?? "",
-    totalFloors: String(building.totalFloors),
-    address: building.location?.address ?? "",
-    city: building.location?.city ?? "",
-    district: building.location?.district ?? "",
-  };
-}
-
-function validate(form: FormState) {
-  const errors: Partial<Record<keyof FormState, string>> = {};
-  const name = form.name.trim();
-  const floors = Number(form.totalFloors);
-  if (!name) errors.name = "Nhập tên công trình.";
-  else if (name.length > 200) errors.name = "Tên công trình tối đa 200 ký tự.";
-  if (!Number.isInteger(floors) || floors < 1) errors.totalFloors = "Số tầng phải là số nguyên từ 1 trở lên.";
-  return errors;
-}
-
-function withoutId<T extends { id: string }>(value: T): Omit<T, "id"> {
-  const copy: Partial<T> = { ...value };
-  delete copy.id;
-  return copy as Omit<T, "id">;
-}
-
-/** Keeps coordinates/geojson/contact the form does not edit, so saving never wipes them. */
-function toInput(form: FormState, existing?: Building): BuildingInput {
-  const address = form.address.trim() || null;
-  const city = form.city.trim() || null;
-  const district = form.district.trim() || null;
-  const kept = existing?.location ? withoutId(existing.location) : { address: null, city: null, district: null, latitude: null, longitude: null, geojson: null };
-  const hasLocation = Boolean(address || city || district || existing?.location);
-  return {
-    name: form.name.trim(),
-    buildingType: form.buildingType.trim() || null,
-    totalFloors: Number(form.totalFloors),
-    location: hasLocation ? { ...kept, address, city, district } : null,
-    contact: existing?.contact ? withoutId(existing.contact) : null,
-  };
-}
-
-function BuildingForm({ form, errors, onChange }: { form: FormState; errors: ReturnType<typeof validate>; onChange: (patch: Partial<FormState>) => void }) {
-  return <div className="ops-stack">
-    <fieldset className="ops-fieldset">
-      <legend>Thông tin chung</legend>
-      <Field label="Tên công trình" required error={errors.name}>{(p) => <Input {...p} required maxLength={200} value={form.name} onChange={(event) => onChange({ name: event.target.value })} />}</Field>
-      <div className="ops-form-grid">
-        <Field label="Loại công trình">{(p) => <Input {...p} maxLength={200} value={form.buildingType} placeholder="Chung cư, trường học…" onChange={(event) => onChange({ buildingType: event.target.value })} />}</Field>
-        <Field label="Số tầng" required error={errors.totalFloors}>{(p) => <Input {...p} required min="1" inputMode="numeric" type="number" value={form.totalFloors} onChange={(event) => onChange({ totalFloors: event.target.value })} />}</Field>
-      </div>
-    </fieldset>
-    <fieldset className="ops-fieldset">
-      <legend>Vị trí (không bắt buộc)</legend>
-      <Field label="Địa chỉ">{(p) => <Input {...p} maxLength={300} value={form.address} onChange={(event) => onChange({ address: event.target.value })} />}</Field>
-      <div className="ops-form-grid">
-        <Field label="Quận / huyện">{(p) => <Input {...p} maxLength={120} value={form.district} onChange={(event) => onChange({ district: event.target.value })} />}</Field>
-        <Field label="Tỉnh / thành phố">{(p) => <Input {...p} maxLength={120} value={form.city} onChange={(event) => onChange({ city: event.target.value })} />}</Field>
-      </div>
-    </fieldset>
-  </div>;
-}
-
-export function BuildingsWorkspace() {
+/**
+ * Building list/create/edit/archive. An OrganizationUser works inside their own tenant (no `organizationId`
+ * is ever sent). PlatformAdmin must pick an organization: either through the `organizationId` prop (admin
+ * route `/admin/organizations/[id]/buildings`) or the `?org=` picker on `/workspace/buildings`.
+ */
+export function BuildingsWorkspace({ organizationId: organizationIdProp }: { organizationId?: string } = {}) {
   const router = useRouter();
   const toast = useToast();
   const { accessToken, ready, user } = useAuthSession();
@@ -118,18 +58,33 @@ export function BuildingsWorkspace() {
   const [editing, setEditing] = useState<Building | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<ReturnType<typeof validate>>({});
+  const [fieldErrors, setFieldErrors] = useState<ReturnType<typeof validateBuildingForm>>({});
+  const submitting = useRef(false);
   const [archiving, setArchiving] = useState<BuildingSummary | null>(null);
   const [archiveBusy, setArchiveBusy] = useState(false);
 
-  const blocked = ready && user?.role === 0 && !user.organizationId;
-  const enabled = Boolean(accessToken) && ready && !blocked;
+  const isAdmin = user?.role === 0;
+  // OrganizationUser: tenant comes from the account, so the parameter is never sent. PlatformAdmin: must choose.
+  const scopedOrgId = isAdmin ? (organizationIdProp ?? (get("org") || undefined)) : undefined;
+  const needsOrganization = ready && isAdmin && !scopedOrgId;
+  const blocked = ready && user?.role === 1 && !user.organizationId;
+  const enabled = Boolean(accessToken) && ready && !blocked && !needsOrganization;
   const { data, error, loading, reload } = useAsyncData(
-    `buildings:${page}:${status}:${urlSearch}`,
-    (signal) => buildingsApi.list(accessToken as string, { page, pageSize: PAGE_SIZE, search: urlSearch.trim() || undefined, isActive: statusToFilter(status) }, signal),
+    `buildings:${scopedOrgId ?? "own"}:${page}:${status}:${urlSearch}`,
+    (signal) => buildingsApi.list(accessToken as string, { page, pageSize: PAGE_SIZE, search: urlSearch.trim() || undefined, isActive: statusToFilter(status), organizationId: scopedOrgId }, signal),
     enabled,
   );
-
+  const organizations = useAsyncData(
+    "buildings:org-picker",
+    () => organizationsApi.list(accessToken as string, { pageSize: 100, page: 1 }),
+    Boolean(accessToken) && ready && isAdmin && !organizationIdProp,
+  );
+  const organization = useAsyncData(
+    `buildings:org:${scopedOrgId}`,
+    () => organizationsApi.get(accessToken as string, scopedOrgId as string),
+    Boolean(accessToken) && ready && isAdmin && Boolean(scopedOrgId),
+  );
+  const organizationName = organization.data?.name;
 
   const items = data?.items ?? [];
   const totalCount = data?.totalCount ?? 0;
@@ -153,19 +108,20 @@ export function BuildingsWorkspace() {
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!accessToken || !drawer || saving) return;
-    const errors = validate(form);
+    if (!accessToken || !drawer || saving || submitting.current) return;
+    const errors = validateBuildingForm(form);
     setFieldErrors(errors);
     if (Object.keys(errors).length) return;
 
+    submitting.current = true;
     setSaving(true);
     setFormError("");
     try {
       if (drawer.mode === "create") {
-        const created = await buildingsApi.create(accessToken, toInput(form));
+        const created = await buildingsApi.create(accessToken, buildingFormToInput(form), scopedOrgId);
         router.push(`${routes.workspaceBuildings}/${created.id}`);
       } else {
-        await buildingsApi.update(accessToken, drawer.id, toInput(form, editing ?? undefined));
+        await buildingsApi.update(accessToken, drawer.id, buildingFormToInput(form, editing ?? undefined), scopedOrgId);
         setDrawer(null);
         toast.notify({ tone: "success", title: "Đã lưu công trình" });
         reload();
@@ -173,6 +129,7 @@ export function BuildingsWorkspace() {
     } catch {
       setFormError("Không thể lưu công trình. Nội dung bạn nhập vẫn được giữ lại; hãy thử lại sau.");
     } finally {
+      submitting.current = false;
       setSaving(false);
     }
   };
@@ -181,7 +138,7 @@ export function BuildingsWorkspace() {
     if (!accessToken || !archiving) return;
     setArchiveBusy(true);
     try {
-      await buildingsApi.archive(accessToken, archiving.id);
+      await buildingsApi.archive(accessToken, archiving.id, scopedOrgId);
       toast.notify({ tone: "success", title: "Đã lưu trữ công trình", description: archiving.name });
       setArchiving(null);
       reload();
@@ -193,9 +150,39 @@ export function BuildingsWorkspace() {
   };
 
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  const crumbs: Crumb[] | undefined = isAdmin ? [
+    { label: "Quản trị", href: routes.adminOverview },
+    { label: "Tổ chức", href: routes.adminOrganizations },
+    { label: "Công trình" },
+  ] : undefined;
+  const orgPicker = isAdmin && !organizationIdProp;
+
   if (blocked) {
     return <><PageHeader title="Công trình" description="Quản lý công trình và các phiên bản mô hình IFC của tổ chức." />
-      <Alert tone="info" title="Công trình thuộc về tổ chức" action={<Button asChild variant="secondary" className="mt-3"><Link href={routes.adminOrganizations}>Quản lý tổ chức</Link></Button>}>PlatformAdmin hãy tạo tổ chức, cấp tài khoản OrganizationUser, rồi đăng nhập bằng tài khoản đó để tạo công trình.</Alert></>;
+      <Alert tone="warning" title="Tài khoản chưa thuộc tổ chức nào">Hãy liên hệ PlatformAdmin để được gắn vào một tổ chức trước khi quản lý công trình.</Alert></>;
+  }
+
+  const pageDescription = isAdmin
+    ? "Xem và quản lý công trình thay mặt tổ chức. Mọi thao tác đều áp dụng cho tổ chức đã chọn."
+    : "Quản lý công trình và các phiên bản mô hình IFC của tổ chức.";
+
+  const organizationSelect = orgPicker && <div className="ops-toolbar">
+    <div className="ops-field ops-toolbar-grow">
+      <label htmlFor="building-org">Tổ chức</label>
+      <Select id="building-org" value={scopedOrgId ?? ""} disabled={organizations.loading && !organizations.data} onChange={(event) => setParams({ org: event.target.value })}>
+        <option value="">Chọn tổ chức…</option>
+        {(organizations.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}{item.isActive ? "" : " (đã khóa)"}</option>)}
+      </Select>
+    </div>
+  </div>;
+
+  if (needsOrganization) {
+    return <>
+      <PageHeader title="Công trình" description={pageDescription} breadcrumbs={crumbs} />
+      {organizationSelect}
+      {organizations.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tổ chức" action={<Button size="sm" variant="secondary" className="mt-3" onClick={organizations.reload}>Thử lại</Button>}>Hãy thử lại sau.</Alert>}
+      <EmptyState icon={Building2} title="Chọn tổ chức để xem công trình" description="Công trình thuộc về từng tổ chức. PlatformAdmin cần chọn tổ chức trước khi xem hoặc tạo công trình." action={<Button asChild variant="secondary"><Link href={routes.adminOrganizations}>Mở danh sách tổ chức</Link></Button>} />
+    </>;
   }
 
   const rowActions = (building: BuildingSummary) => <span className="ops-actions" style={{ justifyContent: "flex-end" }}>
@@ -207,10 +194,14 @@ export function BuildingsWorkspace() {
 
   return <>
     <PageHeader
-      title="Công trình"
-      description="Quản lý công trình và các phiên bản mô hình IFC của tổ chức."
+      title={isAdmin && organizationName ? `Công trình · ${organizationName}` : "Công trình"}
+      description={pageDescription}
+      breadcrumbs={crumbs}
       actions={<><Button variant="quiet" onClick={reload} disabled={loading}><RefreshCw size={16} aria-hidden="true" />{loading ? "Đang tải…" : "Tải lại"}</Button><Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo công trình</Button></>}
     />
+
+    {organizationSelect}
+    {organization.error !== undefined && <Alert tone="danger" title="Không đọc được tổ chức">Tổ chức không tồn tại hoặc bạn không có quyền xem. Hãy chọn lại từ danh sách tổ chức.</Alert>}
 
     <div className="ops-toolbar">
       <div className="ops-field ops-toolbar-grow" style={{ position: "relative" }}>
