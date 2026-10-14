@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 /*
  * Runs against `pnpm dev` (set PLAYWRIGHT_DEV_URL, e.g. http://localhost:5241); skipped otherwise.
- * Evidence type: the prototype uses LOCAL SAMPLE DATA and route-mocked auth. No review/Learn/Library API exists
- * yet, so none of this is integration evidence.
+ * Evidence type: the prototypes use LOCAL SAMPLE DATA and route-mocked auth. No Learn/Library API exists yet
+ * (BE#57), so none of this is integration evidence. Reviews is a real screen now and is tested in admin-scenario-reviews.spec.ts.
  */
 const devUrl = process.env.PLAYWRIGHT_DEV_URL;
 test.skip(!devUrl, "set PLAYWRIGHT_DEV_URL to a running `pnpm dev` server");
@@ -17,15 +17,9 @@ async function signIn(page: Page, user: typeof admin | typeof owner = admin) {
   await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
 }
 
-const apiCalls = (page: Page) => {
-  const calls: string[] = [];
-  page.on("request", (request) => { const { pathname } = new URL(request.url()); if (/^\/api\/.*(scenario-versions|scenario-reviews|admin\/learn|library)/i.test(pathname)) calls.push(`${request.method()} ${pathname}`); });
-  return calls;
-};
-
 test("dev shows the prototype banner and the pending blocker together", async ({ page }) => {
   await signIn(page);
-  for (const path of ["/admin/reviews", "/admin/learn", "/admin/library"]) {
+  for (const path of ["/admin/learn", "/admin/library"]) {
     await page.goto(path);
     await expect(page.getByTestId("pending-module")).toBeVisible();
     await expect(page.getByTestId("prototype-banner")).toContainText("Dữ liệu mẫu · chỉ môi trường phát triển");
@@ -34,103 +28,9 @@ test("dev shows the prototype banner and the pending blocker together", async ({
 
 test("organization users are blocked in dev as well", async ({ page }) => {
   await signIn(page, owner);
-  await page.goto("/admin/reviews");
+  await page.goto("/admin/learn");
   await expect(page.getByRole("heading", { name: "Không có quyền truy cập" })).toBeVisible();
   await expect(page.getByTestId("prototype-banner")).toHaveCount(0);
-});
-
-test.describe("reviews prototype", () => {
-  test("filters, pagination in URL, detail with separate readiness and hashes", async ({ page }) => {
-    await signIn(page);
-    const calls = apiCalls(page);
-    await page.goto("/admin/reviews");
-    await expect(page.getByRole("table", { name: /Hàng chờ/ }).getByRole("row")).toHaveCount(7); // header + 6
-    await page.getByLabel("Trạng thái duyệt").selectOption("Submitted");
-    await expect(page).toHaveURL(/status=Submitted/);
-    await page.getByRole("combobox", { name: "Tổ chức" }).selectOption("org-saomai");
-    await expect(page).toHaveURL(/organizationId=org-saomai/);
-    await expect(page.getByRole("button", { name: /Cháy kho hàng giờ cao điểm/ })).toBeVisible();
-    await page.getByRole("button", { name: /Cháy kho hàng giờ cao điểm/ }).click();
-    await expect(page).toHaveURL(/review=version-/);
-    await expect(page.getByText("Readiness kỹ thuật không thay thế việc duyệt nội dung")).toBeVisible();
-    await page.getByRole("tab", { name: "Hash đóng băng" }).click();
-    await expect(page.getByLabel("Hash nội dung")).toHaveText(/^[0-9a-f]{64}$/);
-    await page.getByRole("tab", { name: "Readiness kỹ thuật" }).click();
-    await expect(page.getByText("ConfirmForTraining")).toBeVisible();
-    expect(calls).toEqual([]);
-  });
-
-  test("pagination", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/admin/reviews");
-    await page.getByRole("button", { name: "Trang sau" }).click();
-    await expect(page).toHaveURL(/page=2/);
-    await expect(page.getByText("Trang 2/3")).toBeVisible();
-  });
-
-  test("reject requires a reason and keeps the idempotency key across a lost response", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/admin/reviews?status=Submitted");
-    await page.getByRole("button", { name: /Sơ tán giờ ra chơi/ }).click();
-    await page.getByRole("button", { name: "Từ chối", exact: true }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByRole("button", { name: "Từ chối", exact: true }).click();
-    await expect(dialog.getByText("Nhập lý do từ chối")).toBeVisible();
-    await dialog.getByLabel(/Lý do từ chối/).fill("Thiếu tiêu chí thời gian phản ứng.");
-    await dialog.getByRole("button", { name: "Từ chối", exact: true }).click();
-    await expect(page.getByText("Đã từ chối kịch bản")).toBeVisible();
-    await expect(page.getByText("Thiếu tiêu chí thời gian phản ứng.")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Duyệt nội dung" })).toHaveCount(0);
-  });
-
-  test("network failure keeps the reason and retry succeeds once", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/admin/reviews?status=Submitted");
-    await page.getByLabel("Lỗi mạng ở lần gửi quyết định kế tiếp").check();
-    await page.getByRole("button", { name: /Cháy phòng máy chủ/ }).click();
-    await page.getByRole("button", { name: "Từ chối", exact: true }).click();
-    const dialog = page.getByRole("dialog");
-    await dialog.getByLabel(/Lý do từ chối/).fill("Cần bổ sung rubric.");
-    await dialog.getByRole("button", { name: "Từ chối", exact: true }).click();
-    await expect(dialog.getByText("Không kết nối được tới máy chủ")).toBeVisible();
-    await expect(dialog.getByLabel(/Lý do từ chối/)).toHaveValue("Cần bổ sung rubric.");
-    await dialog.getByRole("button", { name: "Thử lại" }).click();
-    await expect(page.getByText("Đã từ chối kịch bản", { exact: true })).toBeVisible();
-  });
-
-  test("approve needs confirmation; hash mismatch is reported and the detail can be reloaded", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/admin/reviews?status=Submitted");
-    await page.getByRole("button", { name: /Mất điện và khói/ }).click();
-    await page.getByLabel("409 hash không khớp ở lần kế tiếp").check();
-    await page.getByRole("button", { name: "Duyệt nội dung" }).click();
-    const dialog = page.getByRole("dialog");
-    const confirm = dialog.getByRole("button", { name: "Duyệt nội dung" });
-    await expect(confirm).toBeDisabled();
-    await dialog.getByLabel("Tôi đã xem nội dung và rubric của đúng phiên bản này.").check();
-    await confirm.click();
-    await expect(dialog.getByText("Hash không khớp nội dung đã nộp")).toBeVisible();
-    await dialog.getByRole("button", { name: "Tải lại chi tiết" }).click();
-    await page.getByRole("button", { name: "Duyệt nội dung" }).click();
-    await page.getByRole("dialog").getByLabel("Tôi đã xem nội dung và rubric của đúng phiên bản này.").check();
-    await page.getByRole("dialog").getByRole("button", { name: "Duyệt nội dung" }).click();
-    await expect(page.getByText("Đã duyệt nội dung kịch bản")).toBeVisible();
-  });
-
-  test("loading, empty and error simulations", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/admin/reviews");
-    await page.getByLabel("Mô phỏng").selectOption("error");
-    await expect(page.getByText("Không tải được hàng chờ")).toBeVisible();
-    await page.getByLabel("Mô phỏng").selectOption("empty");
-    await expect(page.getByText("Chưa có kịch bản nào chờ duyệt")).toBeVisible();
-    await page.getByLabel("Mô phỏng").selectOption("normal");
-    await page.getByRole("button", { name: /Sơ tán giờ ra chơi/ }).click();
-    await expect(page.getByRole("button", { name: "Về hàng chờ" })).toBeVisible();
-    await page.getByLabel("Mô phỏng").selectOption("loading");
-    await page.getByRole("button", { name: "Về hàng chờ" }).click();
-    await expect(page.getByText("Đang tải hàng chờ duyệt…")).toBeAttached();
-  });
 });
 
 test.describe("learn prototype", () => {
@@ -281,7 +181,7 @@ for (const width of [1440, 375]) {
       await page.setViewportSize({ width, height: width === 375 ? 800 : 900 });
       await page.emulateMedia({ colorScheme: theme });
       await signIn(page);
-      for (const path of ["/admin/reviews", "/admin/reviews?review=version-sample-1", "/admin/learn", "/admin/learn?post=lp-1", "/admin/library"]) {
+      for (const path of ["/admin/learn", "/admin/learn?post=lp-1", "/admin/library"]) {
         await page.goto(path);
         await expect(page.getByTestId("prototype-banner")).toBeVisible();
         await page.waitForTimeout(700);

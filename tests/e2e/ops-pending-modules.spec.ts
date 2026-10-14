@@ -15,11 +15,11 @@ async function signIn(page: Page, user: typeof admin | typeof owner) {
 }
 
 const modules = [
-  { path: "/admin/reviews", heading: "Duyệt kịch bản", issue: "issues/52", fakeButtons: ["Duyệt nội dung", "Từ chối", "Tạo bài", "Thêm mục", "Xuất bản"] },
   { path: "/admin/learn", heading: "Learn CMS", issue: "issues/57", fakeButtons: ["Tạo bài", "Xuất bản", "Lưu bản nháp"] },
   { path: "/admin/library", heading: "Thư viện tổ chức", issue: "issues/57", fakeButtons: ["Thêm mục", "Tạo phiên bản mới"] },
 ];
 
+// Reviews is a real screen now (F3, backed by GET /api/admin/scenario-reviews); only Learn CMS and Library still wait for BE#57.
 const SAMPLE_MARKERS = ["Dữ liệu mẫu · chỉ môi trường phát triển", "Đặt lại dữ liệu mẫu", "Trường THPT Lê Quý Đôn (mẫu)", "Sơ tán giờ ra chơi", "Thoát nạn khi có khói dày", "school-evacuation", "Giả lập: người khác sửa bài này"];
 
 for (const mod of modules) {
@@ -42,17 +42,10 @@ for (const mod of modules) {
   });
 }
 
-test("production reviews page does not offer manual versionId or hash entry", async ({ page }) => {
-  await signIn(page, admin);
-  await page.goto("/admin/reviews");
-  await expect(page.locator("main input, main textarea, main select")).toHaveCount(0);
-  await expect(page.getByText("không cho nhập tay versionId hay hash")).toBeVisible();
-});
-
-test("production reviews page makes no review API calls", async ({ page }) => {
+test("production pending modules make no Learn/Library API calls", async ({ page }) => {
   await signIn(page, admin);
   const calls: string[] = [];
-  page.on("request", (request) => { if (/^\/api\/.*(scenario-versions|scenario-reviews|admin\/learn|library)/i.test(new URL(request.url()).pathname)) calls.push(request.url()); });
+  page.on("request", (request) => { if (/^\/api\/.*(admin\/learn|library)/i.test(new URL(request.url()).pathname)) calls.push(request.url()); });
   for (const mod of modules) { await page.goto(mod.path); await expect(page.getByTestId("pending-module")).toBeVisible(); }
   expect(calls).toEqual([]);
 });
@@ -73,13 +66,12 @@ test("signed-out visitors are sent to sign in, not shown the mod", async ({ page
   await expect(page.getByTestId("pending-module")).toHaveCount(0);
 });
 
-test("admin navigation marks the three modules as waiting for the backend", async ({ page }) => {
+test("admin navigation marks only Learn CMS and Library as waiting for the backend", async ({ page }) => {
   await signIn(page, admin);
-  await page.goto("/admin/reviews");
-  for (const label of ["Duyệt kịch bản", "Learn CMS", "Thư viện tổ chức"]) {
-    const link = page.getByRole("navigation", { name: "Quản trị hệ thống" }).getByRole("link", { name: new RegExp(label) });
-    await expect(link).toContainText("Chờ BE");
-  }
+  await page.goto("/admin/learn");
+  const nav = page.getByRole("navigation", { name: "Quản trị hệ thống" });
+  for (const label of ["Learn CMS", "Thư viện tổ chức"]) await expect(nav.getByRole("link", { name: new RegExp(label) })).toContainText("Chờ BE");
+  await expect(nav.getByRole("link", { name: /Duyệt kịch bản/ })).not.toContainText("Chờ BE");
 });
 
 for (const width of [1440, 375]) {
@@ -93,7 +85,7 @@ for (const width of [1440, 375]) {
         await expect(page.getByTestId("pending-module")).toBeVisible();
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
         expect(overflow, `${mod.path} overflows horizontally`).toBeLessThanOrEqual(0);
-        if (mod.path === "/admin/reviews") await page.screenshot({ path: testInfo.outputPath(`pending-reviews-${width}-${theme}.png`), fullPage: true });
+        await page.screenshot({ path: testInfo.outputPath(`pending-${mod.path.split("/").pop()}-${width}-${theme}.png`), fullPage: true });
       }
     });
   }
