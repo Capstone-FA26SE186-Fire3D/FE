@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 import { useIdempotencyKey } from "@/api/idempotency";
-import { ApiError } from "@/api/types/common";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/dialog";
@@ -16,6 +15,7 @@ import { carryOverCandidates, carryOverExtras, type CarryKey } from "../v1/carry
 import { createDraftV1 } from "../v1/create-draft";
 import { useRevisionFloors } from "../v1/use-revision-floors";
 import { FloorsStatus, ReprocessGuide } from "./geometry-status";
+import { describeApiError } from "@/api/describe-error";
 
 /**
  * Shown above a draft that has no `schemaVersion`. The draft keeps its historical typed shape: it is edited as before, it is
@@ -73,7 +73,7 @@ function ConvertDialog({ accessToken, buildingId, scenarioId, revisionId, pin, d
       done();
       setCreated(result);
     } catch (cause) {
-      setError(cause instanceof ApiError ? (cause.fieldErrors[0]?.message ?? cause.message) : "Không thể tạo bản nháp mới.");
+      setError(describeApiError(cause, "Không thể tạo bản nháp mới."));
     } finally {
       setCreating(false);
     }

@@ -295,7 +295,7 @@ select.ops-input { appearance: none; padding-right: 34px; background-image: line
 .ops-empty > svg { color: var(--ember); }
 /* An empty state inside a table body sits in the table frame instead of drawing a second dashed box */
 .ops-table td > .ops-empty { border: 0; border-radius: 0; background: transparent; }
-.ops-empty h3 { margin: 0; font-size: 17px; font-weight: 600; }
+.ops-empty .ops-empty-title { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.35; }
 .ops-empty p { max-width: 440px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
 
 /* ───────── Theme toggle ───────── */

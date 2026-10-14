@@ -21,6 +21,7 @@ import { useAuthSession } from "@/features/auth/auth-session";
 import type { UserRole } from "@/features/auth/types";
 import { accountsApi } from "../api";
 import type { ManagedAccount } from "../types";
+import { RetryButton } from "@/components/ui/retry-button";
 
 const PAGE_SIZE = 20;
 const roles: Array<{ value: UserRole; label: string }> = [
@@ -161,7 +162,7 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
       </Select>
     </div>
 
-    {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tài khoản" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{describeApiError(list.error, "Không tải được danh sách tài khoản. Hãy thử lại sau.")}</Alert>}
+    {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tài khoản" action={<RetryButton error={list.error} onRetry={list.reload} />}>{describeApiError(list.error, "Không tải được danh sách tài khoản. Hãy thử lại sau.")}</Alert>}
 
     <Table caption="Danh sách tài khoản">
       <thead><tr><th>Tài khoản</th><th>Vai trò</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead>

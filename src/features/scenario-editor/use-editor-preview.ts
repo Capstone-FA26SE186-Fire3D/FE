@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { ApiError } from "@/api/types/common";
 import { scenarioEditorApi, type EditorPreviewV1 } from "./api";
+import { describeApiError } from "@/api/describe-error";
 
 export type PreviewPhase = "idle" | "loading" | "ready" | "not-ready" | "reprocess" | "error";
 
@@ -23,9 +24,9 @@ function message(error: unknown) {
   if (error instanceof ApiError) {
     if (error.status === 404) return "Không tìm thấy revision này trong công trình.";
     if (error.status === 401 || error.status === 403) return "Không có quyền xem mô hình của revision này.";
-    return error.message || "Không tải được thông tin mô hình.";
+    return describeApiError(error, "Không tải được thông tin mô hình.");
   }
-  return error instanceof Error ? error.message : "Không tải được thông tin mô hình.";
+  return describeApiError(error, "Không tải được thông tin mô hình.");
 }
 
 /**

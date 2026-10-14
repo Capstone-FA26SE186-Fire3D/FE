@@ -12,6 +12,7 @@ import { prepareForSave, type Selection } from "./store/model";
 import { mergeIssues, normalizeServerIssues, validateDraftState, type Issue } from "./store/validation";
 import { deepEqual, isObject, type JsonObject } from "./store/json";
 import { normalizeEtag } from "./store/etag";
+import { describeApiError } from "@/api/describe-error";
 
 export type LoadState = { phase: "loading" } | { phase: "ready" } | { phase: "error"; status?: number; message: string };
 
@@ -29,8 +30,7 @@ export type SaveResult =
 export type EditorMeta = Pick<DraftResponse, "id" | "scenarioId" | "revisionId" | "buildingId" | "draftNumber" | "source" | "updatedAt">;
 
 function errorMessage(error: unknown, fallback: string) {
-  if (error instanceof ApiError) return error.message || fallback;
-  return error instanceof Error && error.message ? error.message : fallback;
+  return describeApiError(error, fallback);
 }
 
 /** Human text for the statuses `PUT /api/scenario-drafts/{id}` can answer with. */
@@ -39,12 +39,12 @@ export function describeSaveError(error: unknown): { message: string; conflict: 
     if (error.status === 412) return { conflict: true, message: "Bản nháp đã được thay đổi ở nơi khác. Nội dung bạn đang nhập vẫn được giữ nguyên." };
     if (error.status === 428) return { conflict: false, message: "Thiếu If-Match: chưa có ETag của bản nháp. Hãy tải lại bản nháp." };
     if (error.status === 400 && error.code === "INVALID_IF_MATCH") return { conflict: false, message: "ETag của bản nháp không hợp lệ (INVALID_IF_MATCH). Hãy tải lại bản nháp." };
-    if (error.status === 400) return { conflict: false, message: `Máy chủ từ chối dữ liệu: ${error.message}` };
+    if (error.status === 400) return { conflict: false, message: `Máy chủ từ chối dữ liệu${error.code ? ` (${error.code})` : ""}: ${error.fieldErrors[0]?.message ?? "kiểm tra lại nội dung bản nháp."}` };
     if (error.status === 401 || error.status === 403) return { conflict: false, message: "Phiên đăng nhập hết hạn hoặc không còn quyền sửa bản nháp này." };
     if (error.status === 404) return { conflict: false, message: "Bản nháp không còn tồn tại hoặc không thuộc tổ chức của bạn." };
-    return { conflict: false, message: error.message || `Không thể lưu (mã ${error.status}).` };
+    return { conflict: false, message: describeApiError(error, `Không thể lưu (mã ${error.status}).`) };
   }
-  return { conflict: false, message: error instanceof Error ? error.message : "Không thể lưu bản nháp." };
+  return { conflict: false, message: describeApiError(error, "Không thể lưu bản nháp.") };
 }
 
 /**

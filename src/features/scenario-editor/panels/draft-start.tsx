@@ -5,7 +5,6 @@ import { useState, type FormEvent } from "react";
 
 import { useAsyncData } from "@/api/use-async-data";
 import { useIdempotencyKey } from "@/api/idempotency";
-import { ApiError } from "@/api/types/common";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -18,6 +17,7 @@ import { scenarioVersionsApi } from "@/features/scenarios/versions-api";
 import { createDraftV1 } from "../v1/create-draft";
 import { useRevisionFloors } from "../v1/use-revision-floors";
 import { FloorsStatus } from "./geometry-status";
+import { describeApiError } from "@/api/describe-error";
 
 /**
  * Entry screen when the URL has no `?draft=`. Drafts of the scenario come from the server (newest save first), so work
@@ -48,7 +48,7 @@ export function DraftStart({ accessToken, buildingId, scenarioId, onOpen }: { ac
       done();
       onOpen(created.id);
     } catch (cause) {
-      setError(cause instanceof ApiError ? (cause.fieldErrors[0]?.message ?? cause.message) : "Không thể tạo bản nháp.");
+      setError(describeApiError(cause, "Không thể tạo bản nháp."));
     } finally {
       setCreating(false);
     }

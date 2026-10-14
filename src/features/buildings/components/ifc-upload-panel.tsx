@@ -9,7 +9,7 @@ import { Panel } from "@/components/ui/panel";
 import { formatBytes } from "../format";
 import { validateIfcFile } from "../ifc-upload";
 import { uploadSteps, useIfcUploadFlow } from "../use-ifc-upload-flow";
-import { useNow } from "../use-now";
+import { useNow } from "@/api/use-now";
 
 function Stepper({ completed, running, failedStep }: { completed: number; running: boolean; failedStep: number | null }) {
   return <ol className="ops-stepper" aria-label="Các bước tải IFC">

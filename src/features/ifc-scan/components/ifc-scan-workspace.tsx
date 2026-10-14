@@ -19,7 +19,9 @@ const inventoryRows: { kind: IfcElementKind; label: string; icon: typeof BrickWa
 const anchorLabels: Record<ScenarioAnchorKind, string> = { room: "không gian nguồn cháy", stair: "cầu thang", exit: "cửa / lối thoát" };
 
 function safeErrorMessage(error: unknown) {
-  return error instanceof Error && error.message ? error.message : "Không thể đọc tệp IFC này.";
+  // The IFC parser reports in English: lead with a Vietnamese explanation and keep its text only as a technical detail.
+  const detail = error instanceof Error && error.message ? ` Chi tiết kỹ thuật: ${error.message.slice(0, 200)}` : "";
+  return `Không thể đọc tệp IFC này. Kiểm tra tệp có đúng định dạng IFC và không bị hỏng, rồi thử lại.${detail}`;
 }
 
 type IfcScanWorkspaceProps = {

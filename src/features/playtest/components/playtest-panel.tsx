@@ -21,7 +21,7 @@ import { describePlaytestError, outcomeIsUnknown, type PlaytestErrorView } from 
 import { canCancel, describeStatus, isPlaytestTerminal } from "../status";
 import type { PlaytestStatus } from "../types";
 import { packageMissing, type PlaytestPackageState, type PlaytestPackageWatch } from "../use-playtest-package";
-import { useNow } from "../use-now";
+import { useNow } from "@/api/use-now";
 import { usePlaytestStatus } from "../use-playtest-status";
 import { CompletionView } from "./completion-view";
 import { HandoffCard } from "./handoff-card";

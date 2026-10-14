@@ -13,6 +13,7 @@ import type { LoadedDraft } from "../api";
 import { initializeDraft } from "../v1/create-draft";
 import { useRevisionFloors } from "../v1/use-revision-floors";
 import { FloorsStatus } from "./geometry-status";
+import { describeApiError } from "@/api/describe-error";
 
 /**
  * A draft whose state is `{}` (just created). The first PUT must be a document that declares `schemaVersion`, so the editor
@@ -34,7 +35,7 @@ export function EmptyDraftPanel({ accessToken, buildingId, scenarioId, draftId, 
       onInitialized();
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 412) setError("Bản nháp vừa được thay đổi ở nơi khác. Tải lại trang để xem nội dung mới nhất; chưa có gì bị ghi đè.");
-      else setError(cause instanceof ApiError ? (cause.fieldErrors[0]?.message ?? cause.message) : "Không thể khởi tạo bản nháp.");
+      else setError(describeApiError(cause, "Không thể khởi tạo bản nháp."));
     } finally {
       setBusy(false);
     }
