@@ -4,7 +4,7 @@
  * Draft -> Published versions, post lifecycle Unpublished/Published/Hidden/Deleted.
  */
 import { ApiError, type PageResponse } from "@/api/types/common";
-import { sampleHash } from "@/features/admin-reviews/sample-store";
+import { sampleHash } from "@/features/dev-prototype/sample-hash";
 import { toWireContent } from "./api";
 import type { ContentBlock, CreatePostInput, DraftContent, LearnCatalog, LearnCmsPort, LearnListFilters, LearnPost, LearnPostSummary, LearnVersion, LifecycleAction, PostStatus, WithEtag } from "./types";
 import { validateDraft, validateSlug } from "./validate";
