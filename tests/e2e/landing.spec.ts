@@ -53,8 +53,10 @@ test('choices interrupt and return before routing explicitly', async ({ page }) 
   await settled(page, 'phone'); await next.click();
   await expect(page).toHaveURL(/\/login\?/);
   await expect(page.locator('canvas')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Đăng nhập trải nghiệm' }).click();
-  await expect(page).toHaveURL(/\/learning-hub$/);
+  // The branch continues to the real sign-in page (not a demo login) and remembers where to return to.
+  expect(new URL(page.url()).searchParams.get('next')).toBe('/learning-hub');
+  await expect(page.getByLabel('Email')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Tiếp tục với Google' })).toBeVisible();
 });
 
 test('cutaway supports drag, arrow keys and Home without selection or outline', async ({ page }) => {
