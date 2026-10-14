@@ -3,15 +3,13 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { ApiError } from "@/api/types/common";
-import type { EditorPreview } from "@/features/buildings/types";
+import { scenarioEditorApi, type EditorPreviewV1 } from "./api";
 
-import { scenarioEditorApi } from "./api";
-
-export type PreviewPhase = "idle" | "loading" | "ready" | "not-ready" | "error";
+export type PreviewPhase = "idle" | "loading" | "ready" | "not-ready" | "reprocess" | "error";
 
 export type PreviewState = {
   phase: PreviewPhase;
-  preview: EditorPreview | null;
+  preview: EditorPreviewV1 | null;
   error: string | null;
   /** Bumped whenever a fresh signed URL was fetched; the viewport reloads the model when it changes. */
   nonce: number;
@@ -55,6 +53,11 @@ export function useEditorPreview(accessToken: string | null, buildingId: string 
       try {
         const preview = await scenarioEditorApi.editorPreview(accessToken, buildingId, revisionId, controller.signal);
         if (stopped) return;
+        // ReprocessRequired is final until IFC is processed again: no URL and no coordinates are ever returned, so do not poll.
+        if (preview.status === "ReprocessRequired") {
+          setState((current) => ({ phase: "reprocess", preview, error: null, nonce: current.nonce, attempts: polls }));
+          return;
+        }
         const ready = preview.status === "Ready" && Boolean(preview.downloadUrl);
         if (ready) {
           setState((current) => ({ phase: "ready", preview, error: null, nonce: current.nonce + 1, attempts: polls }));

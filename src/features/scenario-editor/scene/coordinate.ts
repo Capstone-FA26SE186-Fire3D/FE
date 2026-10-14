@@ -1,6 +1,10 @@
 /**
- * `coordinateTransform` from `GET /api/buildings/{id}/editor-preview` (BE `EditorPreview.cs`): the BE only guarantees
- * "an array of exactly 16 finite numbers". Order, units and axes are NOT specified (BE#54).
+ * `coordinateTransform` from `GET /api/buildings/{id}/editor-preview`. With `fet3d.editor/1` it is the IFC -> GLB transform
+ * (unit scale and origin included) and is NEVER applied to the model or to scenario objects: the GLB is already in scene space
+ * (see v1/matrix.ts). This module only describes the matrix for display; the old assumption that it places the model in
+ * scenario space (A2 below) is no longer used by the viewport (`applyTransform: false`).
+ *
+ * Historical notes (pre-contract): the BE only guaranteed "an array of exactly 16 finite numbers".
  *
  * ASSUMPTIONS made here (kept in one place so they can be swapped once the BE documents the contract):
  *  A1. The 16 numbers are a 4x4 matrix in COLUMN-MAJOR order (the layout `THREE.Matrix4.fromArray` and glTF use):
@@ -39,7 +43,7 @@ export function interpretCoordinateTransform(raw: unknown): TransformInfo {
   const sz = Math.hypot(m[8], m[9], m[10]);
   if (sx < 1e-9 || sy < 1e-9 || sz < 1e-9) return { ok: false, reason: "Ma trận suy biến (tỉ lệ bằng 0); không áp dụng." };
   const scale: [number, number, number] = [sx, sy, sz];
-  if (scale.some((s) => s < 0.01 || s > 100)) warnings.push("Tỉ lệ của ma trận rất lệch 1 — có thể sai đơn vị (mm/m); chưa xác nhận trong BE#54.");
+  if (scale.some((s) => s < 0.01 || s > 100)) warnings.push("Tỉ lệ của ma trận rất lệch 1 — có thể sai đơn vị (mm/m).");
   const isIdentity = m.every((value, index) => Math.abs(value - IDENTITY[index]) < 1e-9);
   return { ok: true, values: m.slice(), isIdentity, scale, translation: [m[12], m[13], m[14]], warnings };
 }
