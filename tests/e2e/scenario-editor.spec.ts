@@ -459,8 +459,8 @@ test("legacy draft: banner says so, goals / NPC / blocked / equipment are v1-onl
   const kinds = page.getByTestId("legacy-kinds");
   await expect(kinds).toContainText("Chỉ có trong fet3d.editor/1");
   await expect(page.getByTestId("scenario-editor")).not.toContainText("BE #54");
-  await expect(page.getByTestId("playtest")).toBeDisabled();
-  await expect(page.getByTestId("playtest")).toContainText("Chờ BE #55");
+  await expect(page.getByTestId("playtest")).toHaveAttribute("href", `/workspace/buildings/${BUILDING_ID}/scenarios/${SCENARIO_ID}/versions?tab=playtest`);
+  await expect(page.getByTestId("playtest")).not.toContainText("Chờ BE");
   await expect(page.getByTestId("versions-link")).toHaveAttribute("href", `/workspace/buildings/${BUILDING_ID}/scenarios/${SCENARIO_ID}/versions`);
   // The untyped legacy arrays are carried through a save untouched and no v1 document is ever written.
   await page.getByTestId("add-spawn").click();
