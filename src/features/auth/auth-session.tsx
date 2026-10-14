@@ -21,6 +21,8 @@ type AuthSessionContextValue = {
   loginWithGoogle: () => Promise<GoogleLoginResult>;
   completeGoogleOnboarding: (input: GoogleOnboardingInput) => Promise<AuthUser>;
   logout: () => Promise<void>;
+  /** Drops the local session without navigating or calling the API (e.g. after a 401 on a public landing page). */
+  endSession: () => void;
   register: (input: RegisterInput) => Promise<void>;
   requestPasswordReset: (email: string) => Promise<void>;
   resetPassword: (token: string, newPassword: string) => Promise<void>;
@@ -199,11 +201,12 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     loginWithGoogle,
     completeGoogleOnboarding,
     logout,
+    endSession: clearSession,
     register,
     requestPasswordReset,
     resetPassword,
     updateUser,
-  }), [accessToken, completeGoogleOnboarding, login, loginWithGoogle, logout, pending, ready, register, requestPasswordReset, resetPassword, updateUser, user]);
+  }), [accessToken, clearSession, completeGoogleOnboarding, login, loginWithGoogle, logout, pending, ready, register, requestPasswordReset, resetPassword, updateUser, user]);
 
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;
 }

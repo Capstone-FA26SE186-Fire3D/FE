@@ -26,12 +26,13 @@ import { IfcUploadPanel } from "./ifc-upload-panel";
 import { OverviewTab } from "./overview-tab";
 import { PreviewPanel } from "./preview-panel";
 import { ProcessingStatusPanel } from "./processing-status-panel";
+import { QrPanel } from "./qr-panel";
 import { RevisionDetailsPanel } from "./revision-details-panel";
 import { ScenariosPanel } from "./scenarios-panel";
 
-export const buildingTabs = ["overview", "ifc", "scenarios", "access", "services"] as const;
+export const buildingTabs = ["overview", "ifc", "scenarios", "access", "qr", "services"] as const;
 export type BuildingTab = (typeof buildingTabs)[number];
-const tabLabels: Record<BuildingTab, string> = { overview: "Tổng quan", ifc: "IFC & xử lý", scenarios: "Kịch bản", access: "Quyền tham gia", services: "Dịch vụ" };
+const tabLabels: Record<BuildingTab, string> = { overview: "Tổng quan", ifc: "IFC & xử lý", scenarios: "Kịch bản", access: "Quyền tham gia", qr: "QR", services: "Dịch vụ" };
 const SCENARIO_PAGE_SIZE = 20;
 
 type PipelineSnapshot = { revisionId: string; jobs: ProcessingJob[]; pipeline: RevisionPipeline };
@@ -54,6 +55,9 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "overview" }:
   const urlTab = get("tab");
   const tab: BuildingTab = isTab(urlTab) ? urlTab : defaultTab;
   const [scenarioPage, setScenarioPage] = useState(1);
+  // The QR tab stays mounted once opened: a freshly issued token exists only in its memory and must survive tab switches.
+  const [qrOpened, setQrOpened] = useState(false);
+  if (tab === "qr" && !qrOpened) setQrOpened(true);
 
   const building = useAsyncData(`building:${buildingId}`, (signal) => buildingsApi.get(token, buildingId, signal), enabled);
   const revisions = useAsyncData(`revisions:${buildingId}`, (signal) => buildingsApi.listRevisions(token, buildingId, 1, 50, signal), enabled);
@@ -189,6 +193,10 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "overview" }:
 
       <TabsContent value="access">
         {accessToken && <BuildingAccessPanel accessToken={accessToken} buildingId={buildingId} />}
+      </TabsContent>
+
+      <TabsContent value="qr" forceMount hidden={tab !== "qr"}>
+        {qrOpened && accessToken && <QrPanel accessToken={accessToken} buildingId={buildingId} buildingName={data?.name ?? "Công trình"} />}
       </TabsContent>
 
       <TabsContent value="services">
