@@ -6,6 +6,7 @@ import { ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAsyncData } from "@/api/use-async-data";
+import type { Change } from "@/features/library/apply";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Drawer, Modal } from "@/components/ui/dialog";
@@ -26,6 +27,7 @@ import type { ObjectKind } from "../../v1/contract";
 import { parseGeometry } from "../../v1/geometry";
 import { targetOf } from "../../v1/issues";
 import { applyMatrix, glbToLocal, localToGlb, round3, isUnitQuaternion } from "../../v1/matrix";
+import { setFieldsCommand } from "../../v1/commands";
 import { readGeometryPin, readObjects, readString, type ReferenceContext } from "../../v1/state";
 import { useEditorV1 } from "../../v1/use-editor-v1";
 import type { Issue } from "../../store/validation";
@@ -36,6 +38,7 @@ import { KindAvailability } from "../kind-availability";
 import { createV1Actions } from "./actions";
 import { V1GeometryPanel } from "./v1-geometry-panel";
 import { V1IssuesPanel } from "./v1-issues";
+import { V1LibraryPanel, initialLibraryUi, type AppliedSample, type LibraryUi } from "./v1-library-panel";
 import { V1ObjectForm } from "./v1-object-form";
 import { V1ScenarioForm } from "./v1-scenario-form";
 import { V1Toolbar } from "./v1-toolbar";
@@ -46,7 +49,7 @@ const EditorViewport = dynamic(() => import("../../scene/editor-viewport"), {
   loading: () => <div className="se-viewport" aria-busy="true"><Skeleton style={{ position: "absolute", inset: 0, borderRadius: 0 }} /><span className="se-overlay-chip" role="status">Đang chuẩn bị khung nhìn 3D…</span></div>,
 });
 
-type PanelTab = "object" | "scenario" | "issues" | "geometry" | "kinds";
+type PanelTab = "object" | "scenario" | "library" | "issues" | "geometry" | "kinds";
 type MobileTab = "model" | "objects" | "props";
 
 const ORIGIN = { x: 0, y: 0, z: 0 };
@@ -66,6 +69,8 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const [layerVisibility, setLayerVisibility] = useState<Record<string, boolean>>({});
   const [modelStatus, setModelStatus] = useState<ModelStatus>({ phase: "none" });
   const [pick, setPick] = useState<{ name: string; point: Point3 } | null>(null);
+  const [applied, setApplied] = useState<AppliedSample[]>([]);
+  const [libraryUi, setLibraryUi] = useState<LibraryUi>(initialLibraryUi);
   const isMobile = useMediaQuery("(max-width: 767px)");
   const isDesktop = useMediaQuery("(min-width: 1100px)");
 
@@ -122,6 +127,15 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const gizmoEnabled = !isMobile;
   const selectedIndex = state.selection?.index ?? null;
   const selectedObject = selectedIndex === null ? undefined : objects[selectedIndex];
+  /** A library sample becomes ONE undoable command; the sample is recorded for this session only (the draft schema has no provenance field). */
+  const onApplySample = useCallback((changes: Change[], sample: Omit<AppliedSample, "at">) => {
+    if (changes.length === 0) return;
+    const label = `Áp dụng ${sample.code} v${sample.versionNumber}`;
+    edit((draft, id, selection, now) => setFieldsCommand(draft, id, changes, { label, at: now, selection }));
+    setApplied((current) => [...current, { ...sample, at: Date.now() }]);
+    toast.notify({ tone: "success", title: "Đã áp dụng mẫu vào bản nháp", description: "Chưa lưu. Hoàn tác bằng nút Hoàn tác hoặc Ctrl+Z." });
+  }, [edit, toast]);
+
   const placeDisabledReason = !geometry ? "Cần Geometry hợp lệ để đặt đối tượng" : activeFloor === null ? "Chọn một tầng trước khi đặt đối tượng" : null;
 
   const onSave = useCallback(async () => {
@@ -290,6 +304,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
           <TabsList aria-label="Nhóm thuộc tính">
             <TabsTrigger value="object">Đối tượng</TabsTrigger>
             <TabsTrigger value="scenario">Kịch bản</TabsTrigger>
+            <TabsTrigger value="library" data-testid="tab-library">Thư viện</TabsTrigger>
             <TabsTrigger value="issues" data-testid="tab-issues">Kiểm tra{issueCount > 0 ? ` (${issueCount})` : ""}</TabsTrigger>
             <TabsTrigger value="geometry" data-testid="tab-geometry">Mô hình</TabsTrigger>
             <TabsTrigger value="kinds" data-testid="tab-kinds">Khả dụng</TabsTrigger>
@@ -297,6 +312,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
           <div className="se-panel-scroll">
             <TabsContent value="object"><V1ObjectForm object={selectedObject} issues={issues} actions={actions} geometry={geometry} catalog={catalogView} runtimeVersion={runtimeVersion} pick={pick} onOpenScenario={() => setPanelTab("scenario")} /></TabsContent>
             <TabsContent value="scenario"><V1ScenarioForm draft={state.draft} issues={issues} actions={actions} catalog={catalogView} rubricCatalog={rubricState} /></TabsContent>
+            <TabsContent value="library"><V1LibraryPanel accessToken={accessToken} ui={libraryUi} onUi={setLibraryUi} draft={state.draft} selectedObject={selectedObject} runtimeVersion={runtimeVersion} runtimes={runtimes} rubric={rubricView} applied={applied} canUndoLast={(label) => lastPast?.label === label} onUndo={() => dispatch({ type: "undo" })} onApply={onApplySample} /></TabsContent>
             <TabsContent value="issues"><V1IssuesPanel issues={issues} shapeProblems={editor.shapeProblems} report={editor.report} reportStale={editor.reportStale} validating={editor.validating} validateError={editor.validateError} dirty={dirty} onValidate={() => void onValidate()} onJump={onJump} /></TabsContent>
             <TabsContent value="geometry"><V1GeometryPanel reading={reading} preview={preview} pin={pin} buildingId={buildingId} revisionId={revisionId} onRepin={actions.pinGeometry} modelSummary={modelSummary} /></TabsContent>
             <TabsContent value="kinds"><KindAvailability statuses={kindStatus} onRetryCatalog={catalogQuery.reload} /></TabsContent>

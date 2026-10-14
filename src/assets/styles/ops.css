@@ -155,6 +155,7 @@
 /* ───────── Surfaces ───────── */
 .ops-panel { min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .ops-panel-body { padding: 20px; }
+.ops-panel-body:empty { display: none; }
 .ops-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
 .ops-panel-head h2 { margin: 0; font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
 .ops-panel-head p { margin: 4px 0 0; color: var(--dim); font-size: 12px; }
@@ -207,7 +208,6 @@ select.ops-input { appearance: none; padding-right: 34px; background-image: line
 .ops-badge[data-tone="ember"] { background: var(--ember-soft); color: var(--ember); }
 .ops-badge[data-tone="pending"]::before { animation: ops-pulse 1.4s ease-in-out infinite; }
 @keyframes ops-pulse { 50% { opacity: .25; } }
-.ops-proto { display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border: 1px dashed var(--warning); border-radius: 6px; color: var(--warning); font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
 .ops-alert { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; padding: 12px 14px; border: 1px solid var(--line-strong); border-left-width: 3px; border-radius: 9px; background: var(--bg-soft); color: var(--text); font-size: 13px; line-height: 1.55; }
 .ops-alert > svg { margin-top: 2px; }
 .ops-alert strong { display: block; margin-bottom: 2px; }

@@ -21,6 +21,7 @@ export const routes = {
   adminCommerce: "/admin/commerce",
   adminSupport: "/admin/support",
   workspaceBuildings: "/workspace/buildings",
+  workspaceLibrary: "/workspace/library",
   workspaceBilling: "/workspace/billing",
   workspaceBillingReturn: "/workspace/billing/return",
   workspaceIfc: "/workspace/ifc",
