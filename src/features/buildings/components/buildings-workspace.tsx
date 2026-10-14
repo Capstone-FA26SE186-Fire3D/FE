@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { buildingsApi } from "../api";
+import { describeApiError } from "../format";
 import { organizationsApi } from "@/features/organizations/api";
 import type { Building, BuildingSummary } from "../types";
 import { BuildingForm, buildingFormToInput, emptyForm, formFromBuilding, validateBuildingForm, type FormState } from "./building-form";
@@ -73,6 +74,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
     `buildings:${scopedOrgId ?? "own"}:${page}:${status}:${urlSearch}`,
     (signal) => buildingsApi.list(accessToken as string, { page, pageSize: PAGE_SIZE, search: urlSearch.trim() || undefined, isActive: statusToFilter(status), organizationId: scopedOrgId }, signal),
     enabled,
+    { scope: scopedOrgId ?? "own" },
   );
   const organizations = useAsyncData(
     "buildings:org-picker",
@@ -83,6 +85,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
     `buildings:org:${scopedOrgId}`,
     () => organizationsApi.get(accessToken as string, scopedOrgId as string),
     Boolean(accessToken) && ready && isAdmin && Boolean(scopedOrgId),
+    { keepPrevious: false },
   );
   const organizationName = organization.data?.name;
 
@@ -218,7 +221,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
       </div>
     </div>
 
-    {error !== undefined && <Alert tone="danger" title="Không tải được danh sách" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reload}>Thử lại</Button>}>{loadError}</Alert>}
+    {error !== undefined && <Alert tone="danger" title="Không tải được danh sách" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reload}>Thử lại</Button>}>{describeApiError(error, loadError)}</Alert>}
 
     {view === "table"
       ? <Table caption="Danh sách công trình">

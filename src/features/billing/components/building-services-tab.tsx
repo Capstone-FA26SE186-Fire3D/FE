@@ -69,7 +69,7 @@ export function BuildingServicesTab({ buildingId }: { buildingId: string }) {
 
   const selectedId = get("quotation");
   const paymentId = get("payment");
-  const selected = useAsyncData(`billing:quotation:${selectedId}`, (signal) => billingApi.getQuotation(token, selectedId, signal), enabled && Boolean(selectedId));
+  const selected = useAsyncData(`billing:quotation:${selectedId}`, (signal) => billingApi.getQuotation(token, selectedId, signal), enabled && Boolean(selectedId), { keepPrevious: false });
   const current: WithEtag<Quotation> | null = override && override.data.id === selectedId ? override : selected.data ?? null;
 
   const summary = useMemo(() => summarizeEntitlements(entitlements.data?.items ?? []), [entitlements.data]);

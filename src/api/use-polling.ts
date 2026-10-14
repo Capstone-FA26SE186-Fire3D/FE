@@ -24,13 +24,16 @@ export function nextPollDelay(baseMs: number, failures: number, maxBackoffMs: nu
 
 /**
  * Polls while the page is visible and the component is mounted. Starts at `intervalMs` (3s), backs off on
- * errors, honors Retry-After, pauses in background tabs and stops on a final state.
+ * errors, honors Retry-After, pauses in background tabs, stops on a final state and halts on 401/403 (`halted`; `refresh()` resumes).
  */
 export function usePolling<T>({ fetcher, isDone, enabled = true, intervalMs = 3000, maxBackoffMs = 30_000, resetKey = "" }: PollingOptions<T>) {
   const [data, setData] = useState<T | undefined>();
   const [error, setError] = useState<unknown>();
   const [finishedFor, setFinishedFor] = useState<string | null>(null);
   const finished = finishedFor === resetKey;
+  // 401/403 will not heal by waiting (the session or the permission is gone): polling halts until the user retries.
+  const [haltedFor, setHaltedFor] = useState<string | null>(null);
+  const halted = haltedFor === resetKey;
   const [reloadToken, setReloadToken] = useState(0);
   const fetcherRef = useRef(fetcher);
   const isDoneRef = useRef(isDone);
@@ -73,6 +76,7 @@ export function usePolling<T>({ fetcher, isDone, enabled = true, intervalMs = 30
         if (stopped || controller.signal.aborted) return;
         failures += 1;
         setError(cause);
+        if (cause instanceof ApiError && (cause.status === 401 || cause.status === 403)) { setHaltedFor(resetKey); return; }
         schedule(nextPollDelay(intervalMs, failures, maxBackoffMs, cause instanceof ApiError ? cause.retryAfterSeconds : undefined));
       }
     }
@@ -96,8 +100,9 @@ export function usePolling<T>({ fetcher, isDone, enabled = true, intervalMs = 30
 
   const refresh = useCallback(() => {
     setFinishedFor(null);
+    setHaltedFor(null);
     setReloadToken((token) => token + 1);
   }, []);
 
-  return { data, error, finished, polling: enabled && !finished, refresh };
+  return { data, error, finished, halted, polling: enabled && !finished && !halted, refresh };
 }

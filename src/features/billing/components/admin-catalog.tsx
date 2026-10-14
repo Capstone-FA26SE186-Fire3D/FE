@@ -17,6 +17,7 @@ import { billingApi } from "../api";
 import { billingErrorText, isStatus } from "../errors";
 import { formatDate, formatNumber, formatVnd, isoToLocalInput, localInputToIso } from "../format";
 import type { DiscountInput, DiscountKind, DiscountRule, PackageInput, QuotaPolicy, ServicePackage } from "../types";
+import { keepEdits } from "@/utils/keep-edits";
 import "../billing.css";
 
 type ErrorMap = Record<string, string | undefined>;
@@ -114,9 +115,12 @@ export function PackagesSection({ accessToken }: { accessToken: string }) {
     if (!editing?.item) return;
     try {
       const fresh = await billingApi.getPackage(accessToken, editing.item.id);
+      // PATCH replaces every field: only what I typed stays mine, the rest must follow the newer version or it would be overwritten.
+      const base = packageToForm(editing.item);
+      setForm((current) => keepEdits(current, base, packageToForm(fresh.data)));
       setEditing({ item: fresh.data, etag: fresh.etag });
       setConflict(false); setFormError("");
-      toast.notify({ tone: "info", title: "Đã tải bản mới", description: "Nội dung bạn nhập vẫn giữ nguyên; đối chiếu với bản mới trong danh sách rồi lưu lại." });
+      toast.notify({ tone: "info", title: "Đã tải bản mới", description: "Các trường bạn đã sửa vẫn giữ nguyên; các trường còn lại đã cập nhật theo bản mới. Kiểm tra rồi lưu lại." });
       list.reload();
     } catch (cause) { setFormError(billingErrorText(cause)); }
   };
@@ -242,9 +246,11 @@ export function DiscountsSection({ accessToken }: { accessToken: string }) {
     if (!editing?.item) return;
     try {
       const fresh = await billingApi.getDiscount(accessToken, editing.item.id);
+      const base = discountToForm(editing.item);
+      setForm((current) => keepEdits(current, base, discountToForm(fresh.data)));
       setEditing({ item: fresh.data, etag: fresh.etag });
       setConflict(false); setFormError("");
-      toast.notify({ tone: "info", title: "Đã tải bản mới", description: "Nội dung bạn nhập vẫn giữ nguyên; kiểm tra lại rồi lưu." });
+      toast.notify({ tone: "info", title: "Đã tải bản mới", description: "Các trường bạn đã sửa vẫn giữ nguyên; các trường còn lại đã cập nhật theo bản mới. Kiểm tra lại rồi lưu." });
       list.reload();
     } catch (cause) { setFormError(billingErrorText(cause)); }
   };

@@ -56,7 +56,7 @@ export function EnterpriseSection({ accessToken, defaultEmail, defaultName, onOp
   const [sent, setSent] = useState(false);
 
   const list = useAsyncData(`billing:enterprise:${page}`, (signal) => billingApi.listEnterpriseRequests(accessToken, page, PAGE_SIZE, "mine", signal));
-  const detail = useAsyncData(`billing:enterprise:detail:${requestId}`, (signal) => billingApi.getEnterpriseRequest(accessToken, "mine", requestId, signal), Boolean(requestId));
+  const detail = useAsyncData(`billing:enterprise:detail:${requestId}`, (signal) => billingApi.getEnterpriseRequest(accessToken, "mine", requestId, signal), Boolean(requestId), { keepPrevious: false });
   const request = useMemo(() => detail.data?.data ?? null, [detail.data]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {

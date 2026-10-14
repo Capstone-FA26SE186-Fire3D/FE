@@ -1,9 +1,11 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { resetCommandKeys } from "@/api/command-keys";
 import { ApiError } from "@/api/types/common";
 import { routes } from "@/configs/routes";
+import { clearPendingCheckout } from "@/features/billing/pending-payment";
 import { useDemoSession } from "@/store/demo-session";
 import { authApi } from "./api";
 import { signInWithGoogle } from "./firebase";
@@ -56,6 +58,16 @@ function persistTokens(tokens: StoredTokens | null) {
   }
 }
 
+/**
+ * Browser storage that points at one tenant's business objects (the retry keys of unfinished commands, the checkout the
+ * user left for PayOS). It must not survive a logout or an account switch: the next account in this tab would otherwise
+ * replay the previous account's keys or be sent to its quotation.
+ */
+function forgetAccountBoundData() {
+  resetCommandKeys();
+  clearPendingCheckout();
+}
+
 function toMessage(error: unknown) {
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
@@ -69,8 +81,12 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [pending, setPending] = useState(false);
   const [ready, setReady] = useState(false);
+  // The account this tab last held: a different account signing in (even without a logout in between) starts clean.
+  const lastUserId = useRef<string | null>(null);
 
-  const saveSession = useCallback((response: TokenResponse) => {
+  const saveSession = useCallback((response: TokenResponse, explicitLogin = false) => {
+    if (explicitLogin && lastUserId.current && lastUserId.current !== response.user.id) forgetAccountBoundData();
+    lastUserId.current = response.user.id;
     setAccessToken(response.accessToken);
     setUser(response.user);
     persistTokens({ accessToken: response.accessToken, refreshToken: response.refreshToken });
@@ -94,6 +110,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       try {
         const currentUser = await authApi.me(tokens.accessToken);
         if (!active) return;
+        lastUserId.current = currentUser.id;
         setAccessToken(tokens.accessToken);
         setUser(currentUser);
       } catch (error) {
@@ -105,7 +122,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
           const refreshed = await authApi.refresh(tokens.refreshToken);
           if (active) saveSession(refreshed);
         } catch {
-          if (active) clearSession();
+          // The session is really gone (expired/revoked): whoever signs in next may be another account.
+          if (active) { clearSession(); forgetAccountBoundData(); }
         }
       } finally {
         if (active) setReady(true);
@@ -118,7 +136,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (email: string, password: string) => {
     try {
       const response = await authApi.login(email, password);
-      saveSession(response);
+      saveSession(response, true);
       return response.user;
     } catch (error) {
       if (error instanceof ApiError) throw error;
@@ -130,7 +148,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     try {
       const firebaseIdToken = await signInWithGoogle();
       const response = await authApi.loginFirebase(firebaseIdToken);
-      if (response.status === "Authenticated") saveSession(response.authentication);
+      if (response.status === "Authenticated") saveSession(response.authentication, true);
       return response;
     } catch (error) {
       throw error;
@@ -139,7 +157,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
 
   const completeGoogleOnboarding = useCallback(async (input: GoogleOnboardingInput) => {
     const response = await authApi.completeGoogleOnboarding(input);
-    saveSession(response);
+    saveSession(response, true);
     return response.user;
   }, [saveSession]);
 
@@ -177,6 +195,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     const token = accessToken;
     clearSession();
+    forgetAccountBoundData();
+    lastUserId.current = null;
     resetDemo();
     router.replace(routes.home);
     if (!token) return;
@@ -189,6 +209,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
 
   const endSession = useCallback(() => {
     clearSession();
+    forgetAccountBoundData();
+    lastUserId.current = null;
     resetDemo();
   }, [clearSession, resetDemo]);
 

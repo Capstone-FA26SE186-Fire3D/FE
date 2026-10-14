@@ -148,6 +148,21 @@ Nút Playtest của editor là liên kết tới tab Playtest của màn phiên 
 | Thương mại, editor catalog | 500 → BE#64. |
 | Chưa kiểm | IFC upload, editor, thanh toán PayOS, review/release (bị chặn bởi BE#64 hoặc chưa an toàn để chạy trên dữ liệu thật). |
 
+## Regression xuyên màn hình (FE#68, 14/10/2026)
+
+Bộ `tests/e2e/regression-*.spec.ts` (46 test, route mock có trạng thái; helper chung `regression-helpers.ts`) kiểm các lỗi trạng thái cũ / sai tenant / ghi đè trên nhánh cuối chuỗi PR #63–#67. **Mức bằng chứng: mock** (FE đã tích hợp); chưa có smoke API thật cho các hành vi dưới.
+
+| Nhóm | Phủ | Lỗi FE tìm thấy và đã sửa |
+|---|---|---|
+| Phiên / tenant (`regression-session-tenant`) | Đăng xuất rồi đăng nhập org khác cùng tab: danh sách, chi tiết theo id, history Back/Forward, nội dung `sessionStorage`/`localStorage` | Bản đồ Idempotency-Key bền (`fet3d:learn-command-keys:v1`) và checkout PayOS dang dở (`fet3d:billing:pending-checkout:v1`, kèm `returnTo`/quotationId của org cũ) **sống sót sau đăng xuất**; nay xóa ở `logout`/`endSession`, khi không khôi phục được phiên hết hạn và khi một tài khoản khác đăng nhập. |
+| Trạng thái trong URL (`regression-url-state`) | Drawer `?quotation=` (Org, Admin), `?item=` (Library), `?org=` (Admin đổi tổ chức): đổi URL khi màn đang mở | `useAsyncData` giữ dữ liệu của key trước: drawer hiện báo giá/mẫu cũ (và che lỗi 404/403 của cái mới), danh sách công trình hiện công trình + tên tổ chức trước khi tổ chức mới tải xong. Thêm tuỳ chọn `keepPrevious:false` và `scope`. Truy vấn thất bại (khác key, hoặc 401/403/404) không còn để lại hàng cũ cạnh lỗi; báo cáo analytics giữ hành vi "giữ số liệu cũ + cảnh báo" bằng `keepWhenDenied`. |
+| Lỗi chung + dữ liệu cũ (`regression-errors-stale`) | 401/403/429+Retry-After/5xx/mất mạng ở danh sách công trình, tài khoản, tổ chức; thử lại; lọc lỗi không để lại hàng của bộ lọc cũ; 403 khi tải lại xóa hàng; phản hồi muộn không ghi đè; reload/back/forward giữ filter, số request; polling | Công trình/Tài khoản/Tổ chức dùng một câu cố định cho mọi lỗi (401 báo "kiểm tra kết nối"); `usePolling` thử lại vô hạn khi 401/403. Nay `describeApiError` dùng chung (`src/api/describe-error.ts`) và polling dừng ở 401/403 (nút Thử lại tiếp tục). |
+| ETag 412 (`regression-etag`) | Hồ sơ cá nhân, hồ sơ tổ chức, Admin sửa tổ chức, gói dịch vụ, quy tắc giảm giá; lỗi ghi 401/403/5xx/mạng ở hồ sơ; bấm đúp Lưu | Sau 412, "Tải bản mới" giữ **toàn bộ** form: trường chưa sửa quay về bản cũ và ghi đè thay đổi của người kia ở lần lưu sau (PATCH thay toàn bộ field). Nay chỉ trường người dùng đã gõ được giữ (`src/utils/keep-edits.ts`). Hồ sơ hiện `error.message` tiếng Anh thô ở 401/403/5xx. |
+
+Đã có test ở spec riêng từ trước và không lặp lại: 412 của Learn, Library, knowledge source, support, quyền Building, annotation, editor draft; bấm đúp cho tạo báo giá, upload IFC, process, scenario, QR, Admin review, tin nhắn support, AI.
+
+Còn rủi ro / chưa phủ (xem báo cáo FE#68): access token hết hạn giữa phiên không được làm mới tự động (chỉ làm mới khi khôi phục phiên), Retry-After hiển thị là câu tĩnh "sau N giây" ở hầu hết màn (đếm ngược động chỉ ở playtest handoff), `POST /api/buildings` và `PUT /api/buildings/{id}` chưa có Idempotency-Key/If-Match ở BE, `useIdempotencyKey` chỉ nhớ một payload mỗi hook.
+
 ## Cách chạy test
 
 - `pnpm build` phải chạy với `NEXT_PUBLIC_API_BASE_URL=` (rỗng) để mock Playwright cùng origin. Nếu `.env` trỏ tới API thật, trình duyệt coi mock là khác origin và giấu header `ETag`/`Retry-After` → các test 412/Retry-After sẽ lỗi.

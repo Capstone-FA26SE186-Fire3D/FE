@@ -170,8 +170,8 @@ export function QuotationsSection({ accessToken }: { accessToken: string }) {
   const selectedId = get("quotation");
   const list = useAsyncData(`commerce:quotes:${page}`, (signal) => billingApi.listQuotations(accessToken, page, PAGE_SIZE, signal));
   const organizations = useAsyncData("commerce:orgs", () => organizationsApi.list(accessToken, { page: 1, pageSize: 100 }));
-  const detail = useAsyncData(`commerce:quote:${selectedId}`, (signal) => billingApi.getQuotation(accessToken, selectedId, signal), Boolean(selectedId));
-  const checkouts = useAsyncData(`commerce:quote-checkouts:${selectedId}:${detail.data?.data.revision ?? 0}`, (signal) => billingApi.listQuotationCheckouts(accessToken, selectedId, 1, 20, signal), Boolean(selectedId) && Boolean(detail.data) && detail.data?.data.status !== "Draft");
+  const detail = useAsyncData(`commerce:quote:${selectedId}`, (signal) => billingApi.getQuotation(accessToken, selectedId, signal), Boolean(selectedId), { keepPrevious: false });
+  const checkouts = useAsyncData(`commerce:quote-checkouts:${selectedId}:${detail.data?.data.revision ?? 0}`, (signal) => billingApi.listQuotationCheckouts(accessToken, selectedId, 1, 20, signal), Boolean(selectedId) && Boolean(detail.data) && detail.data?.data.status !== "Draft", { keepPrevious: false });
   const [override, setOverride] = useState<WithEtag<Quotation> | null>(null);
   const current = override && override.data.id === selectedId ? override : detail.data ?? null;
   const orgName = useMemo(() => Object.fromEntries((organizations.data?.items ?? []).map((item) => [item.id, item.name])), [organizations.data]);

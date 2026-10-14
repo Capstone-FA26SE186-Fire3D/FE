@@ -43,9 +43,9 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
   const enabled = allowed && !rangeError && (variant !== "admin-organization" || Boolean(organizationId));
   const key = `${variant}:${organizationId ?? ""}:${urlFrom}:${urlTo}`;
 
-  const training = useAsyncData(`training:${key}`, (signal) => analyticsApi.training(accessToken as string, scope, range, signal), enabled && tab === "training");
-  const operations = useAsyncData(`operations:${key}`, (signal) => analyticsApi.operations(accessToken as string, scope, range, signal), enabled && tab === "operations");
-  const revenue = useAsyncData(`revenue:${key}`, (signal) => analyticsApi.revenue(accessToken as string, range, signal), enabled && tab === "revenue" && variant === "platform");
+  const training = useAsyncData(`training:${key}`, (signal) => analyticsApi.training(accessToken as string, scope, range, signal), enabled && tab === "training", { keepWhenDenied: true });
+  const operations = useAsyncData(`operations:${key}`, (signal) => analyticsApi.operations(accessToken as string, scope, range, signal), enabled && tab === "operations", { keepWhenDenied: true });
+  const revenue = useAsyncData(`revenue:${key}`, (signal) => analyticsApi.revenue(accessToken as string, range, signal), enabled && tab === "revenue" && variant === "platform", { keepWhenDenied: true });
   const names = useAsyncData("analytics:organization-names", () => accountsApi.organizations(accessToken as string).then((page) => new Map(page.items.map((item) => [item.id, item.name]))), enabled && tab === "training" && variant === "platform");
 
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
