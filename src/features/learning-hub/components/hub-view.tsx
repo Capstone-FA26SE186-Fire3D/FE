@@ -16,11 +16,11 @@ import { AskPanel } from "./ask-panel";
 import { HistoryPanel } from "./history-panel";
 import { SavedPosts } from "./saved-posts";
 
-/** `unavailable` views stay in the menu so the URL keeps working and the reason is one click away; see CapabilityUnavailable. */
+/** `unavailable` views stay in the menu so the URL keeps working and the reason is one click away; see CapabilityUnavailable. Only Hỏi đáp (BE#77) is still one. */
 const views = [
   { key: "saved", label: "Bài đã lưu", icon: "archive-book" },
   { key: "questions", label: "Hỏi đáp", icon: "message-question", unavailable: true },
-  { key: "history", label: "Lịch sử", icon: "clock", unavailable: true },
+  { key: "history", label: "Lịch sử", icon: "clock" },
   { key: "support", label: "Hỗ trợ", icon: "send-2" },
   { key: "profile", label: "Hồ sơ", icon: "user" },
 ] as const satisfies ReadonlyArray<{ key: string; label: string; icon: IconsaxName; unavailable?: true }>;

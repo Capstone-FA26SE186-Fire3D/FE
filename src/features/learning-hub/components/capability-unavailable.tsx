@@ -12,7 +12,7 @@ export type NextStep = { label: string; href: string };
 /**
  * A capability of the Learning Hub that the server cannot serve yet. It states the reason and what the learner can do
  * now; it never shows sample data or a success. Replace a call site with the real view when its contract exists
- * (AI for Trainee: BE#77, personal history/results: BE#78) and keep this component for the next blocked capability.
+ * (AI for Trainee: BE#77) and keep this component for the next blocked capability. Personal history/results (BE#78) is real now: features/training-history.
  */
 export function CapabilityUnavailable({ icon: Icon, title, reason, context, steps }: {
   icon: LucideIcon;
