@@ -10,7 +10,7 @@ import "../learn.css";
 
 /** "Đọc tiếp": other Published posts, preferring the same situation. Best effort: it renders nothing when it cannot load. */
 export function RelatedPosts({ currentId, situation }: { currentId: string; situation?: string }) {
-  const related = useAsyncData(`learn:related:${situation ?? ""}`, (signal) => learnApi.posts({ situation, page: 1, pageSize: 5 }, signal));
+  const related = useAsyncData(`learn:related:${situation ?? ""}`, (signal) => learnApi.posts({ situations: situation ? [situation] : undefined, page: 1, pageSize: 5 }, signal));
   const items = (related.data?.items ?? []).filter((item) => item.id !== currentId).slice(0, 4);
   if (!items.length) return null;
   return <aside className="reader-related" aria-labelledby="reader-related-heading">
