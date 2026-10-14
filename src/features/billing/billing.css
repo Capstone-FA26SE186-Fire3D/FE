@@ -63,7 +63,21 @@
 .bill-meter { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
 .bill-meter > span { display: block; height: 100%; border-radius: inherit; background: var(--ember); }
 
-.bill-proto { border: 1px dashed var(--warning); border-radius: 12px; padding: 16px; display: grid; gap: 14px; }
+.bill-states { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.bill-segment { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-soft); }
+.bill-segment button { min-height: 44px; padding: 0 14px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.bill-segment button:hover { color: var(--text); }
+.bill-segment button[data-active="true"] { background: var(--ember-soft); color: var(--ember); }
+.bill-segment button:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+
+.bill-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.bill-list > li { padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-soft); min-width: 0; }
+.bill-list > li[data-read="false"][data-relevant="true"] { border-color: var(--ember); }
+.bill-period { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.bill-package-groups { display: grid; gap: 14px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.bill-package-group { min-width: 0; }
+.bill-package[aria-disabled="true"] { opacity: .6; cursor: not-allowed; }
+.bill-filters > .ops-field { min-width: 160px; }
 
 @media (max-width: 640px) {
   .bill-row { align-items: stretch; }
