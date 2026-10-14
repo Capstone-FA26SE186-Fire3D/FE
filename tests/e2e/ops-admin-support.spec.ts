@@ -35,7 +35,7 @@ const analytics = {
   definitions: { accounts: "current snapshot" },
   accounts: [{ role: "PlatformAdmin", isActive: true, count: 2 }, { role: "OrganizationUser", isActive: true, count: 7 }, { role: "Trainee", isActive: true, count: 40 }, { role: "Trainee", isActive: false, count: 3 }],
   buildings: [{ key: true, count: 11 }, { key: false, count: 2 }],
-  ifcJobs: [{ status: "Succeeded", count: 9 }, { status: "Failed", count: 2 }],
+  processingJobs: [{ kind: "IfcProcessing", status: "Succeeded", count: 9 }, { kind: "IfcProcessing", status: "Failed", count: 2 }],
   tickets: [{ status: "Open", count: 4 }, { status: "Resolved", count: 6 }],
 };
 
@@ -58,7 +58,7 @@ test.describe("pure helpers", () => {
 });
 
 test.describe("admin overview", () => {
-  test("shows only operations analytics with period, as-of time and pending BE cards", async ({ page }) => {
+  test("opens on operations analytics with period and as-of time; training and revenue load only when their tab opens", async ({ page }) => {
     const queries: string[] = [];
     await signIn(page, admin);
     await page.route("**/api/admin/analytics/operations*", (route) => { queries.push(new URL(route.request().url()).search); return route.fulfill({ json: analytics }); });
@@ -70,10 +70,9 @@ test.describe("admin overview", () => {
     await expect(page.getByText("Tài khoản (hiện tại)")).toBeVisible();
     await expect(page.locator(".ops-stat", { hasText: "Tài khoản (hiện tại)" }).locator("strong")).toHaveText("52");
     await expect(page.locator(".ops-stat", { hasText: "Công trình (hiện tại)" }).locator("strong")).toHaveText("13");
-    await expect(page.getByRole("list", { name: "Tiến trình IFC theo trạng thái" })).toContainText("Thất bại");
-    // Only the operations endpoint is called; no plays/completion/revenue numbers are invented.
-    await expect(page.getByText("Lượt chơi & hoàn thành")).toBeVisible();
-    await expect(page.getByText("Chờ BE").first()).toBeVisible();
+    await expect(page.getByRole("list", { name: "Tiến trình IfcProcessing theo trạng thái" })).toContainText("Thất bại");
+    // Only the operations endpoint is called until another tab opens; the old "Chờ BE" cards are gone.
+    await expect(page.locator("#ops-main").getByText("Chờ BE")).toHaveCount(0);
     expect(queries).toEqual([""]);
   });
 
@@ -114,7 +113,7 @@ test.describe("admin overview", () => {
     await signIn(page, admin);
     await page.route("**/api/admin/analytics/operations*", (route) => { calls += 1; return fail ? route.fulfill({ status: 500, json: { title: "x" } }) : route.fulfill({ json: analytics }); });
     await page.goto("/admin/overview");
-    await expect(page.getByText("Không tải được tổng quan")).toBeVisible();
+    await expect(page.getByText("Không tải được báo cáo vận hành")).toBeVisible();
     fail = false;
     await page.getByRole("button", { name: "Thử lại" }).click();
     await expect(page.getByText("Tài khoản (hiện tại)")).toBeVisible();

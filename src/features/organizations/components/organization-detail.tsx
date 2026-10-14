@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, Pencil, RefreshCw, UserPlus } from "lucide-react";
+import { BarChart3, Building2, Pencil, RefreshCw, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError } from "@/api";
@@ -163,6 +163,7 @@ export function OrganizationDetail({ id, accessToken, onToggle, onSaved }: { id:
       {!edits && <Button variant="secondary" onClick={startEdit}><Pencil size={16} aria-hidden="true" />Sửa hồ sơ</Button>}
       <Button asChild><Link href={ownersHref(organization.id)}><UserPlus size={16} aria-hidden="true" />Tạo OrganizationUser</Link></Button>
       <Button asChild variant="secondary"><Link href={buildingsHref(organization.id)}><Building2 size={16} aria-hidden="true" />Xem công trình</Link></Button>
+      <Button asChild variant="secondary"><Link href={`${routes.adminOrganizations}/${organization.id}/analytics`}><BarChart3 size={16} aria-hidden="true" />Xem báo cáo</Link></Button>
       <Button variant={organization.isActive ? "secondary" : "primary"} onClick={() => onToggle(organization)}>{organization.isActive ? "Vô hiệu hóa tổ chức" : "Kích hoạt tổ chức"}</Button>
     </div>
   </div>;
