@@ -10,7 +10,7 @@ export type Patch =
   | { op: "insert"; path: Path; index: number; value: Json }
   | { op: "remove"; path: Path; index: number; value: Json };
 
-export type Command = {
+export type Command<S = Selection> = {
   id: number;
   label: string;
   patches: Patch[];
@@ -20,8 +20,8 @@ export type Command = {
   windowMs?: number;
   at: number;
   /** Selection to restore on undo / apply on redo. Undefined leaves the selection alone. */
-  selectBefore?: Selection;
-  selectAfter?: Selection;
+  selectBefore?: S;
+  selectAfter?: S;
 };
 
 export function applyPatch(state: JsonObject, patch: Patch): JsonObject {
@@ -36,18 +36,18 @@ export function invertPatch(patch: Patch): Patch {
   return { op: "insert", path: patch.path, index: patch.index, value: patch.value };
 }
 
-export function applyCommand(state: JsonObject, command: Command): JsonObject {
+export function applyCommand(state: JsonObject, command: Command<unknown>): JsonObject {
   return command.patches.reduce(applyPatch, state);
 }
 
-export function revertCommand(state: JsonObject, command: Command): JsonObject {
+export function revertCommand(state: JsonObject, command: Command<unknown>): JsonObject {
   return command.patches.slice().reverse().map(invertPatch).reduce(applyPatch, state);
 }
 
 // ───────── history ─────────
 
-export type History = { past: Command[]; future: Command[] };
-export const emptyHistory: History = { past: [], future: [] };
+export type History<S = Selection> = { past: Command<S>[]; future: Command<S>[] };
+export const emptyHistory: History<never> = { past: [], future: [] };
 export const HISTORY_LIMIT = 200;
 
 function compact(patches: Patch[]): Patch[] {
@@ -62,16 +62,16 @@ function compact(patches: Patch[]): Patch[] {
   return [...merged.values()].filter((patch) => !deepEqual(patch.before, patch.after));
 }
 
-export function mergeCommands(previous: Command, next: Command): Command {
+export function mergeCommands<S>(previous: Command<S>, next: Command<S>): Command<S> {
   return { ...previous, patches: compact([...previous.patches, ...next.patches]), at: next.at, selectAfter: next.selectAfter };
 }
 
-export function canMerge(previous: Command | undefined, next: Command): previous is Command {
+export function canMerge<S>(previous: Command<S> | undefined, next: Command<S>): previous is Command<S> {
   if (!previous || !next.mergeKey || previous.mergeKey !== next.mergeKey) return false;
   return next.windowMs === undefined || next.at - previous.at <= next.windowMs;
 }
 
-export function pushCommand(history: History, command: Command): History {
+export function pushCommand<S>(history: History<S>, command: Command<S>): History<S> {
   const top = history.past[history.past.length - 1];
   if (canMerge(top, command)) {
     const merged = mergeCommands(top, command);

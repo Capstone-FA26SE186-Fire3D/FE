@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 
 import { ApiError } from "@/api/types/common";
 
-import { scenarioEditorApi, type DraftResponse } from "./api";
+import { scenarioEditorApi, type DraftResponse, type LoadedDraft } from "./api";
 import { type Command } from "./store/commands";
 import { editorReducer, initialEditorState, isDirty, saveStatus, type EditorState } from "./store/editor-store";
 import { compareDrafts, resolveMerge, type MergeChoice, type MergeUnit } from "./store/merge";
@@ -47,7 +47,11 @@ export function describeSaveError(error: unknown): { message: string; conflict: 
   return { conflict: false, message: error instanceof Error ? error.message : "Không thể lưu bản nháp." };
 }
 
-export function useScenarioEditor(accessToken: string | null, draftId: string | null) {
+/**
+ * `initial` is the draft the entry screen already read to decide between legacy and `fet3d.editor/1`; the first load uses
+ * it instead of a second GET. A reload (retry) always asks the server again.
+ */
+export function useScenarioEditor(accessToken: string | null, draftId: string | null, initial?: LoadedDraft) {
   const [state, dispatch] = useReducer(editorReducer, initialEditorState);
   const [load, setLoad] = useState<LoadState>({ phase: "loading" });
   const [meta, setMeta] = useState<EditorMeta | null>(null);
@@ -63,6 +67,7 @@ export function useScenarioEditor(accessToken: string | null, draftId: string | 
   const validatingRef = useRef(false);
   const requestScope = useRef<AbortController | null>(null);
   const clock = useRef(() => Date.now());
+  const initialRef = useRef(initial);
 
   useEffect(() => {
     stateRef.current = state;
@@ -74,20 +79,28 @@ export function useScenarioEditor(accessToken: string | null, draftId: string | 
     requestScope.current = controller;
     savingRef.current = false;
     validatingRef.current = false;
+    const apply = ({ draft, etag }: LoadedDraft) => {
+      const body = isObject(draft.state) ? draft.state : {};
+      dispatch({ type: "loaded", draft: body, etag, version: draft.version });
+      setMeta({ id: draft.id, scenarioId: draft.scenarioId, revisionId: draft.revisionId, buildingId: draft.buildingId, draftNumber: draft.draftNumber, source: draft.source, updatedAt: draft.updatedAt });
+      setServerIssues([]);
+      setValidatedSnapshot(null);
+      setLastValidation(null);
+      setLoad({ phase: "ready" });
+    };
+    const seed = reloadToken === 0 && initialRef.current?.draft.id === draftId ? initialRef.current : undefined;
     const timer = window.setTimeout(() => {
-      setLoad({ phase: "loading" });
       setValidating(false);
       setValidateError(null);
+      if (seed) {
+        apply(seed);
+        return;
+      }
+      setLoad({ phase: "loading" });
       scenarioEditorApi.getDraft(accessToken, draftId, controller.signal)
-        .then(({ draft, etag }) => {
+        .then((loaded) => {
           if (controller.signal.aborted) return;
-          const body = isObject(draft.state) ? draft.state : {};
-          dispatch({ type: "loaded", draft: body, etag, version: draft.version });
-          setMeta({ id: draft.id, scenarioId: draft.scenarioId, revisionId: draft.revisionId, buildingId: draft.buildingId, draftNumber: draft.draftNumber, source: draft.source, updatedAt: draft.updatedAt });
-          setServerIssues([]);
-          setValidatedSnapshot(null);
-          setLastValidation(null);
-          setLoad({ phase: "ready" });
+          apply(loaded);
         })
         .catch((cause: unknown) => {
           if (controller.signal.aborted) return;

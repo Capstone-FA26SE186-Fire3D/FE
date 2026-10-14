@@ -19,6 +19,7 @@ import { useEditorPreview } from "../use-editor-preview";
 import type { useScenarioEditor } from "../use-scenario-editor";
 import { parseFloors } from "../scene/preview-model";
 import type { ModelRequest, ModelStatus, ViewportHandle } from "../scene/editor-viewport";
+import type { MarkerInput, MarkerRef, Point3, TransformResult } from "../scene/scene-controller";
 import type { Tool } from "../store/editor-store";
 import { readHazards, readNumber, readSpawns, type ObjectKind, type Position, type Selection } from "../store/model";
 import { issueSelection, type Issue } from "../store/validation";
@@ -26,7 +27,9 @@ import { createActions } from "./actions";
 import { ConflictDialog } from "./conflict-dialog";
 import { useLeaveGuard, useMediaQuery } from "./hooks";
 import { IssuesPanel } from "./issues-panel";
-import { LockedSections } from "./locked-sections";
+import { LegacyBanner } from "./legacy-banner";
+import { LegacyKinds } from "./kind-availability";
+import { ReprocessGuide } from "./geometry-status";
 import { ObjectForm } from "./object-form";
 import { ScenarioForm } from "./scenario-form";
 import { SceneTree } from "./scene-tree";
@@ -80,6 +83,14 @@ export function EditorWorkspace({ accessToken, buildingId, scenarioId, editor }:
     ? { key: `${preview.preview.artifactId ?? "artifact"}:${preview.nonce}`, url: preview.preview.downloadUrl, expiresAt: preview.preview.expiresAt, coordinateTransform: preview.preview.coordinateTransform, floors, semanticMapping: preview.preview.semanticMapping }
     : null;
 
+  const markers = useMemo<MarkerInput[]>(() => [
+    ...spawns.map((spawn, index): MarkerInput => ({ kind: "spawn", index, variant: "spawn", layer: "spawn", position: { x: spawn.x, y: spawn.y, z: spawn.z }, yawDegrees: spawn.rotation })),
+    ...hazards.map((hazard, index): MarkerInput => ({ kind: "hazard", index, variant: hazard.type, layer: "hazard", position: { x: hazard.position.x, y: hazard.position.y, z: hazard.position.z }, yawDegrees: hazard.position.rotation, dormant: hazard.activationTime > previewTime })),
+  ], [spawns, hazards, previewTime]);
+  const viewportTool = state.tool === "place-spawn" || state.tool === "place-hazard" ? "place" : state.tool;
+  const placeKind = state.tool === "place-spawn" ? "spawn" : "hazard";
+  const asSelection = (ref: MarkerRef | null): Selection => (ref && (ref.kind === "spawn" || ref.kind === "hazard") ? { kind: ref.kind, index: ref.index } : null);
+
   const actions = useMemo(() => createActions(edit, (selection) => dispatch({ type: "select", selection })), [edit, dispatch]);
   const gizmoEnabled = !isMobile;
   const timeLimit = readNumber(state.draft, ["scoringConfig", "timeLimitSeconds"]);
@@ -113,10 +124,10 @@ export function EditorWorkspace({ accessToken, buildingId, scenarioId, editor }:
     if (selection) setPanelTab("object");
   }, [dispatch]);
 
-  const onTransform = useCallback((kind: ObjectKind, index: number, next: Partial<Position>, phase: "start" | "change" | "end") => {
+  const onTransform = useCallback((ref: MarkerRef, next: TransformResult | null, phase: "start" | "change" | "end") => {
     if (phase === "start") { gesture.current += 1; return; }
-    if (phase === "end") return;
-    actions.drag(kind, index, next, gesture.current, state.tool === "rotate" ? "Xoay" : "Di chuyển");
+    if (phase === "end" || !next || (ref.kind !== "spawn" && ref.kind !== "hazard")) return;
+    actions.drag(ref.kind, ref.index, { x: next.position.x, y: next.position.y, z: next.position.z, rotation: next.yawDegrees }, gesture.current, state.tool === "rotate" ? "Xoay" : "Di chuyển");
   }, [actions, state.tool]);
 
   const onJump = useCallback((issue: Issue) => {
@@ -163,7 +174,9 @@ export function EditorWorkspace({ accessToken, buildingId, scenarioId, editor }:
     modelLayers={modelLayers} layerVisibility={layerVisibility} onLayer={(key, visible) => setLayerVisibility((current) => ({ ...current, [key]: visible }))}
     modelVisible={modelVisible} onModelVisible={setModelVisible} hasModel={modelStatus.phase === "loaded"} />;
 
-  const previewBanner = preview.phase === "not-ready"
+  const previewBanner = preview.phase === "reprocess" && meta
+    ? <ReprocessGuide buildingId={buildingId} revisionId={meta.revisionId} />
+    : preview.phase === "not-ready"
     ? <Alert tone="warning" title="Mô hình 3D chưa sẵn sàng" action={<div className="se-banner-actions"><span>Trạng thái revision: {preview.preview?.revisionStatus ?? "?"}. Tự kiểm tra lại mỗi vài giây{preview.attempts >= 24 ? " (đã dừng, hãy thử lại)" : ""}. Bạn vẫn đặt được đối tượng bằng tọa độ.</span><Button type="button" size="sm" variant="secondary" onClick={preview.refresh}>Kiểm tra lại</Button></div>} />
     : preview.phase === "error"
       ? <Alert tone="danger" title="Không lấy được thông tin mô hình" action={<div className="se-banner-actions"><span>{preview.error}</span><Button type="button" size="sm" variant="secondary" onClick={preview.refresh}>Thử lại</Button></div>} />
@@ -176,7 +189,9 @@ export function EditorWorkspace({ accessToken, buildingId, scenarioId, editor }:
         : <Button type="button" size="sm" variant="secondary" onClick={() => void onSave()}>Thử lại</Button>}</div>} />
     : null;
 
-  return <div className="se-root" data-mobile-tab={mobileTab} data-testid="scenario-editor">
+  const legacyBanner = <LegacyBanner accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} revisionId={meta?.revisionId} draft={state.draft} dirty={dirty} />;
+
+  return <div className="se-root" data-mobile-tab={mobileTab} data-testid="scenario-editor" data-draft-mode="legacy">
     <header className="se-header">
       <nav aria-label="Đường dẫn" className="se-crumbs">
         <Link href={routes.workspaceBuildings}>Công trình</Link><ChevronRight size={14} aria-hidden="true" />
@@ -192,7 +207,7 @@ export function EditorWorkspace({ accessToken, buildingId, scenarioId, editor }:
       status={status} onSave={() => void onSave()} onValidate={() => void onValidate()} validating={editor.validating}
       saveDisabled={status === "saving" || (status === "saved")} versionsHref={versionsHref} onOpenTree={() => setTreeOpen(true)} hasTree={!isDesktop && !isMobile} />
 
-    {(previewBanner || saveBanner) && <div className="se-banners">{saveBanner}{previewBanner}</div>}
+    <div className="se-banners">{legacyBanner}{saveBanner}{previewBanner}</div>
 
     <nav className="se-mobile-tabs" aria-label="Phần của trình soạn thảo">
       {([["model", "Mô hình"], ["objects", "Đối tượng"], ["props", "Thuộc tính"]] as const).map(([value, label]) => (
@@ -203,9 +218,10 @@ export function EditorWorkspace({ accessToken, buildingId, scenarioId, editor }:
     <div className="se-body">
       <aside className="se-panel se-left" aria-label="Tầng và đối tượng">{isDesktop || isMobile ? tree : null}</aside>
       <section className="se-center" aria-label="Khung nhìn 3D">
-        <EditorViewport ref={viewportRef} spawns={spawns} hazards={hazards} selection={state.selection} tool={state.tool} previewTime={previewTime} gizmoEnabled={gizmoEnabled}
+        <EditorViewport ref={viewportRef} markers={markers} selection={state.selection} tool={viewportTool} placeKind={placeKind} gizmoEnabled={gizmoEnabled}
           model={model} activeFloor={activeFloor} showModel={modelVisible} layerVisibility={layerVisibility}
-          onSelect={onSelect} onPlace={place} onTransform={onTransform} onModelPick={setPick} onModelStatus={setModelStatus} onUrlExpired={preview.refresh} />
+          onSelect={(ref) => onSelect(asSelection(ref))} onPlace={(kind, point: Point3) => place(kind === "spawn" ? "spawn" : "hazard", { ...point, rotation: 0 })}
+          onTransform={onTransform} onModelPick={setPick} onModelStatus={setModelStatus} onUrlExpired={preview.refresh} />
         <div className="se-viewport-foot">
           {modelInfo && <span data-testid="model-info">{modelInfo.meshes} mesh · {modelInfo.triangles.toLocaleString("vi-VN")} tam giác · {modelInfo.size.join(" × ")} m</span>}
           {pick && <span className="se-pick">Phần tử: {pick.name}</span>}
@@ -218,13 +234,13 @@ export function EditorWorkspace({ accessToken, buildingId, scenarioId, editor }:
             <TabsTrigger value="object">Đối tượng</TabsTrigger>
             <TabsTrigger value="scenario">Kịch bản</TabsTrigger>
             <TabsTrigger value="issues" data-testid="tab-issues">Kiểm tra{issues.length > 0 ? ` (${issues.length})` : ""}</TabsTrigger>
-            <TabsTrigger value="locked">Chờ BE</TabsTrigger>
+            <TabsTrigger value="locked">Loại khác</TabsTrigger>
           </TabsList>
           <div className="se-panel-scroll">
             <TabsContent value="object"><ObjectForm draft={state.draft} selection={state.selection} issues={issues} actions={actions} /></TabsContent>
             <TabsContent value="scenario"><ScenarioForm draft={state.draft} issues={issues} actions={actions} catalog={{ loading: catalog.loading && !catalog.data, error: Boolean(catalog.error), items: catalog.data }} /></TabsContent>
             <TabsContent value="issues"><IssuesPanel issues={issues} serverStale={editor.serverStale} validating={editor.validating} validateError={editor.validateError} lastValidation={editor.lastValidation} dirty={dirty} onValidate={() => void onValidate()} onJump={onJump} /></TabsContent>
-            <TabsContent value="locked"><LockedSections draft={state.draft} /></TabsContent>
+            <TabsContent value="locked"><LegacyKinds /></TabsContent>
           </div>
         </Tabs>
       </aside>

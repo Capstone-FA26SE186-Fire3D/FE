@@ -166,3 +166,19 @@
 }
 
 .se-tree .se-add { min-height: 36px; }
+
+/* fet3d.editor/1 */
+.se-right .ops-tabs-list { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: thin; }
+.se-right .ops-tab { flex: 0 0 auto; white-space: nowrap; }
+.se-facts { display: grid; gap: 8px; margin: 0; }
+.se-facts > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; font-size: 13px; }
+.se-facts dt { color: var(--dim); }
+.se-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; color: var(--text); }
+.se-floors { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.se-floors li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: baseline; font-size: 13px; color: var(--muted); }
+.se-floors li strong { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.se-floors code { color: var(--dim); font-size: 11px; }
+.se-banners .ops-stack { gap: 8px; }
+@media (max-width: 420px) {
+  .se-facts > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}
