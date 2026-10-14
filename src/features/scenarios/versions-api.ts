@@ -1,4 +1,6 @@
 import { apiClient } from "@/api/client";
+import { normalizePage, type RawPage } from "@/api/pagination";
+import type { PageResponse } from "@/api/types/common";
 
 import type {
   BuildReleaseInput,
@@ -7,6 +9,8 @@ import type {
   ContentReviewSubmission,
   CreatedResource,
   DraftForSnapshot,
+  DraftPage,
+  DraftSummary,
   DraftValidation,
   JobQa,
   PackageBuildAccepted,
@@ -16,11 +20,18 @@ import type {
   ProcessingJobDetail,
   ProcessingJobPage,
   Release,
+  ReleaseListFilters,
+  ReleasePage,
+  ReleaseSummary,
   ScenarioDetail,
   ScenarioVersionDetail,
   ScenarioVersionPage,
+  ScenarioVersionSummary,
   TrainingItem,
+  ValidationRunHistoryItem,
   VersionIssuePage,
+  VersionReadiness,
+  VersionReview,
 } from "./version-types";
 
 function headers(accessToken: string): HeadersInit {
@@ -35,12 +46,48 @@ export const scenarioVersionsApi = {
   getScenario(accessToken: string, scenarioId: string, signal?: AbortSignal) {
     return apiClient.request<ScenarioDetail>(`/api/scenarios/${scenarioId}`, { headers: headers(accessToken), signal });
   },
-  listVersions(accessToken: string, scenarioId: string, page: number, pageSize: number, signal?: AbortSignal) {
-    return apiClient.request<ScenarioVersionPage>(`/api/scenarios/${scenarioId}/versions`, {
+  async listVersions(accessToken: string, scenarioId: string, page: number, pageSize: number, signal?: AbortSignal): Promise<ScenarioVersionPage> {
+    const raw = await apiClient.request<RawPage<ScenarioVersionSummary>>(`/api/scenarios/${scenarioId}/versions`, {
       headers: headers(accessToken),
       query: { page, pageSize },
       signal,
     });
+    return normalizePage(raw, { page, pageSize });
+  },
+  /** Drafts of a scenario without state, newest save first. Lets the user resume work after a reload or on another machine. */
+  async listDrafts(accessToken: string, scenarioId: string, page: number, pageSize: number, signal?: AbortSignal): Promise<DraftPage> {
+    const raw = await apiClient.request<RawPage<DraftSummary>>(`/api/scenarios/${scenarioId}/drafts`, {
+      headers: headers(accessToken),
+      query: { page, pageSize },
+      signal,
+    });
+    return normalizePage(raw, { page, pageSize });
+  },
+  /** Technical readiness of the version (package job, QA outcome, confirmation, `missing` codes). Report only. */
+  getVersionReadiness(accessToken: string, versionId: string, signal?: AbortSignal) {
+    return apiClient.request<VersionReadiness>(`/api/scenario-versions/${versionId}/readiness`, { headers: headers(accessToken), signal });
+  },
+  /** Frozen submission: hashes, submit/decision metadata and rejection reason. 404 while the version was never submitted. */
+  getVersionReview(accessToken: string, versionId: string, signal?: AbortSignal) {
+    return apiClient.request<VersionReview>(`/api/scenario-versions/${versionId}/review`, { headers: headers(accessToken), signal });
+  },
+  /** QA history of the revision across jobs and attempts, newest first. */
+  async listValidationRuns(accessToken: string, revisionId: string, page: number, pageSize: number, signal?: AbortSignal): Promise<PageResponse<ValidationRunHistoryItem>> {
+    const raw = await apiClient.request<RawPage<ValidationRunHistoryItem>>(`/api/revisions/${revisionId}/validation-runs`, {
+      headers: headers(accessToken),
+      query: { page, pageSize },
+      signal,
+    });
+    return normalizePage(raw, { page, pageSize });
+  },
+  /** Releases newest first; an OrganizationUser only sees its own organization. */
+  async listReleases(accessToken: string, filters: ReleaseListFilters, page: number, pageSize: number, signal?: AbortSignal): Promise<ReleasePage> {
+    const raw = await apiClient.request<RawPage<ReleaseSummary>>("/api/releases", {
+      headers: headers(accessToken),
+      query: { ...filters, page, pageSize },
+      signal,
+    });
+    return normalizePage(raw, { page, pageSize });
   },
   getVersion(accessToken: string, versionId: string, signal?: AbortSignal) {
     return apiClient.request<ScenarioVersionDetail>(`/api/scenario-versions/${versionId}`, { headers: headers(accessToken), signal });
@@ -117,9 +164,13 @@ export const scenarioVersionsApi = {
   getRelease(accessToken: string, releaseId: string, signal?: AbortSignal) {
     return apiClient.request<Release>(`/api/releases/${releaseId}`, { headers: headers(accessToken), signal });
   },
-  /** Currently always 503 `PUBLISH_GATE_UNAVAILABLE` (BE#51). Never treat a Built release as Published. */
-  publishRelease(accessToken: string, releaseId: string) {
-    return apiClient.request<void>(`/api/releases/${releaseId}/publish`, { headers: headers(accessToken), method: "POST" });
+  /**
+   * Publishes a Built release: 200 with the updated `ReleaseResponse`. `Idempotency-Key` is required: reuse the same key
+   * when the same release is retried. 503 `PUBLISH_GATE_UNAVAILABLE` and 409 gate codes leave it Built; always take the
+   * status from the response or a fresh read, never assume Published.
+   */
+  publishRelease(accessToken: string, releaseId: string, idempotencyKey: string) {
+    return apiClient.request<Release>(`/api/releases/${releaseId}/publish`, { headers: headers(accessToken), idempotencyKey, method: "POST" });
   },
   revokeRelease(accessToken: string, releaseId: string, reason: string) {
     return apiClient.request<void>(`/api/releases/${releaseId}/revoke`, { headers: headers(accessToken), json: { reason }, method: "POST" });
