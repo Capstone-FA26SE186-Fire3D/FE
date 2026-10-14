@@ -187,6 +187,11 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     }
   }, [accessToken, clearSession, resetDemo, router]);
 
+  const endSession = useCallback(() => {
+    clearSession();
+    resetDemo();
+  }, [clearSession, resetDemo]);
+
   const updateUser = useCallback((nextUser: AuthUser) => {
     setUser(nextUser);
   }, []);
@@ -201,12 +206,12 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     loginWithGoogle,
     completeGoogleOnboarding,
     logout,
-    endSession: clearSession,
+    endSession,
     register,
     requestPasswordReset,
     resetPassword,
     updateUser,
-  }), [accessToken, clearSession, completeGoogleOnboarding, login, loginWithGoogle, logout, pending, ready, register, requestPasswordReset, resetPassword, updateUser, user]);
+  }), [accessToken, completeGoogleOnboarding, endSession, login, loginWithGoogle, logout, pending, ready, register, requestPasswordReset, resetPassword, updateUser, user]);
 
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;
 }

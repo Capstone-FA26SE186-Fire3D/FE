@@ -15,7 +15,7 @@ type TabKey = (typeof TABS)[number];
 const isTab = (value: string): value is TabKey => (TABS as readonly string[]).includes(value);
 
 /** Every URL parameter owned by a tab; switching tabs clears them so filters never leak across tabs. */
-const TAB_PARAMS = ["page", "ticket", "status", "priority", "assignedTo", "organizationId", "fbStatus", "fbOrganizationId", "actorId", "action", "targetId", "correlationId", "from", "to"];
+const TAB_PARAMS = ["page", "ticket", "status", "priority", "assignedTo", "organizationId", "fbStatus", "fbOrganizationId", "feedback", "log", "actorId", "action", "targetId", "correlationId", "from", "to"];
 
 export function AdminSupport() {
   const { accessToken, ready, user } = useAuthSession();

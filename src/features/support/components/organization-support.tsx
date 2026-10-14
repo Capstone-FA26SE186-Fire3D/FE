@@ -57,7 +57,7 @@ function UserTicketPanel({ ticketId, accessToken, myId }: { ticketId: string; ac
     </dl>
     <section className={styles.section} aria-label="Trao đổi">
       <h3>Trao đổi ({state.messageTotal})</h3>
-      <MessageList messages={messages} empty="Chưa có phản hồi. Đội hỗ trợ sẽ trả lời tại đây; bạn cũng có thể bổ sung thông tin bên dưới." label={(authorId) => authorId === myId ? { name: "Bạn", mine: true } : { name: "Đội hỗ trợ Fire3D", mine: false }} />
+      <MessageList messages={messages} empty="Chưa có phản hồi. Đội hỗ trợ sẽ trả lời tại đây; bạn cũng có thể bổ sung thông tin bên dưới." label={(item) => item.authorId === myId ? { name: "Bạn", mine: true } : { name: item.author?.displayName?.trim() ? `${item.author.displayName.trim()} · Đội hỗ trợ Fire3D` : "Đội hỗ trợ Fire3D", mine: false }} />
       <MessageComposer
         ticketId={ticket.id}
         disabledReason={ticket.status === "Closed" ? "Yêu cầu này đã đóng. Hãy tạo yêu cầu mới nếu bạn cần hỗ trợ thêm." : undefined}
@@ -71,7 +71,9 @@ function UserTicketPanel({ ticketId, accessToken, myId }: { ticketId: string; ac
   </div>;
 }
 
-function CreateTicketForm({ accessToken, onCreated, onCancel }: { accessToken: string; onCreated: (id: string) => void; onCancel: () => void }) {
+export type SupportAudience = "organization" | "trainee";
+
+function CreateTicketForm({ accessToken, audience, onCreated, onCancel }: { accessToken: string; audience: SupportAudience; onCreated: (id: string) => void; onCancel: () => void }) {
   const toast = useToast();
   const { keyFor, done } = useIdempotencyKey();
   const [subject, setSubject] = useState("");
@@ -109,7 +111,7 @@ function CreateTicketForm({ accessToken, onCreated, onCancel }: { accessToken: s
 
   return <form onSubmit={submit} noValidate className="ops-stack">
     <Field label="Tiêu đề" required error={errors.subject}>{(p) => <Input {...p} maxLength={255} value={subject} onChange={(event) => setSubject(event.target.value)} autoComplete="off" />}</Field>
-    <Field label="Mô tả" required hint="Mô tả vấn đề, các bước đã thử và tên công trình liên quan (nếu có). Không gửi mật khẩu." error={errors.description}>{(p) => <Textarea {...p} rows={7} maxLength={10000} value={description} onChange={(event) => setDescription(event.target.value)} />}</Field>
+    <Field label="Mô tả" required hint={audience === "trainee" ? "Mô tả vấn đề, các bước đã thử và bài học hoặc buổi tập liên quan (nếu có). Không gửi mật khẩu." : "Mô tả vấn đề, các bước đã thử và tên công trình liên quan (nếu có). Không gửi mật khẩu."} error={errors.description}>{(p) => <Textarea {...p} rows={7} maxLength={10000} value={description} onChange={(event) => setDescription(event.target.value)} />}</Field>
     {formError && <Alert tone="danger">{formError}</Alert>}
     <div className="ops-actions" style={{ justifyContent: "flex-end" }}>
       <Button type="button" variant="quiet" onClick={onCancel} disabled={saving}>Hủy</Button>
@@ -118,7 +120,7 @@ function CreateTicketForm({ accessToken, onCreated, onCancel }: { accessToken: s
   </form>;
 }
 
-function TicketsTab({ accessToken, myId }: { accessToken: string; myId: string }) {
+function TicketsTab({ accessToken, myId, audience }: { accessToken: string; myId: string; audience: SupportAudience }) {
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const status = get("status");
   const ticketId = get("ticket");
@@ -147,13 +149,13 @@ function TicketsTab({ accessToken, myId }: { accessToken: string; myId: string }
           <td><StatusBadge tone={ticketStatusTone(ticket.status)}>{ticketStatusLabel(ticket.status)}</StatusBadge></td>
           <td>{formatDateTime(ticket.updatedAt)}</td>
         </tr>)}
-        {list.data && !items.length && <TableMessage colSpan={3}><EmptyState icon={status ? Search : Inbox} title={status ? "Không có yêu cầu phù hợp." : "Bạn chưa gửi yêu cầu hỗ trợ nào"} description={status ? "Thử đổi bộ lọc trạng thái." : "Khi gặp sự cố với công trình, mô hình IFC hoặc tài khoản, hãy tạo yêu cầu để đội Fire3D hỗ trợ."} action={!status && <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo yêu cầu hỗ trợ</Button>} /></TableMessage>}
+        {list.data && !items.length && <TableMessage colSpan={3}><EmptyState icon={status ? Search : Inbox} title={status ? "Không có yêu cầu phù hợp." : "Bạn chưa gửi yêu cầu hỗ trợ nào"} description={status ? "Thử đổi bộ lọc trạng thái." : audience === "trainee" ? "Khi gặp sự cố với bài học, ứng dụng hoặc tài khoản, hãy tạo yêu cầu để đội Fire3D hỗ trợ." : "Khi gặp sự cố với công trình, mô hình IFC hoặc tài khoản, hãy tạo yêu cầu để đội Fire3D hỗ trợ."} action={!status && <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo yêu cầu hỗ trợ</Button>} /></TableMessage>}
       </tbody>
     </Table>
     {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
 
     <Drawer open={creating} onOpenChange={(open) => { if (!open) setCreating(false); }} title="Tạo yêu cầu hỗ trợ" description="Đội Fire3D sẽ trả lời ngay trong yêu cầu này.">
-      <CreateTicketForm accessToken={accessToken} onCancel={() => setCreating(false)} onCreated={(id) => { setCreating(false); list.reload(); setParams({ ticket: id, page: 1 }); }} />
+      <CreateTicketForm accessToken={accessToken} audience={audience} onCancel={() => setCreating(false)} onCreated={(id) => { setCreating(false); list.reload(); setParams({ ticket: id, page: 1 }); }} />
     </Drawer>
     <Drawer open={Boolean(ticketId)} onOpenChange={(open) => { if (!open) setParams({ ticket: null, page }); }} title="Chi tiết yêu cầu" description="Lịch sử trao đổi với đội hỗ trợ." className={styles.wideDrawer}>
       {ticketId && <UserTicketPanel key={ticketId} ticketId={ticketId} accessToken={accessToken} myId={myId} />}
@@ -210,7 +212,7 @@ function CreateFeedbackForm({ accessToken, onCreated, onCancel }: { accessToken:
   </form>;
 }
 
-function FeedbackTab({ accessToken }: { accessToken: string }) {
+function FeedbackTab({ accessToken, audience }: { accessToken: string; audience: SupportAudience }) {
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const status = get("status");
   const [creating, setCreating] = useState(false);
@@ -239,7 +241,7 @@ function FeedbackTab({ accessToken }: { accessToken: string }) {
           <td><StatusBadge tone={feedbackStatusTone(item.status)}>{feedbackStatusLabel(item.status)}</StatusBadge></td>
           <td>{formatDateTime(item.createdAt)}</td>
         </tr>)}
-        {list.data && !items.length && <TableMessage colSpan={4}><EmptyState icon={status ? Search : MessageSquareText} title={status ? "Không có phản hồi phù hợp." : "Bạn chưa gửi phản hồi nào"} description={status ? "Thử đổi bộ lọc trạng thái." : "Chia sẻ góp ý về công cụ, mô hình hoặc trải nghiệm sử dụng để Fire3D cải thiện."} action={!status && <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Gửi phản hồi</Button>} /></TableMessage>}
+        {list.data && !items.length && <TableMessage colSpan={4}><EmptyState icon={status ? Search : MessageSquareText} title={status ? "Không có phản hồi phù hợp." : "Bạn chưa gửi phản hồi nào"} description={status ? "Thử đổi bộ lọc trạng thái." : audience === "trainee" ? "Chia sẻ góp ý về bài học, ứng dụng hoặc trải nghiệm luyện tập để Fire3D cải thiện." : "Chia sẻ góp ý về công cụ, mô hình hoặc trải nghiệm sử dụng để Fire3D cải thiện."} action={!status && <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Gửi phản hồi</Button>} /></TableMessage>}
       </tbody>
     </Table>
     {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
@@ -250,15 +252,27 @@ function FeedbackTab({ accessToken }: { accessToken: string }) {
   </>;
 }
 
-export function OrganizationSupport() {
-  const { accessToken, ready, user } = useAuthSession();
+/** Tickets and feedback of the signed-in creator. Shared by the organization workspace and the Trainee learning hub. */
+export function SupportTabs({ accessToken, myId, audience }: { accessToken: string; myId: string; audience: SupportAudience }) {
   const { get, setParams } = useUrlParams();
   const tabParam = get("tab");
   const tab: TabKey = isTab(tabParam) ? tabParam : "tickets";
+  return <Tabs value={tab} onValueChange={(value) => { if (isTab(value) && value !== tab) setParams({ tab: value === "tickets" ? null : value, ticket: null, status: null, page: null }); }}>
+    <TabsList aria-label="Hỗ trợ và phản hồi">
+      <TabsTrigger value="tickets">Yêu cầu hỗ trợ</TabsTrigger>
+      <TabsTrigger value="feedback">Phản hồi</TabsTrigger>
+    </TabsList>
+    <TabsContent value="tickets"><TicketsTab accessToken={accessToken} myId={myId} audience={audience} /></TabsContent>
+    <TabsContent value="feedback"><FeedbackTab accessToken={accessToken} audience={audience} /></TabsContent>
+  </Tabs>;
+}
+
+export function OrganizationSupport() {
+  const { accessToken, ready, user } = useAuthSession();
 
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
   if (user?.role !== 1 || !accessToken) {
-    return <Alert tone="danger" title="Chỉ dành cho tài khoản tổ chức" action={user?.role === 0 ? <Link className="mt-3 inline-block underline" href={routes.adminSupport}>Mở hộp thư hỗ trợ của quản trị</Link> : undefined}>Yêu cầu và phản hồi thuộc về người tạo; PlatformAdmin xử lý chúng trong khu quản trị.</Alert>;
+    return <Alert tone="danger" title="Chỉ dành cho tài khoản tổ chức" action={user?.role === 0 ? <Link className="mt-3 inline-block underline" href={routes.adminSupport}>Mở hộp thư hỗ trợ của quản trị</Link> : user?.role === 2 ? <Link className="mt-3 inline-block underline" href={routes.learningHubSupport}>Mở hỗ trợ trong Góc học tập</Link> : undefined}>Yêu cầu và phản hồi thuộc về người tạo; PlatformAdmin xử lý chúng trong khu quản trị.</Alert>;
   }
 
   return <>
@@ -267,13 +281,6 @@ export function OrganizationSupport() {
       description="Gửi yêu cầu hỗ trợ, theo dõi trao đổi với đội Fire3D và gửi phản hồi về sản phẩm. Chỉ bạn xem được các mục do bạn tạo."
       breadcrumbs={[{ label: "Không gian tổ chức", href: routes.workspaceBuildings }, { label: "Hỗ trợ & phản hồi" }]}
     />
-    <Tabs value={tab} onValueChange={(value) => { if (isTab(value) && value !== tab) setParams({ tab: value === "tickets" ? null : value, ticket: null, status: null, page: null }); }}>
-      <TabsList aria-label="Hỗ trợ và phản hồi">
-        <TabsTrigger value="tickets">Yêu cầu hỗ trợ</TabsTrigger>
-        <TabsTrigger value="feedback">Phản hồi</TabsTrigger>
-      </TabsList>
-      <TabsContent value="tickets"><TicketsTab accessToken={accessToken} myId={user.id} /></TabsContent>
-      <TabsContent value="feedback"><FeedbackTab accessToken={accessToken} /></TabsContent>
-    </Tabs>
+    <SupportTabs accessToken={accessToken} myId={user.id} audience="organization" />
   </>;
 }

@@ -20,6 +20,12 @@ import { GoogleIcon } from "./google-icon";
 
 type FieldErrors = Record<string, string>;
 
+// Shown after the server revoked every session (explicit Google link, first local password).
+const sessionNotices: Record<string, string> = {
+  "google-linked": "Google đã được liên kết với tài khoản của bạn. Vì lý do bảo mật, mọi phiên đăng nhập đã được thu hồi: hãy đăng nhập lại bằng email hoặc Google.",
+  "password-set": "Mật khẩu Fire3D đã được đặt. Vì lý do bảo mật, mọi phiên đăng nhập đã được thu hồi: hãy đăng nhập lại bằng email và mật khẩu mới hoặc bằng Google.",
+};
+
 function errorCode(error: unknown) {
   const code = error instanceof ApiError ? error.payload?.code : undefined;
   return typeof code === "string" ? code : undefined;
@@ -73,6 +79,7 @@ export function LoginForm() {
   const googleRequestRef = useRef(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const initialStage = useRef(true);
+  const sessionNotice = sessionNotices[params.get("notice") ?? ""];
   const requestedNext = pendingAction?.type === "ask"
     ? `${routes.learningHub}?article=${encodeURIComponent(pendingAction.slug)}`
     : params.get("next");
@@ -310,6 +317,7 @@ export function LoginForm() {
       </div>}
       <h1 ref={headingRef} tabIndex={-1}>{googleOnboarding ? "Hoàn thiện tài khoản Google" : mode === "login" ? "Đăng nhập Fire3D" : "Tạo tài khoản"}</h1>
       <p id="auth-note">{googleOnboarding ? "Chọn loại tài khoản và hoàn thiện thông tin để tiếp tục." : mode === "login" ? "Tiếp tục học với tài khoản của bạn." : otpSent ? "Bước 2 / 2 · Xác minh email" : "Bước 1 / 2 · Thông tin tài khoản"}</p>
+      {sessionNotice && !message && <div role="status" className="verification-panel"><p>{sessionNotice}</p></div>}
       {message && <div role="alert" aria-label="Lỗi xác thực" className="form-message"><CircleAlert aria-hidden="true" size={18} /><div><strong>Thông báo từ Fire3D</strong><p>{message}</p><button type="button" disabled={submitting} onClick={() => { setMessage(""); headingRef.current?.focus(); }}>Kiểm tra thông tin và thử lại</button></div></div>}
       {googleOnboarding && <div className="verification-panel" role="status"><p>{googleOnboarding.recovery ? "Bấm Tiếp tục với Google để kiểm tra tài khoản và nhận phiên đăng nhập." : !googleOnboarding.proof ? "Hiện chưa thể tạo tài khoản Google vì dịch vụ chưa cung cấp xác minh cần thiết. Bạn có thể thử lại Google hoặc đăng ký bằng email." : proofExpired ? "Xác minh đã hết hạn. Hãy thử lại Google." : `Đang hoàn thiện cho ${googleOnboarding.proof.email}`}</p></div>}
       {googleWait && <p className="verification-status" role="status">Có thể thử lại sau {googleWait.seconds} giây.</p>}
