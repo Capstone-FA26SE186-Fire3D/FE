@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 import { ApiError } from "@/api";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams, useUrlSearch } from "@/api/use-url-params";
+import { describeApiError } from "@/api/describe-error";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Drawer, Modal } from "@/components/ui/dialog";
@@ -20,6 +21,7 @@ import { useAuthSession } from "@/features/auth/auth-session";
 import type { UserRole } from "@/features/auth/types";
 import { accountsApi } from "../api";
 import type { ManagedAccount } from "../types";
+import { RetryButton } from "@/components/ui/retry-button";
 
 const PAGE_SIZE = 20;
 const roles: Array<{ value: UserRole; label: string }> = [
@@ -160,14 +162,14 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
       </Select>
     </div>
 
-    {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tài khoản" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>Hãy kiểm tra kết nối rồi thử lại.</Alert>}
+    {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tài khoản" action={<RetryButton error={list.error} onRetry={list.reload} />}>{describeApiError(list.error, "Không tải được danh sách tài khoản. Hãy thử lại sau.")}</Alert>}
 
     <Table caption="Danh sách tài khoản">
-      <thead><tr><th>Tài khoản</th><th>Vai trò</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr></thead>
+      <thead><tr><th>Tài khoản</th><th>Vai trò</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
       <tbody>
         {list.loading && !list.data && <TableMessage colSpan={4}><SkeletonRows rows={6} label="Đang tải danh sách tài khoản…" /></TableMessage>}
         {items.map((account) => <tr key={account.id}>
-          <td><button type="button" className="ops-cell-primary" style={{ border: 0, background: "none", padding: 0, textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => void openDetail(account.id)}>{account.fullName || account.email}<span className="ops-cell-sub">{account.email}</span></button></td>
+          <td><button type="button" className="ops-cell-primary" style={{ border: 0, background: "none", textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => void openDetail(account.id)}>{account.fullName || account.username || account.email}<span className="ops-cell-sub">{account.username ? `@${account.username} · ${account.email}` : account.email}</span></button></td>
           <td>{roleLabel(account.role)}</td>
           <td>{statusBadge(account)}</td>
           <td className="ops-cell-actions"><Button size="sm" variant="quiet" onClick={() => setToggling(account)} aria-label={`${account.isActive ? "Khóa" : "Mở"} ${account.email}`}>{account.isActive ? "Khóa" : "Mở"}</Button></td>
@@ -181,6 +183,7 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
       footer={selected && <Button variant={selected.isActive ? "secondary" : "primary"} onClick={() => setToggling(selected)}><UserCog size={16} aria-hidden="true" />{selected.isActive ? "Vô hiệu hóa" : "Kích hoạt"}</Button>}>
       {selected && <dl className="ops-stack" style={{ margin: 0 }}>
         <div><dt className="ops-field-hint">Vai trò</dt><dd style={{ margin: 0 }}>{roleLabel(selected.role)}</dd></div>
+        {selected.username && <div><dt className="ops-field-hint">Tên người dùng</dt><dd style={{ margin: 0 }}>{selected.username}</dd></div>}
         <div><dt className="ops-field-hint">Trạng thái</dt><dd style={{ margin: 0 }}>{statusBadge(selected)}</dd></div>
         {selected.organizationId && <div><dt className="ops-field-hint">Tổ chức</dt><dd style={{ margin: 0 }}>{orgName(selected.organizationId) ?? selected.organizationId}</dd></div>}
         <div><dt className="ops-field-hint">Đăng nhập gần nhất</dt><dd style={{ margin: 0 }}>{formatDate(selected.lastLoginAt)}</dd></div>

@@ -33,23 +33,7 @@ export function shortHash(hash: string | null | undefined, length = 10) {
   return hash.length > length ? `${hash.slice(0, length)}…` : hash;
 }
 
-/** User-facing Vietnamese text for a failed request. The raw (English) server title is not shown. */
-export function describeApiError(error: unknown, fallback: string): string {
-  if (error instanceof ApiError) {
-    if (error.status === 401) return "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.";
-    if (error.status === 403) return "Bạn không có quyền thực hiện thao tác này.";
-    if (error.status === 404) return "Không tìm thấy dữ liệu. Có thể công trình hoặc revision đã bị xóa hoặc không thuộc tổ chức này.";
-    if (error.status === 412) return "Dữ liệu đã được người khác thay đổi.";
-    if (error.status === 428) return "Thiếu điều kiện phiên bản. Hãy tải lại rồi thử lại.";
-    if (error.status === 429 || error.status === 503) {
-      return error.retryAfterSeconds ? `Hệ thống đang bận. Hãy thử lại sau ${error.retryAfterSeconds} giây.` : "Hệ thống đang bận. Hãy thử lại sau ít phút.";
-    }
-    if (error.status >= 500) return "Máy chủ gặp lỗi. Hãy thử lại sau.";
-    return error.fieldErrors[0]?.message ?? fallback;
-  }
-  if (error instanceof TypeError) return "Mất kết nối tới máy chủ. Kiểm tra mạng rồi thử lại.";
-  return fallback;
-}
+export { describeApiError } from "@/api/describe-error";
 
 export function isStatus(error: unknown, status: number) {
   return error instanceof ApiError && error.status === status;

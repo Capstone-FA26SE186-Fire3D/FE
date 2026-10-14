@@ -1,6 +1,7 @@
 import { apiClient } from "@/api/client";
 import type {
   AdminTicketUpdate,
+  AuditDetail,
   AuditFilters,
   AuditLog,
   AuditPage,
@@ -21,6 +22,7 @@ export const supportEtag = (revision: number) => `"support-${revision}"`;
 const etagOf = (headers: Headers, revision: number) => headers.get("etag") ?? supportEtag(revision);
 
 export type TicketWithEtag = { ticket: Ticket; etag: string };
+export type FeedbackWithEtag = { feedback: Feedback; etag: string };
 type MessagePaging = { page?: number; pageSize?: number };
 
 export type TicketScope = "user" | "admin";
@@ -54,12 +56,22 @@ export const supportApi = {
   createFeedback(accessToken: string, input: CreateFeedbackInput, idempotencyKey: string) {
     return apiClient.request<Feedback>("/api/feedback", { headers: auth(accessToken), json: input, idempotencyKey });
   },
-  updateFeedbackStatus(accessToken: string, id: string, status: FeedbackStatus, revision: number) {
-    return apiClient.request<Feedback>(`/api/admin/feedback/${id}/status`, { headers: auth(accessToken), json: { status }, method: "PATCH", ifMatch: supportEtag(revision) });
+  /** PlatformAdmin detail: includes `createdBy.email` and the `"support-N"` ETag to send as If-Match on the status PATCH. */
+  async getFeedback(accessToken: string, id: string, signal?: AbortSignal): Promise<FeedbackWithEtag> {
+    const response = await apiClient.requestWithMeta<Feedback>(`/api/admin/feedback/${id}`, { headers: auth(accessToken), signal });
+    return { feedback: response.data, etag: etagOf(response.headers, response.data.revision) };
+  },
+  async updateFeedbackStatus(accessToken: string, id: string, status: FeedbackStatus, etag: string): Promise<FeedbackWithEtag> {
+    const response = await apiClient.requestWithMeta<Feedback>(`/api/admin/feedback/${id}/status`, { headers: auth(accessToken), json: { status }, method: "PATCH", ifMatch: etag });
+    return { feedback: response.data, etag: etagOf(response.headers, response.data.revision) };
   },
 
   listAuditLogs(accessToken: string, filters: AuditFilters, signal?: AbortSignal) {
     return apiClient.request<AuditPage>("/api/admin/audit-logs", { headers: auth(accessToken), query: filters, signal });
+  },
+  /** Metadata plus the allowlisted field changes of one record. */
+  getAuditLog(accessToken: string, id: string, signal?: AbortSignal) {
+    return apiClient.request<AuditDetail>(`/api/admin/audit-logs/${id}`, { headers: auth(accessToken), signal });
   },
 };
 

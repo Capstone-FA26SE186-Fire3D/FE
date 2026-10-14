@@ -5,7 +5,15 @@ export type FeedbackStatus = "Submitted" | "Reviewed" | "Closed";
 /** Support envelope is `{items,total,page,pageSize}` (not `totalCount`). */
 export type SupportPage<T> = { items: T[]; total: number; page: number; pageSize: number };
 
-export type SupportMessage = { id: string; authorId: string; message: string; createdAt: string };
+/**
+ * Who sent a ticket/feedback/message. `displayName` is the current label (not a snapshot) and is null when the
+ * user was deleted (`available:false`). `email` is only present in PlatformAdmin responses (`/api/admin/...`).
+ */
+export type SupportPerson = { id: string; displayName: string | null; available: boolean; email?: string | null };
+/** The organization stored on the resource when it was created, not the creator's current membership. */
+export type SupportOrganization = { id: string; name: string | null; available: boolean };
+
+export type SupportMessage = { id: string; authorId: string; message: string; createdAt: string; author?: SupportPerson | null };
 
 export type Ticket = {
   id: string;
@@ -21,6 +29,8 @@ export type Ticket = {
   updatedAt: string;
   /** Only present on detail responses. */
   messages?: SupportPage<SupportMessage>;
+  createdBy?: SupportPerson | null;
+  organization?: SupportOrganization | null;
 };
 
 export type Feedback = {
@@ -34,6 +44,8 @@ export type Feedback = {
   revision: number;
   createdAt: string;
   updatedAt: string;
+  createdBy?: SupportPerson | null;
+  organization?: SupportOrganization | null;
 };
 
 export type SupportFilters = {
@@ -58,7 +70,15 @@ export type AuditLog = {
   targetId: string | null;
   correlationId: string | null;
   createdAt: string;
+  /** Current labels; null when unknown or deleted. */
+  actorDisplayName?: string | null;
+  organizationName?: string | null;
 };
+
+/** Allowlisted field change: values are only status/priority names, GUIDs, dates, booleans or non-negative numbers. */
+export type AuditFieldChange = { field: string; before: unknown; after: unknown };
+/** `reason` is administrative free text; this UI never renders it, only whether one was recorded. */
+export type AuditDetail = AuditLog & { changes: AuditFieldChange[]; reason?: string | null };
 
 export type AuditFilters = {
   actorId?: string;

@@ -19,9 +19,11 @@ import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { buildingsApi } from "../api";
+import { describeApiError } from "../format";
 import { organizationsApi } from "@/features/organizations/api";
 import type { Building, BuildingSummary } from "../types";
 import { BuildingForm, buildingFormToInput, emptyForm, formFromBuilding, validateBuildingForm, type FormState } from "./building-form";
+import { RetryButton } from "@/components/ui/retry-button";
 
 const PAGE_SIZE = 20;
 type StatusFilter = "active" | "archived" | "all";
@@ -73,6 +75,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
     `buildings:${scopedOrgId ?? "own"}:${page}:${status}:${urlSearch}`,
     (signal) => buildingsApi.list(accessToken as string, { page, pageSize: PAGE_SIZE, search: urlSearch.trim() || undefined, isActive: statusToFilter(status), organizationId: scopedOrgId }, signal),
     enabled,
+    { scope: scopedOrgId ?? "own" },
   );
   const organizations = useAsyncData(
     "buildings:org-picker",
@@ -83,6 +86,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
     `buildings:org:${scopedOrgId}`,
     () => organizationsApi.get(accessToken as string, scopedOrgId as string),
     Boolean(accessToken) && ready && isAdmin && Boolean(scopedOrgId),
+    { keepPrevious: false },
   );
   const organizationName = organization.data?.name;
 
@@ -180,7 +184,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
     return <>
       <PageHeader title="Công trình" description={pageDescription} breadcrumbs={crumbs} />
       {organizationSelect}
-      {organizations.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tổ chức" action={<Button size="sm" variant="secondary" className="mt-3" onClick={organizations.reload}>Thử lại</Button>}>Hãy thử lại sau.</Alert>}
+      {organizations.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tổ chức" action={<RetryButton error={organizations.error} onRetry={organizations.reload} />}>Hãy thử lại sau.</Alert>}
       <EmptyState icon={Building2} title="Chọn tổ chức để xem công trình" description="Công trình thuộc về từng tổ chức. PlatformAdmin cần chọn tổ chức trước khi xem hoặc tạo công trình." action={<Button asChild variant="secondary"><Link href={routes.adminOrganizations}>Mở danh sách tổ chức</Link></Button>} />
     </>;
   }
@@ -218,11 +222,11 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
       </div>
     </div>
 
-    {error !== undefined && <Alert tone="danger" title="Không tải được danh sách" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reload}>Thử lại</Button>}>{loadError}</Alert>}
+    {error !== undefined && <Alert tone="danger" title="Không tải được danh sách" action={<RetryButton error={error} onRetry={reload} />}>{describeApiError(error, loadError)}</Alert>}
 
     {view === "table"
       ? <Table caption="Danh sách công trình">
-        <thead><tr><th>Công trình</th><th>Loại</th><th>Số tầng</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr></thead>
+        <thead><tr><th>Công trình</th><th>Loại</th><th>Số tầng</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
         <tbody>
           {loading && !data && <TableMessage colSpan={5}><SkeletonRows rows={5} label="Đang tải danh sách công trình…" /></TableMessage>}
           {items.map((building) => <tr key={building.id}>

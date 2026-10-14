@@ -54,7 +54,7 @@ export function ObjectForm({ draft, selection, issues, actions }: { draft: JsonO
             onCommit={(value) => { if (value !== undefined) actions.setCoordinate(kind, index, axis, value); }} />
         ))}
       </div>
-      <p className="ops-field-hint">Hướng xoay giả định theo {ROTATION_UNIT === "degrees" ? "độ" : "radian"} quanh trục đứng; BE#54 chưa chốt đơn vị.</p>
+      <p className="ops-field-hint">Bản nháp cũ không khai báo đơn vị xoay; editor giả định {ROTATION_UNIT === "degrees" ? "độ" : "radian"} quanh trục đứng. Bản nháp theo fet3d.editor/1 dùng quaternion đơn vị.</p>
     </fieldset>
 
     {hazard && <fieldset className="ops-fieldset">

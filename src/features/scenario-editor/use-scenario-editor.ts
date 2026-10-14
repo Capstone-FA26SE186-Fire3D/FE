@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 
 import { ApiError } from "@/api/types/common";
 
-import { scenarioEditorApi, type DraftResponse } from "./api";
+import { scenarioEditorApi, type DraftResponse, type LoadedDraft } from "./api";
 import { type Command } from "./store/commands";
 import { editorReducer, initialEditorState, isDirty, saveStatus, type EditorState } from "./store/editor-store";
 import { compareDrafts, resolveMerge, type MergeChoice, type MergeUnit } from "./store/merge";
@@ -12,6 +12,7 @@ import { prepareForSave, type Selection } from "./store/model";
 import { mergeIssues, normalizeServerIssues, validateDraftState, type Issue } from "./store/validation";
 import { deepEqual, isObject, type JsonObject } from "./store/json";
 import { normalizeEtag } from "./store/etag";
+import { describeApiError } from "@/api/describe-error";
 
 export type LoadState = { phase: "loading" } | { phase: "ready" } | { phase: "error"; status?: number; message: string };
 
@@ -29,8 +30,7 @@ export type SaveResult =
 export type EditorMeta = Pick<DraftResponse, "id" | "scenarioId" | "revisionId" | "buildingId" | "draftNumber" | "source" | "updatedAt">;
 
 function errorMessage(error: unknown, fallback: string) {
-  if (error instanceof ApiError) return error.message || fallback;
-  return error instanceof Error && error.message ? error.message : fallback;
+  return describeApiError(error, fallback);
 }
 
 /** Human text for the statuses `PUT /api/scenario-drafts/{id}` can answer with. */
@@ -39,15 +39,19 @@ export function describeSaveError(error: unknown): { message: string; conflict: 
     if (error.status === 412) return { conflict: true, message: "Bản nháp đã được thay đổi ở nơi khác. Nội dung bạn đang nhập vẫn được giữ nguyên." };
     if (error.status === 428) return { conflict: false, message: "Thiếu If-Match: chưa có ETag của bản nháp. Hãy tải lại bản nháp." };
     if (error.status === 400 && error.code === "INVALID_IF_MATCH") return { conflict: false, message: "ETag của bản nháp không hợp lệ (INVALID_IF_MATCH). Hãy tải lại bản nháp." };
-    if (error.status === 400) return { conflict: false, message: `Máy chủ từ chối dữ liệu: ${error.message}` };
+    if (error.status === 400) return { conflict: false, message: `Máy chủ từ chối dữ liệu${error.code ? ` (${error.code})` : ""}: ${error.fieldErrors[0]?.message ?? "kiểm tra lại nội dung bản nháp."}` };
     if (error.status === 401 || error.status === 403) return { conflict: false, message: "Phiên đăng nhập hết hạn hoặc không còn quyền sửa bản nháp này." };
     if (error.status === 404) return { conflict: false, message: "Bản nháp không còn tồn tại hoặc không thuộc tổ chức của bạn." };
-    return { conflict: false, message: error.message || `Không thể lưu (mã ${error.status}).` };
+    return { conflict: false, message: describeApiError(error, `Không thể lưu (mã ${error.status}).`) };
   }
-  return { conflict: false, message: error instanceof Error ? error.message : "Không thể lưu bản nháp." };
+  return { conflict: false, message: describeApiError(error, "Không thể lưu bản nháp.") };
 }
 
-export function useScenarioEditor(accessToken: string | null, draftId: string | null) {
+/**
+ * `initial` is the draft the entry screen already read to decide between legacy and `fet3d.editor/1`; the first load uses
+ * it instead of a second GET. A reload (retry) always asks the server again.
+ */
+export function useScenarioEditor(accessToken: string | null, draftId: string | null, initial?: LoadedDraft) {
   const [state, dispatch] = useReducer(editorReducer, initialEditorState);
   const [load, setLoad] = useState<LoadState>({ phase: "loading" });
   const [meta, setMeta] = useState<EditorMeta | null>(null);
@@ -63,6 +67,7 @@ export function useScenarioEditor(accessToken: string | null, draftId: string | 
   const validatingRef = useRef(false);
   const requestScope = useRef<AbortController | null>(null);
   const clock = useRef(() => Date.now());
+  const initialRef = useRef(initial);
 
   useEffect(() => {
     stateRef.current = state;
@@ -74,20 +79,28 @@ export function useScenarioEditor(accessToken: string | null, draftId: string | 
     requestScope.current = controller;
     savingRef.current = false;
     validatingRef.current = false;
+    const apply = ({ draft, etag }: LoadedDraft) => {
+      const body = isObject(draft.state) ? draft.state : {};
+      dispatch({ type: "loaded", draft: body, etag, version: draft.version });
+      setMeta({ id: draft.id, scenarioId: draft.scenarioId, revisionId: draft.revisionId, buildingId: draft.buildingId, draftNumber: draft.draftNumber, source: draft.source, updatedAt: draft.updatedAt });
+      setServerIssues([]);
+      setValidatedSnapshot(null);
+      setLastValidation(null);
+      setLoad({ phase: "ready" });
+    };
+    const seed = reloadToken === 0 && initialRef.current?.draft.id === draftId ? initialRef.current : undefined;
     const timer = window.setTimeout(() => {
-      setLoad({ phase: "loading" });
       setValidating(false);
       setValidateError(null);
+      if (seed) {
+        apply(seed);
+        return;
+      }
+      setLoad({ phase: "loading" });
       scenarioEditorApi.getDraft(accessToken, draftId, controller.signal)
-        .then(({ draft, etag }) => {
+        .then((loaded) => {
           if (controller.signal.aborted) return;
-          const body = isObject(draft.state) ? draft.state : {};
-          dispatch({ type: "loaded", draft: body, etag, version: draft.version });
-          setMeta({ id: draft.id, scenarioId: draft.scenarioId, revisionId: draft.revisionId, buildingId: draft.buildingId, draftNumber: draft.draftNumber, source: draft.source, updatedAt: draft.updatedAt });
-          setServerIssues([]);
-          setValidatedSnapshot(null);
-          setLastValidation(null);
-          setLoad({ phase: "ready" });
+          apply(loaded);
         })
         .catch((cause: unknown) => {
           if (controller.signal.aborted) return;

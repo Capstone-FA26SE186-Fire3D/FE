@@ -19,7 +19,9 @@ const inventoryRows: { kind: IfcElementKind; label: string; icon: typeof BrickWa
 const anchorLabels: Record<ScenarioAnchorKind, string> = { room: "không gian nguồn cháy", stair: "cầu thang", exit: "cửa / lối thoát" };
 
 function safeErrorMessage(error: unknown) {
-  return error instanceof Error && error.message ? error.message : "Không thể đọc tệp IFC này.";
+  // The IFC parser reports in English: lead with a Vietnamese explanation and keep its text only as a technical detail.
+  const detail = error instanceof Error && error.message ? ` Chi tiết kỹ thuật: ${error.message.slice(0, 200)}` : "";
+  return `Không thể đọc tệp IFC này. Kiểm tra tệp có đúng định dạng IFC và không bị hỏng, rồi thử lại.${detail}`;
 }
 
 type IfcScanWorkspaceProps = {
@@ -97,7 +99,7 @@ export function IfcScanWorkspace({
         {error && <p className={styles.error} role="alert"><AlertTriangle size={16} /> {error}</p>}
       </div>
 
-      <aside className={styles.sidebar} aria-live="polite">
+      <div className={styles.sidebar} aria-live="polite">
         <section className={styles.panel}>
           <div className={styles.panelHeading}><Layers3 size={18} /><div><p>01 / Kết quả quét</p><h2>{scan ? scan.fileName : "Chưa có mô hình"}</h2></div></div>
           {scan ? <>
@@ -121,7 +123,7 @@ export function IfcScanWorkspace({
         </section>
 
         {selectedElement && <section className={styles.selection}><p>Đang chọn IFC #{selectedElement.expressID}</p><strong>{selectedElement.typeName}</strong><span>{selectedElement.bounds ? "Đã focus trong mô hình" : "Không có hình học hiển thị để focus"}</span></section>}
-      </aside>
+      </div>
     </div>
   </section>;
 }

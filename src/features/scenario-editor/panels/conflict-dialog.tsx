@@ -24,6 +24,8 @@ const FIELD_NAME: Record<string, string> = {
   spawnPoints: "Điểm xuất phát", hazards: "Nguy cơ", scoringConfig: "Chấm điểm", routingConfig: "Tuyến thoát hiểm", rubric: "Rubric",
   learningObjectives: "Mục tiêu học tập", learnerInstructions: "Hướng dẫn người học", objectAnchors: "Neo đối tượng", requiredCapabilities: "Năng lực runtime",
   runtimeVersion: "Phiên bản runtime", goals: "Goal", npcs: "NPC", blockedElements: "Vùng chặn", modePolicy: "Chính sách chế độ", safetyThresholds: "Ngưỡng an toàn",
+  // fet3d.editor/1
+  schemaVersion: "Phiên bản schema", name: "Tên kịch bản", geometry: "Geometry đã ghim", objects: "Đối tượng", timeLimitSeconds: "Thời gian tối đa", randomSeed: "Hạt giống ngẫu nhiên", replanIntervalSeconds: "Chu kỳ lập kế hoạch lại",
 };
 
 /**

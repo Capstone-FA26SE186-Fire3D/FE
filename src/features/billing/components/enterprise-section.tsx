@@ -1,7 +1,7 @@
 "use client";
 
 import { Mail, Send } from "lucide-react";
-import { useRef, useState, type FormEvent } from "react";
+import { useMemo, useRef, useState, type FormEvent } from "react";
 import { ApiError } from "@/api";
 import { useIdempotencyKey } from "@/api/idempotency";
 import { useAsyncData } from "@/api/use-async-data";
@@ -10,19 +10,19 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field, Input, Textarea } from "@/components/ui/field";
+import { Drawer } from "@/components/ui/dialog";
 import { Panel } from "@/components/ui/panel";
 import { SkeletonRows } from "@/components/ui/skeleton";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { billingApi } from "../api";
 import { billingErrorText } from "../errors";
 import { formatDateTime } from "../format";
 import type { EnterpriseRequestInput } from "../types";
+import { EnterpriseResponses, EnterpriseStatusBadge } from "./enterprise-common";
 import "../billing.css";
 
 const PAGE_SIZE = 10;
-const statusLabel: Record<string, string> = { New: "Mới gửi", Contacted: "Đã liên hệ", Quoted: "Đã báo giá", Closed: "Đã đóng" };
 
 type Form = { requestedBuildingCount: string; requestedDurationMonths: string; contactName: string; contactEmail: string; contactPhone: string; notes: string };
 const empty: Form = { requestedBuildingCount: "", requestedDurationMonths: "", contactName: "", contactEmail: "", contactPhone: "", notes: "" };
@@ -43,9 +43,10 @@ function validate(form: Form) {
  * Contact form for bulk / enterprise purchases. It creates a request for the sales team only:
  * no quotation, payment or entitlement is created until PlatformAdmin follows up.
  */
-export function EnterpriseSection({ accessToken, defaultEmail, defaultName }: { accessToken: string; defaultEmail?: string; defaultName?: string }) {
+export function EnterpriseSection({ accessToken, defaultEmail, defaultName, onOpenQuotation }: { accessToken: string; defaultEmail?: string; defaultName?: string; onOpenQuotation?: (id: string) => void }) {
   const toast = useToast();
-  const { page, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
+  const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
+  const requestId = get("request");
   const key = useIdempotencyKey();
   const lock = useRef(false);
   const [form, setForm] = useState<Form>({ ...empty, contactEmail: defaultEmail ?? "", contactName: defaultName ?? "" });
@@ -55,6 +56,8 @@ export function EnterpriseSection({ accessToken, defaultEmail, defaultName }: { 
   const [sent, setSent] = useState(false);
 
   const list = useAsyncData(`billing:enterprise:${page}`, (signal) => billingApi.listEnterpriseRequests(accessToken, page, PAGE_SIZE, "mine", signal));
+  const detail = useAsyncData(`billing:enterprise:detail:${requestId}`, (signal) => billingApi.getEnterpriseRequest(accessToken, "mine", requestId, signal), Boolean(requestId), { keepPrevious: false });
+  const request = useMemo(() => detail.data?.data ?? null, [detail.data]);
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -119,17 +122,31 @@ export function EnterpriseSection({ accessToken, defaultEmail, defaultName }: { 
     <Panel title="Yêu cầu đã gửi" bodyClassName="ops-stack">
       {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert>}
       <Table caption="Yêu cầu báo giá số lượng lớn đã gửi">
-        <thead><tr><th>Yêu cầu</th><th>Trạng thái</th></tr></thead>
+        <thead><tr><th>Yêu cầu</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
         <tbody>
-          {list.loading && !list.data && <TableMessage colSpan={2}><SkeletonRows rows={3} label="Đang tải yêu cầu…" /></TableMessage>}
+          {list.loading && !list.data && <TableMessage colSpan={3}><SkeletonRows rows={3} label="Đang tải yêu cầu…" /></TableMessage>}
           {items.map((item) => <tr key={item.id}>
             <td><span className="ops-cell-primary">{item.requestedBuildingCount} công trình{item.requestedDurationMonths ? ` · ${item.requestedDurationMonths} tháng` : ""}<span className="ops-cell-sub">{item.contactName} · {formatDateTime(item.createdAt)}</span></span></td>
-            <td><StatusBadge tone={item.status === "New" ? "info" : "neutral"}>{statusLabel[item.status] ?? item.status}</StatusBadge></td>
+            <td><EnterpriseStatusBadge status={item.status} /></td>
+            <td className="ops-cell-actions"><Button size="sm" variant="quiet" onClick={() => setParams({ request: item.id }, "replace")} aria-label={`Xem yêu cầu ${item.requestedBuildingCount} công trình gửi ${formatDateTime(item.createdAt)}`}>Xem</Button></td>
           </tr>)}
-          {list.data && !items.length && <TableMessage colSpan={2}><EmptyState icon={Mail} title="Chưa có yêu cầu" description="Yêu cầu bạn gửi sẽ hiện ở đây cùng trạng thái xử lý." /></TableMessage>}
+          {list.data && !items.length && <TableMessage colSpan={3}><EmptyState icon={Mail} title="Chưa có yêu cầu" description="Yêu cầu bạn gửi sẽ hiện ở đây cùng trạng thái xử lý." /></TableMessage>}
         </tbody>
       </Table>
       {(list.data?.totalCount ?? 0) > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={list.data?.totalCount ?? 0} onPageChange={setPage} disabled={list.loading} />}
     </Panel>
+
+    <Drawer open={Boolean(requestId)} onOpenChange={(open) => { if (!open) setParams({ request: null }, "replace"); }} title="Yêu cầu số lượng lớn" description="Trạng thái và phản hồi từ đội kinh doanh. Yêu cầu này chưa phát sinh thanh toán hay dịch vụ.">
+      {requestId && detail.loading && !request && <SkeletonRows rows={4} label="Đang tải yêu cầu…" />}
+      {requestId && detail.error !== undefined && !request && <Alert tone="danger" title="Không tải được yêu cầu" action={<Button size="sm" variant="secondary" className="mt-3" onClick={detail.reload}>Thử lại</Button>}>{billingErrorText(detail.error)}</Alert>}
+      {request && <div className="ops-stack" data-testid="enterprise-detail">
+        <div className="bill-row"><strong>{request.requestedBuildingCount} công trình{request.requestedDurationMonths ? ` · ${request.requestedDurationMonths} tháng` : ""}</strong><EnterpriseStatusBadge status={request.status} /></div>
+        <p className="bill-muted bill-wrap">{request.contactName} · {request.contactEmail}{request.contactPhone ? ` · ${request.contactPhone}` : ""}<br />Gửi {formatDateTime(request.createdAt)}{request.closedAt ? ` · đóng ${formatDateTime(request.closedAt)}` : ""}</p>
+        {request.notes && <p className="bill-wrap" style={{ margin: 0, whiteSpace: "pre-wrap" }}>{request.notes}</p>}
+        {request.quotationId && <Alert tone="success" title="Đã có báo giá cho yêu cầu này" action={onOpenQuotation ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => onOpenQuotation(request.quotationId as string)}>Mở báo giá</Button> : undefined}>PlatformAdmin soạn báo giá nháp; bạn xem, chấp nhận và thanh toán sau khi báo giá được phát hành.</Alert>}
+        {request.status === "Closed" && <Alert tone="info" title="Yêu cầu đã đóng">Báo giá và thanh toán đã tạo (nếu có) không bị hủy. Gửi yêu cầu mới nếu cần hỗ trợ thêm.</Alert>}
+        <EnterpriseResponses accessToken={accessToken} scope="mine" requestId={request.id} />
+      </div>}
+    </Drawer>
   </div>;
 }

@@ -38,11 +38,12 @@ export type VersionJobs = {
  * revision's job list (so they survive a reload); the selected job is polled every 3 s with backoff until it is final.
  * Succeeded is not Passed: the verdict comes only from the job's validation runs and their Error/Critical issues.
  */
-export function useVersionJobs({ accessToken, revisionId, versionId, rememberedJobId }: {
+export function useVersionJobs({ accessToken, revisionId, versionId, preferredJobId }: {
   accessToken: string;
   revisionId: string;
   versionId: string;
-  rememberedJobId?: string;
+  /** Job the server names in the version's readiness (`packageJob`); used until the user picks another. */
+  preferredJobId?: string;
 }): VersionJobs {
   const [chosen, setChosen] = useState<{ versionId: string; jobId: string } | null>(null);
   const jobsQuery = useAsyncData(`version-jobs:${revisionId}`, (signal) => scenarioVersionsApi.listRevisionJobs(accessToken, revisionId, signal));
@@ -52,7 +53,7 @@ export function useVersionJobs({ accessToken, revisionId, versionId, rememberedJ
     [jobsQuery.data, versionId],
   );
 
-  const selectedJobId = (chosen?.versionId === versionId ? chosen.jobId : undefined) ?? rememberedJobId ?? jobs[0]?.id;
+  const selectedJobId = (chosen?.versionId === versionId ? chosen.jobId : undefined) ?? preferredJobId ?? jobs[0]?.id;
   const qaPolls = useRef<{ jobId?: string; count: number }>({ count: 0 });
 
   const polling = usePolling<Snapshot>({

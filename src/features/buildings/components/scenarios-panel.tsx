@@ -84,7 +84,7 @@ export function ScenariosPanel({ accessToken, buildingId, revisionLabel, scenari
     <Panel title="Kịch bản của công trình" actions={<Button size="sm" variant="quiet" onClick={scenarios.reload} disabled={loading}><RefreshCw size={14} aria-hidden="true" />Tải lại</Button>} bodyClassName="ops-stack">
       {scenarios.error !== undefined && <Alert tone="danger" title="Không tải được danh sách kịch bản" action={<Button size="sm" variant="secondary" className="mt-3" onClick={scenarios.reload}>Thử lại</Button>}>{describeApiError(scenarios.error, "Hãy thử lại sau.")}</Alert>}
       <Table caption="Danh sách kịch bản">
-        <thead><tr><th>Kịch bản</th><th>Phiên bản gần nhất</th><th>Tạo lúc</th><th aria-label="Thao tác" /></tr></thead>
+        <thead><tr><th>Kịch bản</th><th>Phiên bản gần nhất</th><th>Tạo lúc</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
         <tbody>
           {loading && !data && <TableMessage colSpan={4}><SkeletonRows rows={3} label="Đang tải kịch bản…" /></TableMessage>}
           {items.map((scenario) => <tr key={scenario.id}>

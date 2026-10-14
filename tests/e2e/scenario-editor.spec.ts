@@ -448,21 +448,28 @@ test("client validation flags an empty rubric/objectives without presetting any 
   await expect(page.getByTestId("criterion-0")).toHaveCount(0);
 });
 
-test("goals / NPC / blocked elements / devices and Playtest are locked with the BE issue named; their data is preserved", async ({ page }) => {
+test("legacy draft: banner says so, goals / NPC / blocked / equipment are v1-only (no BE#54 note), Playtest stays locked, goals are preserved", async ({ page }) => {
   const mock = newMock();
   await open(page, mock);
-  await page.getByRole("tab", { name: "Chờ BE" }).click();
-  const locked = page.getByTestId("locked-sections");
-  for (const key of ["goals", "npcs", "blockedElements", "devices"]) {
-    const section = locked.locator(`[data-capability="${key}"]`);
-    await expect(section).toHaveAttribute("data-locked", "true");
-    await expect(section.getByRole("button")).toBeDisabled();
-    await expect(section).toContainText("Chờ BE #54");
-  }
-  await expect(locked.locator('[data-capability="goals"]')).toContainText("đang có 1 mục");
-  await expect(page.getByTestId("playtest")).toBeDisabled();
-  await expect(page.getByTestId("playtest")).toContainText("Chờ BE #55");
+  await expect(page.getByTestId("scenario-editor")).toHaveAttribute("data-draft-mode", "legacy");
+  const banner = page.getByTestId("legacy-banner");
+  await expect(page.getByText("Bản nháp cũ (chưa theo fet3d.editor/1)")).toBeVisible();
+  await expect(banner).toContainText("không được tự chuyển đổi");
+  await page.getByRole("tab", { name: "Loại khác" }).click();
+  const kinds = page.getByTestId("legacy-kinds");
+  await expect(kinds).toContainText("Chỉ có trong fet3d.editor/1");
+  await expect(page.getByTestId("scenario-editor")).not.toContainText("BE #54");
+  await expect(page.getByTestId("playtest")).toHaveAttribute("href", `/workspace/buildings/${BUILDING_ID}/scenarios/${SCENARIO_ID}/versions?tab=playtest`);
+  await expect(page.getByTestId("playtest")).not.toContainText("Chờ BE");
   await expect(page.getByTestId("versions-link")).toHaveAttribute("href", `/workspace/buildings/${BUILDING_ID}/scenarios/${SCENARIO_ID}/versions`);
+  // The untyped legacy arrays are carried through a save untouched and no v1 document is ever written.
+  await page.getByTestId("add-spawn").click();
+  await page.getByTestId("save").click();
+  await expect(status(page)).toHaveText("Đã lưu");
+  expect(mock.puts).toHaveLength(1);
+  expect(mock.puts[0].body.schemaVersion).toBeUndefined();
+  expect(mock.puts[0].body.goals).toEqual(sampleDraftState().goals);
+  expect(mock.puts[0].body.spawnPoints).toHaveLength(2);
 });
 
 test("unsaved work: beforeunload warns, in-app links and Back ask first, saving clears the warning", async ({ page }) => {
@@ -523,6 +530,29 @@ test("no ?draft=: a draft is created with a stable Idempotency-Key across a retr
   expect(mock.createDraftCalls[1].key).toBe(mock.createDraftCalls[0].key);
   expect(mock.createDraftCalls[0].body).toEqual({ revisionId: "44444444-4444-4444-8444-444444444444" });
   await expect(page.getByTestId("scenario-editor")).toBeVisible();
+});
+
+test("no ?draft=: the server's draft list survives a reload, marks the current draft and opens the chosen one", async ({ page }) => {
+  const OTHER = "44444444-4444-4444-8444-444444444499";
+  const mock = newMock({
+    drafts: [
+      { id: DRAFT_ID, draftNumber: 3, version: 51, updatedAt: "2026-10-02T00:00:00Z", lastEditedByName: "Nguyễn Văn A", schemaVersion: "fet3d.editor/1" },
+      { id: OTHER, draftNumber: 2, version: 7, updatedAt: "2026-10-01T00:00:00Z", lastEditedByName: null, schemaVersion: null },
+    ],
+    currentDraftId: DRAFT_ID,
+  });
+  await installEditorMocks(page, mock);
+  await page.goto(`/workspace/buildings/${BUILDING_ID}/scenarios/${SCENARIO_ID}`);
+  const list = page.getByRole("list", { name: "Bản nháp đã lưu" });
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  await expect(list.getByRole("listitem").first()).toContainText("hiện tại");
+  await expect(list.getByRole("listitem").nth(1)).toContainText("chưa theo fet3d.editor/1");
+  await page.reload();
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  await page.getByTestId(`open-draft-${DRAFT_ID}`).click();
+  await expect(page).toHaveURL(new RegExp(`draft=${DRAFT_ID}`));
+  await expect(page.getByTestId("scenario-editor")).toBeVisible();
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith("fire3d-editor-draft")))).toEqual([]);
 });
 
 test("draft errors: 404 and 403 show their own screens; a server error can be retried", async ({ page }) => {
@@ -629,7 +659,7 @@ for (const theme of ["light", "dark"] as const) {
     await page.getByTestId("validate").click();
     await expect(page.getByTestId("issue-item")).toHaveCount(1);
     await page.screenshot({ path: testInfo.outputPath(`issues-${theme}.png`) });
-    await page.getByRole("tab", { name: "Chờ BE" }).click();
+    await page.getByRole("tab", { name: "Loại khác" }).click();
     await page.screenshot({ path: testInfo.outputPath(`locked-${theme}.png`) });
     await page.getByRole("tab", { name: "Kịch bản" }).click();
     await page.getByTestId("time-limit").fill("240");

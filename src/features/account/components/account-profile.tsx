@@ -3,9 +3,10 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Camera, LogOut, Trash2 } from "lucide-react";
 import { ApiError } from "@/api";
+import { describeApiError } from "@/api/describe-error";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/field";
@@ -17,9 +18,11 @@ import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import { authApi } from "@/features/auth/api";
 import { useAuthSession } from "@/features/auth/auth-session";
+import { GoogleLinkPanel } from "./google-link-panel";
 import type { AuthUser, UserGender } from "@/features/auth/types";
 import { organizationsApi } from "@/features/organizations/api";
 import type { OrganizationProfile } from "@/features/organizations/types";
+import { keepEdits } from "@/utils/keep-edits";
 
 const roleNames = ["Quản trị nền tảng", "Người dùng tổ chức", "Học viên"];
 const supportedAvatarTypes = ["image/jpeg", "image/png", "image/webp"];
@@ -55,9 +58,11 @@ function problemOf(error: unknown, fieldNames: string[]): FormProblem {
     if (error.isPreconditionFailed) return { message: "Hồ sơ vừa được thay đổi ở nơi khác nên chưa lưu. Nội dung bạn nhập vẫn được giữ lại.", fields, stale: true };
     if (error.status === 428) return { message: "Chưa có phiên bản hồ sơ để đối chiếu. Hãy tải lại rồi lưu lại.", fields, stale: true };
     if (error.status === 429) return { message: error.retryAfterSeconds ? `Thao tác quá nhanh. Thử lại sau ${error.retryAfterSeconds} giây.` : "Thao tác quá nhanh. Hãy thử lại sau ít phút.", fields, stale: false };
-    return { message: error.message || "Không thể lưu thay đổi. Vui lòng thử lại.", fields, stale: false };
+    // Session lost, no permission, not found and server errors get the shared Vietnamese wording, never the raw English title.
+    const generic = error.status === 401 || error.status === 403 || error.status === 404 || error.status >= 500;
+    return { message: generic ? describeApiError(error, "") : error.message || "Không thể lưu thay đổi. Vui lòng thử lại.", fields, stale: false };
   }
-  return { message: error instanceof Error ? error.message : "Không thể lưu thay đổi. Vui lòng thử lại.", fields: {}, stale: false };
+  return { message: describeApiError(error, "Không thể lưu thay đổi. Vui lòng thử lại."), fields: {}, stale: false };
 }
 
 function Avatar({ avatarUrl, initials }: { avatarUrl?: string | null; initials: string }) {
@@ -72,6 +77,8 @@ export function AccountProfile() {
   const toast = useToast();
   const [profile, setProfile] = useState<AuthUser | null>(user);
   const [profileEtag, setProfileEtag] = useState<string | null>(null);
+  // The server values each form was last filled from; a field differs from it only if the user edited it.
+  const saved = useRef<{ profile: ProfileForm | null; organization: OrganizationForm | null }>({ profile: null, organization: null });
   const [profileForm, setProfileForm] = useState<ProfileForm>(() => user ? toProfileForm(user) : { dob: "", fullName: "", gender: "", phoneNumber: "", username: "" });
   const [organization, setOrganization] = useState<OrganizationProfile | null>(null);
   const [organizationEtag, setOrganizationEtag] = useState<string | null>(null);
@@ -97,7 +104,10 @@ export function AccountProfile() {
     try {
       const profileResponse = await authApi.meWithMeta(accessToken);
       setProfile(profileResponse.data);
-      if (!keepForms) setProfileForm(toProfileForm(profileResponse.data));
+      const latestProfile = toProfileForm(profileResponse.data);
+      const profileBase = saved.current.profile;
+      saved.current.profile = latestProfile;
+      setProfileForm((current) => (keepForms ? keepEdits(current, profileBase, latestProfile) : latestProfile));
       setProfileEtag(etagFrom(profileResponse.headers, profileResponse.data.profileRevision));
       updateUser(profileResponse.data);
       if (profileResponse.data.role !== 1) {
@@ -107,10 +117,13 @@ export function AccountProfile() {
       }
       const organizationResponse = await organizationsApi.getMine(accessToken);
       setOrganization(organizationResponse.data);
-      if (!keepForms) setOrganizationForm(toOrganizationForm(organizationResponse.data));
+      const latestOrganization = toOrganizationForm(organizationResponse.data);
+      const organizationBase = saved.current.organization;
+      saved.current.organization = latestOrganization;
+      setOrganizationForm((current) => (keepForms ? keepEdits(current, organizationBase, latestOrganization) : latestOrganization));
       setOrganizationEtag(etagFrom(organizationResponse.headers, organizationResponse.data.profileRevision));
     } catch (cause) {
-      setLoadError(cause instanceof Error ? cause.message : "Không tải được hồ sơ.");
+      setLoadError(describeApiError(cause, "Không tải được hồ sơ."));
     } finally {
       setLoading(false);
       setInitialized(true);
@@ -140,6 +153,7 @@ export function AccountProfile() {
         gender: profileForm.gender === "" ? null : Number(profileForm.gender) as UserGender,
         phoneNumber: profileForm.phoneNumber.trim() || null,
       });
+      saved.current.profile = toProfileForm(next.data);
       setProfile(next.data); setProfileForm(toProfileForm(next.data)); setProfileEtag(etagFrom(next.headers, next.data.profileRevision)); updateUser(next.data);
       toast.notify({ tone: "success", title: "Đã lưu hồ sơ cá nhân" });
     } catch (cause) { setProblem("profile", problemOf(cause, ["fullName", "username", "dob", "gender", "phoneNumber"])); } finally { setBusy("profile", false); }
@@ -155,6 +169,7 @@ export function AccountProfile() {
         address: organizationForm.address.trim() || null,
         phoneNumber: organizationForm.phoneNumber.trim() || null,
       });
+      saved.current.organization = toOrganizationForm(next.data);
       setOrganization(next.data); setOrganizationForm(toOrganizationForm(next.data)); setOrganizationEtag(etagFrom(next.headers, next.data.profileRevision));
       toast.notify({ tone: "success", title: "Đã lưu hồ sơ tổ chức" });
     } catch (cause) { setProblem("organization", problemOf(cause, ["name", "address", "phoneNumber"])); } finally { setBusy("organization", false); }
@@ -207,12 +222,11 @@ export function AccountProfile() {
   if (!ready) return <div aria-busy="true" role="status" className="ops-stack"><Skeleton style={{ height: 40, width: 260 }} /><Skeleton style={{ height: 160 }} /><span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Đang tải tài khoản…</span></div>;
   if (!isAuthenticated || !user) return <Panel title="Tài khoản" bodyClassName="ops-stack"><p style={{ margin: 0, color: "var(--muted)" }}>Bạn cần đăng nhập để xem trang này.</p><div><Button asChild><Link href={routes.login}>Đăng nhập</Link></Button></div></Panel>;
 
-  const errorAlert = (key: FormKey, onReload?: () => void) => {
+  const errorAlert = (key: FormKey, reloadable = false) => {
     const problem = problems[key];
     if (!problem) return null;
-    return <Alert tone={problem.stale ? "warning" : "danger"} title={problem.stale ? "Hồ sơ đã thay đổi" : "Không thể lưu thay đổi"} action={problem.stale && onReload ? <Button type="button" size="sm" variant="secondary" className="mt-3" onClick={onReload} disabled={loading}>{loading ? "Đang tải…" : "Tải bản mới nhất"}</Button> : undefined}>{problem.message}</Alert>;
+    return <Alert tone={problem.stale ? "warning" : "danger"} title={problem.stale ? "Hồ sơ đã thay đổi" : "Không thể lưu thay đổi"} action={problem.stale && reloadable ? <Button type="button" size="sm" variant="secondary" className="mt-3" onClick={() => { setProblem(key); void loadProfile(true); }} disabled={loading}>{loading ? "Đang tải…" : "Tải bản mới nhất"}</Button> : undefined}>{problem.message}</Alert>;
   };
-  const reloadKeepingInput = (key: FormKey) => () => { setProblem(key); void loadProfile(true); };
   const avatarLocked = Boolean(saving.avatar) || !profileEtag;
   const fieldError = (key: FormKey, name: string) => problems[key]?.fields[name];
 
@@ -233,7 +247,7 @@ export function AccountProfile() {
           </label>
           {displayUser?.avatarUrl && <Button type="button" variant="quiet" onClick={() => void removeAvatar()} disabled={saving.avatar}><Trash2 size={16} aria-hidden="true" />Xóa ảnh</Button>}
         </div>
-        {errorAlert("avatar", reloadKeepingInput("avatar"))}
+        {errorAlert("avatar", true)}
         <dl style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14, margin: 0 }}>
           <div><dt className="ops-field-hint">Vai trò</dt><dd style={{ margin: "4px 0 0" }}>{roleNames[displayUser?.role ?? 2] ?? "Người dùng"}</dd></div>
           <div><dt className="ops-field-hint">Tổ chức</dt><dd style={{ margin: "4px 0 0" }}>{organization?.name ?? (displayUser?.organizationId ? "Đang tải tổ chức…" : "Chưa thuộc tổ chức")}</dd></div>
@@ -250,7 +264,7 @@ export function AccountProfile() {
             <Field label="Số điện thoại" error={fieldError("profile", "phoneNumber")} className="ops-span-all">{(p) => <Input {...p} inputMode="tel" maxLength={16} value={profileForm.phoneNumber} onChange={(event) => setProfileForm((value) => ({ ...value, phoneNumber: event.target.value }))} placeholder="+84901234567" />}</Field>
           </div>
           <p className="ops-field-hint" style={{ margin: 0 }}>Email đăng nhập: <strong style={{ color: "var(--text)" }}>{displayUser?.email}</strong></p>
-          {errorAlert("profile", reloadKeepingInput("profile"))}
+          {errorAlert("profile", true)}
           <div><Button type="submit" disabled={saving.profile || loading || !profileEtag}>{saving.profile ? "Đang lưu…" : "Lưu hồ sơ cá nhân"}</Button></div>
         </fieldset></form>
       </Panel>
@@ -262,12 +276,12 @@ export function AccountProfile() {
             <Field label="Địa chỉ tổ chức" error={fieldError("organization", "address")}>{(p) => <Input {...p} maxLength={500} value={organizationForm.address} onChange={(event) => setOrganizationForm((value) => ({ ...value, address: event.target.value }))} />}</Field>
             <Field label="Điện thoại tổ chức" error={fieldError("organization", "phoneNumber")}>{(p) => <Input {...p} inputMode="tel" maxLength={30} value={organizationForm.phoneNumber} onChange={(event) => setOrganizationForm((value) => ({ ...value, phoneNumber: event.target.value }))} />}</Field>
           </div>
-          {errorAlert("organization", reloadKeepingInput("organization"))}
+          {errorAlert("organization", true)}
           <div><Button type="submit" disabled={saving.organization || loading || !organizationEtag}>{saving.organization ? "Đang lưu…" : "Lưu hồ sơ tổ chức"}</Button></div>
         </fieldset></form>
       </Panel>}
 
-      <Panel title="Bảo mật" description="Đổi mật khẩu sẽ thu hồi mọi phiên Fire3D, sau đó bạn sẽ đăng nhập lại.">
+      {displayUser?.hasLocalLogin !== false && <Panel title="Bảo mật" description="Đổi mật khẩu sẽ thu hồi mọi phiên Fire3D, sau đó bạn sẽ đăng nhập lại.">
         <form onSubmit={changePassword} noValidate className="ops-stack">
           <Field label="Mật khẩu hiện tại" required error={fieldError("password", "currentPassword")}>{(p) => <PasswordInput {...p} className="ops-input" visibilityLabel="mật khẩu hiện tại" autoComplete="current-password" required maxLength={128} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />}</Field>
           <Field label="Mật khẩu mới" required error={passwordErrors.newPassword ?? fieldError("password", "newPassword")}>{(p) => <PasswordInput {...p} className="ops-input" visibilityLabel="mật khẩu mới" autoComplete="new-password" required minLength={6} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />}</Field>
@@ -275,7 +289,9 @@ export function AccountProfile() {
           {errorAlert("password")}
           <div><Button type="submit" disabled={saving.password}>{saving.password ? "Đang đổi mật khẩu…" : "Đổi mật khẩu"}</Button></div>
         </form>
-      </Panel>
+      </Panel>}
+
+      {accessToken && displayUser && <GoogleLinkPanel accessToken={accessToken} profile={displayUser} onReload={() => { setProblem("password"); void loadProfile(true); }} onProfileChange={(next, etag) => { setProfile(next); setProfileEtag(etag ?? (next.profileRevision ? `"${next.profileRevision}"` : null)); updateUser(next); }} />}
 
       <div><Button variant="secondary" onClick={() => void logout()}><LogOut size={16} aria-hidden="true" />Đăng xuất</Button></div>
     </div>

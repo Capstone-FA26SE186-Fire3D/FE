@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, CircleAlert, Clock, Loader2, RefreshCw, X } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePolling } from "@/api/use-polling";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -11,18 +11,12 @@ import { billingApi } from "../api";
 import { billingCodeMessage, billingErrorText } from "../errors";
 import { formatDateTime, formatVnd } from "../format";
 import type { PayosPayment, ProvisioningLine } from "../types";
+import { provisioningLabels } from "./payment-states";
 import "../billing.css";
 
 type StepState = "done" | "active" | "warn" | "fail" | "todo";
 
 export type PaymentSummary = { tone: "success" | "info" | "warning" | "danger"; title: string; detail: string; final: boolean };
-
-const lineLabel: Record<string, { label: string; tone: Tone }> = {
-  NotStarted: { label: "Chưa bắt đầu", tone: "neutral" },
-  Pending: { label: "Đang kích hoạt", tone: "info" },
-  NeedsReconcile: { label: "Cần đối soát", tone: "warning" },
-  Succeeded: { label: "Đã kích hoạt", tone: "success" },
-};
 
 /**
  * `Paid` only proves money arrived. Service is provisioned per Building: success is declared only when
@@ -34,8 +28,9 @@ export function summarizePayment(payment: PayosPayment): PaymentSummary {
   switch (payment.paymentStatus) {
     case "Paid":
       if (payment.provisioningStatus === "Succeeded") return { tone: "success", title: "Đã thanh toán và kích hoạt dịch vụ", detail: "Tất cả công trình trong báo giá đã được kích hoạt.", final: true };
-      if (payment.provisioningStatus === "Pending") return { tone: "info", title: "Đã nhận tiền · đang kích hoạt dịch vụ", detail: `Dịch vụ chưa có hiệu lực cho tới khi từng công trình kích hoạt xong (${done}/${lines.length}). Trang tự cập nhật.`, final: false };
-      return { tone: "warning", title: "Đã nhận tiền · kích hoạt đang cần đối soát", detail: `Tiền đã được ghi nhận nhưng dịch vụ chưa kích hoạt đủ (${done}/${lines.length} công trình). Hệ thống tự thử lại; nếu kéo dài hãy liên hệ hỗ trợ kèm mã đơn ${payment.orderCode}. Bạn không cần thanh toán lại.`, final: false };
+      if (payment.provisioningStatus === "Pending" || payment.provisioningStatus === "NotStarted") return { tone: "info", title: "Đã nhận tiền · đang kích hoạt dịch vụ", detail: `Dịch vụ chưa có hiệu lực cho tới khi từng mục kích hoạt xong (${done}/${lines.length}). Trang tự cập nhật.`, final: false };
+      if (payment.provisioningStatus === "Partial") return { tone: "warning", title: "Đã nhận tiền · mới kích hoạt một phần", detail: `Mới ${done}/${lines.length} mục có hiệu lực; các mục còn lại chưa được xem là đã có dịch vụ. Hệ thống tự thử lại, bạn không cần thanh toán lại. Nếu kéo dài hãy liên hệ hỗ trợ kèm mã đơn ${payment.orderCode}.`, final: false };
+      return { tone: "warning", title: "Đã nhận tiền · kích hoạt đang cần đối soát", detail: `Tiền đã được ghi nhận nhưng dịch vụ chưa kích hoạt đủ (${done}/${lines.length} mục). Hệ thống tự thử lại; nếu kéo dài hãy liên hệ hỗ trợ kèm mã đơn ${payment.orderCode}. Bạn không cần thanh toán lại.`, final: false };
     case "Pending":
       return { tone: "info", title: "Đang chờ PayOS xác nhận thanh toán", detail: "Hoàn tất trên trang PayOS. Việc quay lại từ PayOS chỉ là điều hướng; hệ thống chỉ ghi nhận khi PayOS xác nhận.", final: false };
     case "Expired":
@@ -55,7 +50,7 @@ function Dot({ state }: { state: StepState }) {
 }
 
 function lineBadge(line: ProvisioningLine) {
-  const item = lineLabel[line.status] ?? { label: line.status, tone: "neutral" as Tone };
+  const item = provisioningLabels[line.status] ?? { label: line.status, tone: "neutral" as Tone };
   return <StatusBadge tone={item.tone}>{item.label}</StatusBadge>;
 }
 
@@ -64,7 +59,7 @@ export function PaymentStatusView({ payment, buildingNames }: { payment: PayosPa
   const summary = summarizePayment(payment);
   const paid = payment.paymentStatus === "Paid";
   const paymentState: StepState = paid ? "done" : payment.paymentStatus === "Pending" ? "active" : payment.paymentStatus === "Failed" ? "fail" : "warn";
-  const provisioningState: StepState = !paid ? "todo" : payment.provisioningStatus === "Succeeded" ? "done" : payment.provisioningStatus === "Pending" ? "active" : "warn";
+  const provisioningState: StepState = !paid ? "todo" : payment.provisioningStatus === "Succeeded" ? "done" : payment.provisioningStatus === "Pending" || payment.provisioningStatus === "NotStarted" ? "active" : "warn";
 
   return <div className="ops-stack" data-testid="payment-status" data-payment-status={payment.paymentStatus} data-provisioning-status={payment.provisioningStatus}>
     <Alert tone={summary.tone} title={summary.title}>{summary.detail}</Alert>
@@ -75,11 +70,11 @@ export function PaymentStatusView({ payment, buildingNames }: { payment: PayosPa
         <p>{paid ? `Đã ghi nhận ${payment.paidAt ? `lúc ${formatDateTime(payment.paidAt)}` : ""}${payment.transactionStatus ? ` · giao dịch ${payment.transactionStatus}` : ""}` : summary.title}</p>
       </div></li>
       <li className="bill-step" data-state={provisioningState}><Dot state={provisioningState} /><div>
-        <h4>Kích hoạt dịch vụ từng công trình</h4>
-        <p>{!paid ? "Bắt đầu sau khi PayOS xác nhận thanh toán." : payment.provisioningStatus === "Succeeded" ? "Hoàn tất cho mọi công trình." : "Chưa hoàn tất: chưa xem là đã có dịch vụ."}</p>
-        {payment.items.length > 0 && <ul aria-label="Trạng thái kích hoạt theo công trình">
+        <h4>Kích hoạt dịch vụ (từng công trình hoặc quota AI)</h4>
+        <p>{!paid ? "Bắt đầu sau khi PayOS xác nhận thanh toán." : payment.provisioningStatus === "Succeeded" ? "Hoàn tất cho mọi mục trong báo giá." : "Chưa hoàn tất: chưa xem là đã có dịch vụ."}</p>
+        {payment.items.length > 0 && <ul aria-label="Trạng thái kích hoạt theo mục">
           {payment.items.map((line) => <li key={line.quotationItemId} data-testid="provisioning-line" data-line-status={line.status}>
-            <span>{buildingNames[line.buildingId] ?? `Công trình ${line.buildingId.slice(0, 8)}`}{line.errorCode && <small className="bill-dim" style={{ display: "block" }}>{billingCodeMessage(line.errorCode) ?? `Mã lỗi: ${line.errorCode}`}</small>}</span>
+            <span>{line.buildingId === null ? "Quota AI trả trước (top-up)" : buildingNames[line.buildingId] ?? `Công trình ${line.buildingId.slice(0, 8)}`}{line.errorCode && <small className="bill-dim" style={{ display: "block" }}>{billingCodeMessage(line.errorCode) ?? `Mã lỗi: ${line.errorCode}`}</small>}</span>
             {lineBadge(line)}
           </li>)}
         </ul>}
@@ -88,7 +83,15 @@ export function PaymentStatusView({ payment, buildingNames }: { payment: PayosPa
   </div>;
 }
 
-/** Polls the payment (3-5s, backs off on errors, pauses in hidden tabs) until it reaches a final state. */
+const STUCK_POLL_MS = 15_000;
+
+/** Money received but provisioning needs recovery: it can take minutes, so poll slower instead of hammering. */
+const isStuck = (payment: PayosPayment) => payment.paymentStatus === "Paid" && (payment.provisioningStatus === "Partial" || payment.provisioningStatus === "NeedsReconcile");
+
+/**
+ * Polls the payment (4s; backs off on errors, honors Retry-After, pauses in hidden tabs) until it reaches a final
+ * state. `Paid` without finished provisioning keeps polling (every 15s once it needs reconciliation).
+ */
 export function PaymentProgress({ accessToken, paymentRequestId, buildingNames, onSettled, intervalMs = 4000 }: {
   accessToken: string;
   paymentRequestId: string;
@@ -97,10 +100,16 @@ export function PaymentProgress({ accessToken, paymentRequestId, buildingNames, 
   onSettled?: (payment: PayosPayment) => void;
   intervalMs?: number;
 }) {
+  const [stuck, setStuck] = useState(false);
   const poll = usePolling<PayosPayment>({
-    fetcher: (signal) => billingApi.getPayment(accessToken, paymentRequestId, signal),
+    fetcher: async (signal) => {
+      const payment = await billingApi.getPayment(accessToken, paymentRequestId, signal);
+      setStuck(isStuck(payment));
+      return payment;
+    },
     isDone: (payment) => summarizePayment(payment).final,
-    intervalMs,
+    intervalMs: stuck ? STUCK_POLL_MS : intervalMs,
+    resetKey: paymentRequestId,
   });
   const settled = useRef<string | null>(null);
   const { data, finished } = poll;
@@ -120,6 +129,6 @@ export function PaymentProgress({ accessToken, paymentRequestId, buildingNames, 
   return <div className="ops-stack">
     <PaymentStatusView payment={data} buildingNames={buildingNames} />
     {poll.error !== undefined && <Alert tone="warning" title="Tạm thời không cập nhật được">{billingErrorText(poll.error)} Đang tự thử lại.</Alert>}
-    {!finished && <div className="bill-row"><span className="bill-dim" aria-live="polite">Tự cập nhật mỗi vài giây khi trang đang mở.</span><Button size="sm" variant="quiet" onClick={poll.refresh}><RefreshCw size={14} aria-hidden="true" />Kiểm tra ngay</Button></div>}
+    {!finished && <div className="bill-row"><span className="bill-dim" aria-live="polite">{stuck ? "Đang chờ kích hoạt lại; trang kiểm tra thưa hơn và tự dừng khi bạn rời tab." : "Tự cập nhật mỗi vài giây khi trang đang mở."}</span><Button size="sm" variant="quiet" onClick={poll.refresh}><RefreshCw size={14} aria-hidden="true" />Kiểm tra ngay</Button></div>}
   </div>;
 }

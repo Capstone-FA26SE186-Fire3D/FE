@@ -1,17 +1,91 @@
 "use client";
 
-import { Search } from "lucide-react";
-import { useState } from "react";
-import { ArticleCard } from "./article-card";
-import type { LearnArticle } from "../types";
+import { RefreshCw } from "lucide-react";
+import { useCallback } from "react";
+import { useAsyncData } from "@/api/use-async-data";
+import { Button } from "@/components/ui/button";
+import { describeFilterError, describeReadError, learnApi } from "../api";
+import { hasLearnFilters, learnQueryKey, type LearnFilterField } from "../query";
+import { useLearnQuery } from "../use-learn-query";
+import { LearnBookmarksProvider } from "./bookmarks-context";
+import { LearnActiveFilters, LearnFilterPanel } from "./learn-filters";
+import { LearnPagination } from "./learn-pagination";
+import { LearnSearchBox } from "./learn-search-box";
+import { PostCard } from "./post-card";
+import { SavePostButton } from "./save-post-button";
+import "../learn.css";
 
-export function LearnBrowser({ articles, saved = false }: { articles: LearnArticle[]; saved?: boolean }) {
-  const [query, setQuery] = useState("");
-  const normalized = query.trim().toLocaleLowerCase("vi");
-  const filtered = articles.filter((article) => `${article.title} ${article.excerpt} ${article.category}`.toLocaleLowerCase("vi").includes(normalized));
-  return <>
-    <div className="learn-toolbar"><label className="learn-search"><Search aria-hidden="true" size={18} /><input className="search-field" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={saved ? "Tìm trong bài đã lưu" : "Tìm một chủ đề để bắt đầu"} aria-label={saved ? "Tìm bài đã lưu" : "Tìm bài Learn"} /></label><span className="source-note">Nội dung mẫu · chưa thẩm định chuyên môn</span></div>
-    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 learn-grid">{filtered.map((article) => <ArticleCard article={article} key={article.slug} />)}</div>
-    {!filtered.length && <p className="learn-no-results" role="status">Chưa có bài phù hợp. Thử một từ khóa khác nhé.</p>}
-  </>;
+const PAGE_SIZE = 12;
+
+function CardSkeletons() {
+  return <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 learn-grid" role="status" aria-live="polite" aria-label="Đang tải bài viết">
+    {Array.from({ length: 6 }, (_, index) => <div key={index} className="learn-card learn-skeleton" aria-hidden="true"><span /><span /><span /></div>)}
+  </div>;
+}
+
+/**
+ * Public Learn list. Search, kind, situation and page live in the URL and are answered by the API (`GET /api/learn/posts`), which filters
+ * before paging and returns the exact total; nothing is filtered in the browser. A newer query aborts the older request, so a late answer
+ * never replaces what the reader asked for last.
+ */
+export function LearnBrowser() {
+  const { query, update } = useLearnQuery();
+  const situations = useAsyncData("learn:situations", (signal) => learnApi.situations(signal));
+  const posts = useAsyncData(learnQueryKey(query, PAGE_SIZE), (signal) => learnApi.posts({ search: query.search, situations: query.situations, kinds: query.kinds, page: query.page, pageSize: PAGE_SIZE }, signal));
+  const filtered = hasLearnFilters(query);
+  const rejected = posts.error !== undefined ? describeFilterError(posts.error) : null;
+  const failure = posts.error !== undefined && !rejected ? describeReadError(posts.error) : null;
+  const broken = rejected !== null || failure !== null;
+  // After a failed reload the previous page is stale: show the error, not old cards.
+  const items = broken ? [] : posts.data?.items ?? [];
+  const total = posts.data?.total ?? 0;
+  const pageBeyondEnd = !!posts.data && !posts.loading && !broken && items.length === 0 && total > 0 && query.page > 1;
+  const noMatch = !!posts.data && !posts.loading && !broken && items.length === 0 && !pageBeyondEnd;
+
+  const commitSearch = useCallback((search: string, mode: "push" | "replace") => update({ search }, mode), [update]);
+  const clearAll = () => update({ search: "", kinds: [], situations: [] });
+  const resetRejected = () => {
+    const fields = new Set<LearnFilterField>(rejected?.fields.length ? rejected.fields : ["search", "situation", "kind"]);
+    update({ ...(fields.has("search") ? { search: "" } : {}), ...(fields.has("kind") ? { kinds: [] } : {}), ...(fields.has("situation") ? { situations: [] } : {}), page: 1 });
+  };
+
+  return <LearnBookmarksProvider>
+    <LearnSearchBox value={query.search} onCommit={commitSearch} />
+    <LearnFilterPanel selection={query} situations={situations.data} situationsFailed={situations.error !== undefined} onRetrySituations={situations.reload} onChange={(patch) => update(patch)} />
+    <LearnActiveFilters selection={query} situations={situations.data} onChange={(patch) => update(patch)} onClear={clearAll} />
+
+    {!broken && <p className="learn-result-count" role="status" aria-live="polite">
+      {posts.loading ? "Đang cập nhật kết quả…" : posts.data ? (filtered ? `${total} bài khớp bộ lọc` : `${total} bài`) : ""}
+    </p>}
+
+    {rejected && <div className="learn-state" role="alert">
+      <h2>Bộ lọc không hợp lệ</h2>
+      <p>{rejected.messages.length ? rejected.messages.join(" ") : "Máy chủ từ chối một tham số trong đường dẫn."} Mã lỗi: {rejected.code}.</p>
+      <Button variant="secondary" onClick={resetRejected}>{rejected.fields.length ? "Đặt lại tham số lỗi" : "Đặt lại bộ lọc"}</Button>
+    </div>}
+
+    {failure && <div className="learn-state" role="alert">
+      <h2>{failure.title}</h2><p>{failure.message}</p>
+      <Button variant="secondary" onClick={posts.reload}><RefreshCw size={16} aria-hidden="true" />Thử lại</Button>
+    </div>}
+
+    {posts.loading && !posts.data && !broken && <CardSkeletons />}
+
+    {items.length > 0 && <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 learn-grid" aria-busy={posts.loading}>
+      {items.map((post) => <PostCard key={post.id} slug={post.slug} title={post.title} summary={post.summary} kind={post.kind} coverImageUrl={post.coverImageUrl} publishedAt={post.publishedAt} action={<SavePostButton postId={post.id} slug={post.slug} compact />} />)}
+    </div>}
+
+    {noMatch && !filtered && <div className="learn-state" role="status">
+      <h2>Chưa có bài nào được đăng</h2>
+      <p>Khi có bài được xuất bản, chúng sẽ xuất hiện ở đây.</p>
+    </div>}
+    {noMatch && filtered && <div className="learn-state" role="status">
+      <h2>Không có bài khớp bộ lọc</h2>
+      <p>Từ khóa được tìm nguyên cụm trong tiêu đề và mô tả, nên một từ ngắn hơn thường cho nhiều kết quả hơn. Chọn nhiều loại hoặc nhiều tình huống sẽ mở rộng kết quả; kết hợp từ khóa, loại và tình huống sẽ thu hẹp lại.</p>
+      <Button variant="secondary" onClick={clearAll}>Xóa bộ lọc</Button>
+    </div>}
+    {pageBeyondEnd && <div className="learn-state" role="status"><h2>Trang này không có bài</h2><p>Kết quả chỉ có {Math.ceil(total / PAGE_SIZE)} trang.</p><Button variant="secondary" onClick={() => update({ page: 1 })}>Về trang đầu</Button></div>}
+
+    {!broken && <LearnPagination page={query.page} pageSize={PAGE_SIZE} total={total} onPageChange={(page) => update({ page })} disabled={posts.loading} />}
+  </LearnBookmarksProvider>;
 }

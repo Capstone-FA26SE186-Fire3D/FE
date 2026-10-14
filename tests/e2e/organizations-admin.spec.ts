@@ -43,7 +43,8 @@ test("PlatformAdmin creates, reviews and locks an Organization through the Fire3
   await expect(page).toHaveURL(/organization=org-1/);
   const detail = page.getByRole("dialog", { name: "Thông tin tổ chức" });
   await expect(detail.getByRole("link", { name: "Tạo OrganizationUser" })).toHaveAttribute("href", "/admin/accounts?organizationId=org-1");
-  await expect(detail.getByText("Chờ BE: địa chỉ và số điện thoại")).toBeVisible();
+  await expect(detail.getByText("Chờ BE: địa chỉ và số điện thoại")).toHaveCount(0);
+  await expect(detail.getByRole("button", { name: "Sửa hồ sơ" })).toBeVisible();
 
   // Locking needs an explicit confirmation.
   await detail.getByRole("button", { name: "Vô hiệu hóa tổ chức" }).click();

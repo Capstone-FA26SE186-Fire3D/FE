@@ -26,9 +26,18 @@ export type DraftResponse = {
 
 export type LoadedDraft = { draft: DraftResponse; etag: string };
 
-export type RuntimeCatalogEntry = { runtimeVersion: string; protocolVersion: string; manifestSchemaVersion: string; capabilities: unknown };
+export type RuntimeCatalogEntry = { runtimeVersion: string; protocolVersion: string; manifestSchemaVersion: string; capabilities: unknown; capabilityContracts?: unknown };
 
 export type ValidateResponse = { draftId: string; version: number; isValid: boolean; issues: unknown };
+
+/** `POST /api/scenario-drafts/{id}/validate-state`: dry run of an unsaved body. `stateHash` is the SHA-256 of the checked JSON as the BE re-serialized it. */
+export type ValidateStateResponse = { draftId: string; storedVersion: number; stateHash: string; isValid: boolean; issues: unknown };
+
+/** `GET /api/buildings/{id}/editor-preview` with the `fet3d.editor/1` fields (status Ready | NotReady | ReprocessRequired). */
+export type EditorPreviewV1 = EditorPreview & { schemaVersion?: string | null; units?: string | null; upAxis?: string | null; handedness?: string | null };
+
+/** `GET /api/revisions/{id}/floors`: pin + floors of the accepted Geometry artifact, without storage access. */
+export type RevisionFloorsResponse = { revisionId: string; buildingId: string; status: string; artifactId: string | null; sha256Hash: string | null; schemaVersion: string | null; floors: unknown | null };
 
 export const scenarioEditorApi = {
   getScenario(accessToken: string, scenarioId: string, signal?: AbortSignal) {
@@ -62,6 +71,16 @@ export const scenarioEditorApi = {
     return apiClient.request<RuntimeCatalogEntry[]>("/api/scenario-interactions/catalog", { headers: auth(accessToken), signal });
   },
   editorPreview(accessToken: string, buildingId: string, revisionId: string, signal?: AbortSignal) {
-    return apiClient.request<EditorPreview>(`/api/buildings/${buildingId}/editor-preview`, { headers: auth(accessToken), query: { revisionId }, signal });
+    return apiClient.request<EditorPreviewV1>(`/api/buildings/${buildingId}/editor-preview`, { headers: auth(accessToken), query: { revisionId }, signal });
+  },
+  revisionFloors(accessToken: string, revisionId: string, signal?: AbortSignal) {
+    return apiClient.request<RevisionFloorsResponse>(`/api/revisions/${revisionId}/floors`, { headers: auth(accessToken), signal });
+  },
+  rubricCatalog(accessToken: string, signal?: AbortSignal) {
+    return apiClient.request<unknown>("/api/scenario-rubrics/catalog", { headers: auth(accessToken), signal });
+  },
+  /** Validates the body that would be PUT without storing it or changing the ETag. Shape problems come back as issues (200), not 422. */
+  validateState(accessToken: string, draftId: string, body: JsonObject, signal?: AbortSignal) {
+    return apiClient.request<ValidateStateResponse>(`/api/scenario-drafts/${draftId}/validate-state`, { headers: auth(accessToken), method: "POST", json: body, signal });
   },
 };

@@ -5,6 +5,18 @@ export function formatVnd(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? vnd.format(value) : "—";
 }
 
+const integer = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
+
+/** Counts (learners, quota units) as returned by the BE; never rounded or converted to money. */
+export function formatNumber(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? integer.format(value) : "—";
+}
+
+/** Quota is shown in the unit the policy names (e.g. "1.200 tokens"); units never combine. */
+export function formatQuota(value: number | null | undefined, unit: string | null | undefined) {
+  return `${formatNumber(value)}${unit ? ` ${unit}` : ""}`;
+}
+
 /** BE `DateTime` values are UTC but may arrive without a designator; treat those as UTC, not local time. */
 export function parseUtc(value: string | null | undefined): Date | null {
   if (!value) return null;

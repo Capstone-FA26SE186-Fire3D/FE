@@ -151,7 +151,7 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
     >
       {jobs.jobsError !== undefined && <Alert tone="danger" title="Không tải được danh sách job" action={<Button size="sm" variant="secondary" className="mt-3" onClick={jobs.reloadJobs}>Thử lại</Button>}>{describeError(jobs.jobsError).message}</Alert>}
       <Table caption="Job package build">
-        <thead><tr><th>Loại</th><th>Trạng thái</th><th>Tạo lúc</th><th aria-label="Thao tác" /></tr></thead>
+        <thead><tr><th>Loại</th><th>Trạng thái</th><th>Tạo lúc</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
         <tbody>
           {jobs.jobsLoading && jobs.jobs.length === 0 && <TableMessage colSpan={4}><SkeletonRows rows={3} label="Đang tải job…" /></TableMessage>}
           {jobs.jobs.map((job) => <tr key={job.id} className={job.id === jobs.selectedJobId ? "ver-row-selected" : undefined}>

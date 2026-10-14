@@ -74,11 +74,11 @@ export function errorText(cause: unknown, fallback: string) {
   return fallback;
 }
 
-export function MessageList({ messages, label, empty }: { messages: SupportMessage[]; label: (authorId: string) => { name: string; mine: boolean }; empty: string }) {
+export function MessageList({ messages, label, empty }: { messages: SupportMessage[]; label: (message: SupportMessage) => { name: string; mine: boolean }; empty: string }) {
   if (!messages.length) return <p className={styles.muted}>{empty}</p>;
   return <ol className={styles.thread} aria-label="Lịch sử trao đổi">
     {messages.map((message) => {
-      const author = label(message.authorId);
+      const author = label(message);
       return <li key={message.id} className={styles.bubble} data-mine={author.mine ? "true" : undefined}>
         <div className={styles.bubbleMeta}><strong>{author.name}</strong><time dateTime={message.createdAt}>{formatDateTime(message.createdAt)}</time></div>
         <p>{message.message}</p>

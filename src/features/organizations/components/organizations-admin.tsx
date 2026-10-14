@@ -1,11 +1,12 @@
 "use client";
 
-import { Building2, Landmark, Plus, RefreshCw, Search, UserPlus } from "lucide-react";
+import { Landmark, Plus, RefreshCw, Search } from "lucide-react";
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { ApiError } from "@/api";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams, useUrlSearch } from "@/api/use-url-params";
+import { describeApiError } from "@/api/describe-error";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Drawer, Modal } from "@/components/ui/dialog";
@@ -20,10 +21,11 @@ import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { organizationsApi } from "../api";
 import type { Organization } from "../types";
+import { OrganizationDetail } from "./organization-detail";
+import { RetryButton } from "@/components/ui/retry-button";
 
 const PAGE_SIZE = 20;
 const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/;
-const BE_ISSUE_PROFILE = "https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/60";
 
 function slugify(value: string) {
   return value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -37,35 +39,6 @@ type CreateErrors = { name?: string; slug?: string };
 
 function statusBadge(organization: Organization) {
   return <StatusBadge tone={organization.isActive ? "success" : "neutral"}>{organization.isActive ? "Hoạt động" : "Vô hiệu hóa"}</StatusBadge>;
-}
-
-function OrganizationDetail({ id, accessToken, onToggle }: { id: string; accessToken: string; onToggle: (organization: Organization) => void }) {
-  const detail = useAsyncData(`organization:${id}`, (signal) => organizationsApi.get(accessToken, id, signal), true);
-  const organization = detail.data;
-
-  if (!organization) {
-    if (detail.error !== undefined) {
-      const missing = detail.error instanceof ApiError && detail.error.status === 404;
-      return <Alert tone="danger" title={missing ? "Không tìm thấy tổ chức" : "Không mở được tổ chức"} action={missing ? undefined : <Button size="sm" variant="secondary" className="mt-3" onClick={detail.reload}>Thử lại</Button>}>{missing ? "Tổ chức có thể đã bị xóa hoặc đường dẫn không đúng." : "Hãy kiểm tra kết nối rồi thử lại."}</Alert>;
-    }
-    return <SkeletonRows rows={4} label="Đang tải thông tin tổ chức…" />;
-  }
-
-  return <div className="ops-stack">
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>{statusBadge(organization)}<code style={{ color: "var(--muted)", fontSize: 13 }}>{organization.slug}</code></div>
-    <dl className="ops-stack" style={{ margin: 0, gap: 12 }}>
-      <div><dt className="ops-field-hint">Tên tổ chức</dt><dd style={{ margin: 0, fontWeight: 600 }}>{organization.name}</dd></div>
-      <div><dt className="ops-field-hint">Mã tổ chức</dt><dd style={{ margin: 0, fontFamily: "ui-monospace, Consolas, monospace", fontSize: 12, overflowWrap: "anywhere" }}>{organization.id}</dd></div>
-      <div><dt className="ops-field-hint">Tạo lúc</dt><dd style={{ margin: 0, fontSize: 14, fontWeight: 400 }}>{formatDate(organization.createdAt)}</dd></div>
-      <div><dt className="ops-field-hint">Cập nhật</dt><dd style={{ margin: 0, fontSize: 14, fontWeight: 400 }}>{formatDate(organization.updatedAt)}</dd></div>
-    </dl>
-    <Alert tone="info" title="Chờ BE: địa chỉ và số điện thoại">Response quản trị chưa có địa chỉ, số điện thoại và chưa có API sửa hồ sơ từ admin, nên các trường này chưa hiển thị. <a href={BE_ISSUE_PROFILE} target="_blank" rel="noreferrer" style={{ color: "var(--ember)", textDecoration: "underline" }}>BE#60</a></Alert>
-    <div className="ops-actions">
-      <Button asChild><Link href={ownersHref(organization.id)}><UserPlus size={16} aria-hidden="true" />Tạo OrganizationUser</Link></Button>
-      <Button asChild variant="secondary"><Link href={buildingsHref(organization.id)}><Building2 size={16} aria-hidden="true" />Xem công trình</Link></Button>
-      <Button variant={organization.isActive ? "secondary" : "primary"} onClick={() => onToggle(organization)}>{organization.isActive ? "Vô hiệu hóa tổ chức" : "Kích hoạt tổ chức"}</Button>
-    </div>
-  </div>;
 }
 
 export function OrganizationsAdmin() {
@@ -177,14 +150,14 @@ export function OrganizationsAdmin() {
       </Select>
     </div>
 
-    {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tổ chức" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>Hãy kiểm tra kết nối rồi thử lại.</Alert>}
+    {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tổ chức" action={<RetryButton error={list.error} onRetry={list.reload} />}>{describeApiError(list.error, "Không tải được danh sách tổ chức. Hãy thử lại sau.")}</Alert>}
 
     <Table caption="Danh sách tổ chức">
-      <thead><tr><th>Tổ chức</th><th>Trạng thái</th><th>Tạo lúc</th><th aria-label="Thao tác" /></tr></thead>
+      <thead><tr><th>Tổ chức</th><th>Trạng thái</th><th>Tạo lúc</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
       <tbody>
         {list.loading && !list.data && <TableMessage colSpan={4}><SkeletonRows rows={6} label="Đang tải danh sách tổ chức…" /></TableMessage>}
         {items.map((organization) => <tr key={organization.id}>
-          <td><button type="button" className="ops-cell-primary" style={{ border: 0, background: "none", padding: 0, textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => openDetail(organization.id)}>{organization.name}<span className="ops-cell-sub">{organization.slug}</span></button></td>
+          <td><button type="button" className="ops-cell-primary" style={{ border: 0, background: "none", textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => openDetail(organization.id)}>{organization.name}<span className="ops-cell-sub">{organization.slug}</span></button></td>
           <td>{statusBadge(organization)}</td>
           <td>{formatDate(organization.createdAt)}</td>
           <td className="ops-cell-actions">
@@ -199,7 +172,7 @@ export function OrganizationsAdmin() {
     {totalCount > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} disabled={list.loading} />}
 
     <Drawer open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) closeDetail(); }} title="Thông tin tổ chức" description="Dữ liệu lấy trực tiếp từ Fire3D API.">
-      {selectedId && accessToken && <OrganizationDetail key={`${selectedId}:${detailVersion}`} id={selectedId} accessToken={accessToken} onToggle={(organization) => { setToggleError(""); setToggling(organization); }} />}
+      {selectedId && accessToken && <OrganizationDetail key={`${selectedId}:${detailVersion}`} id={selectedId} accessToken={accessToken} onToggle={(organization) => { setToggleError(""); setToggling(organization); }} onSaved={list.reload} />}
     </Drawer>
 
     <Drawer open={creating} onOpenChange={(open) => { if (!open && !saving) setCreating(false); }} title="Tạo tổ chức" description="Slug là định danh URL, không đổi được sau khi tạo.">

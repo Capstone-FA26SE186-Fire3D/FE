@@ -1,7 +1,7 @@
 import { ApiError } from "@/api/types/common";
 import type { Tone } from "@/components/ui/status-badge";
 
-import type { ContentReviewSubmission, ProcessingJobDetail, Release, ValidationRun, VersionIssue } from "./version-types";
+import type { ProcessingJobDetail, Release, ReviewStatus, ValidationRun, VersionIssue, VersionReadiness } from "./version-types";
 
 /** The three gates are independent: technical readiness, content approval and release never imply each other. */
 export type GateState = {
@@ -10,11 +10,11 @@ export type GateState = {
   tone: Tone;
   /** One sentence for the stepper. */
   detail: string;
-  /** False when BE offers no way to read it back (shown as "Chưa có dữ liệu (chờ BE)"). */
+  /** False when the server did not report this gate (older deployment or failed read); shown as "Chưa có dữ liệu". */
   known: boolean;
 };
 
-export const NO_DATA_TEXT = "Chưa có dữ liệu (chờ BE)";
+export const NO_DATA_TEXT = "Chưa có dữ liệu";
 
 export function shortHash(value: string | null | undefined, length = 12) {
   if (!value) return "—";
@@ -52,12 +52,30 @@ export function qaVerdict(runs: ValidationRun[], issues: VersionIssue[]): QaVerd
   return { kind: "failed", run, blockingIssues };
 }
 
-export function technicalGate(input: { job?: ProcessingJobDetail; verdict?: QaVerdict; confirmReviewId?: string | null; hasJobs: boolean }): GateState {
-  if (input.confirmReviewId) {
-    return { label: "Đã xác nhận kỹ thuật", tone: "success", known: true, detail: "Đã ghi nhận xác nhận kỹ thuật (trong phiên này). Việc này không thay thế duyệt nội dung." };
+/** Plain-language meaning of the `missing` codes BE reports in readiness (`PACKAGE_VALIDATION_REQUIRED`…). */
+export const MISSING_TEXT: Record<string, string> = {
+  PACKAGE_VALIDATION_REQUIRED: "Chưa có validation run cho package build của phiên bản này.",
+  QA_NOT_PASSED: "QA chưa đạt (validation run không Passed).",
+  QA_BLOCKERS_PRESENT: "Còn issue Error/Critical chặn.",
+  CONFIRMATION_REQUIRED: "Chưa xác nhận kỹ thuật (confirm-for-training).",
+  RUNTIME_ARTIFACT_REQUIRED: "Chưa có artifact runtime sẵn sàng.",
+  PROCESSING_REQUIRED: "Revision IFC chưa được xử lý.",
+  GEOMETRY_VALIDATION_REQUIRED: "Revision chưa có kiểm tra geometry.",
+};
+
+export function missingText(code: string) {
+  return MISSING_TEXT[code] ?? code;
+}
+
+export function technicalGate(input: { job?: ProcessingJobDetail; verdict?: QaVerdict; readiness?: VersionReadiness; hasJobs: boolean }): GateState {
+  if (input.readiness?.confirmationReviewId) {
+    return { label: "Đã xác nhận kỹ thuật", tone: "success", known: true, detail: "Máy chủ đã ghi nhận xác nhận kỹ thuật cho phiên bản này. Việc này không thay thế duyệt nội dung." };
   }
   const status = input.job?.job.status;
   if (!input.job) {
+    if (input.readiness?.packageJob && !input.hasJobs) {
+      return { label: "Đang tải job", tone: "neutral", known: true, detail: "Phiên bản đã có job package build; đang tải kết quả." };
+    }
     return input.hasJobs
       ? { label: "Chọn job để xem", tone: "neutral", known: true, detail: "Version đã có job package build; chọn một job để xem kết quả." }
       : { label: "Chưa chạy package build", tone: "neutral", known: true, detail: "Chạy package build để có kết quả QA kỹ thuật." };
@@ -69,14 +87,17 @@ export function technicalGate(input: { job?: ProcessingJobDetail; verdict?: QaVe
   return { label: "QA đạt, chờ xác nhận", tone: "info", known: true, detail: "QA Passed. Cần xác nhận kỹ thuật (confirm-for-training) trước khi tạo release." };
 }
 
-export function approvalGate(submission?: ContentReviewSubmission | null): GateState {
-  if (!submission) {
-    return { label: NO_DATA_TEXT, tone: "pending", known: false, detail: "BE chưa có API đọc trạng thái duyệt (BE#52). Chỉ hiển thị kết quả lệnh gửi duyệt trong phiên này." };
+/** Content approval gate from the state the server reports on the version (`reviewStatus`, `rejectReason`). */
+export function approvalGate(reviewStatus?: ReviewStatus | string | null, rejectReason?: string | null): GateState {
+  if (!reviewStatus) {
+    return { label: NO_DATA_TEXT, tone: "pending", known: false, detail: "Máy chủ không trả trạng thái duyệt của phiên bản này. Tải lại; nếu vẫn thiếu, kiểm tra phiên bản triển khai của BE." };
   }
-  const status = submission.status.toLowerCase();
-  if (status === "approved") return { label: "Đã duyệt", tone: "success", known: true, detail: "Đúng hash nội dung và rubric đã gửi." };
-  if (status === "rejected") return { label: "Bị từ chối", tone: "danger", known: true, detail: "Sửa nội dung sẽ tạo version mới và phải gửi duyệt lại." };
-  return { label: "Đã gửi, chờ duyệt", tone: "info", known: true, detail: "Trạng thái lúc gửi (trong phiên này). Kết quả duyệt của PlatformAdmin chưa đọc lại được (BE#52)." };
+  const status = reviewStatus.toLowerCase();
+  if (status === "notsubmitted") return { label: "Chưa gửi duyệt", tone: "neutral", known: true, detail: "Gửi duyệt để PlatformAdmin duyệt đúng hash nội dung và rubric của phiên bản này." };
+  if (status === "approved") return { label: "Đã duyệt", tone: "success", known: true, detail: "PlatformAdmin đã duyệt đúng hash nội dung và rubric đã gửi." };
+  if (status === "rejected") return { label: "Bị từ chối", tone: "danger", known: true, detail: rejectReason ? `Lý do: ${rejectReason}. Sửa nội dung sẽ tạo version mới và phải gửi duyệt lại.` : "Sửa nội dung sẽ tạo version mới và phải gửi duyệt lại." };
+  if (status === "submitted") return { label: "Đã gửi, chờ duyệt", tone: "info", known: true, detail: "Đang chờ PlatformAdmin duyệt." };
+  return { label: reviewStatus, tone: "neutral", known: true, detail: "Trạng thái duyệt do máy chủ báo." };
 }
 
 export function releaseGate(release?: Release | null): GateState {
@@ -84,7 +105,7 @@ export function releaseGate(release?: Release | null): GateState {
   const status = release.status.toLowerCase();
   if (status === "published") return { label: "Published", tone: "success", known: true, detail: "Đã phát hành." };
   if (status === "revoked") return { label: "Revoked", tone: "danger", known: true, detail: release.revokedReason ? `Đã thu hồi: ${release.revokedReason}` : "Đã thu hồi." };
-  return { label: "Built, chưa phát hành", tone: "warning", known: true, detail: "Built chỉ là gói đã dựng. Phát hành đang bị chặn (BE#51)." };
+  return { label: "Built, chưa phát hành", tone: "warning", known: true, detail: "Built chỉ là gói đã dựng. Phát hành còn phải qua cổng kiểm tra lại duyệt nội dung, readiness và quyền dịch vụ của Building." };
 }
 
 // ---- Error messages by code ----
@@ -107,7 +128,17 @@ const codeMessages: Record<string, string> = {
   RELEASE_PROVENANCE_MISMATCH: "Dữ liệu release không khớp xác nhận kỹ thuật, validation run hiện hành, artifact hoặc còn issue Error/Critical. Kiểm tra mã xác nhận và artifact.",
   PACKAGE_METADATA_MISMATCH: "Metadata package không tương thích runtime hoặc không khớp manifest do worker tạo.",
   RELEASE_ALREADY_EXISTS: "Cặp revision và version này đã có release.",
-  PUBLISH_GATE_UNAVAILABLE: "Cổng phát hành chưa khả dụng. Release vẫn ở trạng thái Built.",
+  PUBLISH_GATE_UNAVAILABLE: "Cổng phát hành chưa được bật ở môi trường này. Release vẫn ở trạng thái Built.",
+  BUILDING_ENTITLEMENT_REQUIRED: "Công trình chưa có dịch vụ trả phí còn hiệu lực. Gói dùng thử không đủ để phát hành.",
+  CONFIRMATION_REQUIRED: "Chưa có xác nhận kỹ thuật đúng revision, phiên bản và validation run.",
+  RELEASE_NOT_BUILT: "Release không còn ở trạng thái Built nên không thể phát hành lại.",
+  RELEASE_READINESS_REQUIRED: "Readiness kỹ thuật của release chưa đủ điều kiện phát hành.",
+  RELEASE_QA_NOT_PASSED: "QA của release chưa đạt.",
+  RELEASE_QA_BLOCKERS_PRESENT: "Release còn issue Error/Critical chặn.",
+  RELEASE_ARTIFACT_REQUIRED: "Release thiếu artifact runtime hợp lệ.",
+  PACKAGE_COMPATIBILITY_REQUIRED: "Package chưa tương thích với runtime hiện có.",
+  TRAINING_UNAVAILABLE: "Training của release không còn khả dụng.",
+  TRAINING_INACTIVE: "Training của release không ở trạng thái Active.",
   BUILDING_ACCESS_REQUIRED: "Không có quyền truy cập công trình này.",
   UNAUTHORIZED: "Phiên đăng nhập không còn hiệu lực. Hãy đăng nhập lại.",
   FORBIDDEN: "Tài khoản này không có quyền thực hiện thao tác.",

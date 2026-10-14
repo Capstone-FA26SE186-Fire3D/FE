@@ -11,6 +11,8 @@ export type ManagedAccount = {
   lastLoginAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Present when the account set one (Trainee username, or a later profile update). */
+  username?: string | null;
 };
 
 export type Organization = {
