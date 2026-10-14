@@ -9,25 +9,25 @@ import { ApiError } from "@/api/types/common";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, Input, Select } from "@/components/ui/field";
+import { Field, Select } from "@/components/ui/field";
 import { Panel } from "@/components/ui/panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buildingsApi } from "@/features/buildings/api";
+import { scenarioVersionsApi } from "@/features/scenarios/versions-api";
 
 import { scenarioEditorApi } from "../api";
-import { BE_ISSUES } from "../config";
-
-const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
- * Entry screen when the URL has no `?draft=`. The BE has no endpoint that lists the drafts of a scenario (BE#53), so the
- * editor can either create a new draft on a revision (Idempotency-Key, stable per scenario+revision) or open a draft by id.
+ * Entry screen when the URL has no `?draft=`. Drafts of the scenario come from the server (newest save first), so work
+ * is found again after a reload or on another machine; the editor can also create a new draft on a revision
+ * (Idempotency-Key, stable per scenario+revision).
  */
 export function DraftStart({ accessToken, buildingId, scenarioId, onOpen }: { accessToken: string; buildingId: string; scenarioId: string; onOpen: (draftId: string) => void }) {
   const revisions = useAsyncData(`editor-revisions:${buildingId}`, () => buildingsApi.listRevisions(accessToken, buildingId, 1, 50));
+  const drafts = useAsyncData(`editor-drafts:${scenarioId}`, (signal) => scenarioVersionsApi.listDrafts(accessToken, scenarioId, 1, 50, signal));
+  const scenario = useAsyncData(`editor-scenario:${scenarioId}`, (signal) => scenarioVersionsApi.getScenario(accessToken, scenarioId, signal));
   const { keyFor, done } = useIdempotencyKey();
   const [revisionId, setRevisionId] = useState("");
-  const [draftId, setDraftId] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const items = revisions.data?.items ?? [];
@@ -49,14 +49,20 @@ export function DraftStart({ accessToken, buildingId, scenarioId, onOpen }: { ac
     }
   };
 
-  const open = (event: FormEvent) => {
-    event.preventDefault();
-    if (GUID.test(draftId.trim())) onOpen(draftId.trim());
-  };
-
   return <div className="se-start">
     <h1>Soạn kịch bản</h1>
-    <p>Chọn bản nháp để chỉnh sửa. Hệ thống chưa có danh sách bản nháp theo kịch bản nên bạn tạo bản mới trên một revision, hoặc mở lại bằng mã bản nháp đã lưu.</p>
+    <p>Tiếp tục một bản nháp đã lưu của kịch bản, hoặc tạo bản mới trên một revision IFC.</p>
+    <Panel title="Bản nháp đã lưu" description="Danh sách do máy chủ trả, bản lưu gần nhất trước. Mở lại được sau khi tải lại trang hoặc đổi máy.">
+      {drafts.loading && !drafts.data ? <div role="status"><Skeleton style={{ height: 42 }} /></div>
+        : drafts.error ? <Alert tone="danger" title="Không tải được danh sách bản nháp" action={<Button type="button" size="sm" variant="secondary" onClick={drafts.reload}>Thử lại</Button>} />
+          : (drafts.data?.items.length ?? 0) === 0 ? <EmptyState icon={FolderOpen} title="Chưa có bản nháp nào" description="Tạo bản nháp đầu tiên ở bên dưới." />
+            : <ul className="ops-stack" aria-label="Bản nháp đã lưu" style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {drafts.data?.items.map((draft) => <li key={draft.id} className="ops-actions" style={{ justifyContent: "space-between" }}>
+                <span>#{draft.draftNumber} · {new Date(draft.updatedAt).toLocaleString("vi-VN")}{draft.lastEditedByName ? " · " + draft.lastEditedByName : ""}{draft.schemaVersion ? " · " + draft.schemaVersion : " · cũ"}{draft.id === scenario.data?.currentDraftId ? " · hiện tại" : ""}</span>
+                <Button type="button" size="sm" variant={draft.id === scenario.data?.currentDraftId ? "primary" : "secondary"} onClick={() => onOpen(draft.id)} data-testid={"open-draft-" + draft.id}><FolderOpen size={16} aria-hidden="true" /> Mở bản nháp</Button>
+              </li>)}
+            </ul>}
+    </Panel>
     <Panel title="Tạo bản nháp mới" description="Mỗi bản nháp gắn với một revision IFC.">
       {revisions.loading && !revisions.data ? <div role="status"><Skeleton style={{ height: 42 }} /></div>
         : revisions.error ? <Alert tone="danger" title="Không tải được danh sách revision" action={<Button type="button" size="sm" variant="secondary" onClick={revisions.reload}>Thử lại</Button>} />
@@ -70,14 +76,6 @@ export function DraftStart({ accessToken, buildingId, scenarioId, onOpen }: { ac
               {error && <Alert tone="danger" title="Tạo bản nháp thất bại">{error}</Alert>}
               <div><Button type="submit" disabled={creating} data-testid="create-draft">{creating ? "Đang tạo…" : "Tạo bản nháp"}</Button></div>
             </form>}
-    </Panel>
-    <Panel title="Mở bản nháp đã có" description={`Dùng mã bản nháp (GUID). Xem ${BE_ISSUES.draftLookup.label}.`}>
-      <form className="ops-stack" onSubmit={open}>
-        <Field label="Mã bản nháp" error={draftId && !GUID.test(draftId.trim()) ? "Mã phải có dạng GUID." : undefined}>
-          {(props) => <Input {...props} value={draftId} onChange={(event) => setDraftId(event.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" autoComplete="off" spellCheck={false} />}
-        </Field>
-        <div><Button type="submit" variant="secondary" disabled={!GUID.test(draftId.trim())}><FolderOpen size={16} aria-hidden="true" /> Mở bản nháp</Button></div>
-      </form>
     </Panel>
   </div>;
 }

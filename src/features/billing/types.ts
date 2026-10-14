@@ -1,10 +1,11 @@
+import { normalizePage } from "@/api/pagination";
 import type { PageResponse } from "@/api/types/common";
 
 /** Billing paginates as `{ items, total, page, pageSize }`; `toPageResponse` adapts it to the shared shape. */
 export type BillingPageResponse<T> = { items: T[]; total: number; page: number; pageSize: number };
 
 export function toPageResponse<T>(page: BillingPageResponse<T>): PageResponse<T> {
-  return { items: page.items, totalCount: page.total, page: page.page, pageSize: page.pageSize };
+  return normalizePage(page);
 }
 
 /** Value + the ETag header of the read that produced it (CORS exposes ETag). */

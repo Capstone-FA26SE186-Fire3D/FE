@@ -525,6 +525,29 @@ test("no ?draft=: a draft is created with a stable Idempotency-Key across a retr
   await expect(page.getByTestId("scenario-editor")).toBeVisible();
 });
 
+test("no ?draft=: the server's draft list survives a reload, marks the current draft and opens the chosen one", async ({ page }) => {
+  const OTHER = "44444444-4444-4444-8444-444444444499";
+  const mock = newMock({
+    drafts: [
+      { id: DRAFT_ID, draftNumber: 3, version: 51, updatedAt: "2026-10-02T00:00:00Z", lastEditedByName: "Nguyễn Văn A", schemaVersion: "fet3d.editor/1" },
+      { id: OTHER, draftNumber: 2, version: 7, updatedAt: "2026-10-01T00:00:00Z", lastEditedByName: null, schemaVersion: null },
+    ],
+    currentDraftId: DRAFT_ID,
+  });
+  await installEditorMocks(page, mock);
+  await page.goto(`/workspace/buildings/${BUILDING_ID}/scenarios/${SCENARIO_ID}`);
+  const list = page.getByRole("list", { name: "Bản nháp đã lưu" });
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  await expect(list.getByRole("listitem").first()).toContainText("hiện tại");
+  await expect(list.getByRole("listitem").nth(1)).toContainText("cũ");
+  await page.reload();
+  await expect(list.getByRole("listitem")).toHaveCount(2);
+  await page.getByTestId(`open-draft-${DRAFT_ID}`).click();
+  await expect(page).toHaveURL(new RegExp(`draft=${DRAFT_ID}`));
+  await expect(page.getByTestId("scenario-editor")).toBeVisible();
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith("fire3d-editor-draft")))).toEqual([]);
+});
+
 test("draft errors: 404 and 403 show their own screens; a server error can be retried", async ({ page }) => {
   await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "t", refreshToken: "r" })));
   await page.route("**/api/auth/me", (route) => route.fulfill({ json: { id: "o", email: "o@x.test", fullName: "O", role: 1, organizationId: "org-1" } }));

@@ -4,30 +4,31 @@ import { Send, Snowflake } from "lucide-react";
 import { useState } from "react";
 
 import { useIdempotencyKey } from "@/api";
+import type { AsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/dialog";
 import { Panel } from "@/components/ui/panel";
+import { SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
 
-import type { VersionMemory } from "../../use-version-memory";
 import { approvalGate, describeError, type DescribedError } from "../../version-readiness";
-import type { ScenarioVersionDetail } from "../../version-types";
+import type { ScenarioVersionDetail, VersionReview } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
-
-const BE52 = "https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/52";
+import { formatDateTime } from "./version-content";
 
 /**
- * Submit the frozen version to PlatformAdmin for content review. Approval status and rejection reasons cannot be read
- * back yet (BE#52); only the response of this tab's own submit command is shown, labelled as such.
+ * Submit the frozen version to PlatformAdmin for content review. The review state, the frozen hashes and a rejection
+ * reason all come from the server (`reviewStatus` on the version, `GET .../review`), so they survive a reload or another
+ * machine. The submit response only triggers a re-read.
  */
-export function ReviewPanel({ accessToken, version, memory, remember, canSubmit }: {
+export function ReviewPanel({ accessToken, version, review, canSubmit, onSubmitted }: {
   accessToken: string;
   version: ScenarioVersionDetail;
-  memory: VersionMemory;
-  remember: (patch: VersionMemory) => void;
+  review: AsyncData<VersionReview>;
   canSubmit: boolean;
+  onSubmitted: () => void;
 }) {
   const toast = useToast();
   const { keyFor, done } = useIdempotencyKey();
@@ -35,8 +36,9 @@ export function ReviewPanel({ accessToken, version, memory, remember, canSubmit 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<DescribedError | null>(null);
 
-  const submission = memory.submission;
-  const gate = approvalGate(submission);
+  const gate = approvalGate(version.reviewStatus, version.rejectReason);
+  const submitted = Boolean(version.reviewStatus) && version.reviewStatus?.toLowerCase() !== "notsubmitted";
+  const frozen = review.data?.review;
   const alreadySubmitted = error?.code === "CONTENT_REVIEW_ALREADY_EXISTS";
 
   const submit = async () => {
@@ -44,13 +46,16 @@ export function ReviewPanel({ accessToken, version, memory, remember, canSubmit 
     setBusy(true);
     setError(null);
     try {
-      const result = await scenarioVersionsApi.submitForReview(accessToken, version.id, keyFor({ versionId: version.id }));
+      await scenarioVersionsApi.submitForReview(accessToken, version.id, keyFor({ versionId: version.id }));
       done();
-      remember({ submission: result });
       setConfirming(false);
+      onSubmitted();
       toast.notify({ tone: "success", title: "Đã gửi duyệt", description: "Nội dung và rubric của version này đã được đóng băng để duyệt." });
     } catch (cause) {
-      setError(describeError(cause, "Không gửi duyệt được."));
+      const described = describeError(cause, "Không gửi duyệt được.");
+      setError(described);
+      // Another tab/machine already submitted it: show what the server holds instead of leaving a stale "not submitted".
+      if (described.code === "CONTENT_REVIEW_ALREADY_EXISTS") onSubmitted();
     } finally {
       setBusy(false);
     }
@@ -70,31 +75,28 @@ export function ReviewPanel({ accessToken, version, memory, remember, canSubmit 
       {error && !confirming && !alreadySubmitted && <Alert tone="danger" title={error.message} action={<Button size="sm" variant="secondary" className="mt-3" onClick={() => void submit()} disabled={busy}>Thử lại (cùng khóa)</Button>}>
         {error.code && <>Mã lỗi: {error.code}. </>}Thử lại dùng cùng Idempotency-Key nên không gửi trùng.
       </Alert>}
-      {alreadySubmitted && !confirming && <Alert tone="warning" title={error?.message}>Phiên bản này đã được gửi trước đó, có thể từ phiên làm việc khác. Trạng thái duyệt hiện tại chưa đọc lại được (BE#52).</Alert>}
+      {alreadySubmitted && !confirming && <Alert tone="warning" title={error?.message}>Phiên bản này đã được gửi trước đó (có thể từ phiên làm việc hoặc máy khác). Trạng thái hiện tại được tải lại từ máy chủ.</Alert>}
       <div className="ver-actions-row">
-        <Button onClick={() => setConfirming(true)} disabled={!canSubmit || Boolean(submission) || busy}><Send size={16} aria-hidden="true" />Gửi duyệt</Button>
+        <Button onClick={() => setConfirming(true)} disabled={!canSubmit || submitted || busy}><Send size={16} aria-hidden="true" />Gửi duyệt</Button>
         {!canSubmit && <span className="ver-note">Chỉ tài khoản OrganizationUser gửi duyệt được.</span>}
-        {submission && <span className="ver-note">Đã gửi trong phiên này.</span>}
+        {submitted && <span className="ver-note">Phiên bản này đã được gửi duyệt.</span>}
       </div>
     </Panel>
 
-    <Panel title="Kết quả gửi duyệt" description="Hiển thị theo phản hồi của lệnh gửi duyệt trong phiên này." bodyClassName="ops-stack">
-      {submission
-        ? <>
-          <div className="ver-actions-row"><StatusBadge tone={gate.tone}>{gate.label}</StatusBadge><span className="ver-note">{gate.detail}</span></div>
-          <dl className="ver-dl">
-            <dt>Mã review</dt><dd className="ver-hash" data-testid="review-id">{submission.reviewId}</dd>
-            <dt>Trạng thái lúc gửi</dt><dd>{submission.status}</dd>
-            <dt>Hash nội dung</dt><dd className="ver-hash">{submission.contentHash} {submission.contentHash === version.scenarioHash ? "(khớp phiên bản)" : "(KHÔNG khớp phiên bản)"}</dd>
-            <dt>Hash rubric</dt><dd className="ver-hash">{submission.rubricHash}</dd>
-          </dl>
-        </>
-        : <p className="ver-note">Chưa có lệnh gửi duyệt nào trong phiên này.</p>}
-      <div className="ver-pending" data-testid="be52-pending">
-        <strong>Chờ BE #52: xem lại sau khi tải lại trang</strong>
-        Backend chưa có API đọc trạng thái duyệt hay lý do từ chối của một phiên bản. Vì vậy sau khi tải lại, trạng thái duyệt hiển thị là &quot;Chưa có dữ liệu (chờ BE)&quot; và không được suy đoán. Việc duyệt/từ chối do PlatformAdmin thực hiện ở màn Duyệt kịch bản.{" "}
-        <a href={BE52} target="_blank" rel="noreferrer" style={{ color: "var(--ember)" }}>Issue BE #52</a>
-      </div>
+    <Panel title="Kết quả gửi duyệt" description="Trạng thái do máy chủ báo; tải lại trang vẫn giữ nguyên." bodyClassName="ops-stack">
+      <div className="ver-actions-row"><StatusBadge tone={gate.tone}>{gate.label}</StatusBadge><span className="ver-note">{gate.detail}</span></div>
+      {submitted && review.loading && !review.data && <SkeletonRows rows={2} label="Đang tải chi tiết gửi duyệt…" />}
+      {submitted && review.error !== undefined && <Alert tone="danger" title="Không tải được chi tiết gửi duyệt" action={<Button size="sm" variant="secondary" className="mt-3" onClick={review.reload}>Thử lại</Button>}>{describeError(review.error).message}</Alert>}
+      {frozen && <dl className="ver-dl">
+        <dt>Mã review</dt><dd className="ver-hash" data-testid="review-id">{frozen.reviewId}</dd>
+        <dt>Trạng thái</dt><dd data-testid="review-status">{frozen.status}</dd>
+        <dt>Gửi lúc</dt><dd>{formatDateTime(frozen.submittedAt)}</dd>
+        {frozen.decidedAt && <><dt>Quyết định lúc</dt><dd>{formatDateTime(frozen.decidedAt)}</dd></>}
+        {frozen.reason && <><dt>Lý do</dt><dd data-testid="review-reason">{frozen.reason}</dd></>}
+        <dt>Hash nội dung</dt><dd className="ver-hash">{frozen.contentHash} {frozen.contentHash === version.scenarioHash ? "(khớp phiên bản)" : "(KHÔNG khớp phiên bản)"}</dd>
+        <dt>Hash rubric</dt><dd className="ver-hash">{frozen.rubricHash}</dd>
+      </dl>}
+      {!submitted && <p className="ver-note">Phiên bản này chưa được gửi duyệt.</p>}
       <p className="ver-note"><Snowflake size={14} aria-hidden="true" style={{ display: "inline", marginRight: 4 }} />Release chỉ tạo được khi PlatformAdmin đã duyệt đúng hash nội dung và hash rubric đã gửi.</p>
     </Panel>
 

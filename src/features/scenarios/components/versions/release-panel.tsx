@@ -1,70 +1,54 @@
 "use client";
 
-import { Package, Rocket, Search, Undo2 } from "lucide-react";
+import { Package, Rocket, Undo2 } from "lucide-react";
 import { useState, type FormEvent } from "react";
 
 import { useIdempotencyKey } from "@/api";
-import { useAsyncData } from "@/api/use-async-data";
+import { useAsyncData, type AsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, Input, Textarea } from "@/components/ui/field";
+import { Field, Textarea } from "@/components/ui/field";
 import { Panel } from "@/components/ui/panel";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableMessage } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 
-import type { VersionJobs } from "../../use-version-jobs";
-import type { VersionMemory } from "../../use-version-memory";
-import { describeError, isUuid, releaseGate, shortHash, type DescribedError } from "../../version-readiness";
-import type { Release, ScenarioVersionDetail } from "../../version-types";
+import type { ReleaseView } from "../../use-version-server-state";
+import { describeError, missingText, releaseGate, shortHash, type DescribedError } from "../../version-readiness";
+import type { ScenarioVersionDetail, VersionReadiness } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
 import { formatDateTime } from "./version-content";
 
-const BE51 = "https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/51";
-const BE53 = "https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/53";
-
-export type ReleaseView = {
-  /** Release that belongs to this version, if known. */
-  release: Release | undefined;
-  /** A release was requested by id but it belongs to another version. */
-  foreign: boolean;
-  loading: boolean;
-  error: unknown;
-  reload: () => void;
-};
-
+/** A publish that did not happen is a gate decision, not a failure of the release: it stays Built. */
 function PublishBlocked({ error }: { error: DescribedError }) {
-  return <Alert tone="warning" title="Chưa thể phát hành: cổng phát hành đang chặn (503 PUBLISH_GATE_UNAVAILABLE)">
-    Release vẫn ở trạng thái <strong>Built</strong>, chưa Published. Backend chỉ cho phát hành khi cổng riêng đã hoạt động: nội dung được duyệt đúng hash, readiness kỹ thuật đạt và Building còn quyền sử dụng (entitlement). Hiện cổng này chưa được bật.{" "}
-    <a href={BE51} target="_blank" rel="noreferrer" style={{ color: "var(--ember)" }}>Issue BE #51</a>
+  return <Alert tone="warning" title={error.message}>
+    Release vẫn ở trạng thái <strong>Built</strong>, chưa Published.{error.code && <> Mã: {error.code}.</>}
+    {error.status === 503 && " Cổng phát hành chưa được bật ở môi trường này; không phải lỗi của release."}
     {error.retryAfterSeconds ? ` Thử lại sau ${error.retryAfterSeconds} giây.` : ""}
   </Alert>;
 }
 
 /**
- * Release (Built) and the read-only list of the building's trainings. Built is a pinned package, not a published
- * training: Publish is contained by BE (always 503 PUBLISH_GATE_UNAVAILABLE) and the UI never reports it as success.
+ * Release (Built → Published) and the read-only list of the building's trainings. Every value here is read from the
+ * server: the release of this version comes from the release list, and the confirmation and candidate artifact a new
+ * release needs come from the version's readiness, so nothing is typed in or remembered by the browser. Built is a
+ * pinned package, not a published training; publish status always comes from the server response.
  */
-export function ReleasePanel({ accessToken, buildingId, version, jobs, memory, remember, canAct, view }: {
+export function ReleasePanel({ accessToken, buildingId, version, readiness, view, noteRelease, canAct }: {
   accessToken: string;
   buildingId: string;
   version: ScenarioVersionDetail;
-  jobs: VersionJobs;
-  memory: VersionMemory;
-  remember: (patch: VersionMemory) => void;
-  canAct: boolean;
+  readiness: AsyncData<VersionReadiness>;
   view: ReleaseView;
+  noteRelease: (releaseId: string) => void;
+  canAct: boolean;
 }) {
   const toast = useToast();
   const buildKey = useIdempotencyKey();
-  const jobKind = jobs.detail?.job.kind;
-  const suggestedArtifact = jobs.verdict?.kind === "passed" && jobKind === "ReleasePackage" ? jobs.verdict.run.artifactId ?? "" : "";
-  const [confirmationId, setConfirmationId] = useState(memory.confirmReviewId ?? "");
-  const [artifactId, setArtifactId] = useState("");
-  const [lookupId, setLookupId] = useState("");
+  const publishKey = useIdempotencyKey();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<DescribedError | null>(null);
   const [publishing, setPublishing] = useState(false);
@@ -78,23 +62,24 @@ export function ReleasePanel({ accessToken, buildingId, version, jobs, memory, r
 
   const release = view.release;
   const gate = releaseGate(release);
-  const confirmationValue = confirmationId.trim();
-  const artifactValue = (artifactId || suggestedArtifact).trim();
-  const confirmationError = confirmationValue && !isUuid(confirmationValue) ? "Mã xác nhận phải là UUID." : undefined;
-  const artifactError = artifactValue && !isUuid(artifactValue) ? "Mã artifact phải là UUID." : undefined;
-  const canBuild = canAct && !busy && !confirmationError && !artifactError && Boolean(confirmationValue) && Boolean(artifactValue);
+  const state = readiness.data;
+  const confirmationId = state?.confirmationReviewId ?? null;
+  const artifactId = state?.candidateArtifactId ?? null;
+  const canBuild = canAct && !busy && Boolean(confirmationId) && Boolean(artifactId);
+  const approved = version.reviewStatus?.toLowerCase() === "approved";
 
   const build = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!canBuild) return;
+    if (!canBuild || !confirmationId || !artifactId) return;
     setBusy(true);
     setError(null);
     try {
-      const payload = { revisionId: version.revisionId, scenarioVersionId: version.id, confirmationReviewId: confirmationValue, candidateArtifactId: artifactValue };
+      const payload = { revisionId: version.revisionId, scenarioVersionId: version.id, confirmationReviewId: confirmationId, candidateArtifactId: artifactId };
       const created = await scenarioVersionsApi.buildRelease(accessToken, payload, buildKey.keyFor(payload));
       buildKey.done();
-      remember({ releaseId: created.id });
+      noteRelease(created.id);
       view.reload();
+      trainings.reload();
       toast.notify({ tone: "success", title: "Đã tạo release (Built)", description: "Release chưa được phát hành." });
     } catch (cause) {
       setError(describeError(cause, "Không tạo được release."));
@@ -108,9 +93,12 @@ export function ReleasePanel({ accessToken, buildingId, version, jobs, memory, r
     setPublishing(true);
     setPublishError(null);
     try {
-      await scenarioVersionsApi.publishRelease(accessToken, release.id);
+      const result = await scenarioVersionsApi.publishRelease(accessToken, release.id, publishKey.keyFor({ releaseId: release.id }));
+      publishKey.done();
       view.reload(); // Status comes from the server, never assumed.
-      toast.notify({ tone: "success", title: "Yêu cầu phát hành đã được chấp nhận", description: "Trạng thái được tải lại từ máy chủ." });
+      trainings.reload();
+      if (result?.status?.toLowerCase() === "published") toast.notify({ tone: "success", title: "Đã phát hành", description: "Trạng thái được tải lại từ máy chủ." });
+      else toast.notify({ tone: "warning", title: "Máy chủ chưa báo Published", description: "Trạng thái hiện tại: " + (result?.status ?? "không rõ") + "." });
     } catch (cause) {
       setPublishError(describeError(cause, "Không phát hành được."));
     } finally {
@@ -127,6 +115,7 @@ export function ReleasePanel({ accessToken, buildingId, version, jobs, memory, r
       setRevoking(false);
       setRevokeReason("");
       view.reload();
+      trainings.reload();
       toast.notify({ tone: "success", title: "Đã thu hồi release" });
     } catch (cause) {
       setRevokeError(describeError(cause, "Không thu hồi được."));
@@ -136,13 +125,11 @@ export function ReleasePanel({ accessToken, buildingId, version, jobs, memory, r
   };
 
   const status = release?.status.toLowerCase();
-  const publishBlocked = publishError?.code === "PUBLISH_GATE_UNAVAILABLE";
 
   return <div className="ops-stack">
     <Panel title="Release" description="Release đóng gói bản đã duyệt và đã xác nhận kỹ thuật. Built chưa phải Published." bodyClassName="ops-stack">
       {view.loading && !release && <SkeletonRows rows={2} label="Đang tải release…" />}
       {view.error !== undefined && <Alert tone="danger" title="Không tải được release" action={<Button size="sm" variant="secondary" className="mt-3" onClick={view.reload}>Thử lại</Button>}>{describeError(view.error).message}</Alert>}
-      {view.foreign && <Alert tone="warning" title="Release này thuộc phiên bản khác">Mã release bạn nhập không gắn với phiên bản đang xem nên không được tính vào trạng thái của phiên bản này.</Alert>}
 
       {release && <>
         <div className="ver-actions-row">
@@ -160,35 +147,40 @@ export function ReleasePanel({ accessToken, buildingId, version, jobs, memory, r
           <dt>Tạo lúc</dt><dd>{formatDateTime(release.createdAt)}</dd>
           {release.publishedAt && <><dt>Phát hành lúc</dt><dd>{formatDateTime(release.publishedAt)}</dd></>}
           {release.revokedAt && <><dt>Thu hồi lúc</dt><dd>{formatDateTime(release.revokedAt)} · {release.revokedReason}</dd></>}
+          {release.entitlement !== undefined && <>
+            <dt>Dịch vụ của Building</dt>
+            <dd data-testid="release-entitlement">{release.entitlement
+              ? `${release.entitlement.status} · ${formatDateTime(release.entitlement.startsAt)} → ${formatDateTime(release.entitlement.endsAt)} · ${release.entitlement.paid ? "đã thanh toán" : "chưa thanh toán"}${release.entitlement.learnerLimit != null ? ` · tối đa ${release.entitlement.learnerLimit} học viên` : ""}`
+              : "Không có kỳ dịch vụ nào đang hiệu lực"}</dd>
+          </>}
         </dl>
 
         {status === "built" && <Alert tone="info" title="Release đang ở trạng thái Built">
-          Gói đã được dựng và ghim, nhưng Trainee chưa dùng được cho tới khi phát hành. Điều kiện phát hành: nội dung được duyệt đúng hash, readiness kỹ thuật đạt, Building còn entitlement.
+          Gói đã được dựng và ghim, nhưng Trainee chưa dùng được cho tới khi phát hành. Khi bạn bấm Phát hành, máy chủ kiểm tra lại: nội dung được duyệt đúng hash, readiness kỹ thuật, tương thích runtime và Building còn dịch vụ trả phí hiệu lực.
         </Alert>}
-        {publishError && (publishBlocked ? <PublishBlocked error={publishError} /> : <Alert tone="danger" title={publishError.message}>{publishError.code && <>Mã lỗi: {publishError.code}.</>}</Alert>)}
+        {publishError && (publishError.status === 503 || publishError.status === 409 ? <PublishBlocked error={publishError} /> : <Alert tone="danger" title={publishError.message}>{publishError.code && <>Mã lỗi: {publishError.code}.</>}</Alert>)}
         <div className="ver-actions-row">
-          {status === "built" && <Button onClick={() => void publish()} disabled={!canAct || publishing}><Rocket size={16} aria-hidden="true" />{publishing ? "Đang gửi…" : "Phát hành"}</Button>}
+          {status === "built" && <Button onClick={() => void publish()} disabled={!canAct || publishing}><Rocket size={16} aria-hidden="true" />{publishing ? "Đang gửi…" : publishError ? "Thử lại phát hành (cùng khóa)" : "Phát hành"}</Button>}
           {(status === "built" || status === "published") && <Button variant="quiet" onClick={() => { setRevokeError(null); setRevoking(true); }} disabled={!canAct}><Undo2 size={16} aria-hidden="true" />Thu hồi release</Button>}
         </div>
-        {status === "built" && !publishError && <p className="ver-note">Cổng phát hành đang bị chặn ở backend (BE#51): bấm &quot;Phát hành&quot; hiện luôn nhận 503. Release vẫn là Built.</p>}
       </>}
 
-      {!release && !view.loading && <>
-        <p className="ver-note">Chưa có release cho phiên bản này trong phiên làm việc. Release chỉ tạo được khi nội dung đã được PlatformAdmin duyệt đúng hash và đã xác nhận kỹ thuật; BE kiểm tra lại các điều kiện đó.</p>
+      {!release && !view.loading && view.error === undefined && <>
+        <p className="ver-note">Chưa có release cho phiên bản này. Release chỉ tạo được khi nội dung đã được PlatformAdmin duyệt đúng hash và đã xác nhận kỹ thuật; máy chủ kiểm tra lại các điều kiện đó.</p>
         <form className="ops-stack" onSubmit={build} noValidate>
           <fieldset className="ops-fieldset">
             <legend>Tạo release (Built)</legend>
             <dl className="ver-dl">
               <dt>Revision</dt><dd className="ver-hash">{version.revisionId}</dd>
               <dt>Phiên bản</dt><dd>v{version.versionNumber}</dd>
+              <dt>Xác nhận kỹ thuật</dt><dd className="ver-hash" data-testid="release-confirmation">{confirmationId ?? "Chưa có — xác nhận ở tab Kết quả kỹ thuật"}</dd>
+              <dt>Artifact ứng viên</dt><dd className="ver-hash" data-testid="release-artifact">{artifactId ?? "Chưa có — cần job ReleasePackage có QA Passed"}</dd>
+              <dt>Duyệt nội dung</dt><dd>{version.reviewStatus ?? "Chưa có dữ liệu"}</dd>
             </dl>
-            <Field label="Mã xác nhận kỹ thuật" required error={confirmationError} hint="Mã nhận được khi xác nhận kỹ thuật. Nếu mất, xác nhận lại ở tab Kết quả kỹ thuật.">
-              {(p) => <Input {...p} value={confirmationId} placeholder="UUID" autoComplete="off" spellCheck={false} onChange={(event) => setConfirmationId(event.target.value)} />}
-            </Field>
-            <Field label="Artifact ứng viên (gói release)" required error={artifactError} hint={suggestedArtifact && !artifactId ? "Đã điền từ validation run Passed của job ReleasePackage." : "Lấy từ validation run Passed của job ReleasePackage."}>
-              {(p) => <Input {...p} value={artifactId || suggestedArtifact} placeholder="UUID" autoComplete="off" spellCheck={false} onChange={(event) => setArtifactId(event.target.value)} />}
-            </Field>
           </fieldset>
+          {readiness.error !== undefined && !state && <Alert tone="danger" title="Không đọc được readiness" action={<Button type="button" size="sm" variant="secondary" className="mt-3" onClick={readiness.reload}>Thử lại</Button>}>{describeError(readiness.error).message}</Alert>}
+          {state && state.missing.length > 0 && <ul className="ver-list" data-testid="release-missing">{state.missing.map((code) => <li key={code}><strong>{code}</strong>: {missingText(code)}</li>)}</ul>}
+          {!approved && version.reviewStatus && <p className="ver-note">Phiên bản chưa ở trạng thái Đã duyệt: máy chủ sẽ từ chối với CONTENT_APPROVAL_REQUIRED.</p>}
           {error && <Alert tone="danger" title={error.message} action={<Button size="sm" variant="secondary" type="submit" className="mt-3" disabled={!canBuild}>Thử lại (cùng khóa)</Button>}>
             {error.code && <>Mã lỗi: {error.code}. </>}Thử lại dùng cùng Idempotency-Key nên không tạo release trùng.
           </Alert>}
@@ -198,29 +190,21 @@ export function ReleasePanel({ accessToken, buildingId, version, jobs, memory, r
           </div>
         </form>
       </>}
-
-      <form className="ops-toolbar" onSubmit={(event) => { event.preventDefault(); if (isUuid(lookupId)) { remember({ releaseId: lookupId.trim() }); setLookupId(""); } }} aria-label="Mở release theo mã">
-        <Field label="Mở release theo mã" className="ops-toolbar-grow" hint="BE chưa có API tìm release theo phiên bản (BE#53).">
-          {(p) => <Input {...p} value={lookupId} placeholder="UUID release" autoComplete="off" spellCheck={false} onChange={(event) => setLookupId(event.target.value)} />}
-        </Field>
-        <Button type="submit" variant="quiet" disabled={!isUuid(lookupId)}><Search size={16} aria-hidden="true" />Mở</Button>
-      </form>
-      <p className="ver-note">Mã release và mã xác nhận được nhớ trong phiên trình duyệt này; sau khi đóng tab bạn cần nhập lại. <a href={BE53} target="_blank" rel="noreferrer" style={{ color: "var(--ember)" }}>Issue BE #53</a></p>
     </Panel>
 
-    <Panel title="Training của công trình" description="Chỉ đọc, không phân trang. Chỉ có dữ liệu sau khi phát hành hoạt động (BE#51)." bodyClassName="ops-stack">
+    <Panel title="Training của công trình" description="Chỉ đọc, không phân trang. Chỉ gồm training đã gắn với nội dung được duyệt." bodyClassName="ops-stack">
       {trainings.error !== undefined && <Alert tone="danger" title="Không tải được danh sách training" action={<Button size="sm" variant="secondary" className="mt-3" onClick={trainings.reload}>Thử lại</Button>}>{describeError(trainings.error).message}</Alert>}
       <Table caption="Training của công trình">
-        <thead><tr><th>Tên</th><th>Trạng thái</th><th>Release</th><th aria-label="Thao tác" /></tr></thead>
+        <thead><tr><th>Tên</th><th>Trạng thái</th><th>Release</th><th>Phiên bản</th></tr></thead>
         <tbody>
           {trainings.loading && !trainings.data && <TableMessage colSpan={4}><SkeletonRows rows={2} label="Đang tải training…" /></TableMessage>}
           {(trainings.data ?? []).map((training) => <tr key={training.id}>
             <td className="ops-cell-primary">{training.name}</td>
             <td><StatusBadge tone={training.status.toLowerCase() === "active" ? "success" : "neutral"}>{training.status}</StatusBadge></td>
-            <td className="ver-hash">{shortHash(training.releaseId, 13)}</td>
-            <td className="ops-cell-actions"><Button size="sm" variant="quiet" onClick={() => remember({ releaseId: training.releaseId })}>Xem release</Button></td>
+            <td><span className="ver-hash">{shortHash(training.releaseId, 13)}</span>{training.releaseStatus && <> · {training.releaseStatus}</>}</td>
+            <td>{training.scenarioVersionId === version.id ? "Phiên bản này" : "Phiên bản khác"}</td>
           </tr>)}
-          {trainings.data && trainings.data.length === 0 && <TableMessage colSpan={4}><EmptyState icon={Package} title="Chưa có training" description="Training xuất hiện sau khi release được phát hành. Hiện phát hành đang bị chặn (BE#51)." /></TableMessage>}
+          {trainings.data && trainings.data.length === 0 && <TableMessage colSpan={4}><EmptyState icon={Package} title="Chưa có training" description="Training xuất hiện khi release được tạo và gắn với nội dung đã duyệt." /></TableMessage>}
         </tbody>
       </Table>
     </Panel>

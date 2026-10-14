@@ -45,12 +45,17 @@ export type MockState = {
   expireFirstPreview: boolean;
   createDraftStatus: number[];
   floors?: unknown;
+  /** Drafts the server lists for the scenario (newest save first). Empty -> the entry screen offers only "create". */
+  drafts: Array<{ id: string; draftNumber: number; version: number; updatedAt: string; lastEditedByName: string | null; schemaVersion: string | null }>;
+  /** `currentDraftId` reported on the scenario detail (BE#53). */
+  currentDraftId: string | null;
+  draftListCalls: number;
 };
 
 export function newMock(overrides: Partial<MockState> = {}): MockState {
   return {
     version: 51, state: sampleDraftState(), puts: [], putStatus: [], getCount: 0, previewCalls: 0, previewQueue: [], glbStatus: [], glbCalls: 0,
-    validate: { isValid: true, issues: [] }, validateCalls: 0, createDraftCalls: [], stripEtagOnPut: false, expireFirstPreview: false, createDraftStatus: [], ...overrides,
+    validate: { isValid: true, issues: [] }, validateCalls: 0, createDraftCalls: [], stripEtagOnPut: false, expireFirstPreview: false, createDraftStatus: [], drafts: [], currentDraftId: null, draftListCalls: 0, ...overrides,
   };
 }
 
@@ -70,7 +75,11 @@ export async function installEditorMocks(page: Page, mock: MockState, options: {
   }, [options.theme ?? null, options.debug ?? true] as const);
 
   await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ETag: '"1"' } }));
-  await page.route(`**/api/scenarios/${SCENARIO_ID}`, (route) => route.fulfill({ json: { id: SCENARIO_ID, buildingId: BUILDING_ID, organizationId: "org-1", name: "Thoát hiểm tầng một", createdAt: "2026-10-01T00:00:00Z" } }));
+  await page.route(`**/api/scenarios/${SCENARIO_ID}`, (route) => route.fulfill({ json: { id: SCENARIO_ID, buildingId: BUILDING_ID, organizationId: "org-1", name: "Thoát hiểm tầng một", createdAt: "2026-10-01T00:00:00Z", currentDraftId: mock.currentDraftId, currentDraftVersion: mock.currentDraftId ? mock.drafts.find((draft) => draft.id === mock.currentDraftId)?.version ?? null : null, draftCount: mock.drafts.length, latestVersionId: null, latestVersionNumber: null } }));
+  await page.route(`**/api/scenarios/${SCENARIO_ID}/drafts?*`, (route) => {
+    mock.draftListCalls += 1;
+    return route.fulfill({ json: { items: mock.drafts.map((draft) => ({ id: draft.id, scenarioId: SCENARIO_ID, revisionId: REVISION_ID, draftNumber: draft.draftNumber, source: "Manual", schemaVersion: draft.schemaVersion, version: draft.version, createdBy: "owner", createdAt: "2026-10-01T00:00:00Z", updatedAt: draft.updatedAt, lastEditedById: "owner", lastEditedByName: draft.lastEditedByName })), totalCount: mock.drafts.length, page: 1, pageSize: 50 } });
+  });
   await page.route("**/api/scenario-interactions/catalog", (route) => route.fulfill({ json: [{ runtimeVersion: "1.0.0", protocolVersion: "1", manifestSchemaVersion: "1", capabilities: { fire: true } }] }));
   await page.route(`**/api/scenario-drafts/${DRAFT_ID}`, async (route: Route) => {
     const request = route.request();

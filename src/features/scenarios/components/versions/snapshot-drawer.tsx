@@ -4,14 +4,15 @@ import { Camera, RefreshCw, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 import { useIdempotencyKey } from "@/api";
+import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/dialog";
-import { Field, Input } from "@/components/ui/field";
+import { Field, Select } from "@/components/ui/field";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
 
-import { changedTopLevelKeys, describeError, isUuid, type DescribedError } from "../../version-readiness";
+import { changedTopLevelKeys, describeError, type DescribedError } from "../../version-readiness";
 import type { DraftForSnapshot, DraftValidation } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
 import { formatDateTime } from "./version-content";
@@ -33,21 +34,30 @@ function DraftSummary({ loaded, label }: { loaded: LoadedDraft; label: string })
 }
 
 /**
- * Create an immutable snapshot (new version) from a draft. The draft id comes from the editor link or is pasted:
- * BE has no "list drafts" endpoint yet (BE#53). Snapshot needs the draft ETag in If-Match and an Idempotency-Key that
- * stays the same while the same draft revision is retried.
+ * Create an immutable snapshot (new version) from a draft. Drafts are listed by the server (newest save first), so the
+ * work can be found again after a reload or on another machine; `preferredDraftId` (the editor link, else the scenario's
+ * current draft) is preselected. Snapshot needs the draft ETag in If-Match and an Idempotency-Key that stays the same
+ * while the same draft revision is retried.
  */
-export function SnapshotDrawer({ open, onOpenChange, accessToken, scenarioId, initialDraftId, onCreated }: {
+export function SnapshotDrawer({ open, onOpenChange, accessToken, scenarioId, initialDraftId, preferredDraftId = "", editorHref, onCreated }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accessToken: string;
   scenarioId: string;
+  /** Draft id from the URL (`?draft=`), if any. */
   initialDraftId: string;
+  /** The scenario's most recently saved draft, used when the URL names none. */
+  preferredDraftId?: string;
+  /** Where to create or edit drafts when the list is empty. */
+  editorHref?: string;
   onCreated: (versionId: string) => void;
 }) {
   const toast = useToast();
   const { keyFor, done } = useIdempotencyKey();
-  const [draftId, setDraftId] = useState(initialDraftId);
+  const drafts = useAsyncData(`snapshot-drafts:${scenarioId}`, (signal) => scenarioVersionsApi.listDrafts(accessToken, scenarioId, 1, 50, signal), open);
+  const draftItems = drafts.data?.items ?? [];
+  const [chosenDraftId, setDraftId] = useState(initialDraftId);
+  const draftId = chosenDraftId || preferredDraftId || draftItems[0]?.id || "";
   const [loaded, setLoaded] = useState<LoadedDraft | null>(null);
   const [conflict, setConflict] = useState<Conflict | null>(null);
   const [validation, setValidation] = useState<DraftValidation | null>(null);
@@ -55,10 +65,9 @@ export function SnapshotDrawer({ open, onOpenChange, accessToken, scenarioId, in
   const [busy, setBusy] = useState<"load" | "validate" | "snapshot" | "">("");
 
   const trimmed = draftId.trim();
-  const idError = trimmed && !isUuid(trimmed) ? "Mã draft phải là UUID." : undefined;
 
   const load = async () => {
-    if (busy || !trimmed || idError) return;
+    if (busy || !trimmed) return;
     setBusy("load");
     setError(null);
     setValidation(null);
@@ -147,11 +156,17 @@ export function SnapshotDrawer({ open, onOpenChange, accessToken, scenarioId, in
     <div className="ops-stack">
       <fieldset className="ops-fieldset">
         <legend>1. Chọn draft</legend>
-        <Field label="Mã draft" required error={idError} hint="Lấy từ trình soạn kịch bản. BE chưa có API liệt kê draft (BE#53).">
-          {(p) => <Input {...p} value={draftId} placeholder="00000000-0000-0000-0000-000000000000" autoComplete="off" spellCheck={false} onChange={(event) => { setDraftId(event.target.value); setLoaded(null); setConflict(null); setValidation(null); setError(null); }} />}
-        </Field>
+        {drafts.error !== undefined && !drafts.data && <Alert tone="danger" title="Không tải được danh sách draft" action={<Button size="sm" variant="secondary" className="mt-3" onClick={drafts.reload}>Thử lại</Button>}>{describeError(drafts.error).message}</Alert>}
+        {drafts.loading && !drafts.data && <p className="ver-note" role="status">Đang tải danh sách draft…</p>}
+        {drafts.data && draftItems.length === 0 && <p className="ver-note">Kịch bản này chưa có draft. {editorHref ? <a href={editorHref} style={{ color: "var(--ember)" }}>Mở trình soạn để tạo draft</a> : "Hãy tạo draft ở trình soạn kịch bản."}</p>}
+        {draftItems.length > 0 && <Field label="Bản nháp" required hint="Danh sách do máy chủ trả, bản lưu gần nhất trước.">
+          {(p) => <Select {...p} value={trimmed} onChange={(event) => { setDraftId(event.target.value); setLoaded(null); setConflict(null); setValidation(null); setError(null); }}>
+            {!draftItems.some((item) => item.id === trimmed) && trimmed && <option value={trimmed}>Draft theo liên kết ({trimmed.slice(0, 8)}…)</option>}
+            {draftItems.map((item) => <option key={item.id} value={item.id}>{"#" + item.draftNumber + " · " + formatDateTime(item.updatedAt) + (item.lastEditedByName ? " · " + item.lastEditedByName : "") + (item.id === preferredDraftId ? " · hiện tại" : "")}</option>)}
+          </Select>}
+        </Field>}
         <div className="ver-actions-row">
-          <Button variant="secondary" onClick={() => void load()} disabled={!trimmed || Boolean(idError) || busy !== ""}>
+          <Button variant="secondary" onClick={() => void load()} disabled={!trimmed || busy !== ""}>
             <RefreshCw size={16} aria-hidden="true" />{busy === "load" ? "Đang tải…" : loaded ? "Tải lại draft" : "Tải draft"}
           </Button>
         </div>

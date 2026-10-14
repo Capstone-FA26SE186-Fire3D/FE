@@ -2,11 +2,20 @@
 
 Theo dõi từng màn hình: **Đã tích hợp** (gọi API thật, có test với mock), **Chờ BE** (thiết kế sẵn, khóa tính năng), **Prototype** (dữ liệu mẫu, chỉ môi trường phát triển; production không có nút giả thành công hay số liệu mẫu).
 
-Nguồn kiểm tra BE: `main` @ `b6a7d74` (đọc source; chưa kiểm chứng deployment). Bằng chứng mock (Playwright route) và kiểm thử API thật được ghi riêng — mock không phải bằng chứng tích hợp.
+Nguồn kiểm tra BE: `main` @ `1eaf988` (14/10/2026; OpenAPI đang triển khai và `/health/version` trả cùng commit). Các nội dung ghi `b6a7d74` bên dưới là trạng thái lúc đối chiếu ban đầu (10/10). Bằng chứng mock (Playwright route) và kiểm thử API thật được ghi riêng — mock không phải bằng chứng tích hợp.
+
+**Ba mức trạng thái cho mỗi tính năng** (một dòng có thể ở các mức khác nhau; không gộp):
+1. **Contract** — BE đã có endpoint/DTO trong OpenAPI hoặc source (chưa chứng minh chạy đúng).
+2. **FE đã tích hợp** — FE gọi đúng contract và có test với mock cùng contract.
+3. **Đã kiểm chứng API thật** — đã chạy với deployment bằng tài khoản/dữ liệu test, ghi ngày và phạm vi.
+
+Backlog đợt tích hợp 14/10/2026: issue tổng [FE#62](https://github.com/Capstone-FA26SE186-Fire3D/FE/issues/62) (F1–F14 = [#48](https://github.com/Capstone-FA26SE186-Fire3D/FE/issues/48)–[#61](https://github.com/Capstone-FA26SE186-Fire3D/FE/issues/61)); issue BE mới [#77](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/77) (AI Trainee), [#78](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/78) (lịch sử/kết quả Trainee), [#79](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/79) (Learn tìm kiếm/lọc), [#80](https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/80) (analytics mở rộng, Phase 2). Bảng coverage FR nằm trong issue tổng.
 
 Riêng BE#59/#66 đã đối chiếu lại source `origin/main` @ `3726c14`: analytics trả `isActive`, gói v7 giới hạn 6/12 tháng, quotation đã kiểm tên/địa chỉ; annotation có cả body `eTag` và header `ETag`. Đây là hiệu chỉnh trạng thái issue theo source, chưa xác nhận deployment hoặc tích hợp toàn bộ API mới.
 
 ## Issue BE đã mở (2026-10-10)
+
+> Cập nhật 14/10/2026: các issue #51–#69 dưới đây đã đóng ở BE; deploy `1eaf988`. Contract tương ứng đã có trong OpenAPI nhưng FE chỉ được coi là tích hợp xong khi có test cùng contract và smoke API thật (xem cột trạng thái ở bảng màn hình). Bảng giữ nguyên để truy vết lý do chặn lúc đó.
 
 | # | Nội dung | Loại | Chặn FE |
 |---|---|---|---|
@@ -56,7 +65,7 @@ Cập nhật bảng này khi hoàn thành từng đợt.
 | Org | Chi tiết công trình: Quyền tham gia | Đã tích hợp (mock test) | `access` GET/PATCH + rotate/revoke, If-Match `"access-N"`, mã mới hiện một lần, Modal xác nhận tác động, 412 |
 | Org | Chi tiết công trình: Dịch vụ | Placeholder | `building-services-tab.tsx` là bản tạm, agent billing thay thế |
 | Admin | Công trình theo tổ chức | Đã tích hợp (mock test) | `/admin/organizations/[organizationId]/buildings` và `/workspace/buildings?org=`; `organizationId` ở query (list/update/archive) và body (create); OrganizationUser không gửi |
-| Org | Phiên bản & readiness của kịch bản (`/workspace/buildings/[id]/scenarios/[scenarioId]/versions`) | Đã tích hợp một phần (mock test) | Snapshot (Idempotency-Key + If-Match, 412 giữ nội dung), package build + polling 3s, QA/issue Error/Critical + confirm-for-training, gửi duyệt, release Built, Phát hành hiện 503 `PUBLISH_GATE_UNAVAILABLE` (BE#51). Trạng thái duyệt/release/xác nhận sau reload **Chưa có dữ liệu (chờ BE)** (BE#52, BE#53): chỉ nhớ theo tab (sessionStorage), không suy đoán. Status job/QA suy từ SQL, chưa có enum công bố |
+| Org | Phiên bản & readiness của kịch bản (`/workspace/buildings/[id]/scenarios/[scenarioId]/versions`) | Contract: có. FE: đã tích hợp (mock test, F1 [#48](https://github.com/Capstone-FA26SE186-Fire3D/FE/issues/48)). API thật: chưa | Trạng thái duyệt (`reviewStatus/reviewId/rejectReason` trên version + `GET /api/scenario-versions/{id}/review`), readiness (`GET .../readiness`: package job, QA, `confirmationReviewId`, `candidateArtifactId`, `missing`), release (`GET /api/releases?scenarioId=`) và danh sách draft (`GET /api/scenarios/{id}/drafts`) đều lấy từ máy chủ; không còn `sessionStorage` làm nguồn sự thật. Tạo release dùng xác nhận/artifact từ readiness (không nhập UUID). Phát hành gửi `Idempotency-Key` (giữ khi retry), đọc `ReleaseResponse`; 503 `PUBLISH_GATE_UNAVAILABLE` = cổng chưa bật (`Publishing:Enabled`), 409 theo từng điều kiện, release vẫn Built. Lịch sử QA theo revision từ `GET /api/revisions/{id}/validation-runs`. Chưa làm: phiên bản trong một lần nhìn cho Admin (F3), hành trình từng bước (Đợt 3) |
 | Org | Dịch vụ & thanh toán (`/workspace/billing`, tab Dịch vụ của công trình) | Đã tích hợp (mock test) | Báo giá 1..n Building theo snapshot BE, accept (If-Match, 409 sau hạn), PayOS create/cancel (Idempotency-Key), poll `paymentStatus` rồi `provisioningStatus` từng Building, entitlement `isEffective`, nhắc hết hạn 5 ngày, yêu cầu liên hệ số lượng lớn. `/workspace/billing/return` chỉ điều hướng; cần cấu hình `PayOS__ReturnUrl/CancelUrl` trỏ tới đó. Chưa kiểm chứng với PayOS/BE thật |
 | Org | Nâng cấp gói, suất học viên, quota AI pooled, top-up | Chờ BE (#56) (+ Prototype) | Production chỉ khối "Chờ BE"; dev có banner "Dữ liệu mẫu", không gọi API |
 | Admin | Thương mại (`/admin/commerce?tab=`) | Đã tích hợp (mock test) | Gói (tạo/sửa If-Match, 412), giảm giá, báo giá (phát hành với thuế/điều khoản/hạn), tra cứu thanh toán theo checkoutId + reconcile, danh sách yêu cầu doanh nghiệp |
@@ -80,7 +89,7 @@ Cập nhật bảng này khi hoàn thành từng đợt.
 | Org | Hỗ trợ & phản hồi `/workspace/support` | Đã tích hợp (mock test) | Tạo ticket (Idempotency-Key giữ khi retry), danh sách, lịch sử trao đổi, tin nhắn, feedback; chỉ OrganizationUser (creator-owned) |
 | Admin | Tổ chức `/admin/organizations` | Đã tích hợp (mock test) | Bảng + drawer chi tiết/tạo, filter/phân trang URL, khóa/mở có xác nhận, link tạo owner và `/admin/organizations/{id}/buildings` (trang do task khác). Chờ BE: địa chỉ/SĐT, sửa hồ sơ từ admin (BE#60) |
 | Org | Hồ sơ `/workspace/profile` (+ `/account` dùng chung) | Đã tích hợp (mock test) | Field/Alert/toast, ETag `"N"`, 412 giữ nội dung + tải bản mới, lỗi field từ API; `/account` bọc `PublicOpsScope` (tối cố định) |
-| Org | Editor kịch bản 3D `/workspace/buildings/[id]/scenarios/[scenarioId]?draft=` | Đã tích hợp một phần (mock test) | Spawn/hazard (kể cả `activationTime`), mục tiêu/hướng dẫn/rubric/chấm điểm/tuyến/runtime, undo/redo, lưu `If-Match`, 412 đối chiếu theo field, validate. Goal/NPC/blocked element/thiết bị: **Chờ BE #54** (khóa). Playtest: **Chờ BE #55** (khóa). Mở lại draft theo scenario: **Chờ BE #53** (hiện dùng `?draft=` hoặc tạo mới) |
+| Org | Editor kịch bản 3D `/workspace/buildings/[id]/scenarios/[scenarioId]?draft=` | Đã tích hợp một phần (mock test) | Spawn/hazard (kể cả `activationTime`), mục tiêu/hướng dẫn/rubric/chấm điểm/tuyến/runtime, undo/redo, lưu `If-Match`, 412 đối chiếu theo field, validate. Goal/NPC/blocked element/thiết bị: **Chờ BE #54** (khóa). Playtest: **Chờ BE #55** (khóa). Mở lại draft theo scenario: đã tích hợp (F1) — màn vào editor liệt kê draft từ `GET /api/scenarios/{id}/drafts`, đánh dấu `currentDraftId`; không còn nhập mã draft tay hoặc `localStorage`. Editor `fet3d.editor/1`: F2 [#49](https://github.com/Capstone-FA26SE186-Fire3D/FE/issues/49) |
 
 ### Editor kịch bản 3D — giả định, giới hạn và điều kiện mở khóa
 

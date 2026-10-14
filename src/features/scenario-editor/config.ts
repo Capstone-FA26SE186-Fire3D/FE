@@ -24,5 +24,4 @@ export type EditorCapability = keyof typeof EDITOR_CAPABILITIES;
 export const BE_ISSUES = {
   editorContract: { label: "BE #54 — contract dữ liệu editor 3D", href: "https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/54" },
   playtest: { label: "BE #55 — playtest handoff", href: "https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/55" },
-  draftLookup: { label: "BE #53 — tìm lại draft theo scenario", href: "https://github.com/Capstone-FA26SE186-Fire3D/BE/issues/53" },
 } as const;

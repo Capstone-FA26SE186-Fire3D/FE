@@ -11,20 +11,21 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/table";
 import { SkeletonRows } from "@/components/ui/skeleton";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
 
 import "./versions.css";
 import { useVersionJobs } from "../../use-version-jobs";
-import { useVersionMemory } from "../../use-version-memory";
+import { useVersionServerState } from "../../use-version-server-state";
 import { approvalGate, describeError, releaseGate, shortHash, technicalGate } from "../../version-readiness";
 import type { ScenarioVersionDetail } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
 import { GateStepper } from "./gate-stepper";
 import { PackageBuildPanel } from "./package-build-panel";
 import { ReadinessPanel } from "./readiness-panel";
-import { ReleasePanel, type ReleaseView } from "./release-panel";
+import { ReleasePanel } from "./release-panel";
 import { ReviewPanel } from "./review-panel";
 import { SnapshotDrawer } from "./snapshot-drawer";
 import { VersionContent, formatDateTime } from "./version-content";
@@ -40,7 +41,7 @@ const tabLabels: Record<TabId, string> = {
   release: "Release",
 };
 
-function Workbench({ accessToken, buildingId, version, tab, onTab, canAct, canSubmit }: {
+function Workbench({ accessToken, buildingId, version, tab, onTab, canAct, canSubmit, onVersionChanged }: {
   accessToken: string;
   buildingId: string;
   version: ScenarioVersionDetail;
@@ -48,37 +49,22 @@ function Workbench({ accessToken, buildingId, version, tab, onTab, canAct, canSu
   onTab: (tab: TabId) => void;
   canAct: boolean;
   canSubmit: boolean;
+  /** A command changed server state the page header/list also shows (review status): reload version detail and list. */
+  onVersionChanged: () => void;
 }) {
-  const { memory, remember } = useVersionMemory(version.id);
-  const jobs = useVersionJobs({ accessToken, revisionId: version.revisionId, versionId: version.id, rememberedJobId: memory.jobId });
+  const server = useVersionServerState({ accessToken, version });
+  const readiness = server.readiness.data;
+  const jobs = useVersionJobs({ accessToken, revisionId: version.revisionId, versionId: version.id, preferredJobId: readiness?.packageJob?.jobId });
+  const refreshAll = () => { server.refresh(); onVersionChanged(); };
 
-  const releaseQuery = useAsyncData(
-    `release:${memory.releaseId ?? "none"}`,
-    (signal) => scenarioVersionsApi.getRelease(accessToken, memory.releaseId as string, signal),
-    Boolean(memory.releaseId),
-  );
-  const loaded = memory.releaseId ? releaseQuery.data : undefined;
-  const foreign = Boolean(loaded && loaded.scenarioVersionId !== version.id);
-  const view: ReleaseView = {
-    release: loaded && !foreign ? loaded : undefined,
-    foreign,
-    loading: Boolean(memory.releaseId) && releaseQuery.loading,
-    error: memory.releaseId ? releaseQuery.error : undefined,
-    reload: releaseQuery.reload,
-  };
-
-  const technical = technicalGate({
-    job: jobs.detail,
-    verdict: jobs.verdict,
-    confirmReviewId: memory.confirmReviewId && memory.confirmRunId && jobs.verdict && jobs.verdict.kind !== "none" && jobs.verdict.run.id === memory.confirmRunId ? memory.confirmReviewId : undefined,
-    hasJobs: jobs.jobs.length > 0,
-  });
+  const technical = technicalGate({ job: jobs.detail, verdict: jobs.verdict, readiness, hasJobs: jobs.jobs.length > 0 || Boolean(readiness?.packageJob) });
 
   return <>
+    {server.readiness.error !== undefined && !readiness && <Alert tone="danger" title="Không đọc được readiness từ máy chủ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={server.readiness.reload}>Thử lại</Button>}>{describeError(server.readiness.error).message} Các cổng bên dưới chỉ phản ánh phần đã tải được.</Alert>}
     <GateStepper gates={[
       { id: "technical", title: "Kết quả kỹ thuật", state: technical },
-      { id: "approval", title: "Duyệt nội dung", state: approvalGate(memory.submission) },
-      { id: "release", title: "Release", state: releaseGate(view.release) },
+      { id: "approval", title: "Duyệt nội dung", state: approvalGate(version.reviewStatus, version.rejectReason) },
+      { id: "release", title: "Release", state: releaseGate(server.releaseView.release) },
     ]} />
     <Tabs value={tab} onValueChange={(value) => onTab(value as TabId)}>
       <TabsList aria-label="Các bước của phiên bản">
@@ -86,16 +72,16 @@ function Workbench({ accessToken, buildingId, version, tab, onTab, canAct, canSu
       </TabsList>
       <TabsContent value="content"><VersionContent version={version} /></TabsContent>
       <TabsContent value="build">
-        <PackageBuildPanel accessToken={accessToken} version={version} jobs={jobs} canAct={canAct} onStarted={(jobId) => { remember({ jobId }); jobs.selectJob(jobId); }} />
+        <PackageBuildPanel accessToken={accessToken} version={version} jobs={jobs} canAct={canAct} onStarted={(jobId) => { jobs.selectJob(jobId); server.readiness.reload(); }} />
       </TabsContent>
       <TabsContent value="readiness">
-        <ReadinessPanel accessToken={accessToken} version={version} jobs={jobs} memory={memory} remember={remember} canAct={canAct} />
+        <ReadinessPanel accessToken={accessToken} version={version} jobs={jobs} readiness={server.readiness} canAct={canAct} onConfirmed={server.refresh} />
       </TabsContent>
       <TabsContent value="review">
-        <ReviewPanel accessToken={accessToken} version={version} memory={memory} remember={remember} canSubmit={canSubmit} />
+        <ReviewPanel accessToken={accessToken} version={version} review={server.review} canSubmit={canSubmit} onSubmitted={refreshAll} />
       </TabsContent>
       <TabsContent value="release">
-        <ReleasePanel accessToken={accessToken} buildingId={buildingId} version={version} jobs={jobs} memory={memory} remember={remember} canAct={canAct} view={view} />
+        <ReleasePanel accessToken={accessToken} buildingId={buildingId} version={version} readiness={server.readiness} view={server.releaseView} noteRelease={server.noteRelease} canAct={canAct} />
       </TabsContent>
     </Tabs>
   </>;
@@ -133,6 +119,7 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
 
   const reloadAll = () => { versions.reload(); detail.reload(); scenario.reload(); };
+  const reloadVersion = () => { versions.reload(); detail.reload(); };
 
   return <>
     <PageHeader
@@ -159,6 +146,7 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
               <strong>v{item.versionNumber} · {item.name}</strong>
               <span>{formatDateTime(item.createdAt)}</span>
               <span className="ver-hash">#{shortHash(item.scenarioHash, 12)}</span>
+              {item.reviewStatus && <StatusBadge tone={approvalGate(item.reviewStatus, item.rejectReason).tone}>{approvalGate(item.reviewStatus, item.rejectReason).label}</StatusBadge>}
             </button>
           </li>)}
         </ul>
@@ -178,6 +166,7 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
           onTab={(next) => setParams({ tab: next === "content" ? "" : next })}
           canAct={canAct}
           canSubmit={canSubmit}
+          onVersionChanged={reloadVersion}
         />}
       </div>
     </div>
@@ -189,6 +178,8 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
       accessToken={accessToken}
       scenarioId={scenarioId}
       initialDraftId={get("draft")}
+      preferredDraftId={scenario.data?.currentDraftId ?? ""}
+      editorHref={editorHref}
       onCreated={(versionId) => { versions.reload(); setParams({ version: versionId, tab: "build", page: "" }); }}
     />}
   </>;
