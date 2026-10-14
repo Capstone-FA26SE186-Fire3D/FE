@@ -31,7 +31,7 @@ export function parseFloors(raw: unknown): FloorInfo[] {
     if (typeof item === "string" && item.trim()) floors.push({ key: `floor-${index}`, name: item.trim(), elevation: null });
     else if (typeof item === "number" && Number.isFinite(item)) floors.push({ key: `floor-${index}`, name: `Tầng ${index + 1}`, elevation: item });
     else if (isRecord(item)) {
-      const elevation = firstNumber(item, ["elevation", "elevationM", "elevation_m", "z", "height", "level"]);
+      const elevation = firstNumber(item, ["elevationMeters", "elevation", "elevationM", "elevation_m", "z", "height", "level"]);
       const name = firstString(item, ["name", "label", "title", "storey", "storeyName"]) ?? `Tầng ${index + 1}`;
       floors.push({ key: firstString(item, ["id", "guid", "globalId", "ifcGuid", "ifc_guid", "key"]) ?? `floor-${index}`, name, elevation: elevation ?? null });
     }
@@ -54,6 +54,14 @@ export function floorCeiling(floors: FloorInfo[], key: string): number | null {
  * A layer is only shown by the viewport when at least one glTF node of that name exists in the loaded model.
  */
 export function parseLayers(raw: unknown, maxLayers = 12): LayerInfo[] {
+  // fet3d.editor/1: `[ { ifcGlobalId, nodeId, floorId, semanticType } ]` -> one layer per IFC type.
+  if (Array.isArray(raw)) {
+    const grouped: Record<string, string[]> = {};
+    for (const entry of raw.slice(0, 100_000)) {
+      if (isRecord(entry) && typeof entry.semanticType === "string" && typeof entry.nodeId === "string") (grouped[entry.semanticType] ??= []).push(entry.nodeId);
+    }
+    return parseLayers(grouped, maxLayers);
+  }
   if (!isRecord(raw)) return [];
   const byCategory = new Map<string, Set<string>>();
   const add = (category: string, name: string) => {

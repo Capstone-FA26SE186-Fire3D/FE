@@ -5,24 +5,48 @@ import { TransformControls } from "three/examples/jsm/controls/TransformControls
 
 import { disposeObject3D } from "@/features/ifc-scan/dispose";
 
-import type { Tool } from "../store/editor-store";
-import type { Hazard, ObjectKind, Position, Selection } from "../store/model";
 import { interpretCoordinateTransform, type TransformInfo } from "./coordinate";
 import { PALETTES, type ScenePalette } from "./palette";
 import { floorCeiling, parseLayers, type FloorInfo, type LayerInfo } from "./preview-model";
 
 export type TransformPhase = "start" | "change" | "end";
 
+/**
+ * The controller is generic: it draws markers in WORLD (GLB) space and reports world-space results. Mapping between world
+ * space and a draft's own coordinates (legacy scenario space, or `fet3d.editor/1` floor-local) belongs to the caller.
+ */
+export type Point3 = { x: number; y: number; z: number };
+export type MarkerRef = { kind: string; index: number };
+export type Quaternion4 = { x: number; y: number; z: number; w: number };
+
+export type MarkerInput = MarkerRef & {
+  /** Which glyph to draw: `spawn`, `fire`, `smoke`, `wind`, `other` (legacy) or one of the v1 kinds. */
+  variant: string;
+  /** Layer toggled from the layer list (`setLayerVisible`). */
+  layer: string;
+  position: Point3;
+  /** Rotation about Y in degrees (legacy), used when `quaternion` is absent. */
+  yawDegrees?: number;
+  /** Full orientation in GLB axes (v1). */
+  quaternion?: Quaternion4;
+  dormant?: boolean;
+};
+
+export type SceneTool = "select" | "move" | "rotate" | "place";
+
+export type TransformResult = { position: Point3; yawDegrees: number; quaternion: Quaternion4 };
+
 export type SceneCallbacks = {
-  onSelect: (selection: Selection) => void;
-  onPlace: (kind: ObjectKind, position: Position) => void;
-  onTransform: (kind: ObjectKind, index: number, next: Partial<Position>, phase: TransformPhase) => void;
-  onModelPick: (pick: { name: string; point: { x: number; y: number; z: number } } | null) => void;
+  onSelect: (selection: MarkerRef | null) => void;
+  /** `kind` is `SceneInputs.placeKind`; `point` is the world point under the pointer. */
+  onPlace: (kind: string, point: Point3) => void;
+  onTransform: (ref: MarkerRef, next: TransformResult | null, phase: TransformPhase) => void;
+  onModelPick: (pick: { name: string; point: Point3 } | null) => void;
   onContextLost: () => void;
   onContextRestored: () => void;
 };
 
-export type SceneInputs = { spawns: Position[]; hazards: Hazard[]; selection: Selection; tool: Tool; previewTime: number };
+export type SceneInputs = { markers: MarkerInput[]; selection: MarkerRef | null; tool: SceneTool; placeKind: string };
 
 export type ModelInfo = {
   meshes: number;
@@ -45,6 +69,7 @@ export class ModelLoadError extends Error {
 export type DebugStats = { renders: number; geometries: number; textures: number; programs: number; lost: boolean; markers: number };
 
 const DEG = Math.PI / 180;
+const markerKey = (ref: MarkerRef) => `${ref.kind}:${ref.index}`;
 const round3 = (value: number) => Math.round(value * 1000) / 1000;
 const NO_CLIP = 1e7;
 
@@ -76,8 +101,8 @@ export class EditorSceneController {
   private readonly materials: Record<string, THREE.MeshStandardMaterial | THREE.MeshBasicMaterial> = {};
   private readonly markers = new Map<string, THREE.Group>();
   private palette: ScenePalette = PALETTES.dark;
-  private inputs: SceneInputs = { spawns: [], hazards: [], selection: null, tool: "select", previewTime: 0 };
-  private layersVisible = { spawn: true, hazard: true };
+  private inputs: SceneInputs = { markers: [], selection: null, tool: "select", placeKind: "" };
+  private readonly markerLayers = new Map<string, boolean>();
   private floors: FloorInfo[] = [];
   private activeFloor: string | null = null;
   private floorOffsetY = 0;
@@ -254,7 +279,7 @@ export class EditorSceneController {
   hasModel() { return this.modelLoaded; }
 
   /** Fetch with progress/abort (not GLTFLoader.load) so HTTP status — e.g. an expired signed URL (403) — is visible to the caller. */
-  async loadModel(url: string, source: { coordinateTransform: unknown; floors: FloorInfo[]; semanticMapping: unknown }, onProgress: (fraction: number | null) => void, signal: AbortSignal): Promise<ModelInfo> {
+  async loadModel(url: string, source: { coordinateTransform: unknown; floors: FloorInfo[]; semanticMapping: unknown; applyTransform?: boolean }, onProgress: (fraction: number | null) => void, signal: AbortSignal): Promise<ModelInfo> {
     let response: Response;
     try {
       response = await fetch(url, { signal, credentials: "omit" });
@@ -296,7 +321,9 @@ export class EditorSceneController {
     }
     this.disposeModel();
     const transform = interpretCoordinateTransform(source.coordinateTransform);
-    if (transform.ok && !transform.isIdentity) this.modelGroup.matrix.fromArray(transform.values);
+    // Legacy drafts assume `coordinateTransform` places the model in scenario space. In `fet3d.editor/1` the GLB IS the
+    // scene space and `coordinateTransform` (IFC -> GLB) is never applied to the model or to objects.
+    if (source.applyTransform !== false && transform.ok && !transform.isIdentity) this.modelGroup.matrix.fromArray(transform.values);
     else this.modelGroup.matrix.identity();
     this.modelGroup.add(gltf.scene);
     this.modelGroup.updateMatrixWorld(true);
@@ -339,6 +366,13 @@ export class EditorSceneController {
 
   // ───────── floors, layers, camera ─────────
 
+  /** Floors known without a model (v1 has them from the floors API), so floor elevation works before the GLB is loaded. */
+  setFloors(floors: FloorInfo[]) {
+    this.floors = floors;
+    this.applyFloor();
+    this.requestRender();
+  }
+
   setFloor(key: string | null) {
     this.activeFloor = key;
     this.applyFloor();
@@ -361,11 +395,11 @@ export class EditorSceneController {
   }
 
   setLayerVisible(key: string, visible: boolean) {
-    if (key === "spawn" || key === "hazard") {
-      this.layersVisible[key] = visible;
+    const nodes = this.layerNodes.get(key);
+    if (nodes) nodes.forEach((node) => { node.visible = visible; });
+    else {
+      this.markerLayers.set(key, visible);
       this.applyInputs();
-    } else {
-      this.layerNodes.get(key)?.forEach((node) => { node.visible = visible; });
     }
     this.requestRender();
   }
@@ -394,7 +428,7 @@ export class EditorSceneController {
   }
 
   focusSelection() {
-    const marker = this.inputs.selection ? this.markers.get(`${this.inputs.selection.kind}:${this.inputs.selection.index}`) : undefined;
+    const marker = this.inputs.selection ? this.markers.get(markerKey(this.inputs.selection)) : undefined;
     if (!marker) return;
     const offset = this.camera.position.clone().sub(this.orbit.target);
     const distance = Math.min(Math.max(offset.length(), 6), 14);
@@ -441,6 +475,10 @@ export class EditorSceneController {
     make("smoke", p.smoke, 0.7, 0.1);
     make("wind", p.wind);
     make("other", p.other);
+    make("goal", p.goal);
+    make("npc", p.npc);
+    make("blocked", p.blocked, 0.9, 0.3);
+    make("equipment", p.equipment);
     const ring = this.materials.ring as THREE.MeshBasicMaterial | undefined;
     if (ring) ring.color.set(p.selected);
     else this.materials.ring = new THREE.MeshBasicMaterial({ color: p.selected, side: THREE.DoubleSide, transparent: true, opacity: 0.95, depthTest: false });
@@ -452,7 +490,7 @@ export class EditorSceneController {
     return (this.geometries[key] ??= create());
   }
 
-  private buildMarker(kind: ObjectKind, type: string): THREE.Group {
+  private buildMarker(kind: string, variant: string): THREE.Group {
     const group = new THREE.Group();
     const mesh = (geometryKey: string, create: () => THREE.BufferGeometry, material: string, setup?: (m: THREE.Mesh) => void) => {
       const m = new THREE.Mesh(this.geometry(geometryKey, create), this.materials[material]);
@@ -461,17 +499,34 @@ export class EditorSceneController {
       group.add(m);
       return m;
     };
-    if (kind === "spawn") {
-      mesh("spawn-body", () => new THREE.CylinderGeometry(0.16, 0.2, 0.75, 16), "spawn", (m) => { m.position.y = 0.45; });
-      mesh("spawn-head", () => new THREE.SphereGeometry(0.17, 16, 12), "spawn", (m) => { m.position.y = 1.0; });
+    const figure = (material: string) => {
+      mesh("spawn-body", () => new THREE.CylinderGeometry(0.16, 0.2, 0.75, 16), material, (m) => { m.position.y = 0.45; });
+      mesh("spawn-head", () => new THREE.SphereGeometry(0.17, 16, 12), material, (m) => { m.position.y = 1.0; });
+    };
+    if (variant === "spawn" || variant === "Spawn") {
+      figure("spawn");
       mesh("spawn-arrow", () => new THREE.ConeGeometry(0.14, 0.4, 16), "spawn", (m) => { m.rotation.x = Math.PI / 2; m.position.set(0, 0.06, 0.5); });
-    } else if (type === "Fire") {
+    } else if (variant === "Npc") {
+      figure("npc");
+      mesh("npc-hat", () => new THREE.ConeGeometry(0.12, 0.26, 12), "npc", (m) => { m.position.y = 1.28; });
+    } else if (variant === "Goal") {
+      mesh("goal-pole", () => new THREE.CylinderGeometry(0.04, 0.04, 1.5, 10), "goal", (m) => { m.position.y = 0.75; });
+      mesh("goal-flag", () => new THREE.BoxGeometry(0.55, 0.34, 0.04), "goal", (m) => { m.position.set(0.3, 1.3, 0); });
+      mesh("goal-base", () => new THREE.CylinderGeometry(0.3, 0.3, 0.05, 20), "goal", (m) => { m.position.y = 0.03; });
+    } else if (variant === "BlockedElement") {
+      mesh("blocked-slab", () => new THREE.BoxGeometry(0.9, 1.4, 0.12), "blocked", (m) => { m.position.y = 0.7; });
+      mesh("blocked-bar-a", () => new THREE.BoxGeometry(1.15, 0.1, 0.16), "other", (m) => { m.position.y = 0.7; m.rotation.z = Math.PI / 4; });
+      mesh("blocked-bar-b", () => new THREE.BoxGeometry(1.15, 0.1, 0.16), "other", (m) => { m.position.y = 0.7; m.rotation.z = -Math.PI / 4; });
+    } else if (variant === "Equipment") {
+      mesh("equipment-box", () => new THREE.BoxGeometry(0.4, 0.55, 0.4), "equipment", (m) => { m.position.y = 0.32; });
+      mesh("equipment-cap", () => new THREE.CylinderGeometry(0.08, 0.08, 0.12, 12), "other", (m) => { m.position.y = 0.66; });
+    } else if (variant === "Hazard" || variant === "fire" || variant === "Fire") {
       mesh("fire-cone", () => new THREE.ConeGeometry(0.36, 1.0, 20), "fire", (m) => { m.position.y = 0.5; });
       mesh("fire-core", () => new THREE.ConeGeometry(0.18, 0.62, 16), "other", (m) => { m.position.y = 0.34; });
-    } else if (type === "Smoke") {
+    } else if (variant === "smoke" || variant === "Smoke") {
       mesh("smoke-puff", () => new THREE.SphereGeometry(0.5, 20, 14), "smoke", (m) => { m.position.y = 0.62; });
       mesh("smoke-puff-2", () => new THREE.SphereGeometry(0.32, 16, 12), "smoke", (m) => { m.position.set(0.28, 0.95, 0.05); });
-    } else if (type === "Wind") {
+    } else if (variant === "wind" || variant === "Wind") {
       mesh("wind-shaft", () => new THREE.CylinderGeometry(0.06, 0.06, 0.9, 12), "wind", (m) => { m.rotation.x = Math.PI / 2; m.position.set(0, 0.5, -0.1); });
       mesh("wind-head", () => new THREE.ConeGeometry(0.18, 0.4, 16), "wind", (m) => { m.rotation.x = Math.PI / 2; m.position.set(0, 0.5, 0.55); });
     } else {
@@ -480,7 +535,7 @@ export class EditorSceneController {
     const ring = mesh("ring", () => new THREE.TorusGeometry(0.62, 0.04, 8, 48), "ring", (m) => { m.rotation.x = Math.PI / 2; m.position.y = 0.04; });
     ring.name = "selection-ring";
     ring.visible = false;
-    group.userData = { kind, type };
+    group.userData = { kind, variant };
     return group;
   }
 
@@ -491,37 +546,37 @@ export class EditorSceneController {
   }
 
   private applyInputs() {
-    const { spawns, hazards, selection, tool, previewTime } = this.inputs;
+    const { markers, selection, tool } = this.inputs;
     const wanted = new Set<string>();
-    const sync = (kind: ObjectKind, index: number, position: Position, type: string, dormant: boolean) => {
-      const key = `${kind}:${index}`;
+    for (const input of markers) {
+      const key = markerKey(input);
       wanted.add(key);
       let marker = this.markers.get(key);
-      if (marker && marker.userData.type !== type) {
+      if (marker && marker.userData.variant !== input.variant) {
+        if (this.transform.object === marker) this.transform.detach();
         this.markerGroup.remove(marker);
         this.markers.delete(key);
         marker = undefined;
       }
       if (!marker) {
-        marker = this.buildMarker(kind, type);
+        marker = this.buildMarker(input.kind, input.variant);
         this.markers.set(key, marker);
         this.markerGroup.add(marker);
       }
-      marker.userData.index = index;
-      const isDragged = this.dragging && selection?.kind === kind && selection.index === index;
-      if (!isDragged) {
-        marker.position.set(position.x, position.y, position.z);
-        marker.rotation.set(0, position.rotation * DEG, 0);
+      marker.userData.index = input.index;
+      marker.userData.kind = input.kind;
+      const isSelected = selection !== null && markerKey(selection) === key;
+      if (!(this.dragging && isSelected)) {
+        marker.position.set(input.position.x, input.position.y, input.position.z);
+        if (input.quaternion) marker.quaternion.set(input.quaternion.x, input.quaternion.y, input.quaternion.z, input.quaternion.w);
+        else marker.rotation.set(0, (input.yawDegrees ?? 0) * DEG, 0);
       }
-      marker.visible = this.layersVisible[kind];
-      const isSelected = selection?.kind === kind && selection.index === index;
+      marker.visible = this.markerLayers.get(input.layer) !== false;
       const ring = marker.getObjectByName("selection-ring");
       if (ring) ring.visible = isSelected;
-      marker.userData.dormant = dormant;
-      marker.scale.setScalar(this.markerScale * (dormant ? 0.6 : 1));
-    };
-    spawns.forEach((position, index) => sync("spawn", index, position, "Spawn", false));
-    hazards.forEach((hazard, index) => sync("hazard", index, hazard.position, hazard.type, hazard.activationTime > previewTime));
+      marker.userData.dormant = input.dormant ?? false;
+      marker.scale.setScalar(this.markerScale * (input.dormant ? 0.6 : 1));
+    }
     for (const [key, marker] of [...this.markers]) {
       if (wanted.has(key)) continue;
       if (this.transform.object === marker) this.transform.detach();
@@ -529,7 +584,7 @@ export class EditorSceneController {
       this.markers.delete(key);
     }
     // Gizmo follows the selected object only for the move/rotate tools.
-    const target = selection && (tool === "move" || tool === "rotate") ? this.markers.get(`${selection.kind}:${selection.index}`) : undefined;
+    const target = selection && (tool === "move" || tool === "rotate") ? this.markers.get(markerKey(selection)) : undefined;
     if (target && target.visible) {
       if (this.transform.object !== target) this.transform.attach(target);
       this.transform.setMode(tool === "rotate" ? "rotate" : "translate");
@@ -563,9 +618,7 @@ export class EditorSceneController {
     this.orbit.enabled = !event.value;
     const marker = this.transform.object as THREE.Group | undefined;
     if (!marker) return;
-    const kind = marker.userData.kind as ObjectKind;
-    const index = marker.userData.index as number;
-    this.callbacks.onTransform(kind, index, {}, event.value ? "start" : "end");
+    this.callbacks.onTransform({ kind: marker.userData.kind as string, index: marker.userData.index as number }, null, event.value ? "start" : "end");
   };
 
   private readonly onObjectChange = () => {
@@ -574,8 +627,10 @@ export class EditorSceneController {
     const q = marker.quaternion;
     const yaw = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
     const degrees = ((yaw / DEG) % 360 + 360) % 360;
-    this.callbacks.onTransform(marker.userData.kind as ObjectKind, marker.userData.index as number, {
-      x: round3(marker.position.x), y: round3(marker.position.y), z: round3(marker.position.z), rotation: round3(degrees),
+    this.callbacks.onTransform({ kind: marker.userData.kind as string, index: marker.userData.index as number }, {
+      position: { x: round3(marker.position.x), y: round3(marker.position.y), z: round3(marker.position.z) },
+      yawDegrees: round3(degrees),
+      quaternion: { x: q.x, y: q.y, z: q.z, w: q.w },
     }, "change");
   };
 
@@ -612,13 +667,13 @@ export class EditorSceneController {
   private pick(clientX: number, clientY: number) {
     this.raycaster.setFromCamera(this.ndc(clientX, clientY), this.camera);
     const { tool } = this.inputs;
-    if (tool === "place-spawn" || tool === "place-hazard") {
+    if (tool === "place") {
       const hit = this.modelHit();
       let point: THREE.Vector3 | null = hit ? hit.point.clone() : null;
       if (!point) {
         point = this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.floorElevation()), new THREE.Vector3());
       }
-      if (point) this.callbacks.onPlace(tool === "place-spawn" ? "spawn" : "hazard", { x: round3(point.x), y: round3(point.y), z: round3(point.z), rotation: 0 });
+      if (point) this.callbacks.onPlace(this.inputs.placeKind, { x: round3(point.x), y: round3(point.y), z: round3(point.z) });
       return;
     }
     const markerHits = this.raycaster.intersectObjects([...this.markers.values()].filter((marker) => marker.visible), true);
@@ -627,7 +682,7 @@ export class EditorSceneController {
       let node: THREE.Object3D | null = first.object;
       while (node && !node.userData.kind) node = node.parent;
       if (node) {
-        this.callbacks.onSelect({ kind: node.userData.kind as ObjectKind, index: node.userData.index as number });
+        this.callbacks.onSelect({ kind: node.userData.kind as string, index: node.userData.index as number });
         return;
       }
     }
@@ -659,16 +714,37 @@ export class EditorSceneController {
     w.__fire3dEditorScene = {
       stats: (): DebugStats => ({ renders: this.renders, geometries: this.renderer.info.memory.geometries, textures: this.renderer.info.memory.textures, programs: this.renderer.info.programs?.length ?? 0, lost: this.lost, markers: this.markers.size }),
       /** Client pixel of a marker's centre, for driving real pointer events in tests. */
-      project: (kind: ObjectKind, index: number) => {
+      project: (kind: string, index: number) => {
         const marker = this.markers.get(`${kind}:${index}`);
         if (!marker) return null;
         const p = marker.position.clone().add(new THREE.Vector3(0, 0.5 * this.markerScale, 0)).project(this.camera);
         const rect = this.renderer.domElement.getBoundingClientRect();
         return { x: rect.left + ((p.x + 1) / 2) * rect.width, y: rect.top + ((1 - p.y) / 2) * rect.height };
       },
+      /** Client pixel of the top centre of a named model node (glTF node name), to drive real picking of model elements in tests. */
+      projectNode: (name: string) => {
+        let found: THREE.Object3D | undefined;
+        this.modelGroup.traverse((object) => { if (!found && object.name === name) found = object; });
+        if (!found) return null;
+        const box = new THREE.Box3().setFromObject(found);
+        const top = new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y - 0.02, (box.min.z + box.max.z) / 2).project(this.camera);
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        return { x: rect.left + ((top.x + 1) / 2) * rect.width, y: rect.top + ((1 - top.y) / 2) * rect.height };
+      },
+      /** Runs the gizmo callbacks as one drag gesture (start, change, end) on the attached marker, in world space. TransformControls itself is not exercised. */
+      simulateDrag: (kind: string, index: number, position: Point3, yawDegrees?: number) => {
+        const marker = this.markers.get(`${kind}:${index}`);
+        if (!marker || this.transform.object !== marker) return false;
+        this.onDraggingChanged({ value: true });
+        marker.position.set(position.x, position.y, position.z);
+        if (yawDegrees !== undefined) marker.rotation.set(0, yawDegrees * DEG, 0);
+        this.onObjectChange();
+        this.onDraggingChanged({ value: false });
+        return true;
+      },
       loseContext: () => loseExt?.loseContext(),
       restoreContext: () => loseExt?.restoreContext(),
-      markerPosition: (kind: ObjectKind, index: number) => this.markers.get(`${kind}:${index}`)?.position.toArray() ?? null,
+      markerPosition: (kind: string, index: number) => this.markers.get(`${kind}:${index}`)?.position.toArray() ?? null,
       clipConstant: () => this.clipPlane.constant,
       gizmoAttached: () => Boolean(this.transform.object),
     };

@@ -7,10 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTheme } from "@/features/theme/theme-scope";
 
-import type { Hazard, Position } from "../store/model";
-import type { ObjectKind, Selection } from "../store/model";
-import type { Tool } from "../store/editor-store";
-import { EditorSceneController, isWebGLAvailable, ModelLoadError, type ModelInfo, type TransformPhase } from "./scene-controller";
+import { EditorSceneController, isWebGLAvailable, ModelLoadError, type MarkerInput, type MarkerRef, type ModelInfo, type Point3, type SceneTool, type TransformPhase, type TransformResult } from "./scene-controller";
 import type { FloorInfo } from "./preview-model";
 
 export type ModelRequest = {
@@ -21,6 +18,8 @@ export type ModelRequest = {
   coordinateTransform: unknown;
   floors: FloorInfo[];
   semanticMapping: unknown;
+  /** false for `fet3d.editor/1`: the GLB is the scene space and the IFC transform is never applied to the model. */
+  applyTransform?: boolean;
 };
 
 export type ModelStatus =
@@ -38,20 +37,22 @@ export type ViewportHandle = {
 
 export type ViewportProps = {
   ref?: Ref<ViewportHandle>;
-  spawns: Position[];
-  hazards: Hazard[];
-  selection: Selection;
-  tool: Tool;
-  previewTime: number;
+  markers: MarkerInput[];
+  selection: MarkerRef | null;
+  tool: SceneTool;
+  /** What the `place` tool puts down (opaque to the viewport). */
+  placeKind: string;
   gizmoEnabled: boolean;
   model: ModelRequest | null;
   activeFloor: string | null;
+  /** Known floors independent of the model (optional; the model request also carries them). */
+  floors?: FloorInfo[];
   showModel: boolean;
   layerVisibility: Record<string, boolean>;
-  onSelect: (selection: Selection) => void;
-  onPlace: (kind: ObjectKind, position: Position) => void;
-  onTransform: (kind: ObjectKind, index: number, next: Partial<Position>, phase: TransformPhase) => void;
-  onModelPick: (pick: { name: string; point: { x: number; y: number; z: number } } | null) => void;
+  onSelect: (selection: MarkerRef | null) => void;
+  onPlace: (kind: string, point: Point3) => void;
+  onTransform: (ref: MarkerRef, next: TransformResult | null, phase: TransformPhase) => void;
+  onModelPick: (pick: { name: string; point: Point3 } | null) => void;
   onModelStatus: (status: ModelStatus) => void;
   /** Called when the signed URL was rejected or had expired: the owner fetches a new one (changes `model.key`). */
   onUrlExpired: () => void;
@@ -60,11 +61,11 @@ export type ViewportProps = {
 const EXPIRED_STATUSES = new Set([400, 401, 403, 404, 410]);
 
 /** The only React component that owns a WebGL context. Loaded with next/dynamic (ssr: false). */
-export default function EditorViewport({ ref, spawns, hazards, selection, tool, previewTime, gizmoEnabled, model, activeFloor, showModel, layerVisibility, onSelect, onPlace, onTransform, onModelPick, onModelStatus, onUrlExpired }: ViewportProps) {
+export default function EditorViewport({ ref, markers, selection, tool, placeKind, gizmoEnabled, model, activeFloor, floors, showModel, layerVisibility, onSelect, onPlace, onTransform, onModelPick, onModelStatus, onUrlExpired }: ViewportProps) {
   const { resolved } = useTheme();
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<EditorSceneController | null>(null);
-  const latest = useRef<Omit<ViewportProps, "ref">>({ spawns, hazards, selection, tool, previewTime, gizmoEnabled, model, activeFloor, showModel, layerVisibility, onSelect, onPlace, onTransform, onModelPick, onModelStatus, onUrlExpired });
+  const latest = useRef<Omit<ViewportProps, "ref">>({ markers, selection, tool, placeKind, gizmoEnabled, model, activeFloor, floors, showModel, layerVisibility, onSelect, onPlace, onTransform, onModelPick, onModelStatus, onUrlExpired });
   const themeRef = useRef(resolved);
   const [remount, setRemount] = useState(0);
   const [lost, setLost] = useState(false);
@@ -74,7 +75,7 @@ export default function EditorViewport({ ref, spawns, hazards, selection, tool, 
   const MAX_AUTO_REFRESH = 2;
 
   useEffect(() => {
-    latest.current = { spawns, hazards, selection, tool, previewTime, gizmoEnabled, model, activeFloor, showModel, layerVisibility, onSelect, onPlace, onTransform, onModelPick, onModelStatus, onUrlExpired };
+    latest.current = { markers, selection, tool, placeKind, gizmoEnabled, model, activeFloor, floors, showModel, layerVisibility, onSelect, onPlace, onTransform, onModelPick, onModelStatus, onUrlExpired };
     themeRef.current = resolved;
   });
 
@@ -102,15 +103,15 @@ export default function EditorViewport({ ref, spawns, hazards, selection, tool, 
     }
     const controller = new EditorSceneController(host, {
       onSelect: (selection) => latest.current.onSelect(selection),
-      onPlace: (kind, position) => latest.current.onPlace(kind, position),
-      onTransform: (kind, index, next, phase) => latest.current.onTransform(kind, index, next, phase),
+      onPlace: (kind, point) => latest.current.onPlace(kind, point),
+      onTransform: (ref, next, phase) => latest.current.onTransform(ref, next, phase),
       onModelPick: (pick) => latest.current.onModelPick(pick),
       onContextLost: () => setLost(true),
       onContextRestored: () => setLost(false),
     }, themeRef.current);
     controllerRef.current = controller;
     const p = latest.current;
-    controller.setInputs({ spawns: p.spawns, hazards: p.hazards, selection: p.selection, tool: p.gizmoEnabled || p.tool === "select" || p.tool.startsWith("place") ? p.tool : "select", previewTime: p.previewTime });
+    controller.setInputs({ markers: p.markers, selection: p.selection, tool: p.gizmoEnabled || p.tool === "select" || p.tool === "place" ? p.tool : "select", placeKind: p.placeKind });
     return () => {
       controller.dispose();
       if (controllerRef.current === controller) controllerRef.current = null;
@@ -120,11 +121,12 @@ export default function EditorViewport({ ref, spawns, hazards, selection, tool, 
   useEffect(() => { controllerRef.current?.setTheme(resolved); }, [resolved, remount]);
 
   useEffect(() => {
-    const effective = gizmoEnabled || tool === "select" || tool.startsWith("place") ? tool : "select";
-    controllerRef.current?.setInputs({ spawns, hazards, selection, tool: effective, previewTime });
-  }, [spawns, hazards, selection, tool, previewTime, gizmoEnabled, remount]);
+    const effective = gizmoEnabled || tool === "select" || tool === "place" ? tool : "select";
+    controllerRef.current?.setInputs({ markers, selection, tool: effective, placeKind });
+  }, [markers, selection, tool, placeKind, gizmoEnabled, remount]);
 
-  useEffect(() => { controllerRef.current?.setFloor(activeFloor); }, [activeFloor, remount, status.phase]);
+  useEffect(() => { if (floors) controllerRef.current?.setFloors(floors); }, [floors, remount]);
+  useEffect(() => { controllerRef.current?.setFloor(activeFloor); }, [activeFloor, floors, remount, status.phase]);
   useEffect(() => { controllerRef.current?.setModelVisible(showModel); }, [showModel, remount, status.phase]);
   useEffect(() => {
     for (const [key, visible] of Object.entries(layerVisibility)) controllerRef.current?.setLayerVisible(key, visible);
@@ -185,7 +187,7 @@ export default function EditorViewport({ ref, spawns, hazards, selection, tool, 
     {unsupported && <div className="se-overlay-full" role="alert">
       <TriangleAlert size={28} aria-hidden="true" />
       <strong>Trình duyệt không bật được WebGL</strong>
-      <p>Bạn vẫn có thể thêm và chỉnh điểm xuất phát, nguy cơ bằng danh sách đối tượng và biểu mẫu tọa độ. Kiểm tra tăng tốc phần cứng của trình duyệt rồi tải lại trang để xem mô hình.</p>
+      <p>Bạn vẫn có thể thêm và chỉnh đối tượng bằng danh sách đối tượng và biểu mẫu tọa độ. Kiểm tra tăng tốc phần cứng của trình duyệt rồi tải lại trang để xem mô hình.</p>
     </div>}
     {lost && <div className="se-overlay-full" role="alert" data-testid="context-lost">
       <TriangleAlert size={28} aria-hidden="true" />
