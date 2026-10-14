@@ -292,7 +292,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
             <TabsTrigger value="scenario">Kịch bản</TabsTrigger>
             <TabsTrigger value="issues" data-testid="tab-issues">Kiểm tra{issueCount > 0 ? ` (${issueCount})` : ""}</TabsTrigger>
             <TabsTrigger value="geometry" data-testid="tab-geometry">Mô hình</TabsTrigger>
-            <TabsTrigger value="kinds" data-testid="tab-kinds">Loại đối tượng</TabsTrigger>
+            <TabsTrigger value="kinds" data-testid="tab-kinds">Khả dụng</TabsTrigger>
           </TabsList>
           <div className="se-panel-scroll">
             <TabsContent value="object"><V1ObjectForm object={selectedObject} issues={issues} actions={actions} geometry={geometry} catalog={catalogView} runtimeVersion={runtimeVersion} pick={pick} onOpenScenario={() => setPanelTab("scenario")} /></TabsContent>

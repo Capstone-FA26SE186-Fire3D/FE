@@ -70,7 +70,7 @@ export function V1Toolbar({ tool, placeKind, onTool, gizmoEnabled, canUndo, canR
         const blocked = placeDisabledReason !== null || placementBlocked(kindStatus[kind]);
         const active = tool === "place" && placeKind === kind;
         return <Button key={kind} type="button" variant={active ? "primary" : "secondary"} size="icon" aria-pressed={active} disabled={blocked} data-testid={`place-${kind}`}
-          aria-label={`Đặt ${KIND_META[kind].label.toLowerCase()}`} title={placeDisabledReason ?? (placementBlocked(kindStatus[kind]) ? `${KIND_META[kind].label}: xem tab “Loại đối tượng”` : `Đặt ${KIND_META[kind].label.toLowerCase()} (bấm lên mô hình)`)}
+          aria-label={`Đặt ${KIND_META[kind].lower}`} title={placeDisabledReason ?? (placementBlocked(kindStatus[kind]) ? `${KIND_META[kind].label}: xem tab “Khả dụng”` : `Đặt ${KIND_META[kind].lower} (bấm lên mô hình)`)}
           onClick={() => onTool("place", kind)}>
           <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
         </Button>;

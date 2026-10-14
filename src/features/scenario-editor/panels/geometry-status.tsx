@@ -15,8 +15,8 @@ export const ifcTabHref = (buildingId: string, revisionId: string) => `${routes.
 export function ReprocessGuide({ buildingId, revisionId }: { buildingId: string; revisionId: string }) {
   return <Alert tone="warning" title="Cần xử lý lại IFC để dùng editor fet3d.editor/1">
     <div className="ops-stack" data-testid="reprocess-guide">
-      <p style={{ margin: 0 }}>Mô hình của revision này được tạo bằng bản xử lý cũ, chưa có tọa độ theo contract nên máy chủ không trả tọa độ hay liên kết tải. Editor không dựng mô hình và không đoán tọa độ.</p>
-      <p style={{ margin: 0 }}>Mở tab IFC của công trình, chạy lại xử lý Geometry cho revision này, rồi quay lại và tải lại trang. Trong lúc chờ, việc tạo bản nháp mới và đặt đối tượng bị khóa.</p>
+      <p style={{ margin: 0 }}>Mô hình của revision được tạo bằng bản xử lý cũ, chưa có tọa độ theo contract nên máy chủ không trả tọa độ hay liên kết tải. Editor không dựng mô hình và không đoán tọa độ.</p>
+      <p style={{ margin: 0 }}>Chạy lại xử lý Geometry cho revision ở tab IFC rồi tải lại trang. Tạo bản nháp mới và đặt đối tượng bị khóa cho đến lúc đó.</p>
       <div><Button asChild variant="secondary" size="sm"><Link href={ifcTabHref(buildingId, revisionId)} data-testid="reprocess-link">Mở tab IFC của công trình</Link></Button></div>
     </div>
   </Alert>;

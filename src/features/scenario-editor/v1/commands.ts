@@ -41,7 +41,7 @@ export function addObjectCommand(draft: JsonObject, id: number, object: NewObjec
       rotation: { ...(object.rotation ?? IDENTITY_QUATERNION) },
     },
   };
-  const command = arrayItemCommand(draft, id, ["objects"], { type: "add", value }, now, `Đặt ${KIND_META[object.kind].label.toLowerCase()}`)!;
+  const command = arrayItemCommand(draft, id, ["objects"], { type: "add", value }, now, `Đặt ${KIND_META[object.kind].lower}`)!;
   return { ...command, selectBefore, selectAfter: at(objects.length) };
 }
 
@@ -49,7 +49,7 @@ export function removeObjectCommand(draft: JsonObject, id: number, index: number
   const objects = readObjects(draft);
   const target = objects[index];
   if (!target) return null;
-  const command = arrayItemCommand(draft, id, ["objects"], { type: "remove", index }, now, `Xóa ${target.kind ? KIND_META[target.kind].label.toLowerCase() : "đối tượng"}`);
+  const command = arrayItemCommand(draft, id, ["objects"], { type: "remove", index }, now, `Xóa ${target.kind ? KIND_META[target.kind].lower : "đối tượng"}`);
   return command ? { ...command, selectBefore: at(index), selectAfter: null } : null;
 }
 

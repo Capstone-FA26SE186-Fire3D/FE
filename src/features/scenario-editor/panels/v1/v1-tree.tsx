@@ -89,8 +89,8 @@ export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, se
             </button></li>;
           })}
         </ul>
-        <Button type="button" variant="quiet" size="sm" className="se-add" data-testid={`add-${kind}`} disabled={blocked} title={addDisabledReason ?? (blocked ? "Xem tab “Loại đối tượng” để biết điều kiện" : undefined)} onClick={() => onAdd(kind)}>
-          <Plus size={14} aria-hidden="true" /> Thêm {KIND_META[kind].label.toLowerCase()}
+        <Button type="button" variant="quiet" size="sm" className="se-add" data-testid={`add-${kind}`} disabled={blocked} title={addDisabledReason ?? (blocked ? "Xem tab “Khả dụng” để biết điều kiện" : undefined)} onClick={() => onAdd(kind)}>
+          <Plus size={14} aria-hidden="true" /> Thêm {KIND_META[kind].lower}
         </Button>
       </section>;
     })}

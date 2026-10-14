@@ -31,3 +31,11 @@ Chỉ lưu kiến thức đã xác minh và cần cho team. Nhật ký lỗi, th
 - **Đừng `git add -A` khi có thư mục công cụ trình duyệt.** `.playwright-mcp/` chứa snapshot có dữ liệu thật (email người dùng) và ảnh chụp; thêm vào ignore trước khi commit. Kiểm `git status` và `git show --stat` trước khi push.
 - **Windows: xóa worktree.** `git worktree remove` có thể để lại thư mục (đường dẫn quá dài, node_modules). Xác nhận git không còn đăng ký worktree rồi xóa bằng PowerShell với tiền tố `\\?\`; sao lưu ghi chú `.codex/local` của worktree trước khi xóa.
 - **Landing — đo hiệu năng:** headless mặc định dùng SwiftShader (~1 FPS) nên không dùng để so FPS; dùng ANGLE D3D11 (`--use-angle=d3d11`) và đo "sync ms" bằng `readPixels`, A/B xen kẽ vì máy dùng chung nhiễu 20–40%. Nút thắt chính là fill-rate theo pixel ratio và overdraw của sprite lửa/khói full-res; pixel ratio thích ứng có hysteresis và lửa instanced trong pass half-res giảm rõ nhất ở màn hình độ phân giải cao, còn ở DPR 1 chỉ khiêm tốn. Giảm bước raymarch của khói tường làm hiện hạt nhiễu, đã hoàn nguyên.
+
+## 2026-10-14 — Editor `fet3d.editor/1`
+
+- **`validate-state` trả `stateHash` trên chuỗi JSON do BE serialize lại (System.Text.Json), không phải chuỗi thô đã gửi.** Ký tự ngoài ASCII và `"`, `&`, `'`, `+`, `<`, `>`, dấu huyền bị thoát thành `\uXXXX`, nên băm `JSON.stringify(body)` không bao giờ khớp khi có tiếng Việt. `v1/hash.ts` tái tạo đúng cách serialize và test có vector đối chiếu với .NET 10; khi đổi, kiểm lại bằng một console project nhỏ.
+- **PUT shape-check của BE bắt cả bản nháp dở dang khi một khối đã có mặt** (rubric thiếu `pass_threshold`, tiêu chí thiếu trọng số, vị trí thiếu quaternion…). Phản chiếu kiểm tra đó ở client và khóa Lưu kèm lý do rẻ hơn một vòng 422; xóa key thay vì gửi chuỗi rỗng/0 khi ô nhập bị xóa.
+- **Gõ liên tiếp hợp nhất vào cùng một mục undo kể cả qua một lần Lưu** (cửa sổ 1,2 s theo `mergeKey`); test "hoàn tác về bản đã lưu" phải đổi sang trường khác hoặc đợi hết cửa sổ.
+- **Playwright `getByRole('tab', { name, exact: true })` hỏng khi nhãn tab có số đếm** ("Kiểm tra (2)"); dùng regex `^Kiểm tra` hoặc `data-testid`.
+- **`Command`/`History` generic theo kiểu selection** (`store/commands.ts`) cho phép dùng chung patch/undo cho editor legacy và v1 mà không ép hai kiểu selection vào nhau.

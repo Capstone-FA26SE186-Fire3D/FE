@@ -15,6 +15,9 @@ import { sha256Hex, serverJson, stateHash } from "../../src/features/scenario-ed
 import { combineIssues, objectIssues, targetOf, toIssues } from "../../src/features/scenario-editor/v1/issues";
 import { applyMatrix, glbToLocal, ifcToGlb, invertAffine, isUnitQuaternion, localToGlb, matrixProblem, near, quaternionToYaw, roundQuaternion, yawToQuaternion } from "../../src/features/scenario-editor/v1/matrix";
 import { completenessIssues, initialStateV1, isV1State, readObjects, shapeIssues } from "../../src/features/scenario-editor/v1/state";
+import { kindAvailability, placementBlocked } from "../../src/features/scenario-editor/v1/availability";
+import { classifyDraft } from "../../src/features/scenario-editor/v1/mode";
+import { floorCeiling, parseFloors, parseLayers } from "../../src/features/scenario-editor/scene/preview-model";
 
 // Evidence level: pure logic against the BE contract fixtures (BE main @ 1eaf988, contracts/editor/v1). No browser, no network.
 
@@ -485,4 +488,64 @@ test("412 comparison works on v1 documents: fields only the server changed are t
   expect((pinned.geometry as JsonObject).artifactId).toBe(ARTIFACT);
   const list = applyCommand(base, addItemCommand(base, nextId(), ["learningObjectives"], "Mục mới", 1, "Thêm mục tiêu", null)!);
   expect((list.learningObjectives as string[]).at(-1)).toBe("Mục mới");
+});
+
+// ───────── mode and availability ─────────
+
+test("draft mode follows the stored state: v1, empty, legacy (never converted) or unsupported", () => {
+  expect(classifyDraft(stateFixture())).toEqual({ mode: "v1", schemaVersion: "fet3d.editor/1" });
+  expect(classifyDraft({})).toEqual({ mode: "empty", schemaVersion: null });
+  expect(classifyDraft({ spawnPoints: [], hazards: [] })).toEqual({ mode: "legacy", schemaVersion: null });
+  expect(classifyDraft({ schemaVersion: "fet3d.editor/2" })).toEqual({ mode: "unsupported", schemaVersion: "fet3d.editor/2" });
+  expect(classifyDraft({ schemaVersion: 1 })).toEqual({ mode: "unsupported", schemaVersion: "" });
+  expect(classifyDraft(null).mode).toBe("unsupported");
+  expect(classifyDraft([]).mode).toBe("unsupported");
+});
+
+test("kind availability comes from real Geometry and the real catalog: no fixed flags, nothing seeded", () => {
+  const geometryInfo = readyGeometry();
+  const base = { geometry: "valid" as const, geometryInfo, catalog: { loading: false, error: false, runtimes: runtimes() }, runtimeVersion: "1.4.0" };
+  const ready = kindAvailability(base);
+  expect(ready.Spawn).toEqual({ state: "ready", capabilities: 0 });
+  expect(ready.Goal).toEqual({ state: "ready", capabilities: 0 });
+  expect(ready.Hazard).toEqual({ state: "ready", capabilities: 1 });
+  expect(ready.Npc).toEqual({ state: "ready", capabilities: 1 });
+  expect(ready.Equipment).toEqual({ state: "ready", capabilities: 1 });
+  expect(ready.BlockedElement).toEqual({ state: "ready", capabilities: 0 });
+  expect(Object.values(ready).some(placementBlocked)).toBe(false);
+
+  // Geometry not usable: every kind waits for it, with the reason.
+  for (const geometry of ["reprocess", "not-ready", "invalid", "loading"] as const) {
+    const blocked = kindAvailability({ ...base, geometry, geometryInfo: null });
+    expect(Object.values(blocked).every((status) => status.state === "needs-geometry")).toBe(true);
+    expect(blocked.Spawn).toEqual({ state: "needs-geometry", geometry });
+  }
+
+  // Empty catalog: capability kinds are blocked and say how many runtimes there are (zero); the others stay available.
+  const empty = kindAvailability({ ...base, catalog: { loading: false, error: false, runtimes: [] }, runtimeVersion: undefined });
+  expect(empty.Hazard).toEqual({ state: "no-capability", runtime: null, runtimes: 0 });
+  expect(placementBlocked(empty.Hazard)).toBe(true);
+  expect(empty.Spawn.state).toBe("ready");
+  // A selected runtime that has no capability for a kind names that runtime.
+  const onlyFire = parseRuntimeCatalog([{ ...catalogSample(), capabilities: ["fire.source"], capabilityContracts: { "fire.source": (catalogSample().capabilityContracts as Record<string, unknown>)["fire.source"] } }]);
+  const partial = kindAvailability({ ...base, catalog: { loading: false, error: false, runtimes: onlyFire } });
+  expect(partial.Npc).toEqual({ state: "no-capability", runtime: "1.4.0", runtimes: 1 });
+  expect(partial.Hazard.state).toBe("ready");
+  // Loading and failed catalogs are not reported as "empty".
+  expect(kindAvailability({ ...base, catalog: { loading: true, error: false, runtimes: [] } }).Hazard.state).toBe("catalog-loading");
+  expect(kindAvailability({ ...base, catalog: { loading: false, error: true, runtimes: [] } }).Hazard.state).toBe("catalog-error");
+  // A blocked element needs an anchor: Geometry without a semantic mapping cannot offer one.
+  const noMapping = kindAvailability({ ...base, geometryInfo: { ...geometryInfo, semantic: [] } });
+  expect(noMapping.BlockedElement).toEqual({ state: "no-anchor" });
+  expect(placementBlocked(noMapping.BlockedElement)).toBe(true);
+});
+
+test("the legacy viewport helpers also understand fet3d.editor/1 metadata (elevationMeters, semanticMapping array) so a legacy draft opened on a v1 revision still gets floors and layers", () => {
+  const meta = geometryMeta();
+  const floors = parseFloors(meta.floors);
+  expect(floors.map((floor) => [floor.key, floor.elevation])).toEqual([["L1", 0], ["L2", 3.5]]);
+  expect(floorCeiling(floors, "L1")).toBe(3.5);
+  const layers = parseLayers(meta.semanticMapping);
+  expect(layers.map((layer) => layer.key).sort()).toEqual(["IfcDoor", "IfcSpace", "IfcStair"]);
+  expect(layers.find((layer) => layer.key === "IfcDoor")!.nodeNames).toEqual(["door_101", "door_102"]);
 });

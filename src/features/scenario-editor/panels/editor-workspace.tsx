@@ -29,7 +29,6 @@ import { useLeaveGuard, useMediaQuery } from "./hooks";
 import { IssuesPanel } from "./issues-panel";
 import { LegacyBanner } from "./legacy-banner";
 import { LegacyKinds } from "./kind-availability";
-import { ReprocessGuide } from "./geometry-status";
 import { ObjectForm } from "./object-form";
 import { ScenarioForm } from "./scenario-form";
 import { SceneTree } from "./scene-tree";
@@ -77,10 +76,10 @@ export function EditorWorkspace({ accessToken, buildingId, scenarioId, editor }:
   const floors = useMemo(() => parseFloors(preview.preview?.floors), [preview.preview?.floors]);
   const modelLayers = modelStatus.phase === "loaded" ? modelStatus.info.layers : [];
   const modelInfo = modelStatus.phase === "loaded" ? modelStatus.info : null;
-  const floorsNote = modelInfo?.floorsOutsideModel ? "Cao độ tầng nằm ngoài khung của mô hình; đơn vị hoặc trục chưa được BE#54 chốt nên không cắt theo tầng." : null;
+  const floorsNote = modelInfo?.floorsOutsideModel ? "Cao độ tầng nằm ngoài khung của mô hình nên không cắt theo tầng." : null;
 
   const model: ModelRequest | null = preview.phase === "ready" && preview.preview?.downloadUrl
-    ? { key: `${preview.preview.artifactId ?? "artifact"}:${preview.nonce}`, url: preview.preview.downloadUrl, expiresAt: preview.preview.expiresAt, coordinateTransform: preview.preview.coordinateTransform, floors, semanticMapping: preview.preview.semanticMapping }
+    ? { key: `${preview.preview.artifactId ?? "artifact"}:${preview.nonce}`, url: preview.preview.downloadUrl, expiresAt: preview.preview.expiresAt, coordinateTransform: preview.preview.coordinateTransform, floors, semanticMapping: preview.preview.semanticMapping, applyTransform: false }
     : null;
 
   const markers = useMemo<MarkerInput[]>(() => [
@@ -174,8 +173,9 @@ export function EditorWorkspace({ accessToken, buildingId, scenarioId, editor }:
     modelLayers={modelLayers} layerVisibility={layerVisibility} onLayer={(key, visible) => setLayerVisibility((current) => ({ ...current, [key]: visible }))}
     modelVisible={modelVisible} onModelVisible={setModelVisible} hasModel={modelStatus.phase === "loaded"} />;
 
-  const previewBanner = preview.phase === "reprocess" && meta
-    ? <ReprocessGuide buildingId={buildingId} revisionId={meta.revisionId} />
+  // The legacy banner already carries the reprocess guide (from the floors endpoint); the preview says the same, so it is not shown twice.
+  const previewBanner = preview.phase === "reprocess"
+    ? null
     : preview.phase === "not-ready"
     ? <Alert tone="warning" title="Mô hình 3D chưa sẵn sàng" action={<div className="se-banner-actions"><span>Trạng thái revision: {preview.preview?.revisionStatus ?? "?"}. Tự kiểm tra lại mỗi vài giây{preview.attempts >= 24 ? " (đã dừng, hãy thử lại)" : ""}. Bạn vẫn đặt được đối tượng bằng tọa độ.</span><Button type="button" size="sm" variant="secondary" onClick={preview.refresh}>Kiểm tra lại</Button></div>} />
     : preview.phase === "error"

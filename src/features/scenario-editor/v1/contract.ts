@@ -13,13 +13,13 @@ export type ObjectKind = (typeof OBJECT_KINDS)[number];
 export const CAPABILITY_REQUIRED_KINDS: readonly ObjectKind[] = ["Hazard", "Npc", "Equipment"];
 export const ANCHOR_REQUIRED_KINDS: readonly ObjectKind[] = ["BlockedElement"];
 
-export const KIND_META: Record<ObjectKind, { label: string; plural: string; description: string; idPrefix: string }> = {
-  Spawn: { label: "Điểm xuất phát", plural: "Điểm xuất phát", description: "Nơi người học bắt đầu tình huống.", idPrefix: "spawn" },
-  Hazard: { label: "Nguy cơ", plural: "Nguy cơ", description: "Nguồn nguy cơ; hành vi do năng lực (capability) của runtime quyết định.", idPrefix: "hazard" },
-  Goal: { label: "Mục tiêu", plural: "Mục tiêu", description: "Điểm hoặc cấu kiện người học phải đạt, ví dụ lối ra.", idPrefix: "goal" },
-  Npc: { label: "NPC", plural: "NPC", description: "Nhân vật mô phỏng; hành vi do năng lực của runtime quyết định.", idPrefix: "npc" },
-  BlockedElement: { label: "Cấu kiện bị chặn", plural: "Cấu kiện bị chặn", description: "Cửa hoặc cấu kiện IFC không đi qua được; bắt buộc chọn cấu kiện neo.", idPrefix: "blocked" },
-  Equipment: { label: "Thiết bị", plural: "Thiết bị", description: "Thiết bị hỗ trợ; hành vi do năng lực của runtime quyết định.", idPrefix: "equipment" },
+export const KIND_META: Record<ObjectKind, { label: string; /** Same label inside a sentence ("Thêm nguy cơ"); acronyms keep their case. */ lower: string; plural: string; description: string; idPrefix: string }> = {
+  Spawn: { label: "Điểm xuất phát", lower: "điểm xuất phát", plural: "Điểm xuất phát", description: "Nơi người học bắt đầu tình huống.", idPrefix: "spawn" },
+  Hazard: { label: "Nguy cơ", lower: "nguy cơ", plural: "Nguy cơ", description: "Nguồn nguy cơ; hành vi do năng lực (capability) của runtime quyết định.", idPrefix: "hazard" },
+  Goal: { label: "Điểm đến", lower: "điểm đến", plural: "Điểm đến (Goal)", description: "Điểm hoặc cấu kiện người học phải đạt, ví dụ lối ra.", idPrefix: "goal" },
+  Npc: { label: "NPC", lower: "NPC", plural: "NPC", description: "Nhân vật mô phỏng; hành vi do năng lực của runtime quyết định.", idPrefix: "npc" },
+  BlockedElement: { label: "Cấu kiện bị chặn", lower: "cấu kiện bị chặn", plural: "Cấu kiện bị chặn", description: "Cửa hoặc cấu kiện IFC không đi qua được; bắt buộc chọn cấu kiện neo.", idPrefix: "blocked" },
+  Equipment: { label: "Thiết bị", lower: "thiết bị", plural: "Thiết bị", description: "Thiết bị hỗ trợ; hành vi do năng lực của runtime quyết định.", idPrefix: "equipment" },
 };
 
 export const TRAINING_MODES = ["Learn", "Guided", "Assessment"] as const;

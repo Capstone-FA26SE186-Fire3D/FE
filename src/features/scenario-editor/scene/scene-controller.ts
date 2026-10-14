@@ -721,6 +721,27 @@ export class EditorSceneController {
         const rect = this.renderer.domElement.getBoundingClientRect();
         return { x: rect.left + ((p.x + 1) / 2) * rect.width, y: rect.top + ((1 - p.y) / 2) * rect.height };
       },
+      /** Client pixel of the top centre of a named model node (glTF node name), to drive real picking of model elements in tests. */
+      projectNode: (name: string) => {
+        let found: THREE.Object3D | undefined;
+        this.modelGroup.traverse((object) => { if (!found && object.name === name) found = object; });
+        if (!found) return null;
+        const box = new THREE.Box3().setFromObject(found);
+        const top = new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y - 0.02, (box.min.z + box.max.z) / 2).project(this.camera);
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        return { x: rect.left + ((top.x + 1) / 2) * rect.width, y: rect.top + ((1 - top.y) / 2) * rect.height };
+      },
+      /** Runs the gizmo callbacks as one drag gesture (start, change, end) on the attached marker, in world space. TransformControls itself is not exercised. */
+      simulateDrag: (kind: string, index: number, position: Point3, yawDegrees?: number) => {
+        const marker = this.markers.get(`${kind}:${index}`);
+        if (!marker || this.transform.object !== marker) return false;
+        this.onDraggingChanged({ value: true });
+        marker.position.set(position.x, position.y, position.z);
+        if (yawDegrees !== undefined) marker.rotation.set(0, yawDegrees * DEG, 0);
+        this.onObjectChange();
+        this.onDraggingChanged({ value: false });
+        return true;
+      },
       loseContext: () => loseExt?.loseContext(),
       restoreContext: () => loseExt?.restoreContext(),
       markerPosition: (kind: string, index: number) => this.markers.get(`${kind}:${index}`)?.position.toArray() ?? null,
