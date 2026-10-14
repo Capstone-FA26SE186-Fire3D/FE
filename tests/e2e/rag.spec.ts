@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
 
+// The prototype page exists on a development server only; a production build answers 404 (demo-rag-gate.spec.ts).
+test.skip(process.env.PLAYWRIGHT_SERVER_MODE !== "dev", "/demo/rag is 404 on a production build");
+
 test('upload retains multipart contract and locks concurrent actions', async ({ page }) => {
   let release: () => void = () => {};
   const pending = new Promise<void>(resolve => { release = resolve; });

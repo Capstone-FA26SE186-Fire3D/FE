@@ -7,8 +7,6 @@ import { ApiError } from "@/api/types/common";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { hasFirebaseAuthConfig } from "@/configs/env";
-import { routes } from "@/configs/routes";
-import { useDemoSession } from "@/store/demo-session";
 import { authApi } from "../api";
 import { useAuthSession } from "../auth-session";
 import { postLoginRoute } from "../redirect";
@@ -53,7 +51,6 @@ function FieldError({ message }: { message?: string }) {
 export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const { pendingAction } = useDemoSession();
   const { isAuthenticated, login, loginWithGoogle, completeGoogleOnboarding, ready, register, user } = useAuthSession();
   const [googleOnboarding, setGoogleOnboarding] = useState<{ proof: GoogleOnboardingProof | null; recovery?: boolean } | null>(null);
   const [proofExpired, setProofExpired] = useState(false);
@@ -80,9 +77,7 @@ export function LoginForm() {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const initialStage = useRef(true);
   const sessionNotice = sessionNotices[params.get("notice") ?? ""];
-  const requestedNext = pendingAction?.type === "ask"
-    ? `${routes.learningHub}?article=${encodeURIComponent(pendingAction.slug)}`
-    : params.get("next");
+  const requestedNext = params.get("next");
 
   useEffect(() => {
     if (initialStage.current) { initialStage.current = false; return; }

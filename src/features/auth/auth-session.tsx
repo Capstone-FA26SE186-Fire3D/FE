@@ -6,7 +6,6 @@ import { resetCommandKeys } from "@/api/command-keys";
 import { ApiError } from "@/api/types/common";
 import { routes } from "@/configs/routes";
 import { clearPendingCheckout } from "@/features/billing/pending-payment";
-import { useDemoSession } from "@/store/demo-session";
 import { authApi } from "./api";
 import { signInWithGoogle } from "./firebase";
 import type { AuthUser, RegisterInput, TokenResponse, GoogleLoginResult, GoogleOnboardingInput } from "./types";
@@ -76,7 +75,6 @@ function toMessage(error: unknown) {
 
 export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const { reset: resetDemo, resumePendingAction } = useDemoSession();
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [user, setUser] = useState<AuthUser | null>(null);
   const [pending, setPending] = useState(false);
@@ -90,8 +88,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     setAccessToken(response.accessToken);
     setUser(response.user);
     persistTokens({ accessToken: response.accessToken, refreshToken: response.refreshToken });
-    resumePendingAction();
-  }, [resumePendingAction]);
+  }, []);
 
   const clearSession = useCallback(() => {
     setAccessToken(null);
@@ -197,7 +194,6 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     clearSession();
     forgetAccountBoundData();
     lastUserId.current = null;
-    resetDemo();
     router.replace(routes.home);
     if (!token) return;
     try {
@@ -205,14 +201,13 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     } catch {
       // A local logout must succeed even if an expired token is rejected by the API.
     }
-  }, [accessToken, clearSession, resetDemo, router]);
+  }, [accessToken, clearSession, router]);
 
   const endSession = useCallback(() => {
     clearSession();
     forgetAccountBoundData();
     lastUserId.current = null;
-    resetDemo();
-  }, [clearSession, resetDemo]);
+  }, [clearSession]);
 
   const updateUser = useCallback((nextUser: AuthUser) => {
     setUser(nextUser);

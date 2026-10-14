@@ -115,7 +115,7 @@ export function ItemDetail({ accessToken, itemId, versionParam, onVersion, onBac
       {versions.length === 0
         ? <EmptyState icon={FilePlus2} title="Chưa có phiên bản nào" description="Tạo phiên bản đầu tiên, nhập nội dung rồi xuất bản để tổ chức dùng được." action={<Button size="sm" onClick={() => startNew(null, null)}>Tạo phiên bản</Button>} />
         : <Table caption="Các phiên bản của mục">
-          <thead><tr><th>Phiên bản</th><th>Tên</th><th>Trạng thái</th><th>Xuất bản</th><th aria-label="Thao tác" /></tr></thead>
+          <thead><tr><th>Phiên bản</th><th>Tên</th><th>Trạng thái</th><th>Xuất bản</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
           <tbody>{versions.map((entry) => <tr key={entry.id} data-testid={`version-row-${entry.versionNumber}`}>
             <td className="ops-cell-primary">v{entry.versionNumber}</td>
             <td style={{ overflowWrap: "anywhere", minWidth: 200 }}>{entry.name}</td>

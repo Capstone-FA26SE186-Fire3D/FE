@@ -47,7 +47,7 @@ function IssuesTab({ issues }: { issues: IssueState }) {
         <option value="all">Mọi mức độ</option>
         {severityOrder.map((level) => <option key={level} value={level}>{severityLabel(level).label}</option>)}
       </Select>
-      <label style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--muted)" }}>
+      <label style={{ display: "inline-flex", alignItems: "center", gap: 8, minHeight: 44, fontSize: 13, color: "var(--muted)" }}>
         <input type="checkbox" checked={currentOnly} onChange={(event) => setCurrentOnly(event.target.checked)} />Chỉ lần chạy hiện hành
       </label>
     </div>

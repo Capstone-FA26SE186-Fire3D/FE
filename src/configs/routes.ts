@@ -12,7 +12,6 @@ export const routes = {
   organizations: "/organizations",
   about: "/about",
   download: "/download",
-  rag: "/demo/rag",
   adminOverview: "/admin/overview",
   adminAccounts: "/admin/accounts",
   adminOrganizations: "/admin/organizations",
