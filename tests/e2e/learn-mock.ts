@@ -55,6 +55,9 @@ export function canonicalize(input: string): { provider: string; videoId: string
   return null;
 }
 
+/** learn_fold_text: NFC, lower case, Vietnamese diacritics removed, đ/Đ become d. */
+export const fold = (text: string) => text.normalize("NFC").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\u0111/g, "d");
+
 type Issue = { code: string; path: string; message: string };
 
 export class LearnBackend {
@@ -225,6 +228,43 @@ export class LearnBackend {
     return { issues, content: { kind, title: title!, summary: summary!, coverImageUrl: cover, blocks, situationIds: [...situationIds].sort(), sources: sources.map((entry) => ({ sourceId: entry.sourceId, role: entry.role, locator: entry.locator ?? {} })) } };
   }
 
+  /**
+   * GET /api/learn/posts as the BE implements it (ContentController.Posts + learn_public_gate): `search` is trimmed and must be 2-100 characters,
+   * matched anywhere in title+" "+summary ignoring case and Vietnamese diacritics; `situation` repeats (<=10 slugs of <=120 chars, OR, only ACTIVE
+   * situations match, an unknown slug just matches nothing); `kind` repeats (Article/Tip/Video, OR, case-insensitive); the filters combine with AND.
+   * Only Published posts whose published version is Published appear, newest first (publishedAt desc, id), filters run before paging and `total` is exact.
+   * Invalid values answer 400 VALIDATION_ERROR with `errors` per field; page < 1 or pageSize outside 1-100 answers 400 without `errors`.
+   */
+  private publicList(query: URLSearchParams): Reply {
+    const errors: Record<string, string[]> = {};
+    const rawSearch = query.get("search");
+    const search = rawSearch && rawSearch.trim() ? rawSearch.trim() : null;
+    if (search !== null && (search.length < 2 || search.length > 100)) errors.search = ["search must be 2-100 characters after trimming."];
+    const slugs = [...new Set(query.getAll("situation").filter((value) => value.trim()).map((value) => value.trim()))];
+    if (slugs.length > 10 || slugs.some((value) => value.length > 120)) errors.situation = ["Use at most 10 situation slugs of up to 120 characters."];
+    const kinds: string[] = [];
+    for (const value of query.getAll("kind").filter((item) => item.trim())) {
+      const known = ["Article", "Tip", "Video"].find((kind) => kind.toLowerCase() === value.trim().toLowerCase());
+      if (known) { if (!kinds.includes(known)) kinds.push(known); } else errors.kind = ["kind must be Article, Tip or Video."];
+    }
+    if (Object.keys(errors).length) return { status: 400, json: { status: 400, title: "Learn filters are invalid.", detail: "Kiểm tra các trường được liệt kê.", code: "VALIDATION_ERROR", errors } };
+    const page = Number(query.get("page") ?? 1);
+    const pageSize = Number(query.get("pageSize") ?? 20);
+    if (!Number.isInteger(page) || !Number.isInteger(pageSize) || page < 1 || pageSize < 1 || pageSize > 100) return this.problem(400, "VALIDATION_ERROR", "page >= 1 and pageSize 1-100.");
+    const wanted = search === null ? null : fold(search);
+    const activeSlugs = new Map(this.situations.filter((item) => item.isActive).map((item) => [item.slug, item.id]));
+    const matches = [...this.posts.values()].flatMap((post) => {
+      const version = post.status === "Published" && post.publishedVersionId ? this.versions.get(post.publishedVersionId) : undefined;
+      if (!version || version.status !== "Published") return [];
+      if (kinds.length && !kinds.includes(version.kind)) return [];
+      if (slugs.length && !slugs.some((slug) => activeSlugs.has(slug) && version.situationIds.includes(activeSlugs.get(slug)!))) return [];
+      if (wanted !== null && !fold(`${version.title} ${version.summary}`).includes(wanted)) return [];
+      return [{ post, version }];
+    }).sort((a, b) => Date.parse(b.version.publishedAt!) - Date.parse(a.version.publishedAt!) || a.post.id.localeCompare(b.post.id));
+    const slice = matches.slice((page - 1) * pageSize, page * pageSize);
+    return { status: 200, json: { items: slice.map(({ post, version }) => ({ id: post.id, slug: post.slug, kind: version.kind, title: version.title, summary: version.summary, coverImageUrl: version.coverImageUrl, publishedAt: version.publishedAt })), total: matches.length, page, pageSize } };
+  }
+
   // ---- HTTP ---------------------------------------------------------------------------------------------------------
 
   private problem(status: number, code: string, title: string, extra: Json = {}): Reply { return { status, json: { status, title, code, ...extra } }; }
@@ -262,15 +302,7 @@ export class LearnBackend {
 
     // Public reads
     if (method === "GET" && path === "/api/learn/situations") return { status: 200, json: this.situations.filter((item) => item.isActive).sort((a, b) => a.name.localeCompare(b.name)).map(({ id, slug, name, description }) => ({ id, slug, name, description })) };
-    if (method === "GET" && path === "/api/learn/posts") {
-      const slug = query.get("situation");
-      const situation = slug ? this.situations.find((item) => item.slug === slug) : null;
-      const published = [...this.posts.values()].filter((post) => post.status === "Published" && (!slug || (situation && this.versions.get(post.publishedVersionId!)!.situationIds.includes(situation.id))))
-        .sort((a, b) => Date.parse(this.versions.get(b.publishedVersionId!)!.publishedAt!) - Date.parse(this.versions.get(a.publishedVersionId!)!.publishedAt!));
-      const paged = this.page(published, query);
-      if (paged.bad) return this.problem(400, "VALIDATION_ERROR", "page >= 1 and pageSize 1-100.");
-      return { status: 200, json: { items: paged.slice.map((post) => { const v = this.versions.get(post.publishedVersionId!)!; return { id: post.id, slug: post.slug, kind: v.kind, title: v.title, summary: v.summary, coverImageUrl: v.coverImageUrl, publishedAt: v.publishedAt }; }), total: paged.total, page: paged.page, pageSize: paged.pageSize } };
-    }
+    if (method === "GET" && path === "/api/learn/posts") return this.publicList(query);
     const publicPost = /^\/api\/learn\/posts\/([^/]+)$/.exec(path);
     if (method === "GET" && publicPost) {
       const post = this.bySlug(decodeURIComponent(publicPost[1]));
@@ -479,7 +511,7 @@ export async function installLearnBackend(page: Page, backend: LearnBackend) {
     if (forced) {
       if (forced.applyFirst) backend.handle(method, path, url.searchParams, headers, body);
       if (forced.delayMs) await new Promise((resolve) => setTimeout(resolve, forced.delayMs));
-      return route.fulfill({ status: forced.status, json: forced.json, headers: forced.headers });
+      return route.fulfill({ status: forced.status, json: forced.json, headers: forced.headers }).catch(() => undefined); // the page may have aborted this request meanwhile
     }
     const reply = backend.handle(method, path, url.searchParams, headers, body);
     if (!reply) return route.fallback();

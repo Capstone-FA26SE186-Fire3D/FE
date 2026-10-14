@@ -17,7 +17,7 @@ async function setup(page: Page, who: Actor = "guest", seed: (backend: LearnBack
 const cards = (page: Page) => page.locator(".learn-card");
 
 test.describe("public list", () => {
-  test("shows only Published posts, newest first, with no fake search box", async ({ page }) => {
+  test("shows only Published posts, newest first, with a labelled search box", async ({ page }) => {
     const backend = await setup(page, "guest", (b) => {
       b.seedPost("cu", { title: "Bài cũ", status: "Published" });
       b.seedPost("moi", { title: "Bài mới", status: "Published" });
@@ -29,9 +29,8 @@ test.describe("public list", () => {
     await expect(cards(page)).toHaveCount(2);
     await expect(cards(page).first()).toContainText("Bài mới");
     for (const hidden of ["Bài nháp", "Bài ẩn", "Bài xóa"]) await expect(page.getByText(hidden)).toHaveCount(0);
-    await expect(page.getByRole("searchbox")).toHaveCount(0);
-    await expect(page.getByLabel("Tìm bài Learn")).toHaveCount(0);
-    await expect(page.getByText("sẽ được bổ sung khi máy chủ hỗ trợ")).toBeVisible();
+    await expect(page.getByRole("searchbox", { name: "Tìm bài Learn" })).toBeVisible();
+    await expect(page.getByText("sẽ được bổ sung khi máy chủ hỗ trợ")).toHaveCount(0);
     expect(backend.calls.every((call) => !call.headers.authorization)).toBe(true); // anonymous reads
   });
 
@@ -46,7 +45,7 @@ test.describe("public list", () => {
     await expect(cards(page)).toHaveCount(0);
   });
 
-  test("filters by ONE situation through the API and keeps it in the URL", async ({ page }) => {
+  test("filters by situation through the API (several = OR) and keeps it in the URL", async ({ page }) => {
     const backend = await setup(page, "guest", (b) => {
       const a = b.seedSituation("chay-nha", "Cháy trong nhà");
       const c = b.seedSituation("thang-may", "Thang máy");
@@ -54,31 +53,32 @@ test.describe("public list", () => {
       b.seedPost("p1", { title: "Bài nhà", status: "Published", situationIds: [a.id] });
       b.seedPost("p2", { title: "Bài thang", status: "Published", situationIds: [c.id] });
       b.seedPost("p3", { title: "Bài cả hai", status: "Published", situationIds: [a.id, c.id] });
+      b.seedPost("p4", { title: "Bài không gắn", status: "Published" });
     });
     await page.goto("/learn");
-    await expect(cards(page)).toHaveCount(3);
+    await expect(cards(page)).toHaveCount(4);
     await expect(page.getByRole("button", { name: "Ngừng dùng" })).toHaveCount(0); // only active situations
-    await page.getByRole("button", { name: "Cháy trong nhà" }).click();
+    await page.getByRole("button", { name: "Cháy trong nhà", exact: true }).click();
     await expect(page).toHaveURL(/situation=chay-nha/);
     await expect(cards(page)).toHaveCount(2);
     expect(backend.callsTo("GET", /^\/api\/learn\/posts$/).at(-1)!.search).toContain("situation=chay-nha");
     await page.reload();
-    await expect(page.getByRole("button", { name: "Cháy trong nhà" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Cháy trong nhà", exact: true })).toHaveAttribute("aria-pressed", "true");
     await expect(cards(page)).toHaveCount(2);
-    await page.getByRole("button", { name: "Thang máy" }).click();
-    await expect(cards(page)).toHaveCount(2);
-    await page.getByRole("button", { name: "Tất cả" }).click();
+    await page.getByRole("button", { name: "Thang máy", exact: true }).click();
     await expect(cards(page)).toHaveCount(3);
+    await page.getByRole("button", { name: "Tất cả", exact: true }).click();
+    await expect(cards(page)).toHaveCount(4);
   });
 
   test("an empty situation and an unknown situation explain themselves", async ({ page }) => {
     await setup(page, "guest", (b) => { b.seedSituation("trong", "Tình huống trống"); b.seedPost("p", { status: "Published" }); });
     await page.goto("/learn?situation=trong");
-    await expect(page.getByRole("heading", { name: "Chưa có bài trong tình huống này" })).toBeVisible();
-    await page.getByRole("button", { name: "Xem tất cả bài" }).click();
+    await expect(page.getByRole("heading", { name: "Không có bài khớp bộ lọc" })).toBeVisible();
+    await page.locator(".learn-state").getByRole("button", { name: "Xóa bộ lọc" }).click();
     await expect(cards(page)).toHaveCount(1);
     await page.goto("/learn?situation=khong-ton-tai");
-    await expect(page.getByRole("heading", { name: "Chưa có bài trong tình huống này" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Không có bài khớp bộ lọc" })).toBeVisible();
   });
 
   test("pagination: page in the URL, reload recovers, out-of-range page is explained", async ({ page }) => {
@@ -280,7 +280,7 @@ for (const width of [1440, 375]) {
         b.addBookmark("them-0");
         b.externalLifecycle(b.bySlug("them-0")!.id, "Hidden");
       });
-      for (const path of ["/learn", "/learn?situation=chay-nha", "/learn/dai", "/learning-hub"]) {
+      for (const path of ["/learn", "/learn?situation=chay-nha", "/learn?search=chay&kind=Video", "/learn/dai", "/learning-hub"]) {
         await page.goto(path);
         await expect(page.locator("main, .learning-main").first()).toBeVisible();
         await page.waitForTimeout(600);
