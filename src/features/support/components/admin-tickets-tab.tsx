@@ -15,7 +15,7 @@ import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { accountsApi } from "@/features/accounts/api";
 import { formatDateTime } from "@/utils/date-range";
 import { supportApi } from "../api";
-import { priorityLabel, priorityOptions, priorityTone, ticketStatusLabel, ticketStatusOptions, ticketStatusTone } from "../labels";
+import { organizationName, personName, priorityLabel, priorityOptions, priorityTone, ticketStatusLabel, ticketStatusOptions, ticketStatusTone } from "../labels";
 import { AdminTicketPanel } from "./admin-ticket-panel";
 import { errorText } from "./ticket-thread";
 import { PendingBox } from "./pending-box";
@@ -71,9 +71,9 @@ export function AdminTicketsTab({ accessToken, myId }: { accessToken: string; my
     {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách ticket" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{errorText(list.error, "Hãy kiểm tra kết nối rồi thử lại.")}</Alert>}
 
     <Table caption="Danh sách ticket hỗ trợ">
-      <thead><tr><th>Ticket</th><th>Trạng thái</th><th>Ưu tiên</th><th>Phụ trách</th><th>Cập nhật</th></tr></thead>
+      <thead><tr><th>Ticket</th><th>Người gửi</th><th>Trạng thái</th><th>Ưu tiên</th><th>Phụ trách</th><th>Cập nhật</th></tr></thead>
       <tbody>
-        {list.loading && !list.data && <TableMessage colSpan={5}><SkeletonRows rows={6} label="Đang tải danh sách ticket…" /></TableMessage>}
+        {list.loading && !list.data && <TableMessage colSpan={6}><SkeletonRows rows={6} label="Đang tải danh sách ticket…" /></TableMessage>}
         {items.map((ticket) => <tr key={ticket.id}>
           <td>
             <button type="button" className={styles.rowButton} onClick={() => open(ticket.id)} aria-label={`Mở ticket ${ticket.ticketNumber}: ${ticket.subject}`}>
@@ -81,12 +81,13 @@ export function AdminTicketsTab({ accessToken, myId }: { accessToken: string; my
               <span className="ops-cell-sub">{ticket.ticketNumber}</span>
             </button>
           </td>
+          <td><span className={styles.clipSmall}>{personName(ticket.createdBy)}</span><span className="ops-cell-sub">{organizationName(ticket.organization)}</span></td>
           <td><StatusBadge tone={ticketStatusTone(ticket.status)}>{ticketStatusLabel(ticket.status)}</StatusBadge></td>
           <td><StatusBadge tone={priorityTone(ticket.priority)}>{priorityLabel(ticket.priority)}</StatusBadge></td>
           <td>{nameOf(ticket.assignedTo)}</td>
           <td>{formatDateTime(ticket.updatedAt)}</td>
         </tr>)}
-        {list.data && !items.length && <TableMessage colSpan={5}><EmptyState icon={filtering ? Search : Inbox} title={filtering ? "Không có ticket phù hợp." : "Chưa có ticket nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Ticket do học viên và tổ chức gửi sẽ xuất hiện ở đây."} /></TableMessage>}
+        {list.data && !items.length && <TableMessage colSpan={6}><EmptyState icon={filtering ? Search : Inbox} title={filtering ? "Không có ticket phù hợp." : "Chưa có ticket nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Ticket do học viên và tổ chức gửi sẽ xuất hiện ở đây."} /></TableMessage>}
       </tbody>
     </Table>
     {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
@@ -94,9 +95,8 @@ export function AdminTicketsTab({ accessToken, myId }: { accessToken: string; my
     <PendingBox
       title="Chưa có từ backend"
       items={[
-        "Người tạo và tổ chức của ticket (response chỉ có mã ticket, nội dung, trạng thái); hiện chỉ lọc được theo tổ chức.",
-        "Tên hiển thị của người gửi tin nhắn (chỉ có authorId).",
-        "Tệp đính kèm và thông báo email/push khi có phản hồi.",
+        "Tệp đính kèm: API hỗ trợ chỉ nhận văn bản thuần.",
+        "Thông báo email/push khi có phản hồi: API hỗ trợ chưa gửi thông báo.",
       ]}
     />
 

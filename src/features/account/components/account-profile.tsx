@@ -17,6 +17,7 @@ import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import { authApi } from "@/features/auth/api";
 import { useAuthSession } from "@/features/auth/auth-session";
+import { GoogleLinkPanel } from "./google-link-panel";
 import type { AuthUser, UserGender } from "@/features/auth/types";
 import { organizationsApi } from "@/features/organizations/api";
 import type { OrganizationProfile } from "@/features/organizations/types";
@@ -267,7 +268,7 @@ export function AccountProfile() {
         </fieldset></form>
       </Panel>}
 
-      <Panel title="Bảo mật" description="Đổi mật khẩu sẽ thu hồi mọi phiên Fire3D, sau đó bạn sẽ đăng nhập lại.">
+      {displayUser?.hasLocalLogin !== false && <Panel title="Bảo mật" description="Đổi mật khẩu sẽ thu hồi mọi phiên Fire3D, sau đó bạn sẽ đăng nhập lại.">
         <form onSubmit={changePassword} noValidate className="ops-stack">
           <Field label="Mật khẩu hiện tại" required error={fieldError("password", "currentPassword")}>{(p) => <PasswordInput {...p} className="ops-input" visibilityLabel="mật khẩu hiện tại" autoComplete="current-password" required maxLength={128} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />}</Field>
           <Field label="Mật khẩu mới" required error={passwordErrors.newPassword ?? fieldError("password", "newPassword")}>{(p) => <PasswordInput {...p} className="ops-input" visibilityLabel="mật khẩu mới" autoComplete="new-password" required minLength={6} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />}</Field>
@@ -275,7 +276,9 @@ export function AccountProfile() {
           {errorAlert("password")}
           <div><Button type="submit" disabled={saving.password}>{saving.password ? "Đang đổi mật khẩu…" : "Đổi mật khẩu"}</Button></div>
         </form>
-      </Panel>
+      </Panel>}
+
+      {accessToken && displayUser && <GoogleLinkPanel accessToken={accessToken} profile={displayUser} onReload={reloadKeepingInput("password")} onProfileChange={(next, etag) => { setProfile(next); setProfileEtag(etag ?? (next.profileRevision ? `"${next.profileRevision}"` : null)); updateUser(next); }} />}
 
       <div><Button variant="secondary" onClick={() => void logout()}><LogOut size={16} aria-hidden="true" />Đăng xuất</Button></div>
     </div>

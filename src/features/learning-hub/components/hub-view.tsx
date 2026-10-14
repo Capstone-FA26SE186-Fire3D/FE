@@ -14,6 +14,7 @@ import { useAuthSession } from "@/features/auth/auth-session";
 import { useAsyncData } from "@/api/use-async-data";
 import { learnApi } from "@/features/learn/api";
 import { isPostSlug } from "@/features/learn/slug";
+import { TraineeSupport } from "@/features/support/components/trainee-support";
 import { useDemoSession } from "@/store/demo-session";
 import { demoAnswer } from "../demo-answer";
 import { SavedPosts } from "./saved-posts";
@@ -22,6 +23,7 @@ const views = [
   { key: "saved", label: "Bài đã lưu", icon: "archive-book" },
   { key: "questions", label: "Hỏi đáp", icon: "message-question" },
   { key: "history", label: "Lịch sử", icon: "clock" },
+  { key: "support", label: "Hỗ trợ", icon: "send-2" },
   { key: "profile", label: "Hồ sơ", icon: "user" },
 ] as const satisfies ReadonlyArray<{ key: string; label: string; icon: IconsaxName }>;
 
@@ -122,6 +124,7 @@ export function HubView() {
           {chat.length ? <ul>{[...chat].reverse().map((item) => <li key={item.id}><Link href={`/learning-hub?view=questions${item.articleSlug ? "&article=" + item.articleSlug : ""}#exchange-${item.id}`} onClick={() => setQuestion("")}>{item.question}<span>{item.articleTitle ?? (item.articleSlug ? "Bài đọc" : "Hỏi đáp chung")}</span></Link><time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString("vi-VN")}</time></li>)}</ul> : <p>Chưa có câu hỏi trong phiên.</p>}
           <div className="learning-reset">{confirmReset ? <><p role="alert">Xóa lịch sử hỏi đáp minh họa trong tab này? Bài đã lưu của bạn trên máy chủ không bị ảnh hưởng.</p><Button variant="quiet" onClick={() => { reset(); setConfirmReset(false); }}>Xác nhận xóa dữ liệu demo</Button><Button variant="ghost" onClick={() => setConfirmReset(false)}>Hủy</Button></> : <Button variant="quiet" onClick={() => setConfirmReset(true)}>Xóa dữ liệu demo</Button>}</div>
         </section>}
+        {view === "support" && <PublicOpsScope><TraineeSupport /></PublicOpsScope>}
         {view === "profile" && <PublicOpsScope><AccountProfile /></PublicOpsScope>}
       </main>
     </div>

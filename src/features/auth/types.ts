@@ -11,6 +11,9 @@ export type AuthUser = {
   phoneNumber?: string | null;
   avatarUrl?: string | null;
   profileRevision?: number;
+  /** Reported by GET /api/auth/me. Absent on older responses; treat as unknown, never as false. */
+  hasLocalLogin?: boolean;
+  googleLinked?: boolean;
   role: UserRole;
   organizationId: string | null;
 };
@@ -79,3 +82,8 @@ export type RegisterInput =
       organizationAddress: string;
       organizationPhoneNumber: string;
     });
+
+// POST /api/me/link-google and POST /api/me/password. The Firebase idToken and passwords are request-only values.
+export type GoogleLinkInput = { idToken: string; currentPassword: string };
+export type GoogleLinkResult = { user: AuthUser; alreadyLinked: boolean; requiresLogin: boolean; etag: string | null };
+export type SetLocalPasswordInput = { idToken: string; newPassword: string };

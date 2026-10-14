@@ -17,6 +17,18 @@ export type OrganizationProfile = Organization & {
   profileRevision: number;
 };
 
+/** `GET /api/organizations/{id}` (PlatformAdmin): profile fields plus counts, all optional on older deployments. */
+export type OrganizationDetail = Organization & {
+  address?: string | null;
+  phoneNumber?: string | null;
+  profileRevision?: number;
+  buildingCount?: number;
+  accountCount?: number;
+};
+
+/** Admin PATCH: omitted fields keep their value; null or empty is rejected by the API, so only send what changed. */
+export type AdminUpdateOrganizationInput = { name?: string; address?: string; phoneNumber?: string };
+
 export type UpdateOrganizationProfileInput = {
   name: string;
   address: string | null;

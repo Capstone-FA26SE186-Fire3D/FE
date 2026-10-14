@@ -167,7 +167,7 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
       <tbody>
         {list.loading && !list.data && <TableMessage colSpan={4}><SkeletonRows rows={6} label="Đang tải danh sách tài khoản…" /></TableMessage>}
         {items.map((account) => <tr key={account.id}>
-          <td><button type="button" className="ops-cell-primary" style={{ border: 0, background: "none", padding: 0, textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => void openDetail(account.id)}>{account.fullName || account.email}<span className="ops-cell-sub">{account.email}</span></button></td>
+          <td><button type="button" className="ops-cell-primary" style={{ border: 0, background: "none", padding: 0, textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => void openDetail(account.id)}>{account.fullName || account.username || account.email}<span className="ops-cell-sub">{account.username ? `@${account.username} · ${account.email}` : account.email}</span></button></td>
           <td>{roleLabel(account.role)}</td>
           <td>{statusBadge(account)}</td>
           <td className="ops-cell-actions"><Button size="sm" variant="quiet" onClick={() => setToggling(account)} aria-label={`${account.isActive ? "Khóa" : "Mở"} ${account.email}`}>{account.isActive ? "Khóa" : "Mở"}</Button></td>
@@ -181,6 +181,7 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
       footer={selected && <Button variant={selected.isActive ? "secondary" : "primary"} onClick={() => setToggling(selected)}><UserCog size={16} aria-hidden="true" />{selected.isActive ? "Vô hiệu hóa" : "Kích hoạt"}</Button>}>
       {selected && <dl className="ops-stack" style={{ margin: 0 }}>
         <div><dt className="ops-field-hint">Vai trò</dt><dd style={{ margin: 0 }}>{roleLabel(selected.role)}</dd></div>
+        {selected.username && <div><dt className="ops-field-hint">Tên người dùng</dt><dd style={{ margin: 0 }}>{selected.username}</dd></div>}
         <div><dt className="ops-field-hint">Trạng thái</dt><dd style={{ margin: 0 }}>{statusBadge(selected)}</dd></div>
         {selected.organizationId && <div><dt className="ops-field-hint">Tổ chức</dt><dd style={{ margin: 0 }}>{orgName(selected.organizationId) ?? selected.organizationId}</dd></div>}
         <div><dt className="ops-field-hint">Đăng nhập gần nhất</dt><dd style={{ margin: 0 }}>{formatDate(selected.lastLoginAt)}</dd></div>

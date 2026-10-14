@@ -15,7 +15,7 @@ import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { buildRange, formatDateTime, MAX_RANGE_DAYS } from "@/utils/date-range";
 import { supportApi } from "../api";
 import { auditActions, isGuid } from "../labels";
-import type { AuditLog } from "../types";
+import { AuditDetail } from "./audit-detail";
 import { PendingBox } from "./pending-box";
 import { errorText } from "./ticket-thread";
 import styles from "./support.module.css";
@@ -70,32 +70,10 @@ function Filters({ initial, onApply, onClear, busy }: { initial: FilterValues; o
   </form>;
 }
 
-function AuditDetail({ log, onFilter }: { log: AuditLog; onFilter: (patch: Partial<FilterValues>) => void }) {
-  const rows: Array<[string, string, Partial<FilterValues> | null]> = [
-    ["Thời điểm", formatDateTime(log.createdAt), null],
-    ["Hành động", log.action, { action: log.action }],
-    ["Loại đối tượng", log.targetEntity ?? "—", null],
-    ["Mã đối tượng", log.targetId ?? "—", log.targetId ? { targetId: log.targetId } : null],
-    ["Mã người thực hiện", log.userId ?? "Hệ thống / không xác định", log.userId ? { actorId: log.userId } : null],
-    ["Mã tổ chức", log.organizationId ?? "—", log.organizationId ? { organizationId: log.organizationId } : null],
-    ["Mã correlation", log.correlationId ?? "—", log.correlationId ? { correlationId: log.correlationId } : null],
-    ["Mã bản ghi", log.id, null],
-  ];
-  return <div className="ops-stack">
-    <Alert tone="info">Nhật ký chỉ lưu metadata: ai làm gì, trên đối tượng nào, lúc nào. Không có nội dung thay đổi, mật khẩu hay token.</Alert>
-    <dl className={styles.meta}>
-      {rows.map(([label, value, filter]) => <div key={label} style={{ display: "contents" }}>
-        <dt>{label}</dt>
-        <dd><span className={label.startsWith("Mã") ? styles.mono : undefined}>{value}</span>{filter && <> <Button size="sm" variant="quiet" onClick={() => onFilter(filter)} aria-label={`Lọc theo ${label.toLowerCase()}`} style={{ minHeight: 28, padding: "0 8px", marginLeft: 6 }}>Lọc</Button></>}</dd>
-      </div>)}
-    </dl>
-  </div>;
-}
-
 export function AuditLogTab({ accessToken }: { accessToken: string }) {
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const values = Object.fromEntries(FILTER_KEYS.map((key) => [key, get(key)])) as FilterValues;
-  const [selected, setSelected] = useState<AuditLog | null>(null);
+  const logId = get("log");
 
   const invalid = validate(values);
   const blocked = Object.keys(invalid).length > 0;
@@ -139,21 +117,21 @@ export function AuditLogTab({ accessToken }: { accessToken: string }) {
       <tbody>
         {list.loading && !list.data && !blocked && <TableMessage colSpan={5}><SkeletonRows rows={6} label="Đang tải nhật ký audit…" /></TableMessage>}
         {!blocked && items.map((log) => <tr key={log.id}>
-          <td><button type="button" className={styles.rowButton} onClick={() => setSelected(log)} aria-label={`Xem bản ghi ${log.action} lúc ${formatDateTime(log.createdAt)}`}>{formatDateTime(log.createdAt)}</button></td>
+          <td><button type="button" className={styles.rowButton} onClick={() => setParams({ log: log.id, page })} aria-label={`Xem bản ghi ${log.action} lúc ${formatDateTime(log.createdAt)}`}>{formatDateTime(log.createdAt)}</button></td>
           <td><StatusBadge tone="neutral">{log.action}</StatusBadge></td>
           <td>{log.targetEntity ?? "—"}<span className={`ops-cell-sub ${styles.mono}`} title={log.targetId ?? undefined}>{short(log.targetId)}</span></td>
-          <td><span className={styles.mono} title={log.userId ?? undefined}>{short(log.userId)}</span></td>
-          <td><span className={styles.mono} title={log.organizationId ?? undefined}>{short(log.organizationId)}</span></td>
+          <td>{log.actorDisplayName?.trim() ? <><span className={styles.clipSmall}>{log.actorDisplayName}</span><span className={`ops-cell-sub ${styles.mono}`} title={log.userId ?? undefined}>{short(log.userId)}</span></> : <span className={styles.mono} title={log.userId ?? undefined}>{log.userId ? short(log.userId) : "Hệ thống"}</span>}</td>
+          <td>{log.organizationName?.trim() ? <><span className={styles.clipSmall}>{log.organizationName}</span><span className={`ops-cell-sub ${styles.mono}`} title={log.organizationId ?? undefined}>{short(log.organizationId)}</span></> : <span className={styles.mono} title={log.organizationId ?? undefined}>{short(log.organizationId)}</span>}</td>
         </tr>)}
         {list.data && !blocked && !items.length && <TableMessage colSpan={5}><EmptyState icon={filtering ? Search : ScrollText} title={filtering ? "Không có bản ghi phù hợp." : "Chưa có bản ghi audit trong khoảng thời gian này"} description={filtering ? "Thử nới bộ lọc hoặc mở rộng khoảng thời gian (tối đa 90 ngày)." : "Chọn khoảng thời gian rộng hơn để xem thêm."} /></TableMessage>}
       </tbody>
     </Table>
     {total > PAGE_SIZE && !blocked && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
 
-    <PendingBox title="Chưa có từ backend" items={["Tên hiển thị của người thực hiện và tổ chức (nhật ký chỉ trả mã).", "Giá trị cũ/mới của thay đổi và lý do hỗ trợ khi admin thao tác thay tổ chức (nhật ký đọc dữ liệu cá nhân chưa triển khai).", "Xuất nhật ký ra tệp."]} />
+    <PendingBox title="Chưa có từ backend" items={["Xuất nhật ký ra tệp.", "Lý do hành động dạng văn bản tự do: chỉ biết có hay không, không hiển thị nội dung."]} />
 
-    <Drawer open={selected !== null} onOpenChange={(value) => { if (!value) setSelected(null); }} title="Chi tiết bản ghi audit" description="Chỉ metadata; dùng nút Lọc để lần theo cùng người thực hiện, đối tượng hoặc correlation.">
-      {selected && <AuditDetail log={selected} onFilter={(patch) => { setSelected(null); apply({ ...values, ...patch }); }} />}
+    <Drawer open={Boolean(logId)} onOpenChange={(value) => { if (!value) setParams({ log: null, page }); }} title="Chi tiết bản ghi audit" description="Metadata và các trường thay đổi được phép; dùng nút Lọc để lần theo cùng người thực hiện, đối tượng hoặc correlation.">
+      {logId && <AuditDetail key={logId} id={logId} accessToken={accessToken} onFilter={(patch) => { const next = { ...values, ...patch }; setParams({ ...Object.fromEntries(FILTER_KEYS.map((key) => [key, next[key]])), log: null }); }} />}
     </Drawer>
   </>;
 }
