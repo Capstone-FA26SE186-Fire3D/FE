@@ -51,8 +51,8 @@ export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, se
       {floors.length === 0
         ? <p className="se-note" data-testid="floors-empty">{geometryNote ?? "Chưa có dữ liệu tầng (cần Geometry hợp lệ)."}</p>
         : <ul className="se-chips" role="radiogroup" aria-label="Chọn tầng">
-          <li><button type="button" role="radio" aria-checked={activeFloor === null} className="se-chip" onClick={() => onFloor(null)}>Tất cả</button></li>
-          {[...floors].sort((a, b) => a.elevationMeters - b.elevationMeters).map((floor) => <li key={floor.id}>
+          <li role="none"><button type="button" role="radio" aria-checked={activeFloor === null} className="se-chip" onClick={() => onFloor(null)}>Tất cả</button></li>
+          {[...floors].sort((a, b) => a.elevationMeters - b.elevationMeters).map((floor) => <li role="none" key={floor.id}>
             <button type="button" role="radio" aria-checked={activeFloor === floor.id} className="se-chip" onClick={() => onFloor(floor.id)} title={`Cao độ ${fmt(floor.elevationMeters)} m · mã ${floor.id}`}>
               {floor.name}<small>{fmt(floor.elevationMeters)} m</small>
             </button>

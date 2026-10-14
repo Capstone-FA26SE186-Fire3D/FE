@@ -184,7 +184,7 @@ export function QuotationsSection({ accessToken }: { accessToken: string }) {
     <div className="bill-row"><p className="bill-muted">Báo giá của mọi tổ chức. Phát hành báo giá nháp để tổ chức chấp nhận và thanh toán; hủy báo giá chưa thanh toán khi cần.</p><Button variant="quiet" onClick={list.reload} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />Tải lại</Button></div>
     {list.error !== undefined && <Alert tone="danger" title="Không tải được báo giá" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert>}
     <Table className="bill-table" caption="Báo giá của mọi tổ chức">
-      <thead><tr><th>Báo giá</th><th>Tổ chức</th><th>Trạng thái</th><th>Hiệu lực đến</th><th className="bill-money">Tổng thanh toán</th><th aria-label="Thao tác" /></tr></thead>
+      <thead><tr><th>Báo giá</th><th>Tổ chức</th><th>Trạng thái</th><th>Hiệu lực đến</th><th className="bill-money">Tổng thanh toán</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
       <tbody>
         {list.loading && !list.data && <TableMessage colSpan={6}><SkeletonRows rows={5} label="Đang tải báo giá…" /></TableMessage>}
         {items.map((item) => <tr key={item.id}>

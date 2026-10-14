@@ -233,7 +233,7 @@ export function EnterpriseAdminSection({ accessToken }: { accessToken: string })
     <p className="bill-muted">Yêu cầu báo giá số lượng lớn của các tổ chức. Xử lý: đánh dấu đã liên hệ, phân công, trả lời, tạo báo giá nháp cho tổ chức hoặc đóng. Không bước nào tự thu tiền hay cấp dịch vụ.</p>
     {list.error !== undefined && <Alert tone="danger" title="Không tải được yêu cầu" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert>}
     <Table className="bill-table" caption="Yêu cầu báo giá số lượng lớn">
-      <thead><tr><th>Tổ chức</th><th>Nhu cầu</th><th>Liên hệ</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr></thead>
+      <thead><tr><th>Tổ chức</th><th>Nhu cầu</th><th>Liên hệ</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
       <tbody>
         {list.loading && !list.data && <TableMessage colSpan={5}><SkeletonRows rows={4} label="Đang tải yêu cầu…" /></TableMessage>}
         {items.map((item) => <tr key={item.id} data-testid="enterprise-row">

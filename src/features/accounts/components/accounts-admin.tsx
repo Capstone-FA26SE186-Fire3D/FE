@@ -164,11 +164,11 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
     {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tài khoản" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{describeApiError(list.error, "Không tải được danh sách tài khoản. Hãy thử lại sau.")}</Alert>}
 
     <Table caption="Danh sách tài khoản">
-      <thead><tr><th>Tài khoản</th><th>Vai trò</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr></thead>
+      <thead><tr><th>Tài khoản</th><th>Vai trò</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
       <tbody>
         {list.loading && !list.data && <TableMessage colSpan={4}><SkeletonRows rows={6} label="Đang tải danh sách tài khoản…" /></TableMessage>}
         {items.map((account) => <tr key={account.id}>
-          <td><button type="button" className="ops-cell-primary" style={{ border: 0, background: "none", padding: 0, textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => void openDetail(account.id)}>{account.fullName || account.username || account.email}<span className="ops-cell-sub">{account.username ? `@${account.username} · ${account.email}` : account.email}</span></button></td>
+          <td><button type="button" className="ops-cell-primary" style={{ border: 0, background: "none", textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => void openDetail(account.id)}>{account.fullName || account.username || account.email}<span className="ops-cell-sub">{account.username ? `@${account.username} · ${account.email}` : account.email}</span></button></td>
           <td>{roleLabel(account.role)}</td>
           <td>{statusBadge(account)}</td>
           <td className="ops-cell-actions"><Button size="sm" variant="quiet" onClick={() => setToggling(account)} aria-label={`${account.isActive ? "Khóa" : "Mở"} ${account.email}`}>{account.isActive ? "Khóa" : "Mở"}</Button></td>

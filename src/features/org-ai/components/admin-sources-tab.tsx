@@ -150,7 +150,7 @@ function SourceForm({ accessToken, onCreated, onClose }: { accessToken: string; 
       {(props) => <Input {...props} value={form.sourceHash} onChange={set("sourceHash")} autoComplete="off" spellCheck={false} className="font-mono" />}
     </Field>
     <Field label="Tính SHA-256 từ tệp" hint={hashing ?? "Chỉ tính cục bộ; tệp không rời trình duyệt."}>
-      {(props) => <input {...props} type="file" onChange={(event) => void hashFile(event.target.files?.[0])} />}
+      {(props) => <Input {...props} type="file" onChange={(event) => void hashFile(event.target.files?.[0])} />}
     </Field>
     <Field label="Liên kết tham chiếu (https)" hint="Không chứa tài khoản/mật khẩu. Tùy chọn." error={show("$.sourceUri", "sourceUri")}>{(props) => <Input {...props} type="url" value={form.sourceUri} onChange={set("sourceUri")} placeholder="https://" autoComplete="off" />}</Field>
     <div className={styles.grid2}>

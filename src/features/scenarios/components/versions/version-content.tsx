@@ -17,7 +17,7 @@ const operatorLabel: Record<string, string> = { gte: "≥", lte: "≤", eq: "=" 
 
 function JsonBlock({ title, value }: { title: string; value: unknown }) {
   return <details>
-    <summary style={{ cursor: "pointer", minHeight: 32, color: "var(--muted)", fontSize: 13 }}>{title}</summary>
+    <summary style={{ cursor: "pointer", minHeight: 44, color: "var(--muted)", fontSize: 13 }}>{title}</summary>
     <pre className="ver-code" tabIndex={0} aria-label={`${title} (JSON, chỉ đọc)`}>{JSON.stringify(value, null, 2) ?? "null"}</pre>
   </details>;
 }

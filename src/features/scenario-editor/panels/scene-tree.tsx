@@ -54,8 +54,8 @@ export function SceneTree({ floors, floorsNote, activeFloor, onFloor, spawns, ha
       {floors.length === 0
         ? <p className="se-note" data-testid="floors-empty">{hasModel ? "Mô hình chưa kèm dữ liệu tầng, hiển thị toàn bộ." : "Chưa có dữ liệu tầng (cần mô hình đã xử lý)."}</p>
         : <ul className="se-chips" role="radiogroup" aria-label="Chọn tầng">
-          <li><button type="button" role="radio" aria-checked={activeFloor === null} className="se-chip" onClick={() => onFloor(null)}>Tất cả</button></li>
-          {floors.map((floor) => <li key={floor.key}>
+          <li role="none"><button type="button" role="radio" aria-checked={activeFloor === null} className="se-chip" onClick={() => onFloor(null)}>Tất cả</button></li>
+          {floors.map((floor) => <li role="none" key={floor.key}>
             <button type="button" role="radio" aria-checked={activeFloor === floor.key} className="se-chip" onClick={() => onFloor(floor.key)} title={floor.elevation !== null ? `Cao độ ${fmt(floor.elevation)} m` : undefined}>
               {floor.name}{floor.elevation !== null && <small>{fmt(floor.elevation)} m</small>}
             </button>

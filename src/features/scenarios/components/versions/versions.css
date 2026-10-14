@@ -54,10 +54,15 @@
 @media (max-width: 1279px) { .ver-journey-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 639px) { .ver-journey-list { grid-template-columns: minmax(0, 1fr); } }
 
-@media (max-width: 1023px) {
-  .ver-gates { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 1279px) {
+  /* With the 248px sidebar a 300px history column leaves the content too narrow to read: stack instead. */
   .ver-layout { grid-template-columns: minmax(0, 1fr); }
 }
+@media (max-width: 1023px) {
+  .ver-gates { grid-template-columns: minmax(0, 1fr); }
+}
+/* A status label wraps inside its card rather than pushing the page wider. */
+.ver-gate .ops-badge, .ver-gates .ops-badge, .ver-journey-step .ops-badge, .ver-actions-row .ops-badge { max-width: 100%; white-space: normal; }
 @media (max-width: 767px) {
   .ver-compare { grid-template-columns: minmax(0, 1fr); }
   .ver-dl { grid-template-columns: minmax(0, 1fr); gap: 2px; }

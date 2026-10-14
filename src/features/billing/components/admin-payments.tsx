@@ -139,7 +139,7 @@ export function PaymentsSection({ accessToken }: { accessToken: string }) {
 
     {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách thanh toán" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert>}
     <Table className="bill-table" caption={kind === "checkouts" ? "Checkout PayOS" : "Yêu cầu thanh toán PayOS"}>
-      <thead><tr><th>Tạo lúc</th><th>Báo giá</th><th>Tổ chức</th><th className="bill-money">Số tiền</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr></thead>
+      <thead><tr><th>Tạo lúc</th><th>Báo giá</th><th>Tổ chức</th><th className="bill-money">Số tiền</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
       <tbody>
         {list.loading && !list.data && <TableMessage colSpan={6}><SkeletonRows rows={5} label="Đang tải thanh toán…" /></TableMessage>}
         {items.map((item) => <tr key={`${item.checkoutId}:${item.paymentRequestId}`} data-testid="ledger-row" data-checkout-status={item.checkoutStatus ?? ""} data-payment-status={item.paymentStatus ?? ""} data-provisioning-status={item.provisioningStatus}>

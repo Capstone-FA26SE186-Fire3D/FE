@@ -260,7 +260,7 @@ function EditorBody({ accessToken, initialPost, initialVersion, tab, onTab, onBa
       extraTabs={[
         { value: "versions", label: "Phiên bản", content: <Panel title="Phiên bản" description="Bản đã xuất bản bất biến; mỗi lần sửa nội dung tạo một bản nháp mới. Chọn một phiên bản để mở." bodyClassName="ops-stack">
           <Table caption="Các phiên bản của bài">
-            <thead><tr><th>Phiên bản</th><th>Trạng thái</th><th>Tiêu đề</th><th>ETag</th><th>Cập nhật</th><th aria-label="Thao tác" /></tr></thead>
+            <thead><tr><th>Phiên bản</th><th>Trạng thái</th><th>Tiêu đề</th><th>ETag</th><th>Cập nhật</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
             <tbody>{versions.map((item) => <tr key={item.id}>
               <td className="ops-cell-primary">v{item.versionNumber}</td>
               <td><span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}><StatusBadge tone={versionStatusView[item.status].tone}>{versionStatusView[item.status].label}</StatusBadge>{post.data.publishedVersionId === item.id && <StatusBadge tone="ember">Đang công khai</StatusBadge>}{version?.data.id === item.id && <StatusBadge tone="info">Đang mở</StatusBadge>}</span></td>

@@ -122,7 +122,7 @@ export function EnterpriseSection({ accessToken, defaultEmail, defaultName, onOp
     <Panel title="Yêu cầu đã gửi" bodyClassName="ops-stack">
       {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert>}
       <Table caption="Yêu cầu báo giá số lượng lớn đã gửi">
-        <thead><tr><th>Yêu cầu</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr></thead>
+        <thead><tr><th>Yêu cầu</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
         <tbody>
           {list.loading && !list.data && <TableMessage colSpan={3}><SkeletonRows rows={3} label="Đang tải yêu cầu…" /></TableMessage>}
           {items.map((item) => <tr key={item.id}>
