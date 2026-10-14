@@ -8,6 +8,7 @@ export const routes = {
   traineeDashboard: "/dashboard/trainee",
   organizationDashboard: "/dashboard/organization",
   learningHub: "/learning-hub",
+  learningHubSupport: "/learning-hub?view=support",
   organizations: "/organizations",
   about: "/about",
   download: "/download",

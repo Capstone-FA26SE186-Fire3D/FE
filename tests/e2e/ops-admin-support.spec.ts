@@ -257,7 +257,7 @@ test.describe("admin support inbox", () => {
     fail = false;
     await page.getByRole("button", { name: "Thử lại" }).click();
     await expect(page.getByText("Chưa có ticket nào")).toBeVisible();
-    await expect(page.getByRole("region", { name: "Chưa có từ backend" })).toContainText("Người tạo và tổ chức của ticket");
+    await expect(page.getByRole("region", { name: "Chưa có từ backend" })).toContainText("Tệp đính kèm");
   });
 
   test("feedback tab updates status with If-Match and handles 412 without losing the choice", async ({ page }) => {
@@ -267,6 +267,7 @@ test.describe("admin support inbox", () => {
     await mockAdminLookups(page);
     await page.route("**/api/admin/support/tickets?*", (route) => route.fulfill({ json: page1([]) }));
     await page.route("**/api/admin/feedback?*", (route) => route.fulfill({ json: page1([feedback]) }));
+    await page.route("**/api/admin/feedback/f-1", (route) => route.fulfill({ headers: { ETag: '"support-1"' }, json: feedback }));
     await page.route("**/api/admin/feedback/f-1/status", async (route) => {
       patches.push({ ifMatch: await route.request().headerValue("if-match"), body: route.request().postDataJSON() });
       if (patches.length === 1) return route.fulfill({ status: 412, json: { code: "PRECONDITION_FAILED" } });
@@ -319,10 +320,11 @@ test.describe("audit log", () => {
     await expect(page.getByText("Chỉ metadata").first()).toBeVisible();
     expect(queries[0].has("from")).toBe(false);
     expect(queries[0].has("to")).toBe(false);
+    await page.route("**/api/admin/audit-logs/a-1", (route) => route.fulfill({ json: { ...log, changes: [] } }));
     await page.getByRole("button", { name: /Xem bản ghi Update/ }).click();
     const drawer = page.getByRole("dialog", { name: "Chi tiết bản ghi audit" });
-    await expect(drawer.getByText("Nhật ký chỉ lưu metadata")).toBeVisible();
-    await drawer.getByRole("button", { name: "Lọc theo mã người thực hiện" }).click();
+    await expect(drawer.getByText("Chỉ hiển thị metadata")).toBeVisible();
+    await drawer.getByRole("button", { name: "Lọc theo người thực hiện" }).click();
     await expect(page).toHaveURL(/actorId=11111111-1111-4111-8111-111111111111/);
   });
 

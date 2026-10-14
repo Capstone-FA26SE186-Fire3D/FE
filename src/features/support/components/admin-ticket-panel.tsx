@@ -11,7 +11,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
 import { formatDateTime } from "@/utils/date-range";
 import { supportApi } from "../api";
-import { allowedTicketTransitions, priorityLabel, priorityOptions, priorityTone, ticketStatusLabel, ticketStatusTone } from "../labels";
+import { allowedTicketTransitions, organizationName, personName, priorityLabel, priorityOptions, priorityTone, ticketStatusLabel, ticketStatusTone } from "../labels";
 import type { AdminTicketUpdate, TicketPriority, TicketStatus } from "../types";
 import { errorText, MessageComposer, MessageList, useTicketDetail } from "./ticket-thread";
 import styles from "./support.module.css";
@@ -85,6 +85,8 @@ export function AdminTicketPanel({ ticketId, accessToken, myId, admins, onChange
     <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 600, overflowWrap: "anywhere" }}>{ticket.subject}</h3>
     <p className={styles.description}>{ticket.description}</p>
     <dl className={styles.meta} style={{ marginTop: 12 }}>
+      <dt>Người gửi</dt><dd>{personName(ticket.createdBy)}{ticket.createdBy?.email && <span className="ops-cell-sub">{ticket.createdBy.email}</span>}</dd>
+      <dt>Tổ chức</dt><dd>{organizationName(ticket.organization)}</dd>
       <dt>Tạo lúc</dt><dd>{formatDateTime(ticket.createdAt)}</dd>
       <dt>Cập nhật</dt><dd>{formatDateTime(ticket.updatedAt)}</dd>
       {ticket.resolvedAt && <><dt>Giải quyết</dt><dd>{formatDateTime(ticket.resolvedAt)}</dd></>}
@@ -113,7 +115,7 @@ export function AdminTicketPanel({ ticketId, accessToken, myId, admins, onChange
 
     <section className={styles.section} aria-label="Trao đổi">
       <h3>Trao đổi ({state.messageTotal})</h3>
-      <MessageList messages={messages} empty="Chưa có tin nhắn nào. Gửi tin đầu tiên để phản hồi người tạo ticket." label={(authorId) => authorId === myId ? { name: "Bạn", mine: true } : admins.some((admin) => admin.id === authorId) ? { name: admins.find((admin) => admin.id === authorId)?.name ?? "Quản trị viên", mine: true } : { name: "Người dùng", mine: false }} />
+      <MessageList messages={messages} empty="Chưa có tin nhắn nào. Gửi tin đầu tiên để phản hồi người tạo ticket." label={(item) => item.authorId === myId ? { name: "Bạn", mine: true } : admins.some((admin) => admin.id === item.authorId) ? { name: admins.find((admin) => admin.id === item.authorId)?.name ?? "Quản trị viên", mine: true } : { name: item.author ? personName(item.author) : "Người dùng", mine: false }} />
       <MessageComposer
         ticketId={ticket.id}
         disabledReason={ticket.status === "Closed" ? "Ticket đã đóng. Đổi trạng thái về “Mới” và lưu để tiếp tục trao đổi." : undefined}
