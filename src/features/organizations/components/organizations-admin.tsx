@@ -151,11 +151,11 @@ export function OrganizationsAdmin() {
     {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tổ chức" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>Hãy kiểm tra kết nối rồi thử lại.</Alert>}
 
     <Table caption="Danh sách tổ chức">
-      <thead><tr><th>Tổ chức</th><th>Trạng thái</th><th>Tạo lúc</th><th aria-label="Thao tác" /></tr></thead>
+      <thead><tr><th>Tổ chức</th><th>Trạng thái</th><th>Tạo lúc</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
       <tbody>
         {list.loading && !list.data && <TableMessage colSpan={4}><SkeletonRows rows={6} label="Đang tải danh sách tổ chức…" /></TableMessage>}
         {items.map((organization) => <tr key={organization.id}>
-          <td><button type="button" className="ops-cell-primary" style={{ border: 0, background: "none", padding: 0, textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => openDetail(organization.id)}>{organization.name}<span className="ops-cell-sub">{organization.slug}</span></button></td>
+          <td><button type="button" className="ops-cell-primary" style={{ border: 0, background: "none", textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => openDetail(organization.id)}>{organization.name}<span className="ops-cell-sub">{organization.slug}</span></button></td>
           <td>{statusBadge(organization)}</td>
           <td>{formatDate(organization.createdAt)}</td>
           <td className="ops-cell-actions">

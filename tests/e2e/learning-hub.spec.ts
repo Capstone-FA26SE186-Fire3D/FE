@@ -62,7 +62,7 @@ test("Q&A and history say why they are unavailable, offer next steps and show no
   await expect(page.getByLabel("Câu hỏi trong Góc học tập")).toHaveCount(0);
   await expect(page.getByRole("log")).toHaveCount(0);
   await expect(page.getByText(/minh họa|soạn sẵn|mô phỏng/i)).toHaveCount(0);
-  await expect(page.getByRole("link", { name: /^Hỏi đáp/ })).toContainText("chưa khả dụng");
+  await expect(page.getByRole("link", { name: /^Hỏi đáp/ })).toContainText(/chưa khả dụng/i);
 
   await page.getByRole("link", { name: /^Lịch sử/ }).click();
   await expect(page).toHaveURL(/view=history/);

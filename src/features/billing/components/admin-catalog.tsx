@@ -130,7 +130,7 @@ export function PackagesSection({ accessToken }: { accessToken: string }) {
     {noPolicies && <Alert tone="info" title="Chưa có chính sách quota">Gói có quota AI cần một phiên bản chính sách quota. Tạo ở tab “Chính sách quota” trước; gói không kèm quota (0) không cần chính sách.</Alert>}
     {noneSellable && <Alert tone="warning" title="Chưa có gói nào đủ điều kiện bán">Tổ chức chỉ mua được gói v7 đã cấu hình đủ (6/12 tháng, số học viên, quota/chính sách). Gói cũ hiển thị “Không bán”. Sửa gói hoặc tạo gói mới.</Alert>}
     <Table className="bill-table" caption="Danh sách gói dịch vụ">
-      <thead><tr><th>Gói</th><th className="bill-money">Đơn giá/tháng</th><th>Thời hạn</th><th className="bill-money">Học viên/kỳ</th><th>Quota AI</th><th>Bán hàng</th><th aria-label="Thao tác" /></tr></thead>
+      <thead><tr><th>Gói</th><th className="bill-money">Đơn giá/tháng</th><th>Thời hạn</th><th className="bill-money">Học viên/kỳ</th><th>Quota AI</th><th>Bán hàng</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
       <tbody>
         {list.loading && !list.data && <TableMessage colSpan={7}><SkeletonRows rows={4} label="Đang tải gói…" /></TableMessage>}
         {items.map((item) => <tr key={item.id} data-testid="package-row" data-purchasable={String(item.isPurchasable)}>
@@ -254,7 +254,7 @@ export function DiscountsSection({ accessToken }: { accessToken: string }) {
     <div className="bill-row"><p className="bill-muted">Mỗi báo giá áp dụng một quy tắc có mức giảm lớn nhất, không cộng dồn. Phần trăm làm tròn VND ở máy chủ.</p><div className="ops-actions"><Button variant="quiet" onClick={list.reload} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />Tải lại</Button><Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo quy tắc</Button></div></div>
     {list.error !== undefined && <Alert tone="danger" title="Không tải được quy tắc giảm giá" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert>}
     <Table className="bill-table" caption="Quy tắc giảm giá">
-      <thead><tr><th>Quy tắc</th><th>Mức giảm</th><th>Điều kiện</th><th>Hiệu lực</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr></thead>
+      <thead><tr><th>Quy tắc</th><th>Mức giảm</th><th>Điều kiện</th><th>Hiệu lực</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
       <tbody>
         {list.loading && !list.data && <TableMessage colSpan={6}><SkeletonRows rows={4} label="Đang tải quy tắc…" /></TableMessage>}
         {items.map((item) => <tr key={item.id}>

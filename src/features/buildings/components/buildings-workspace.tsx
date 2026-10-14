@@ -222,7 +222,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
 
     {view === "table"
       ? <Table caption="Danh sách công trình">
-        <thead><tr><th>Công trình</th><th>Loại</th><th>Số tầng</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr></thead>
+        <thead><tr><th>Công trình</th><th>Loại</th><th>Số tầng</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
         <tbody>
           {loading && !data && <TableMessage colSpan={5}><SkeletonRows rows={5} label="Đang tải danh sách công trình…" /></TableMessage>}
           {items.map((building) => <tr key={building.id}>

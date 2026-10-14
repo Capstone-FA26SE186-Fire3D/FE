@@ -131,7 +131,7 @@ export function BillingWorkspace() {
       <TabsContent value="quotes" style={{ marginTop: 16 }}>
         {quotations.error !== undefined && <Alert tone="danger" title={noAccess(quotations.error) ? "Không có quyền xem báo giá" : "Không tải được báo giá"} action={<Button size="sm" variant="secondary" className="mt-3" onClick={quotations.reload}>Thử lại</Button>}>{billingErrorText(quotations.error)}</Alert>}
         <Table className="bill-table" caption="Danh sách báo giá">
-          <thead><tr><th>Báo giá</th><th>Nội dung</th><th>Trạng thái</th><th>Hiệu lực đến</th><th className="bill-money">Tổng thanh toán</th><th aria-label="Thao tác" /></tr></thead>
+          <thead><tr><th>Báo giá</th><th>Nội dung</th><th>Trạng thái</th><th>Hiệu lực đến</th><th className="bill-money">Tổng thanh toán</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
           <tbody>
             {quotations.loading && !quotations.data && <TableMessage colSpan={6}><SkeletonRows rows={5} label="Đang tải báo giá…" /></TableMessage>}
             {items.map((item) => <tr key={item.id}>
@@ -151,7 +151,7 @@ export function BillingWorkspace() {
       <TabsContent value="services" style={{ marginTop: 16 }}>
         {entitlements.error !== undefined && <Alert tone="danger" title="Không tải được dịch vụ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={entitlements.reload}>Thử lại</Button>}>{billingErrorText(entitlements.error)}</Alert>}
         <Table className="bill-table" caption="Kỳ dịch vụ của các công trình">
-          <thead><tr><th>Công trình</th><th>Kỳ dịch vụ</th><th className="bill-money">Học viên (gói gốc)</th><th>Trạng thái</th><th aria-label="Thao tác" /></tr></thead>
+          <thead><tr><th>Công trình</th><th>Kỳ dịch vụ</th><th className="bill-money">Học viên (gói gốc)</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
           <tbody>
             {(entitlements.loading && !entitlements.data) || (buildings.loading && !buildings.data) ? <TableMessage colSpan={5}><SkeletonRows rows={5} label="Đang tải dịch vụ…" /></TableMessage> : null}
             {serviceRows.map(({ buildingId, summary }) => {

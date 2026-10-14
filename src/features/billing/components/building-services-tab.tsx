@@ -155,7 +155,7 @@ export function BuildingServicesTab({ buildingId }: { buildingId: string }) {
       {quotations.loading && !quotations.data && <Skeleton style={{ height: 90 }} />}
       {quotations.data && mine.length === 0 && <EmptyState icon={FileText} title="Chưa có báo giá cho công trình này" description="Tạo báo giá ở bước trên. Sau khi PlatformAdmin phát hành, bạn chấp nhận và thanh toán tại đây." />}
       {mine.length > 0 && <Table className="bill-table" caption="Báo giá của công trình">
-        <thead><tr><th>Báo giá</th><th>Trạng thái</th><th>Hiệu lực đến</th><th className="bill-money">Tổng thanh toán</th><th aria-label="Thao tác" /></tr></thead>
+        <thead><tr><th>Báo giá</th><th>Trạng thái</th><th>Hiệu lực đến</th><th className="bill-money">Tổng thanh toán</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
         <tbody>{mine.map((item) => <tr key={item.id} aria-selected={item.id === selectedId}>
           <td><span className="ops-cell-primary bill-wrap">{item.quotationNumber}<span className="ops-cell-sub">{item.items.some((line) => line.purchaseAction === "Upgrade") ? "Nâng cấp · " : ""}{item.items.length} công trình</span></span></td>
           <td><QuotationStatusBadge status={item.status} /></td>

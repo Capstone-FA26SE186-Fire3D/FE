@@ -6,7 +6,8 @@ import { cn } from "@/utils/cn";
 const visuallyHidden: CSSProperties = { position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap" };
 
 export function Table({ className, caption, children, ...props }: TableHTMLAttributes<HTMLTableElement> & { caption?: string }) {
-  return <div className="ops-table-wrap"><table className={cn("ops-table", className)} {...props}>{caption && <caption style={visuallyHidden}>{caption}</caption>}{children}</table></div>;
+  // Scrolls sideways on narrow screens: a focusable, named region lets keyboard users scroll it.
+  return <div className="ops-table-wrap" role="region" aria-label={caption ?? "Bảng dữ liệu"} tabIndex={0}><table className={cn("ops-table", className)} {...props}>{caption && <caption style={visuallyHidden}>{caption}</caption>}{children}</table></div>;
 }
 
 /** Full-width row for loading / empty / error states inside a table body. */
