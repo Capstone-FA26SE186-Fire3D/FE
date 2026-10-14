@@ -2,8 +2,8 @@ import { expect, test, type Page } from "@playwright/test";
 
 /*
  * Runs against `pnpm dev` (set PLAYWRIGHT_DEV_URL, e.g. http://localhost:5241); skipped otherwise.
- * Evidence type: the prototypes use LOCAL SAMPLE DATA and route-mocked auth. No Learn/Library API exists yet
- * (BE#57), so none of this is integration evidence. Reviews is a real screen now and is tested in admin-scenario-reviews.spec.ts.
+ * Evidence type: the prototype uses LOCAL SAMPLE DATA and route-mocked auth. No Library API exists yet (BE#57), so none of this is
+ * integration evidence. (Reviews: tests/e2e/admin-scenario-reviews.spec.ts; Learn CMS: tests/e2e/learn-cms.spec.ts are real screens.)
  */
 const devUrl = process.env.PLAYWRIGHT_DEV_URL;
 test.skip(!devUrl, "set PLAYWRIGHT_DEV_URL to a running `pnpm dev` server");
@@ -17,13 +17,27 @@ async function signIn(page: Page, user: typeof admin | typeof owner = admin) {
   await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
 }
 
+const apiCalls = (page: Page) => {
+  const calls: string[] = [];
+  page.on("request", (request) => { const { pathname } = new URL(request.url()); if (/^\/api\/.*(library)/i.test(pathname)) calls.push(`${request.method()} ${pathname}`); });
+  return calls;
+};
+
 test("dev shows the prototype banner and the pending blocker together", async ({ page }) => {
   await signIn(page);
-  for (const path of ["/admin/learn", "/admin/library"]) {
+  for (const path of ["/admin/library"]) {
     await page.goto(path);
     await expect(page.getByTestId("pending-module")).toBeVisible();
     await expect(page.getByTestId("prototype-banner")).toContainText("Dữ liệu mẫu · chỉ môi trường phát triển");
   }
+});
+
+test("the library prototype never calls the library API", async ({ page }) => {
+  await signIn(page);
+  const calls = apiCalls(page);
+  await page.goto("/admin/library");
+  await expect(page.getByTestId("prototype-banner")).toBeVisible();
+  expect(calls).toEqual([]);
 });
 
 test("organization users are blocked in dev as well", async ({ page }) => {
@@ -31,98 +45,6 @@ test("organization users are blocked in dev as well", async ({ page }) => {
   await page.goto("/admin/learn");
   await expect(page.getByRole("heading", { name: "Không có quyền truy cập" })).toBeVisible();
   await expect(page.getByTestId("prototype-banner")).toHaveCount(0);
-});
-
-test.describe("learn prototype", () => {
-  test("list, filters and status meaning", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/admin/learn");
-    await page.getByLabel("Trạng thái bài").selectOption("Hidden");
-    await expect(page).toHaveURL(/status=Hidden/);
-    await page.getByRole("button", { name: /An toàn khi nấu ăn/ }).click();
-    await page.getByRole("tab", { name: "Xuất bản" }).click();
-    await expect(page.getByText(/vẫn có thể là nguồn RAG/).first()).toBeVisible();
-  });
-
-  test("video block rejects other providers, shows a link card and never an iframe", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/admin/learn?post=new");
-    await page.getByRole("tab", { name: "Nội dung" }).click();
-    await page.getByLabel("Loại khối").selectOption("video");
-    await page.getByRole("button", { name: "Thêm khối" }).click();
-    await page.getByLabel("Đường dẫn video").fill("https://vimeo.com/123456");
-    await expect(page.getByText("Chỉ chấp nhận video từ YouTube, Facebook hoặc TikTok.")).toBeVisible();
-    await page.getByLabel("Đường dẫn video").fill("https://youtu.be/dQw4w9WgXcQ");
-    await page.getByLabel("Tóm tắt dự phòng").fill("Tóm tắt cách thoát nạn.");
-    const preview = page.getByTestId("media-preview");
-    await expect(preview).toContainText("YouTube");
-    await expect(preview.getByRole("link")).toHaveAttribute("href", "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
-    await expect(page.locator("iframe")).toHaveCount(0);
-  });
-
-  test("create validates the slug, then saves a draft that cannot be published without a situation", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/admin/learn?post=new");
-    await page.getByLabel("Tiêu đề", { exact: true }).fill("Bài thử");
-    await page.getByLabel(/Slug/).fill("Bài Thử!");
-    await page.getByRole("button", { name: "Lưu bản nháp" }).click();
-    await expect(page.getByText(/Slug chỉ gồm chữ thường/).first()).toBeVisible();
-    await page.getByLabel(/Slug/).fill("bai-thu-moi");
-    await page.getByRole("tab", { name: "Nội dung" }).click();
-    await page.getByRole("button", { name: "Thêm khối" }).click();
-    await page.getByRole("textbox", { name: "Nội dung *" }).fill("Đoạn mở đầu.");
-    await page.getByRole("button", { name: "Lưu bản nháp" }).click();
-    await expect(page.getByText("Đã tạo bản nháp")).toBeVisible();
-    await expect(page).toHaveURL(/post=lp-/);
-    await page.getByRole("tab", { name: "Xuất bản" }).click();
-    await page.getByRole("button", { name: "Xuất bản bản nháp" }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Xuất bản", exact: true }).click();
-    await expect(page.getByRole("dialog").getByText("Chọn ít nhất một tình huống")).toBeVisible();
-  });
-
-  test("412 keeps my edit and offers to compare with the newer version", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/admin/learn?status=Published");
-    await page.getByRole("button", { name: /Thoát nạn khi có khói dày/ }).first().click();
-    await page.getByLabel("Tiêu đề", { exact: true }).fill("Tiêu đề tôi vừa sửa");
-    await page.getByRole("button", { name: "Giả lập: người khác sửa bài này" }).click();
-    await page.getByRole("button", { name: "Lưu bản nháp" }).click();
-    await expect(page.getByText("Bài đã được thay đổi ở nơi khác kể từ lần bạn mở").first()).toBeVisible();
-    await expect(page.getByLabel("Tiêu đề", { exact: true })).toHaveValue("Tiêu đề tôi vừa sửa");
-    await expect(page.getByText("Đối chiếu với bản mới nhất")).toBeVisible();
-    await page.getByRole("button", { name: "Giữ nội dung của tôi" }).click();
-    await page.getByRole("button", { name: "Lưu bản nháp" }).click();
-    await expect(page.getByText("Đã lưu bản nháp")).toBeVisible();
-  });
-
-  test("hide, show, delete and restore follow the documented lifecycle", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/admin/learn?status=Published");
-    await page.getByRole("button", { name: /Nhớ nhanh quy tắc PASS/ }).click();
-    await page.getByRole("tab", { name: "Xuất bản" }).click();
-    await page.getByRole("button", { name: "Ẩn bài" }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Ẩn bài" }).click();
-    await expect(page.getByText("Đã ẩn bài", { exact: true })).toBeVisible();
-    await expect(page.getByText("Đã ẩn", { exact: true }).first()).toBeVisible();
-    await page.getByRole("button", { name: "Xóa bài" }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Xóa bài" }).click();
-    await expect(page.getByText("Đã xóa bài", { exact: true })).toBeVisible();
-    await expect(page.getByText("Đã xóa", { exact: true }).first()).toBeVisible();
-    await page.getByRole("button", { name: "Khôi phục" }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Khôi phục" }).click();
-    await expect(page.getByText("Đã khôi phục bài", { exact: true })).toBeVisible();
-    await expect(page.getByText("Đã ẩn", { exact: true }).first()).toBeVisible(); // restored to Hidden, not public
-  });
-
-  test("showing a hidden post with an unapproved source is refused by the (sample) backend", async ({ page }) => {
-    await signIn(page);
-    await page.goto("/admin/learn?status=Unpublished");
-    await page.getByRole("button", { name: /Hỗ trợ người lớn tuổi/ }).click();
-    await page.getByRole("tab", { name: "Xuất bản" }).click();
-    await page.getByRole("button", { name: "Xuất bản bản nháp" }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Xuất bản", exact: true }).click();
-    await expect(page.getByRole("dialog").getByText(/Nguồn chưa được duyệt|nguồn Common chưa được duyệt/)).toBeVisible();
-  });
 });
 
 test.describe("library prototype", () => {
@@ -181,7 +103,7 @@ for (const width of [1440, 375]) {
       await page.setViewportSize({ width, height: width === 375 ? 800 : 900 });
       await page.emulateMedia({ colorScheme: theme });
       await signIn(page);
-      for (const path of ["/admin/learn", "/admin/learn?post=lp-1", "/admin/library"]) {
+      for (const path of ["/admin/library"]) {
         await page.goto(path);
         await expect(page.getByTestId("prototype-banner")).toBeVisible();
         await page.waitForTimeout(700);

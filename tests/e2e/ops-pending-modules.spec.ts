@@ -15,7 +15,6 @@ async function signIn(page: Page, user: typeof admin | typeof owner) {
 }
 
 const modules = [
-  { path: "/admin/learn", heading: "Learn CMS", issue: "issues/57", fakeButtons: ["Tạo bài", "Xuất bản", "Lưu bản nháp"] },
   { path: "/admin/library", heading: "Thư viện tổ chức", issue: "issues/57", fakeButtons: ["Thêm mục", "Tạo phiên bản mới"] },
 ];
 
@@ -45,7 +44,7 @@ for (const mod of modules) {
 test("production pending modules make no Learn/Library API calls", async ({ page }) => {
   await signIn(page, admin);
   const calls: string[] = [];
-  page.on("request", (request) => { if (/^\/api\/.*(admin\/learn|library)/i.test(new URL(request.url()).pathname)) calls.push(request.url()); });
+  page.on("request", (request) => { if (/^\/api\/.*(library)/i.test(new URL(request.url()).pathname)) calls.push(request.url()); });
   for (const mod of modules) { await page.goto(mod.path); await expect(page.getByTestId("pending-module")).toBeVisible(); }
   expect(calls).toEqual([]);
 });
@@ -66,12 +65,12 @@ test("signed-out visitors are sent to sign in, not shown the mod", async ({ page
   await expect(page.getByTestId("pending-module")).toHaveCount(0);
 });
 
-test("admin navigation marks only Learn CMS and Library as waiting for the backend", async ({ page }) => {
+test("admin navigation marks only the Library as waiting for the backend", async ({ page }) => {
   await signIn(page, admin);
-  await page.goto("/admin/learn");
+  await page.goto("/admin/library");
   const nav = page.getByRole("navigation", { name: "Quản trị hệ thống" });
-  for (const label of ["Learn CMS", "Thư viện tổ chức"]) await expect(nav.getByRole("link", { name: new RegExp(label) })).toContainText("Chờ BE");
-  await expect(nav.getByRole("link", { name: /Duyệt kịch bản/ })).not.toContainText("Chờ BE");
+  await expect(nav.getByRole("link", { name: /Thư viện tổ chức/ })).toContainText("Chờ BE");
+  for (const label of ["Duyệt kịch bản", "Learn CMS"]) await expect(nav.getByRole("link", { name: new RegExp(label) })).not.toContainText("Chờ BE");
 });
 
 for (const width of [1440, 375]) {

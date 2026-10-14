@@ -1,4 +1,4 @@
-import { getArticle } from "@/features/learn/data/articles";
+import { isPostSlug } from "@/features/learn/slug";
 import { isQrToken } from "@/features/qr-landing/token";
 import type { AuthUser } from "./types";
 
@@ -26,7 +26,7 @@ function validatedNext(value: string | null): string | null {
     const buildingRoute = /^\/workspace\/buildings\/[a-zA-Z0-9_-]+(?:\/scenarios(?:\/[a-zA-Z0-9_-]+(?:\/versions)?)?)?$/.test(url.pathname);
     // Building QR landing: `/qr/<token>` with a well-formed token only; the return path carries no query or fragment.
     if (/^\/qr\/[^/]+$/.test(url.pathname)) return isQrToken(url.pathname.slice(4)) ? url.pathname : null;
-    if (!allowed.includes(url.pathname) && !adminRoute && !buildingRoute && !(url.pathname.startsWith("/learn/") && getArticle(url.pathname.slice(7)))) return null;
+    if (!allowed.includes(url.pathname) && !adminRoute && !buildingRoute && !(url.pathname.startsWith("/learn/") && isPostSlug(url.pathname.slice(7)))) return null;
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
     return null;
