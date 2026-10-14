@@ -1,0 +1,39 @@
+/* Public Building QR landing (/qr/<token>). Colors come from the .ops-theme tokens (light / dark / system). */
+.qrl-page { display: flex; flex-direction: column; min-height: 100dvh; }
+.qrl-topbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 0 24px; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); }
+.qrl-brand { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; font-weight: 650; font-size: 16px; color: var(--text); }
+.qrl-brand .fet3d-logo--mark .fet3d-logo__asset { width: 34px; height: 34px; }
+.qrl-spacer { flex: 1; }
+.qrl-user { max-width: 200px; overflow: hidden; color: var(--muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.qrl-main { display: grid; align-content: start; gap: 16px; width: 100%; max-width: 760px; margin: 0 auto; padding: 24px 16px 64px; }
+.qrl-main:focus { outline: none; }
+.qrl-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.qrl-state { display: grid; justify-items: center; gap: 10px; padding: 24px 8px; text-align: center; }
+.qrl-state > svg { color: var(--ember); }
+.qrl-state h1 { margin: 0; font-size: clamp(22px, 5vw, 28px); font-weight: 600; letter-spacing: -.02em; }
+.qrl-state p { max-width: 480px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+
+.qrl-building { display: flex; align-items: flex-start; gap: 14px; min-width: 0; }
+.qrl-building > svg { flex: 0 0 auto; margin-top: 4px; color: var(--ember); }
+.qrl-building > div { min-width: 0; }
+.qrl-building h1 { margin: 2px 0 10px; font-size: clamp(22px, 5vw, 30px); font-weight: 600; letter-spacing: -.02em; line-height: 1.2; overflow-wrap: anywhere; }
+.qrl-eyebrow { margin: 0; color: var(--dim); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.qrl-badges, .qrl-modes { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+
+.qrl-trainings { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.qrl-training { display: grid; gap: 8px; min-width: 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-soft); }
+.qrl-training h3 { margin: 0; font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
+.qrl-desc { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; overflow-wrap: anywhere; }
+.qrl-meta { display: grid; gap: 6px; }
+
+.qrl-steps { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; counter-reset: qrl-step; }
+.qrl-steps li { display: flex; align-items: flex-start; gap: 12px; color: var(--muted); font-size: 14px; line-height: 1.55; counter-increment: qrl-step; }
+.qrl-steps li::before { content: counter(qrl-step); display: inline-grid; flex: 0 0 auto; place-items: center; width: 26px; height: 26px; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--ember); font-size: 12px; font-weight: 650; }
+.qrl-steps strong { color: var(--text); }
+.qrl-steps a { color: var(--ember); text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 767px) {
+  .qrl-topbar { padding: 0 16px; }
+  .qrl-user { max-width: 110px; }
+}

@@ -1,0 +1,31 @@
+/* Building QR tab: one-time view, history table and the A4 print sheet. Colors come from the .ops-theme tokens. */
+.qr-issued-body { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: start; }
+.qr-frame { width: fit-content; padding: 12px; border: 1px solid var(--line-strong); border-radius: 12px; background: #fff; }
+.qr-frame svg { display: block; width: min(220px, 100%); height: auto; }
+.ops-panel-body.qr-history { padding: 0; }
+.qr-history > .ops-muted { padding: 16px 20px; }
+.qr-history .ops-table-wrap { border: 0; border-radius: 0 0 12px 12px; }
+.qr-table td { white-space: nowrap; }
+@media (max-width: 767px) {
+  .qr-issued-body { grid-template-columns: minmax(0, 1fr); }
+  .qr-frame { justify-self: center; }
+}
+
+/* Print sheet: hidden on screen, shown alone only while the Print button has set html[data-print-qr]. */
+.qr-print-root { display: none; }
+@page { size: A4; margin: 16mm; }
+@media print {
+  html[data-print-qr], html[data-print-qr] body { background: #fff !important; color: #000 !important; }
+  html[data-print-qr] body > *:not(.qr-print-root) { display: none !important; }
+  html[data-print-qr] .qr-print-root { display: block; }
+  .qr-print-root .qr-sheet { display: grid; justify-items: center; gap: 6mm; max-width: 100%; margin: 0 auto; text-align: center; break-inside: avoid; }
+  .qr-print-root .qr-sheet, .qr-print-root .qr-sheet * { color: #000 !important; background: transparent; font-family: system-ui, "Segoe UI", Arial, sans-serif; }
+  .qr-print-root h1 { margin: 0; font-size: 26pt; line-height: 1.2; overflow-wrap: anywhere; }
+  .qr-print-root h2 { margin: 4mm 0 0; font-size: 16pt; }
+  .qr-print-root p { margin: 0; font-size: 11pt; line-height: 1.45; overflow-wrap: anywhere; }
+  .qr-print-root .qr-sheet-kicker { font-size: 11pt; letter-spacing: .08em; text-transform: uppercase; }
+  .qr-print-root .qr-sheet-label { font-size: 14pt; }
+  .qr-print-root .qr-sheet-code { display: block; width: 90mm; height: 90mm; }
+  .qr-print-root ol { display: grid; gap: 2mm; margin: 0; padding: 0; list-style-position: inside; font-size: 12pt; text-align: left; }
+  .qr-print-root .qr-sheet-note { max-width: 130mm; font-size: 10pt; }
+}

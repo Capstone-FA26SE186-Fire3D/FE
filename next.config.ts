@@ -8,6 +8,17 @@ const devApiProxy = process.env.FET3D_DEV_API_PROXY?.replace(/\/+$/, "");
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  // The Building QR landing URL carries the QR token: keep it out of Referer headers, search indexes and caches.
+  async headers() {
+    return [{
+      source: "/qr/:path*",
+      headers: [
+        { key: "Referrer-Policy", value: "no-referrer" },
+        { key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" },
+        { key: "Cache-Control", value: "no-store" },
+      ],
+    }];
+  },
   async rewrites() {
     return devApiProxy ? [{ source: "/api/:path*", destination: `${devApiProxy}/api/:path*` }] : [];
   },
