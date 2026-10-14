@@ -1,6 +1,7 @@
 import { apiClient } from "@/api/client";
 import { ApiError } from "@/api/types/common";
 import { bool, isRecord, kindOf, list, num, parsePage, parseSituationRef, parseSourceRef, str, strOrNull } from "./parse";
+import { LEARN_LIMITS, type LearnFilterField } from "./query";
 import type { BookmarkItem, PageOf, PublicPost, PublicPostSummary, PublicSituation, PublicVersion } from "./types";
 
 /** Public Learn (`/api/learn/*`, anonymous) and Trainee bookmarks (Bearer). Contract: BE docs/learn-library.md. */
@@ -36,15 +37,25 @@ function parseBookmark(raw: unknown): BookmarkItem | null {
   return { available: false, postId: raw.postId, bookmarkedAt };
 }
 
+export type LearnPostsQuery = { search?: string; situations?: string[]; kinds?: string[]; page: number; pageSize: number };
+
 export const learnApi = {
   async situations(signal?: AbortSignal): Promise<PublicSituation[]> {
     const raw = await apiClient.request<unknown>("/api/learn/situations", { signal });
     return list(raw).flatMap((item) => (isRecord(item) && typeof item.id === "string" ? [{ id: item.id, slug: str(item.slug), name: str(item.name, str(item.slug)), description: strOrNull(item.description) }] : []));
   },
 
-  /** The API takes ONE situation slug and pages; text search, several situations and kind filters are not available yet (BE#79). */
-  async posts(query: { situation?: string; page: number; pageSize: number }, signal?: AbortSignal): Promise<PageOf<PublicPostSummary>> {
-    const raw = await apiClient.request<unknown>("/api/learn/posts", { query: { situation: query.situation || undefined, page: query.page, pageSize: query.pageSize }, signal });
+  /**
+   * `GET /api/learn/posts` (anonymous, Published only, newest first). Filtering happens on the server BEFORE paging and `total` is exact:
+   * `search` (2-100 chars, matched in title+summary ignoring case and Vietnamese diacritics), `situation` and `kind` repeated (OR inside one
+   * filter, AND between filters). Invalid values answer 400 VALIDATION_ERROR with `errors` per field.
+   */
+  async posts(query: LearnPostsQuery, signal?: AbortSignal): Promise<PageOf<PublicPostSummary>> {
+    const search = query.search?.trim();
+    const raw = await apiClient.request<unknown>("/api/learn/posts", {
+      query: { search: search || undefined, situation: query.situations?.length ? query.situations : undefined, kind: query.kinds?.length ? query.kinds : undefined, page: query.page, pageSize: query.pageSize },
+      signal,
+    });
     return parsePage(raw, parseSummary);
   },
 
@@ -82,4 +93,18 @@ export function describeReadError(error: unknown): { status: number | null; titl
     return { status: error.status, title: "Không tải được nội dung", message: `Máy chủ trả lỗi${error.code ? ` (${error.code})` : ` ${error.status}`}. Hãy thử lại.` };
   }
   return { status: null, title: "Không kết nối được tới máy chủ", message: "Hãy kiểm tra kết nối rồi thử lại." };
+}
+
+const FILTER_FIELDS: readonly LearnFilterField[] = ["search", "situation", "kind"];
+const FILTER_MESSAGES: Record<LearnFilterField, string> = {
+  search: `Từ khóa phải có ${LEARN_LIMITS.searchMin}–${LEARN_LIMITS.searchMax} ký tự.`,
+  situation: `Chỉ chọn tối đa ${LEARN_LIMITS.situationMax} tình huống, mỗi mã dài tối đa ${LEARN_LIMITS.situationSlugMax} ký tự.`,
+  kind: "Loại bài chỉ gồm Bài viết, Mẹo hoặc Video.",
+};
+
+/** A 400 from the list: which filter parameters the API rejected (`errors` of the ProblemDetails) and what to tell the reader. */
+export function describeFilterError(error: unknown): { fields: LearnFilterField[]; messages: string[]; code: string } | null {
+  if (!(error instanceof ApiError) || error.status !== 400) return null;
+  const fields = FILTER_FIELDS.filter((field) => error.fieldMessage(field) !== undefined);
+  return { fields, messages: fields.map((field) => FILTER_MESSAGES[field]), code: error.code ?? "400" };
 }
