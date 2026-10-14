@@ -381,3 +381,9 @@ select.ops-input { appearance: none; padding-right: 34px; background-image: line
 /* Compact "Chờ BE" badge so it is never clipped in the sidebar */
 .ops-nav-text .ops-badge { flex: 0 0 auto; min-height: 20px; padding: 0 6px; font-size: 10.5px; }
 .ops-nav-text .ops-badge::before { display: none; }
+
+/* Learning Hub: a capability the server cannot serve yet (reason + what to do now) */
+.hub-unavailable-icon { color: var(--ember); }
+.hub-unavailable-heading { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
+.hub-unavailable-steps { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.hub-unavailable a:not([class]) { color: var(--ember); text-decoration: underline; text-underline-offset: 3px; }

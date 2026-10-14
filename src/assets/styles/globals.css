@@ -127,18 +127,9 @@ button { cursor: pointer; }
 .verification-panel > p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
 .verification-panel .form-field { margin: 0; }
 .verification-status { margin: 14px 0 0; padding: 11px 12px; border-left: 3px solid var(--ember); background: rgba(238,134,84,.09); color: var(--text); font-size: 13px; line-height: 1.5; }
-.hub-layout { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 20px; }
-.hub-main, .hub-side { display: grid; gap: 18px; align-content: start; }
 .hub-card { padding: 23px; }
 .hub-card h2, .hub-card h3 { margin: 0 0 15px; font-size: 20px; letter-spacing: -.04em; }
 .hub-card h3 { font-size: 15px; }
-.chat-bubble { max-width: 90%; margin: 8px 0; padding: 13px 15px; border-radius: 9px; background: var(--bg-soft); color: var(--muted); font-size: 13px; line-height: 1.65; }
-.chat-bubble.user { margin-left: auto; background: rgba(238,134,84,.13); color: var(--text); }
-.chat-input { display: flex; gap: 8px; margin-top: 18px; }
-.chat-input input { flex: 1; min-width: 0; min-height: 43px; padding: 0 12px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-soft); color: var(--text); outline: 0; }
-.chat-input input:focus { border-color: var(--ember); }
-.saved-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; }
-.saved-row:last-child { border-bottom: 0; }
 .status-chip { display: inline-flex; align-items: center; gap: 6px; color: var(--ember); font-size: 11px; }
 .status-chip i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .download-panel { display: grid; grid-template-columns: 1fr .7fr; gap: 50px; align-items: center; padding: 36px; }
@@ -210,7 +201,6 @@ button { cursor: pointer; }
   .login-shell { min-height: auto; padding-top: 25px; }
   .login-panel { padding: 23px; }
   .account-type-options { grid-template-columns: 1fr; }
-  .hub-layout { grid-template-columns: 1fr; }
   .download-panel { padding: 20px; }
   .admin-filters, .workspace-search { grid-template-columns: 1fr; }
   .account-form { grid-template-columns: 1fr; }
@@ -231,30 +221,8 @@ button { cursor: pointer; }
 
 /* Learning and authentication use the existing FET3D dark/ember tokens. */
 .iconsax { display: inline-block; flex: 0 0 auto; vertical-align: middle; background: currentColor; mask: var(--icon-url) center / contain no-repeat; }
-.learning-hub-main { padding-top: 30px; }
-.hub-heading h1 { margin: 0; font-size: clamp(32px, 4vw, 40px); letter-spacing: -.045em; line-height: 1.2; }
-.hub-greeting { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 12px 0 24px; color: var(--muted); }
-.hub-greeting p { margin: 0; overflow-wrap: anywhere; }
-.hub-demo-label { padding: 5px 10px; border: 1px solid rgba(238,134,84,.35); border-radius: 30px; color: var(--ember); font-size: 12px; }
-.hub-tabs { display: none; }
 .hub-card h2, .hub-card h3 { display: flex; align-items: center; gap: 9px; }
 .hub-card h2 .iconsax, .hub-card h3 .iconsax { color: var(--ember); }
-.hub-chat { display: flex; flex-direction: column; height: clamp(330px, calc(100dvh - 320px), 600px); }
-.hub-chat > h2, .hub-chat > p, .hub-context, .hub-chat .chat-input { flex: 0 0 auto; }
-.hub-context { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 10px 0; margin-top: 8px; border-block: 1px solid var(--line); color: var(--muted); font-size: 12px; }
-.hub-context span { flex: 1 1 auto; }
-.hub-context a { color: var(--ember); text-decoration: underline; text-underline-offset: 3px; }
-.hub-conversation { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-wrap: anywhere; padding-block: 12px; }
-.hub-empty { display: grid; justify-items: start; align-content: center; gap: 10px; min-height: 100%; }
-.hub-empty > .iconsax { color: var(--ember); }
-.hub-empty h3, .hub-empty p { margin: 0; }
-.hub-empty p, .hub-side p { color: var(--muted); font-size: 13px; line-height: 1.6; }
-.hub-suggestions { display: flex; flex-wrap: wrap; gap: 8px; }
-.hub-suggestions button, .hub-tabs button { min-height: 40px; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--bg-soft); color: var(--text); text-align: left; font-size: 12px; cursor: pointer; }
-.hub-suggestions button:hover { border-color: var(--ember); background: rgba(238,134,84,.08); }
-.hub-chat .chat-input { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
-.hub-demo-results { margin-top: 20px; padding: 16px 0; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; line-height: 1.65; }
-.hub-demo-results summary { color: var(--text); cursor: pointer; }
 .login-shell { grid-template-columns: minmax(0, .85fr) minmax(0, 1fr); gap: 48px; max-width: 960px; margin-inline: auto; }
 .login-intro h1 { font-size: clamp(30px, 3.5vw, 42px); line-height: 1.15; letter-spacing: -.045em; }
 .login-intro > p { font-size: 14px; line-height: 1.7; }
@@ -265,11 +233,9 @@ button { cursor: pointer; }
 .login-panel > button { width: 100%; margin-top: 10px; }
 .login-panel .account-type-card { min-height: 88px; padding: 12px; gap: 8px; }
 .login-panel [hidden] { display: none; }
-.login-panel button, .hub-layout button, .hub-tabs button, .saved-row, .hub-suggestions button { transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease; }
-.login-panel button:active, .hub-layout button:active, .hub-tabs button:active { transform: translateY(1px); }
-.login-panel button:focus-visible, .hub-layout button:focus-visible, .hub-tabs button:focus-visible, .hub-demo-results summary:focus-visible, .hub-layout a:focus-visible { outline: 2px solid var(--ember); outline-offset: 3px; }
-.chat-bubble { animation: learning-enter 180ms ease-out; }
-@keyframes learning-enter { from { opacity: 0; transform: translateY(3px); } to { opacity: 1; transform: none; } }
+.login-panel button { transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms ease; }
+.login-panel button:active { transform: translateY(1px); }
+.login-panel button:focus-visible { outline: 2px solid var(--ember); outline-offset: 3px; }
 @media (max-width: 900px) {
   .login-shell { grid-template-columns: minmax(0, 1fr); gap: 14px; max-width: 490px; padding-top: 0; }
   .login-panel { padding: 18px; }
@@ -280,19 +246,9 @@ button { cursor: pointer; }
   .login-page-main { align-items: flex-start; padding-top: 14px; }
 }
 @media (max-width: 640px) {
-  .learning-hub-main, .login-page-main { width: calc(100% - 32px); }
-  .learning-hub-main { padding-top: 20px; }
-  .hub-greeting { margin-bottom: 16px; font-size: 13px; }
-  .hub-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-bottom: 14px; }
-  .hub-tabs button { display: flex; justify-content: center; align-items: center; gap: 5px; padding: 8px 4px; text-align: center; }
-  .hub-tabs button[aria-pressed="true"] { border-color: var(--ember); color: var(--ember); background: rgba(238,134,84,.09); }
-  .hub-layout { grid-template-columns: minmax(0, 1fr); gap: 0; }
   .hub-card { padding: 18px; }
   .hub-card h2 { font-size: 18px; }
-  .hub-chat { height: clamp(330px, calc(100dvh - 340px), 600px); }
-  .hub-empty { align-content: start; gap: 8px; }
-  .hub-empty > .iconsax, .hub-empty > p { display: none; }
-  .hub-tab-chat .hub-side, .hub-tab-saved .hub-main, .hub-tab-history .hub-main, .hub-tab-saved .hub-history, .hub-tab-history .hub-saved { display: none; }
+  .login-page-main { width: calc(100% - 32px); }
   .login-panel { padding: 18px; }
   .login-panel .auth-tabs { margin-bottom: 16px; }
   .login-panel .account-type-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -302,8 +258,8 @@ button { cursor: pointer; }
   .login-panel .account-type-radio { grid-column: 2; grid-row: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .login-panel *, .hub-layout *, .hub-tabs * { animation: none !important; transition: none !important; }
-  .login-panel button:active, .hub-layout button:active, .hub-tabs button:active, .account-type-card:hover { transform: none; }
+  .login-panel * { animation: none !important; transition: none !important; }
+  .login-panel button:active, .account-type-card:hover { transform: none; }
 }
 .auth-fields { min-width: 0; padding: 0; margin: 0; border: 0; }
 .form-message button { margin-top: 7px; padding: 0; border: 0; background: transparent; color: var(--text); text-align: left; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font-size: 12px; }
@@ -347,6 +303,7 @@ button { cursor: pointer; }
 .learning-navigation a:hover, .learning-navigation button:hover { background: var(--bg-soft); color: var(--text); }
 .learning-navigation [aria-current="page"] { background: rgba(238,134,84,.1); color: var(--ember); }
 .learning-nav-bottom { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--line); }
+.learning-nav-note { margin-left: auto; color: var(--muted); font-size: 11px; }
 .learning-menu-toggle { display: none; }
 .learning-content { min-width: 0; }
 .learning-topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 100px; padding: 20px 36px; border-bottom: 1px solid var(--line); }
@@ -359,18 +316,6 @@ button { cursor: pointer; }
 .learning-empty > .iconsax { color: var(--ember); }
 .learning-empty h2 { color: var(--text); font-size: 24px; margin: 22px 0 10px; }
 .learning-empty p { margin-bottom: 24px; font-size: 14px; }
-.learning-view-questions { max-width: 1000px; }
-.learning-workspace .hub-chat { height: max(390px, calc(100dvh - 190px)); }
-.learning-workspace .hub-chat > p { margin-bottom: 0; }
-.learning-history ul { list-style: none; margin: 24px 0; padding: 0; }
-.learning-history li { display: flex; justify-content: space-between; gap: 24px; padding: 22px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
-.learning-history li a { min-width: 0; font-size: 15px; }
-.learning-history li span { display: block; font-size: 12px; color: var(--muted); margin-top: 8px; }
-.learning-history time { flex-shrink: 0; color: var(--muted); font-size: 11px; }
-.learning-note { font-size: 12px; color: var(--muted); }
-.learning-reset { margin-top: 32px; }
-.learning-reset p { font-size: 14px; }
-.learning-reset button { margin: 8px 10px 8px 0; }
 .learning-workspace .account-page { max-width: 900px; }
 .learning-workspace .account-heading h1 { font-size: 28px; }
 @media (max-width: 767px) {
@@ -386,9 +331,6 @@ button { cursor: pointer; }
   .learning-topbar h1 { font-size: 22px; }
   .learning-account span { max-width: 115px; font-size: 11px; }
   .learning-main { padding: 20px 16px; }
-  .learning-workspace .hub-chat { height: max(370px, calc(100dvh - 190px)); padding: 16px; }
-  .learning-workspace .hub-empty { align-content: start; }
-  .learning-history li { flex-direction: column; gap: 10px; }
   .learning-empty { padding: 48px 0; }
 }
 @media (prefers-reduced-motion: reduce) {

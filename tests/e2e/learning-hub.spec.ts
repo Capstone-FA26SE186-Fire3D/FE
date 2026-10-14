@@ -2,8 +2,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { installLearnBackend, LearnBackend, signIn, type Actor } from "./learn-mock";
 
 /*
- * Learning Hub + public Learn layout. Bookmarks are REAL (mock backend, learn-mock.ts); the chat/Q&A in the hub is still a
- * prototype with canned answers (F10 waits for BE#77/#78), so its demo labels and sessionStorage history are unchanged.
+ * Learning Hub + public Learn layout. Bookmarks are REAL (mock backend, learn-mock.ts). Q&A and history/results wait for
+ * the Trainee AI and session-list contracts (BE#77/#78), so those views must say "chưa khả dụng" with the reason and next
+ * steps, and must not show a chat, a composer, sample answers or any sample result.
  */
 
 const slug = "doc-khong-gian";
@@ -20,15 +21,11 @@ async function restore(page: Page, who: Actor = "trainee", extra: (backend: Lear
   extra(backend);
   await signIn(page, backend, who);
   await installLearnBackend(page, backend);
-  await page.addInitScript((articleSlug) => {
-    if (!sessionStorage.getItem("hub-fixture-seeded")) sessionStorage.setItem("fire3d-prototype-content", JSON.stringify({ pendingAction: null, chat: [{ id: "previous", question: "Câu hỏi trước đó", articleSlug, articleTitle: "Đọc không gian trước khi hành động", createdAt: "2026-10-05T00:00:00Z" }] }));
-    sessionStorage.setItem("hub-fixture-seeded", "yes");
-  }, slug);
   return backend;
 }
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 980, height: 650 }, { width: 820, height: 650 }, { width: 375, height: 667 }]) {
-  test(`hub and login fit ${viewport.width}px with the composer and Google visible`, async ({ page }, testInfo) => {
+  test(`hub and login fit ${viewport.width}px with the Google visible and the unavailable view fitting`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     await page.goto("/login");
     const google = page.getByRole("button", { name: "Tiếp tục với Google" });
@@ -40,52 +37,64 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 980, height: 650 
 
     await restore(page);
     await page.goto(`/learning-hub?view=questions&article=${slug}`);
-    await expect(page.getByTestId("article-context")).toContainText("Đọc không gian trước khi hành động");
-    const composer = page.getByLabel("Câu hỏi trong Góc học tập");
-    await expect(composer).toBeVisible();
-    const box = await composer.boundingBox();
-    expect(box!.y + box!.height).toBeLessThan(viewport.height);
+    const unavailable = page.getByTestId("capability-unavailable");
+    await expect(unavailable).toContainText("Chưa khả dụng");
+    await expect(page.getByTestId("capability-context")).toContainText("Đọc không gian trước khi hành động");
+    await expect(unavailable.getByRole("link", { name: "Xem trang ứng dụng" })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
     await page.screenshot({ path: testInfo.outputPath(`hub-${viewport.width}.png`), fullPage: true });
-    await composer.fill("Bài này nói về điều gì?");
-    await composer.press("Enter");
-    await expect(page.getByRole("log")).toContainText("Trích đoạn minh họa");
-    await expect(page.getByRole("log").getByRole("link", { name: /Bài được trích/ }).first()).toBeVisible();
     if (viewport.width < 768) await page.getByRole("button", { name: "Mở menu học tập" }).click();
-    await page.getByRole("link", { name: "Lịch sử", exact: true }).click();
-    await page.getByRole("link", { name: /Câu hỏi trước đó/ }).click();
-    await expect(page.getByTestId("article-context")).toContainText("Đang hỏi theo bài");
-    await expect(page.getByRole("log")).toContainText("Câu hỏi trước đó");
+    await page.getByRole("link", { name: /^Lịch sử/ }).click();
+    await expect(page.getByTestId("capability-unavailable")).toContainText("Lịch sử và kết quả cá nhân chưa khả dụng");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
   });
 }
 
-test("the chat keeps its demo labels and is not presented as AI", async ({ page }) => {
+test("Q&A and history say why they are unavailable, offer next steps and show no demo content", async ({ page }) => {
   await restore(page);
   await page.goto("/learning-hub?view=questions");
-  await expect(page.getByText("Câu trả lời soạn sẵn, chưa kết nối AI. Không dùng khi khẩn cấp.")).toBeVisible();
-  await expect(page.getByRole("log", { name: "Hỏi đáp minh họa" })).toBeVisible();
-  await expect(page.getByText("Kết quả mô phỏng mẫu")).toBeVisible();
+  const panel = page.getByTestId("capability-unavailable");
+  await expect(panel).toContainText("Hỏi đáp AI cho học viên chưa khả dụng");
+  await expect(panel).toContainText("AI cho Trainee đang chờ hệ thống");
+  await expect(panel.getByRole("link", { name: "Đọc bài trong Learn" })).toHaveAttribute("href", "/learn");
+  await expect(panel.getByRole("link", { name: "Xem bài đã lưu" })).toHaveAttribute("href", "/learning-hub?view=saved");
+  await expect(panel.getByRole("link", { name: "Xem trang ứng dụng" })).toHaveAttribute("href", "/download");
+  await expect(page.getByLabel("Câu hỏi trong Góc học tập")).toHaveCount(0);
+  await expect(page.getByRole("log")).toHaveCount(0);
+  await expect(page.getByText(/minh họa|soạn sẵn|mô phỏng/i)).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /^Hỏi đáp/ })).toContainText("chưa khả dụng");
+
+  await page.getByRole("link", { name: /^Lịch sử/ }).click();
+  await expect(page).toHaveURL(/view=history/);
+  await expect(panel).toContainText("Lịch sử và kết quả cá nhân chưa khả dụng");
+  await expect(panel).toContainText("một danh sách trống không có nghĩa là bạn chưa tập");
+  await expect(page.getByText(/Chưa có câu hỏi|Kết quả mô phỏng|minh họa/i)).toHaveCount(0);
+  expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.includes("prototype")))).toEqual([]);
 });
 
-test("asking about an unknown article falls back to the general chat; the article title comes from the API", async ({ page }) => {
+test("the article the learner came from is kept as context, and an unknown one is explained", async ({ page }) => {
   await restore(page);
   await page.goto("/learning-hub?article=khong-co-bai-nay");
-  await expect(page.getByText("Không tìm thấy bài này. Đã mở hỏi đáp chung.")).toBeVisible();
-  await expect(page.getByTestId("article-context")).toContainText("Hỏi đáp chung");
+  await expect(page.getByTestId("capability-context")).toContainText("Không tìm thấy bài bạn mở từ Learn");
+  await expect(page.getByTestId("capability-unavailable")).toContainText("Hỏi đáp AI cho học viên chưa khả dụng");
   await page.goto(`/learning-hub?article=${slug}`);
-  await expect(page.getByTestId("article-context")).toContainText("Đang hỏi theo bài: Đọc không gian trước khi hành động");
+  await expect(page.getByTestId("capability-context")).toContainText("Đọc không gian trước khi hành động");
+  await expect(page.getByTestId("capability-unavailable").getByRole("link", { name: "Đọc lại bài này" })).toHaveAttribute("href", `/learn/${slug}`);
 });
 
-test("keyboard submission respects reduced motion and logout returns home even on backend failure", async ({ page }) => {
+test("an article page offers saving but no fake ask button", async ({ page }) => {
+  await restore(page, "trainee");
+  await page.goto(`/learn/${slug}`);
+  await expect(page.getByRole("heading", { level: 1, name: "Đọc không gian trước khi hành động" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Lưu bài viết" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Hỏi về bài này" })).toHaveCount(0);
+});
+
+test("logout returns home even on backend failure and unavailable views respect reduced motion", async ({ page }) => {
   await restore(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto(`/learning-hub?article=${slug}`);
-  await expect(page.getByTestId("article-context")).toContainText("Đang hỏi theo bài");
-  const composer = page.getByLabel("Câu hỏi trong Góc học tập");
-  await composer.fill("Câu hỏi bàn phím");
-  await composer.press("Enter");
-  await expect(page.getByRole("log")).toContainText("Câu hỏi bàn phím");
-  expect(await page.locator(".chat-bubble").first().evaluate((node) => getComputedStyle(node).animationName)).toBe("none");
+  await page.goto("/learning-hub?view=questions");
+  await expect(page.getByTestId("capability-unavailable")).toBeVisible();
   await page.route("**/api/auth/logout", (route) => route.fulfill({ status: 503 }));
   await page.getByRole("button", { name: "Đăng xuất", exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
@@ -114,28 +123,22 @@ test("mobile organization form and OTP step scroll without overflow", async ({ p
 });
 
 test.describe("saved posts (real bookmark API)", () => {
-  test("default view lists the bookmarks from the server; history navigation and demo reset only touch the chat", async ({ page }) => {
+  test("default view lists the bookmarks from the server; the unavailable views do not touch them", async ({ page }) => {
     const backend = await restore(page, "trainee", (b) => b.addBookmark(slug));
     await page.goto("/learning-hub");
     await expect(page.getByRole("heading", { name: "Bài đã lưu", exact: true })).toBeVisible();
     await expect(page.locator(".learn-card")).toHaveCount(1);
     await expect(page.locator(".learn-card")).toContainText("Đọc không gian trước khi hành động");
     expect(backend.callsTo("GET", /bookmarks$/).length).toBeGreaterThan(0);
-    await page.getByRole("link", { name: "Lịch sử", exact: true }).click();
+    await page.getByRole("link", { name: /^Lịch sử/ }).click();
     await expect(page).toHaveURL(/view=history/);
     await page.reload();
     await expect(page.getByRole("heading", { name: "Lịch sử", exact: true })).toBeVisible();
     await page.goBack();
     await expect(page.getByRole("heading", { name: "Bài đã lưu", exact: true })).toBeVisible();
     await page.goForward();
-    await page.getByRole("button", { name: "Xóa dữ liệu demo", exact: true }).click();
-    await page.getByRole("button", { name: "Hủy", exact: true }).click();
-    await expect(page.getByRole("link", { name: /Câu hỏi trước đó/ })).toBeVisible();
-    await page.getByRole("button", { name: "Xóa dữ liệu demo", exact: true }).click();
-    await page.getByRole("button", { name: "Xác nhận xóa dữ liệu demo" }).click();
-    await expect(page.getByText("Chưa có câu hỏi trong phiên.")).toBeVisible();
     await page.getByRole("link", { name: "Bài đã lưu", exact: true }).click();
-    await expect(page.locator(".learn-card")).toHaveCount(1); // real bookmarks survive the demo reset
+    await expect(page.locator(".learn-card")).toHaveCount(1);
     expect(backend.bookmarks).toHaveLength(1);
   });
 
