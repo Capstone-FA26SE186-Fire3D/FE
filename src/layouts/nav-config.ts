@@ -57,7 +57,7 @@ export const adminArea: OperationsArea = {
     { href: routes.adminAccounts, label: "Tài khoản", icon: Users, group: "Vận hành" },
     { href: routes.adminOrganizations, label: "Tổ chức", icon: Landmark, group: "Vận hành" },
     { href: routes.adminReviews, label: "Duyệt kịch bản", icon: ClipboardCheck, group: "Nội dung", status: "pending-be" },
-    { href: routes.adminLearn, label: "Learn CMS", icon: BookOpen, group: "Nội dung", status: "pending-be" },
+    { href: routes.adminLearn, label: "Learn CMS", icon: BookOpen, group: "Nội dung" },
     { href: routes.adminLibrary, label: "Thư viện tổ chức", icon: Library, group: "Nội dung", status: "pending-be" },
     { href: routes.adminCommerce, label: "Thương mại", icon: CreditCard, group: "Kinh doanh" },
     { href: routes.adminSupport, label: "Hỗ trợ & audit", icon: LifeBuoy, group: "Kinh doanh" },

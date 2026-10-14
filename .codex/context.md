@@ -69,7 +69,7 @@ Khi Docs có cạnh repo, đọc requirements/features/workflows phù hợp. UI 
 - Mặt cắt giữ tầng/cầu thang liên tục, ẩn vỏ ngoài. Orbit nhận focus khi click/kéo, hỗ trợ Arrow/Home, không hiện outline theo yêu cầu. Footer riêng landing đã bỏ.
 - Cháy lan phòng/hành lang/cầu thang/mặt ngoài/mái; smoke volume có depth occlusion và fade biên. NPC có đường đi/khớp/phản ứng dựng sẵn, không solver sơ tán.
 - Nhánh tổ chức: sạm65–105s, sụp từng khu110–143s theo đồng hồ nhánh; rời nhánh reset. Collapse là hoạt cảnh minh họa, không phân tích kết cấu. reveal sở hữu visibility, damage không được bật shell đã ẩn.
-- Auth/Learn/hub dùng sessionStorage có kiểm tra dữ liệu; bài lưu và chat là demo. `/demo/rag` giữ contract AI thử nghiệm.
+- Auth/hub dùng sessionStorage có kiểm tra dữ liệu; chat là demo (bài lưu đã chuyển sang API bookmark thật). `/demo/rag` giữ contract AI thử nghiệm.
 - Bài học ổn định ở [lessons](lessons.md); kiểm chứng/giới hạn ở [ledger](../docs/landing-completion-plan.md). Không coi build pass là nghiệm thu visual/hiệu năng.
 - Hướng thực thi và giới hạn nằm trong [Docs/fire3d-web-ux-design.md](../../Docs/fire3d-web-ux-design.md). Landing, Learn và AI cộng đồng là prototype web; không xem chúng là pipeline production hay chứng nhận an toàn.
 - Cấu trúc source hiện tại là feature-first App Router: `assets`, `components/ui`, `configs`, `features/<feature>/{components,scene,types}`, `layouts`, `store`, `utils`, cùng các route trong `app`. Không tạo `pages/` hoặc root `App.tsx`; route/layout chỉ composition, không chứa logic Three.js hoặc truy vấn dài.
@@ -95,7 +95,7 @@ Khi Docs có cạnh repo, đọc requirements/features/workflows phù hợp. UI 
 
 ## Learn blog boundary — 2026-09-19
 
-- FE mục tiêu có public Learn reader/search/filter theo situation và kind `Article`/`Tip`/`Video`, cùng PlatformAdmin CMS cho Draft/Published và trạng thái bài Unpublished/Published/Hidden/Deleted; hỗ trợ publish ngay, hide/show/delete/restore và ETag/idempotency. Hidden không public nhưng RAG hợp lệ; Deleted bị loại. Đây là target contract; Learn hiện trong code vẫn là prototype/demo.
+- FE mục tiêu có public Learn reader/search/filter theo situation và kind `Article`/`Tip`/`Video`, cùng PlatformAdmin CMS cho Draft/Published và trạng thái bài Unpublished/Published/Hidden/Deleted; hỗ trợ publish ngay, hide/show/delete/restore và ETag/idempotency. Hidden không public nhưng RAG hợp lệ; Deleted bị loại. Learn CMS (/admin/learn), Learn công khai và bookmark Trainee đã nối API thật từ 2026-10 (bằng chứng mock; xem tracker); chỉ hỏi đáp trong Góc học tập còn là prototype.
 - Renderer chỉ nhận media descriptor đã backend validate; hỗ trợ YouTube/Facebook/TikTok theo provider allowlist, có fallback summary/link khi không embed được. Không render iframe/HTML/script tùy ý.
 - Admin UI gửi ETag/revision và idempotency cho version/publish/hide/show/delete/restore; public UI không nhận Draft/Hidden/Deleted. Trainee bookmark qua `.NET API` và gửi `postId`/`versionId` khi hỏi AI; FE không tự quyết định source scope, RAG eligibility, cache invalidation hoặc quota.
 

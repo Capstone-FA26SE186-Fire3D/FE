@@ -16,7 +16,6 @@ async function signIn(page: Page, user: typeof admin | typeof owner) {
 
 const modules = [
   { path: "/admin/reviews", heading: "Duyệt kịch bản", issue: "issues/52", fakeButtons: ["Duyệt nội dung", "Từ chối", "Tạo bài", "Thêm mục", "Xuất bản"] },
-  { path: "/admin/learn", heading: "Learn CMS", issue: "issues/57", fakeButtons: ["Tạo bài", "Xuất bản", "Lưu bản nháp"] },
   { path: "/admin/library", heading: "Thư viện tổ chức", issue: "issues/57", fakeButtons: ["Thêm mục", "Tạo phiên bản mới"] },
 ];
 
@@ -52,7 +51,7 @@ test("production reviews page does not offer manual versionId or hash entry", as
 test("production reviews page makes no review API calls", async ({ page }) => {
   await signIn(page, admin);
   const calls: string[] = [];
-  page.on("request", (request) => { if (/^\/api\/.*(scenario-versions|scenario-reviews|admin\/learn|library)/i.test(new URL(request.url()).pathname)) calls.push(request.url()); });
+  page.on("request", (request) => { if (/^\/api\/.*(scenario-versions|scenario-reviews|library)/i.test(new URL(request.url()).pathname)) calls.push(request.url()); });
   for (const mod of modules) { await page.goto(mod.path); await expect(page.getByTestId("pending-module")).toBeVisible(); }
   expect(calls).toEqual([]);
 });
@@ -73,13 +72,14 @@ test("signed-out visitors are sent to sign in, not shown the mod", async ({ page
   await expect(page.getByTestId("pending-module")).toHaveCount(0);
 });
 
-test("admin navigation marks the three modules as waiting for the backend", async ({ page }) => {
+test("admin navigation marks the two remaining modules as waiting for the backend (Learn CMS is live)", async ({ page }) => {
   await signIn(page, admin);
   await page.goto("/admin/reviews");
-  for (const label of ["Duyệt kịch bản", "Learn CMS", "Thư viện tổ chức"]) {
-    const link = page.getByRole("navigation", { name: "Quản trị hệ thống" }).getByRole("link", { name: new RegExp(label) });
-    await expect(link).toContainText("Chờ BE");
+  const nav = page.getByRole("navigation", { name: "Quản trị hệ thống" });
+  for (const label of ["Duyệt kịch bản", "Thư viện tổ chức"]) {
+    await expect(nav.getByRole("link", { name: new RegExp(label) })).toContainText("Chờ BE");
   }
+  await expect(nav.getByRole("link", { name: /Learn CMS/ })).not.toContainText("Chờ BE");
 });
 
 for (const width of [1440, 375]) {
