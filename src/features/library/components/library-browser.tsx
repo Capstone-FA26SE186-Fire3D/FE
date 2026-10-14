@@ -24,7 +24,7 @@ const PAGE_SIZE = 20;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function ItemDrawer({ accessToken, itemId, onClose }: { accessToken: string; itemId: string; onClose: () => void }) {
-  const query = useAsyncData(`library-org-item:${itemId}`, (signal) => libraryApi.getItem(accessToken, itemId, signal));
+  const query = useAsyncData(`library-org-item:${itemId}`, (signal) => libraryApi.getItem(accessToken, itemId, signal), true, { keepPrevious: false });
   const item = query.data;
   const view = query.error !== undefined && !item ? describeLibraryError(query.error) : null;
   return <Drawer open onOpenChange={(open) => { if (!open) onClose(); }} title={item ? `${item.code} · ${kindLabel[item.kind]}` : "Mẫu thư viện"} description="Chỉ xem. Áp dụng vào kịch bản trong trình soạn thảo, thẻ Thư viện.">

@@ -72,7 +72,7 @@ export function BillingWorkspace() {
   const quotations = useAsyncData(`billing:quotes:${page}`, (signal) => billingApi.listQuotations(token, page, PAGE_SIZE, signal), enabled);
   const entitlements = useAsyncData("billing:entitlements:all", (signal) => billingApi.listEntitlements(token, { pageSize: 100 }, signal), enabled);
   const buildings = useAsyncData("billing:buildings", (signal) => buildingsApi.list(token, { isActive: true, page: 1, pageSize: 100 }, signal), enabled);
-  const selected = useAsyncData(`billing:quotation:${selectedId}`, (signal) => billingApi.getQuotation(token, selectedId, signal), enabled && Boolean(selectedId));
+  const selected = useAsyncData(`billing:quotation:${selectedId}`, (signal) => billingApi.getQuotation(token, selectedId, signal), enabled && Boolean(selectedId), { keepPrevious: false });
 
   const [override, setOverride] = useState<WithEtag<Quotation> | null>(null);
   const current: WithEtag<Quotation> | null = override && override.data.id === selectedId ? override : selected.data ?? null;
