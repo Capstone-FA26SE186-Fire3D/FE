@@ -95,6 +95,27 @@ test.describe("account switch in one tab", () => {
   });
 });
 
+test.describe("expired session", () => {
+  test("a session that can no longer be restored also drops the previous account's retry keys and unfinished checkout", async ({ page }) => {
+    await page.addInitScript(() => {
+      if (sessionStorage.getItem("__seeded")) return;
+      sessionStorage.setItem("__seeded", "1");
+      sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "tok-expired", refreshToken: "refresh-expired" }));
+      sessionStorage.setItem("fet3d:learn-command-keys:v1", JSON.stringify({ abc: { key: "11111111-1111-4111-8111-111111111111", at: Date.now() } }));
+      localStorage.setItem("fet3d:billing:pending-checkout:v1", JSON.stringify({ checkoutId: "co-a", paymentRequestId: null, quotationId: "quo-a", returnTo: "/workspace/billing", savedAt: Date.now() }));
+    });
+    await page.route("**/api/auth/me", (route) => route.fulfill({ status: 401, json: { title: "Unauthorized", code: "UNAUTHORIZED" } }));
+    await page.route("**/api/auth/refresh", (route) => route.fulfill({ status: 401, json: { title: "Unauthorized", code: "UNAUTHORIZED" } }));
+    await page.goto("/learn");
+    await expect(page.getByRole("link", { name: "Đăng nhập", exact: true }).first()).toBeVisible(); // the header shows a signed-out visitor
+    // Polled: the restore finishes after the first paint and a navigation may still be settling.
+    await expect.poll(async () => {
+      const dump = await storageDump(page);
+      return [dump.session["fire3d-auth-tokens"], dump.session["fet3d:learn-command-keys:v1"], dump.local["fet3d:billing:pending-checkout:v1"]];
+    }).toEqual([undefined, undefined, undefined]);
+  });
+});
+
 test.describe("durable command keys", () => {
   test("the opaque Idempotency-Key map is gone after logging out", async ({ page }) => {
     const backend = new LearnBackend();

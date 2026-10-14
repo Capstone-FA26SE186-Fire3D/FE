@@ -122,7 +122,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
           const refreshed = await authApi.refresh(tokens.refreshToken);
           if (active) saveSession(refreshed);
         } catch {
-          if (active) clearSession();
+          // The session is really gone (expired/revoked): whoever signs in next may be another account.
+          if (active) { clearSession(); forgetAccountBoundData(); }
         }
       } finally {
         if (active) setReady(true);

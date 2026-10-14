@@ -25,6 +25,11 @@ export type AsyncDataOptions = {
    * dropped the moment the scope changes (another organization), so nobody else's rows stay on screen while loading.
    */
   scope?: string;
+  /**
+   * Default false: a 401/403/404 means the session lost the right to read this, so the data is dropped and only the error
+   * shows. Pass true for a report that deliberately keeps its last numbers under a warning (analytics).
+   */
+  keepWhenDenied?: boolean;
 };
 
 /**
@@ -35,6 +40,7 @@ export type AsyncDataOptions = {
 export function useAsyncData<T>(key: string, load: (signal: AbortSignal) => Promise<T>, enabled = true, options: AsyncDataOptions = {}): AsyncData<T> {
   const keepPrevious = options.keepPrevious ?? true;
   const scope = options.scope ?? "";
+  const keepWhenDenied = options.keepWhenDenied ?? false;
   const [data, setData] = useState<T | undefined>();
   const [error, setError] = useState<unknown>();
   const [loading, setLoading] = useState(enabled);
@@ -74,7 +80,7 @@ export function useAsyncData<T>(key: string, load: (signal: AbortSignal) => Prom
     // A failed read must not leave rows on screen that answer another query (the previous page or filter), nor rows the
     // session just lost the right to read: only a failed refresh of the SAME query with a transient error keeps its data.
     const failedNow = error !== undefined && errorKey === key;
-    const lostAccess = error instanceof ApiError && (error.status === 401 || error.status === 403 || error.status === 404);
+    const lostAccess = !keepWhenDenied && error instanceof ApiError && (error.status === 401 || error.status === 403 || error.status === 404);
     const hide = foreign || (failedNow && (dataKey !== key || lostAccess));
     return {
       data: hide ? undefined : data,
