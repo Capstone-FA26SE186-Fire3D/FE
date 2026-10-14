@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { History, RefreshCw, SearchX } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
@@ -20,6 +20,10 @@ import "../history.css";
 import { HistoryFilterBar } from "./history-filters";
 import { HistoryRow } from "./history-list";
 import { ResultDrawer } from "./result-drawer";
+
+/** While a listed session is still running or waiting for the device to sync, re-read the list this often (visible tab only). */
+const LIVE_REFRESH_MS = 15_000;
+const LIVE_STATUSES = new Set(["Launching", "Running", "AwaitingSync"]);
 
 const FILTER_PARAM = { status: "status", mode: "mode", buildingId: "building", from: "from", to: "to" } as const;
 
@@ -48,6 +52,16 @@ export function TrainingHistory({ accessToken, userId }: { accessToken: string; 
   const changeFilter = (patch: Partial<Record<keyof typeof FILTER_PARAM, string>>) =>
     setParams(Object.fromEntries(Object.entries(patch).map(([name, value]) => [FILTER_PARAM[name as keyof typeof FILTER_PARAM], value])));
   const clearFilters = () => setParams({ status: null, mode: null, building: null, from: null, to: null });
+
+  // A session that is still running or waiting for sync will change on the server without any action here: keep the list
+  // fresh (paused while the tab is hidden or the detail drawer is open) instead of asking the learner to press "Tải lại".
+  const live = items.some((item) => LIVE_STATUSES.has(item.status));
+  const { reload: reloadList } = list;
+  useEffect(() => {
+    if (!live || sessionParam) return;
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible") reloadList(); }, LIVE_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [live, sessionParam, reloadList]);
 
   const failure = list.error !== undefined ? describeFailure(list.error, "list") : null;
 

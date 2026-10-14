@@ -16,6 +16,7 @@ import { initialV1State, isV1Dirty, v1Reducer, type V1EditorState } from "./edit
 import { stateHash } from "./hash";
 import { combineIssues, toIssues } from "./issues";
 import { completenessIssues, isV1State, shapeIssues, type ReferenceContext } from "./state";
+import { describeApiError } from "@/api/describe-error";
 
 /**
  * What a server answer (validate-state or a refused PUT) says, and about WHICH body: `hash` is the SHA-256 of the checked
@@ -42,8 +43,7 @@ function init(initial: LoadedDraft): V1EditorState {
 }
 
 function message(error: unknown, fallback: string) {
-  if (error instanceof ApiError) return error.message || fallback;
-  return error instanceof Error && error.message ? error.message : fallback;
+  return describeApiError(error, fallback);
 }
 
 /** Human text for a PUT/validate failure that carries v1 error codes. */

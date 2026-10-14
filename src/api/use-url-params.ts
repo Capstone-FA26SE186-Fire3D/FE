@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type ParamValue = string | number | null | undefined;
 
@@ -26,8 +26,13 @@ export function useUrlParams(defaults: UrlParamsSpec = {}) {
 
   const get = useCallback((key: string) => search.get(key) ?? "", [search]);
 
+  // The query the last setParams asked for. Two changes made before the router applied the first one (two filters in a
+  // row, a filter right after a debounced search) build on each other instead of the second overwriting the first.
+  const latest = useRef(search.toString());
+  useEffect(() => { latest.current = search.toString(); }, [search]);
+
   const setParams = useCallback((patch: Record<string, ParamValue>, mode: "push" | "replace" = "push") => {
-    const next = new URLSearchParams(search.toString());
+    const next = new URLSearchParams(latest.current);
     let filterChanged = false;
     for (const [key, value] of Object.entries(patch)) {
       const normalized = value === null || value === undefined || value === "" ? null : String(value);
@@ -37,10 +42,11 @@ export function useUrlParams(defaults: UrlParamsSpec = {}) {
     }
     if (filterChanged && !("page" in patch)) next.delete("page");
     const query = next.toString();
+    latest.current = query;
     const href = query ? `${pathname}?${query}` : pathname;
     if (mode === "replace") router.replace(href, { scroll: false });
     else router.push(href, { scroll: false });
-  }, [pathname, router, search]);
+  }, [pathname, router]);
 
   return { page, pageSize: defaultPageSize, get, setParams, setPage: (value: number) => setParams({ page: value }) };
 }

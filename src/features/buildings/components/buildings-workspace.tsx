@@ -23,6 +23,7 @@ import { describeApiError } from "../format";
 import { organizationsApi } from "@/features/organizations/api";
 import type { Building, BuildingSummary } from "../types";
 import { BuildingForm, buildingFormToInput, emptyForm, formFromBuilding, validateBuildingForm, type FormState } from "./building-form";
+import { RetryButton } from "@/components/ui/retry-button";
 
 const PAGE_SIZE = 20;
 type StatusFilter = "active" | "archived" | "all";
@@ -183,7 +184,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
     return <>
       <PageHeader title="Công trình" description={pageDescription} breadcrumbs={crumbs} />
       {organizationSelect}
-      {organizations.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tổ chức" action={<Button size="sm" variant="secondary" className="mt-3" onClick={organizations.reload}>Thử lại</Button>}>Hãy thử lại sau.</Alert>}
+      {organizations.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tổ chức" action={<RetryButton error={organizations.error} onRetry={organizations.reload} />}>Hãy thử lại sau.</Alert>}
       <EmptyState icon={Building2} title="Chọn tổ chức để xem công trình" description="Công trình thuộc về từng tổ chức. PlatformAdmin cần chọn tổ chức trước khi xem hoặc tạo công trình." action={<Button asChild variant="secondary"><Link href={routes.adminOrganizations}>Mở danh sách tổ chức</Link></Button>} />
     </>;
   }
@@ -221,7 +222,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
       </div>
     </div>
 
-    {error !== undefined && <Alert tone="danger" title="Không tải được danh sách" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reload}>Thử lại</Button>}>{describeApiError(error, loadError)}</Alert>}
+    {error !== undefined && <Alert tone="danger" title="Không tải được danh sách" action={<RetryButton error={error} onRetry={reload} />}>{describeApiError(error, loadError)}</Alert>}
 
     {view === "table"
       ? <Table caption="Danh sách công trình">

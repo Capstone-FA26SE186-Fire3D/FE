@@ -22,6 +22,7 @@ import { useAuthSession } from "@/features/auth/auth-session";
 import { organizationsApi } from "../api";
 import type { Organization } from "../types";
 import { OrganizationDetail } from "./organization-detail";
+import { RetryButton } from "@/components/ui/retry-button";
 
 const PAGE_SIZE = 20;
 const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -149,7 +150,7 @@ export function OrganizationsAdmin() {
       </Select>
     </div>
 
-    {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tổ chức" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{describeApiError(list.error, "Không tải được danh sách tổ chức. Hãy thử lại sau.")}</Alert>}
+    {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tổ chức" action={<RetryButton error={list.error} onRetry={list.reload} />}>{describeApiError(list.error, "Không tải được danh sách tổ chức. Hãy thử lại sau.")}</Alert>}
 
     <Table caption="Danh sách tổ chức">
       <thead><tr><th>Tổ chức</th><th>Trạng thái</th><th>Tạo lúc</th><th><span className="sr-only">Thao tác</span></th></tr></thead>

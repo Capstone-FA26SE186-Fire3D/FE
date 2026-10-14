@@ -6,6 +6,7 @@ import { ApiError } from "@/api/types/common";
 
 import { scenarioEditorApi, type LoadedDraft } from "./api";
 import { classifyDraft, type DraftMode } from "./v1/mode";
+import { describeApiError } from "@/api/describe-error";
 
 export type ProbeState =
   | { phase: "loading" }
@@ -31,7 +32,7 @@ export function useDraftProbe(accessToken: string | null, draftId: string | null
       })
       .catch((cause: unknown) => {
         if (controller.signal.aborted) return;
-        setResult({ key, state: { phase: "error", status: cause instanceof ApiError ? cause.status : undefined, message: cause instanceof Error && cause.message ? cause.message : "Không thể tải bản nháp." } });
+        setResult({ key, state: { phase: "error", status: cause instanceof ApiError ? cause.status : undefined, message: describeApiError(cause, "Không thể tải bản nháp.") } });
       });
     return () => controller.abort();
   }, [accessToken, draftId, key]);

@@ -7,6 +7,7 @@ import { ApiError } from "@/api/types/common";
 import { routes } from "@/configs/routes";
 import { clearPendingCheckout } from "@/features/billing/pending-payment";
 import { authApi } from "./api";
+import { accessTokenExpiry } from "./token-expiry";
 import { signInWithGoogle } from "./firebase";
 import type { AuthUser, RegisterInput, TokenResponse, GoogleLoginResult, GoogleOnboardingInput } from "./types";
 
@@ -66,6 +67,11 @@ function forgetAccountBoundData() {
   resetCommandKeys();
   clearPendingCheckout();
 }
+
+/** Refresh this long before the access token expires, so a request in flight never carries a token that just lapsed. */
+const REFRESH_LEAD_MS = 60_000;
+/** A transient refresh failure (network, 5xx, 429) is retried after this delay instead of signing the user out. */
+const REFRESH_RETRY_MS = 30_000;
 
 function toMessage(error: unknown) {
   if (error instanceof ApiError) return error.message;
@@ -129,6 +135,48 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     void restore();
     return () => { active = false; };
   }, [clearSession, saveSession]);
+
+  // Keep the session alive while the tab is open: renew the access token shortly before it expires (single flight).
+  // A rejected refresh means the session family is gone (revoked/expired) and the user must sign in again; a transient
+  // failure keeps the current session and tries again later.
+  const refreshing = useRef(false);
+  useEffect(() => {
+    if (!accessToken) return;
+    const expiry = accessTokenExpiry(accessToken);
+    if (expiry === null) return;
+    let cancelled = false;
+    let timer = 0;
+    const renew = async () => {
+      if (cancelled || refreshing.current) return;
+      const tokens = readTokens();
+      if (!tokens || tokens.accessToken !== accessToken) return;
+      refreshing.current = true;
+      try {
+        const refreshed = await authApi.refresh(tokens.refreshToken);
+        if (!cancelled) saveSession(refreshed);
+      } catch (error) {
+        if (cancelled) return;
+        const rejected = error instanceof ApiError && (error.status === 400 || error.status === 401 || error.status === 403);
+        if (rejected) { clearSession(); forgetAccountBoundData(); lastUserId.current = null; }
+        else timer = window.setTimeout(() => void renew(), REFRESH_RETRY_MS);
+      } finally {
+        refreshing.current = false;
+      }
+    };
+    const schedule = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => void renew(), Math.max(0, expiry - REFRESH_LEAD_MS - Date.now()));
+    };
+    // Background tabs throttle timers: re-check as soon as the tab is visible again.
+    const onVisible = () => { if (document.visibilityState === "visible") schedule(); };
+    schedule();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [accessToken, clearSession, saveSession]);
 
   const login = useCallback(async (email: string, password: string) => {
     try {

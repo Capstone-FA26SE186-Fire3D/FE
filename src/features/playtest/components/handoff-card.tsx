@@ -14,7 +14,7 @@ import { playtestApi } from "../api";
 import { describePlaytestError, outcomeIsUnknown, type PlaytestErrorView } from "../errors";
 import { canIssueHandoff, formatCountdown, isPlaytestTerminal, msUntil } from "../status";
 import type { PlaytestHandoff, PlaytestStatus } from "../types";
-import { useNow } from "../use-now";
+import { useNow } from "@/api/use-now";
 
 async function copy(text: string) {
   try {
