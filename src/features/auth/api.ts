@@ -1,6 +1,6 @@
 import { apiClient } from "@/api/client";
 import { ApiError } from "@/api/types/common";
-import type { GoogleLoginResult, GoogleOnboardingInput, GoogleOnboardingProof } from "./types";
+import type { GoogleLinkInput, GoogleLinkResult, GoogleLoginResult, GoogleOnboardingInput, GoogleOnboardingProof, SetLocalPasswordInput } from "./types";
 import type { AuthUser, AvatarResponse, AvatarUploadIntent, RegisterInput, RegistrationOtpVerification, TokenResponse, UpdateProfileInput } from "./types";
 
 type ApiUserRole = AuthUser["role"] | "PlatformAdmin" | "OrganizationUser" | "Trainee";
@@ -67,6 +67,17 @@ export const authApi = {
       if (error instanceof ApiError && error.payload?.code === "ACCOUNT_LINK_REQUIRED") return { status: "AccountLinkRequired" };
       throw error;
     }
+  },
+  /** Explicit link of a verified Google identity to the signed-in local account. A first link revokes every session (`requiresLogin`). */
+  async linkGoogle(accessToken: string, input: GoogleLinkInput): Promise<GoogleLinkResult> {
+    const response = await apiClient.requestWithMeta<{ user: ApiAuthUser; alreadyLinked: boolean; requiresLogin: boolean }>("/api/me/link-google", { headers: bearer(accessToken), json: { idToken: input.idToken, currentPassword: input.currentPassword } });
+    const body = response.data;
+    if (!body || typeof body.alreadyLinked !== "boolean" || typeof body.requiresLogin !== "boolean" || !body.user) throw new Error("Máy chủ trả kết quả liên kết Google không hợp lệ. Hãy tải lại hồ sơ để kiểm tra.");
+    return { user: normalizeUser(body.user), alreadyLinked: body.alreadyLinked, requiresLogin: body.requiresLogin, etag: response.headers.get("etag") };
+  },
+  /** First local password of a Google-only account. 204 revokes every session. */
+  setLocalPassword(accessToken: string, input: SetLocalPasswordInput) {
+    return apiClient.request<void>("/api/me/password", { headers: bearer(accessToken), json: { idToken: input.idToken, newPassword: input.newPassword } });
   },
   async completeGoogleOnboarding(input: GoogleOnboardingInput) {
     const result = googleResult(await apiClient.request<FirebaseLoginResponse>("/api/auth/google/onboarding/complete", { json: input }));

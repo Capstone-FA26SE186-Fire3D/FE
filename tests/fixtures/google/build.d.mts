@@ -1,1 +1,1 @@
-export function googleFixtureBundle(): Promise<string>;
+export function googleFixtureBundle(entryFile?: string): Promise<string>;
