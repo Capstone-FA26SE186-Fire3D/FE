@@ -352,7 +352,7 @@ test.describe("package build and technical readiness", () => {
     await expect(page.getByText("QA Passed", { exact: true }).first()).toBeVisible();
     await expect(page.locator("[data-gate=approval]")).toContainText("Chưa gửi duyệt");
     await expect(page.getByTestId("readiness-missing")).toContainText("CONFIRMATION_REQUIRED");
-    await page.getByRole("button", { name: "Xác nhận kỹ thuật" }).click();
+    await page.getByRole("tabpanel", { name: "Kết quả kỹ thuật" }).getByRole("button", { name: "Xác nhận kỹ thuật" }).click();
     await expect(page.getByTestId("confirm-review-id")).toHaveText(IDS.confirm);
     expect(mock.confirmBody).toEqual({ scenarioVersionId: IDS.version, validationRunId: IDS.run });
     await expect(page.locator("[data-gate=technical]")).toContainText("Đã xác nhận kỹ thuật");
