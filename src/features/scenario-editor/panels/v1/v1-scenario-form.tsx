@@ -19,7 +19,7 @@ import type { CatalogView } from "./v1-object-form";
 
 export type RubricCatalogState = { loading: boolean; error: boolean; reload: () => void; view: RubricCatalogView | null };
 
-function Group({ title, description, children, testId }: { title: string; description?: string; children: React.ReactNode; testId?: string }) {
+export function Group({ title, description, children, testId }: { title: string; description?: string; children: React.ReactNode; testId?: string }) {
   return <fieldset className="ops-fieldset se-group" data-testid={testId}>
     <legend>{title}</legend>
     {description && <p className="ops-field-hint">{description}</p>}
@@ -84,8 +84,15 @@ export function V1ScenarioForm({ draft, issues, actions, catalog, rubricCatalog 
   </div>;
 }
 
-function RubricGroup({ draft, issues, actions, catalog }: { draft: JsonObject; issues: Issue[]; actions: V1Actions; catalog: RubricCatalogState }) {
-  const at = (path: string) => messageAt(issues, path);
+/** What the rubric form needs from its host: the editor passes its command-backed actions, the Library admin form plain state writes. */
+export type RubricActions = Pick<V1Actions, "setField" | "addItem" | "removeItem">;
+
+/**
+ * Rubric form over a document that holds `rubric` at its root. `pathPrefix` is where that document sits in the issue paths
+ * (`$` in the scenario editor, `$.payload.state` / `$.payload` in the Library) so server issues land on the right field.
+ */
+export function RubricGroup({ draft, issues, actions, catalog, pathPrefix = "$" }: { draft: JsonObject; issues: Issue[]; actions: RubricActions; catalog: RubricCatalogState; pathPrefix?: string }) {
+  const at = (path: string) => messageAt(issues, `${pathPrefix}${path.slice(1)}`);
   const rubric = isObject(draft.rubric) ? draft.rubric : undefined;
   const criteria = rubric && Array.isArray(rubric.criteria) ? rubric.criteria : [];
   const view = catalog.view;
@@ -93,11 +100,22 @@ function RubricGroup({ draft, issues, actions, catalog }: { draft: JsonObject; i
   return <Group title="Rubric chấm điểm" description="Chỉ số lấy từ danh mục máy chủ (do máy chủ tính từ dữ liệu người học). Hệ thống không đặt sẵn ngưỡng đạt, trọng số hay tiêu chí." testId="group-rubric">
     {catalog.loading && <Skeleton style={{ height: 42 }} />}
     {!catalog.loading && catalog.error && <Alert tone="danger" title="Không tải được danh mục rubric" action={<Button type="button" size="sm" variant="secondary" onClick={catalog.reload}>Thử lại</Button>}>Cần danh mục để chọn chỉ số đúng; hiện chưa thêm được tiêu chí.</Alert>}
+    {!catalog.loading && !catalog.error && view && view.metrics.length === 0 && <Alert tone="warning" title="Danh mục rubric chưa có chỉ số nào"><span data-testid="rubric-catalog-empty">Máy chủ chưa công bố chỉ số nào nên chưa thể chọn chỉ số cho tiêu chí. Quản trị viên cần cấu hình danh mục rubric ở máy chủ; giao diện không tự tạo chỉ số.</span></Alert>}
     {at("$.rubric") && <span className="ops-field-error" role="alert">{at("$.rubric")}</span>}
     {!rubric && view && <div><Button type="button" variant="secondary" size="sm" data-testid="add-rubric" onClick={() => actions.setField(["rubric"], { schema_version: view.defaultSchemaVersion, criteria: [] }, "Thêm rubric", false)}><Plus size={14} aria-hidden="true" /> Thêm rubric</Button></div>}
     {rubric && <>
       <div className="se-coord-grid">
-        <Field label="Phiên bản schema rubric" hint="Cố định theo danh mục máy chủ.">{(props) => <input className="ops-input" {...props} value={typeof rubric.schema_version === "string" ? rubric.schema_version : ""} readOnly data-testid="rubric-schema" />}</Field>
+        <Field label="Phiên bản schema rubric" required error={at("$.rubric.schema_version")} hint='Chuỗi do danh mục máy chủ công bố (ví dụ "1"); số 1, "v1" hay "1.0" không phải bí danh.'>
+          {(props) => {
+            const current = typeof rubric.schema_version === "string" ? rubric.schema_version : "";
+            const supported = view?.supportedSchemaVersions ?? [];
+            return <Select {...props} data-testid="rubric-schema" value={current} onChange={(event) => actions.setField(["rubric", "schema_version"], event.target.value || undefined, "Chọn schema_version", false)}>
+              <option value="">Chọn…</option>
+              {current && !supported.includes(current) && <option value={current}>{current} (không được hỗ trợ)</option>}
+              {supported.map((version) => <option key={version} value={version}>{version}</option>)}
+            </Select>;
+          }}
+        </Field>
         <NumberField label="Ngưỡng đạt" required data-testid="rubric-threshold" value={typeof rubric.pass_threshold === "number" ? rubric.pass_threshold : undefined} error={at("$.rubric.pass_threshold")} onCommit={(value) => actions.setField(["rubric", "pass_threshold"], value, "Sửa ngưỡng đạt")} />
       </div>
       <ol className="se-criteria">

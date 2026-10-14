@@ -28,6 +28,16 @@ export function setPathCommand(draft: JsonObject, id: number, path: Path, value:
   return build(id, patch ? [patch] : [], { label: init.label, at: init.at, selectBefore: init.selection, selectAfter: init.selection, mergeKey: init.typing ? `typing:${pathKey(path)}` : undefined, typing: init.typing });
 }
 
+/**
+ * Several field writes as ONE history entry (applying a library sample): one undo restores every field. Only fields whose value
+ * actually changes produce a patch, so applying a sample that matches the draft leaves no entry. Never merges with typing.
+ */
+export function setFieldsCommand(draft: JsonObject, id: number, changes: ReadonlyArray<{ path: Path; value: Json | undefined }>, init: { label: string; at: number; selection: V1Selection }): V1Command | null {
+  // Each patch is built against the draft BEFORE the command, so two writes under one new parent would each create it; the caller keeps writes disjoint.
+  const patches = changes.flatMap((change) => makeSetPatch(draft, change.path, change.value) ?? []);
+  return build(id, patches, { label: init.label, at: init.at, selectBefore: init.selection, selectAfter: init.selection });
+}
+
 export type NewObject = { kind: ObjectKind; floorId: string; position: Vec3; rotation?: Quat };
 
 export function addObjectCommand(draft: JsonObject, id: number, object: NewObject, now: number, selectBefore: V1Selection): V1Command {

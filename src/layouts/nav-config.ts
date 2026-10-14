@@ -34,6 +34,7 @@ export const organizationArea: OperationsArea = {
   deniedLabel: "Mở thư viện cá nhân",
   nav: [
     { href: routes.workspaceBuildings, label: "Công trình", icon: Building2 },
+    { href: routes.workspaceLibrary, label: "Thư viện mẫu", icon: Library },
     { href: routes.workspaceBilling, label: "Dịch vụ & thanh toán", icon: Receipt },
     { href: routes.workspaceIfc, label: "Quét mô hình IFC", icon: ScanLine },
     { href: routes.workspaceSupport, label: "Hỗ trợ & phản hồi", icon: LifeBuoy },
@@ -57,8 +58,8 @@ export const adminArea: OperationsArea = {
     { href: routes.adminAccounts, label: "Tài khoản", icon: Users, group: "Vận hành" },
     { href: routes.adminOrganizations, label: "Tổ chức", icon: Landmark, group: "Vận hành" },
     { href: routes.adminReviews, label: "Duyệt kịch bản", icon: ClipboardCheck, group: "Nội dung" },
-    { href: routes.adminLearn, label: "Learn CMS", icon: BookOpen, group: "Nội dung", status: "pending-be" },
-    { href: routes.adminLibrary, label: "Thư viện tổ chức", icon: Library, group: "Nội dung", status: "pending-be" },
+    { href: routes.adminLearn, label: "Learn CMS", icon: BookOpen, group: "Nội dung" },
+    { href: routes.adminLibrary, label: "Thư viện tổ chức", icon: Library, group: "Nội dung" },
     { href: routes.adminCommerce, label: "Thương mại", icon: CreditCard, group: "Kinh doanh" },
     { href: routes.adminSupport, label: "Hỗ trợ & audit", icon: LifeBuoy, group: "Kinh doanh" },
   ],

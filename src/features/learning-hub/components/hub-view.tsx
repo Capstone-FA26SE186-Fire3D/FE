@@ -11,10 +11,12 @@ import { routes } from "@/configs/routes";
 import { AccountProfile } from "@/features/account/components/account-profile";
 import { PublicOpsScope } from "@/features/account/components/public-ops-scope";
 import { useAuthSession } from "@/features/auth/auth-session";
-import { articles } from "@/features/learn/data/articles";
-import { LearnBrowser } from "@/features/learn/components/learn-browser";
+import { useAsyncData } from "@/api/use-async-data";
+import { learnApi } from "@/features/learn/api";
+import { isPostSlug } from "@/features/learn/slug";
 import { useDemoSession } from "@/store/demo-session";
 import { demoAnswer } from "../demo-answer";
+import { SavedPosts } from "./saved-posts";
 
 const views = [
   { key: "saved", label: "Bài đã lưu", icon: "archive-book" },
@@ -25,21 +27,25 @@ const views = [
 
 export function HubView() {
   const params = useSearchParams();
-  const { ready: demoReady, bookmarks, chat, askQuestion, reset, storageAvailable } = useDemoSession();
+  const { ready: demoReady, chat, askQuestion, reset, storageAvailable } = useDemoSession();
   const { isAuthenticated, logout, ready: authReady, user } = useAuthSession();
   const ready = demoReady && authReady;
-  const articleSlug = params.get("article");
-  const article = articles.find((item) => item.slug === articleSlug);
+  const rawArticle = params.get("article");
+  const articleSlug = rawArticle && isPostSlug(rawArticle) ? rawArticle : null;
+  // The article the demo chat is "about" comes from the public Learn API, not from local sample data.
+  const articleQuery = useAsyncData(`hub:article:${articleSlug}`, (signal) => learnApi.post(articleSlug ?? "", signal), !!articleSlug);
+  const loadedArticle = articleSlug && articleQuery.data?.slug === articleSlug ? articleQuery.data : null;
+  const article = loadedArticle ? { slug: loadedArticle.slug, title: loadedArticle.version.title, summary: loadedArticle.version.summary } : null;
+  const articleMissing = !!rawArticle && (!articleSlug || (articleQuery.error !== undefined && !loadedArticle));
   const requestedView = params.get("view");
-  const view = views.find((item) => item.key === requestedView)?.key ?? (articleSlug ? "questions" : "saved");
+  const view = views.find((item) => item.key === requestedView)?.key ?? (rawArticle ? "questions" : "saved");
   const selected = views.find((item) => item.key === view)!;
-  const savedArticles = articles.filter((item) => bookmarks.includes(item.slug));
   const [question, setQuestion] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const menuButton = useRef<HTMLButtonElement>(null);
   const navigationRef = useRef<HTMLElement>(null);
-  const contextSlug = article?.slug ?? null;
+  const contextSlug = articleSlug && !articleMissing ? articleSlug : null;
   const messages = chat.filter((item) => item.articleSlug === contextSlug);
   const conversationRef = useRef<HTMLDivElement>(null);
 
@@ -70,7 +76,7 @@ export function HubView() {
   const send = () => {
     const trimmed = question.trim();
     if (!trimmed) return;
-    askQuestion(trimmed, contextSlug);
+    askQuestion(trimmed, contextSlug, article?.title ?? null);
     setQuestion("");
   };
 
@@ -86,20 +92,20 @@ export function HubView() {
     <div className="learning-content">
       <header className="learning-topbar"><div><p>Thư viện cá nhân</p><h1>{selected.label}</h1></div><Link href="/learning-hub?view=profile" className="learning-account"><Iconsax name="user" size={18} /><span>{user?.fullName || user?.email}</span></Link></header>
       <main id="learning-main" className={`learning-main learning-view-${view}`}>
-        {view === "saved" && (savedArticles.length ? <LearnBrowser articles={savedArticles} saved /> : <div className="learning-empty"><Iconsax name="archive-book" size={38} /><h2>Giữ lại những bài bạn muốn đọc tiếp.</h2><p>Chưa có bài đã lưu trong phiên trải nghiệm này.</p><Button asChild><Link href="/learn">Khám phá Learn</Link></Button></div>)}
+        {view === "saved" && <SavedPosts />}
         {view === "questions" && <>
         <Card className="hub-card hub-chat">
           <h2><Iconsax name="message-question" /> Hỏi đáp theo bài đọc</h2>
           <p className="text-sm leading-6 text-[var(--muted)]">Câu trả lời soạn sẵn, chưa kết nối AI. Không dùng khi khẩn cấp.</p>
-          {articleSlug && !article && <p role="status">Không tìm thấy bài này. Đã mở hỏi đáp chung.</p>}
-          <div className="hub-context" data-testid="article-context">{article ? <><span>Đang hỏi theo bài: {article.title}</span><Link href={`/learn/${article.slug}`}>Đọc lại bài</Link><Link href="/learning-hub?view=questions">Hỏi đáp chung</Link></> : <><span>Hỏi đáp chung</span><Link href={routes.learn}>Chọn bài đọc</Link></>}</div>
+          {articleMissing && <p role="status">Không tìm thấy bài này. Đã mở hỏi đáp chung.</p>}
+          <div className="hub-context" data-testid="article-context">{article ? <><span>Đang hỏi theo bài: {article.title}</span><Link href={`/learn/${article.slug}`}>Đọc lại bài</Link><Link href="/learning-hub?view=questions">Hỏi đáp chung</Link></> : articleSlug && !articleMissing ? <span>Đang mở bài để hỏi…</span> : <><span>Hỏi đáp chung</span><Link href={routes.learn}>Chọn bài đọc</Link></>}</div>
           <div ref={conversationRef} role="log" aria-label="Hỏi đáp minh họa" aria-live="polite" className="hub-conversation">
             {!messages.length && <div className="hub-empty"><Iconsax name="message-question" size={32} /><h3>Bắt đầu từ một câu hỏi</h3><p>Chọn gợi ý để xem trích đoạn minh họa có nguồn.</p><div className="hub-suggestions">{["Bài này nói về điều gì?", "Tôi cần ghi nhớ những điểm nào?", "Tìm nguồn để đọc thêm ở đâu?"].map((suggestion) => <button key={suggestion} type="button" onClick={() => askQuestion(suggestion, contextSlug)}>{suggestion}</button>)}</div></div>}
             {messages.map((message) => {
-              const answer = demoAnswer(message.articleSlug);
+              const answer = demoAnswer(message.articleSlug && article?.slug === message.articleSlug ? article : null);
               return <div id={`exchange-${message.id}`} key={message.id} className="mb-5">
                 <div className="chat-bubble user"><strong className="block text-xs">Bạn</strong>{message.question}</div>
-                <div className="chat-bubble"><strong className="mb-2 block text-xs">Trích đoạn minh họa từ bài đọc</strong><p>{answer.text}</p><Link className="underline underline-offset-4" href={answer.source.href}>Nguồn bài mẫu: {answer.source.title}</Link><p className="mt-2 text-xs">{answer.source.publisher}</p></div>
+                <div className="chat-bubble"><strong className="mb-2 block text-xs">Trích đoạn minh họa từ bài đọc</strong><p>{answer.text}</p>{answer.source && <Link className="underline underline-offset-4" href={answer.source.href}>Bài được trích: {answer.source.title}</Link>}</div>
               </div>;
             })}
           </div>
@@ -113,8 +119,8 @@ export function HubView() {
         </>}
         {view === "history" && <section className="learning-history"><p className="learning-note">Hỏi đáp minh họa · tối đa 50 câu hỏi trong tab này.</p>
           {!storageAvailable && <p role="status">Trình duyệt không cho phép lưu phiên. Dữ liệu sẽ mất khi tải lại.</p>}
-          {chat.length ? <ul>{[...chat].reverse().map((item) => <li key={item.id}><Link href={`/learning-hub?view=questions${item.articleSlug ? "&article=" + item.articleSlug : ""}#exchange-${item.id}`} onClick={() => setQuestion("")}>{item.question}<span>{articles.find((entry) => entry.slug === item.articleSlug)?.title ?? "Hỏi đáp chung"}</span></Link><time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString("vi-VN")}</time></li>)}</ul> : <p>Chưa có câu hỏi trong phiên.</p>}
-          <div className="learning-reset">{confirmReset ? <><p role="alert">Xóa toàn bộ bài đã lưu và lịch sử minh họa trong tab này?</p><Button variant="quiet" onClick={() => { reset(); setConfirmReset(false); }}>Xác nhận xóa dữ liệu demo</Button><Button variant="ghost" onClick={() => setConfirmReset(false)}>Hủy</Button></> : <Button variant="quiet" onClick={() => setConfirmReset(true)}>Xóa dữ liệu demo</Button>}</div>
+          {chat.length ? <ul>{[...chat].reverse().map((item) => <li key={item.id}><Link href={`/learning-hub?view=questions${item.articleSlug ? "&article=" + item.articleSlug : ""}#exchange-${item.id}`} onClick={() => setQuestion("")}>{item.question}<span>{item.articleTitle ?? (item.articleSlug ? "Bài đọc" : "Hỏi đáp chung")}</span></Link><time dateTime={item.createdAt}>{new Date(item.createdAt).toLocaleString("vi-VN")}</time></li>)}</ul> : <p>Chưa có câu hỏi trong phiên.</p>}
+          <div className="learning-reset">{confirmReset ? <><p role="alert">Xóa lịch sử hỏi đáp minh họa trong tab này? Bài đã lưu của bạn trên máy chủ không bị ảnh hưởng.</p><Button variant="quiet" onClick={() => { reset(); setConfirmReset(false); }}>Xác nhận xóa dữ liệu demo</Button><Button variant="ghost" onClick={() => setConfirmReset(false)}>Hủy</Button></> : <Button variant="quiet" onClick={() => setConfirmReset(true)}>Xóa dữ liệu demo</Button>}</div>
         </section>}
         {view === "profile" && <PublicOpsScope><AccountProfile /></PublicOpsScope>}
       </main>

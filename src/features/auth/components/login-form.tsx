@@ -75,7 +75,7 @@ export function LoginForm() {
   const initialStage = useRef(true);
   const requestedNext = pendingAction?.type === "ask"
     ? `${routes.learningHub}?article=${encodeURIComponent(pendingAction.slug)}`
-    : pendingAction?.type === "save" ? `/learn/${pendingAction.slug}` : params.get("next");
+    : params.get("next");
 
   useEffect(() => {
     if (initialStage.current) { initialStage.current = false; return; }
