@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -15,6 +16,8 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
+import { AiProposalApply } from "@/features/org-ai/components/ai-proposal-apply";
+import { AI_PROPOSAL_PARAM } from "@/features/org-ai/components/apply-target-dialog";
 
 import { scenarioEditorApi, type LoadedDraft } from "../../api";
 import type { FloorInfo } from "../../scene/preview-model";
@@ -89,6 +92,17 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const editor = useEditorV1({ accessToken, draftId, initial, context });
   const { state, dispatch, edit, dirty, status, meta, issues } = editor;
   const guard = useLeaveGuard(dirty);
+
+  // "Áp dụng vào bản nháp" from the AI page arrives as ?aiRequest=<id>: the proposal is re-read from the server and applied only after a confirmed preview.
+  const aiRequestId = useSearchParams().get(AI_PROPOSAL_PARAM);
+  const [aiDismissed, setAiDismissed] = useState(false);
+  const aiFloorIds = useMemo(() => (geometry ? new Set(geometry.floors.map((floor) => floor.id)) : null), [geometry]);
+  const closeAiProposal = useCallback(() => {
+    setAiDismissed(true);
+    const url = new URL(window.location.href);
+    url.searchParams.delete(AI_PROPOSAL_PARAM);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }, []);
 
   const geometryState: GeometryState = reading.kind === "valid" ? "valid" : reading.kind === "reprocess" ? "reprocess" : reading.kind === "invalid" ? "invalid"
     : (preview.phase === "idle" || preview.phase === "loading") && !preview.preview ? "loading" : "not-ready";
@@ -327,6 +341,8 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
       onLoad={() => void editor.loadConflict()}
       onApply={(choices) => { editor.applyMerge(choices); setConflictOpen(false); toast.notify({ tone: "info", title: "Đã đối chiếu", description: "Kết quả chưa được lưu. Kiểm tra rồi bấm Lưu." }); }}
       onClose={() => { setConflictOpen(false); editor.closeConflict(); }} />
+
+    {aiRequestId && !aiDismissed && <AiProposalApply key={aiRequestId} accessToken={accessToken} requestId={aiRequestId} draft={state.draft} floorIds={aiFloorIds} onApply={edit} onClose={closeAiProposal} />}
 
     <Modal open={guard.pending} onOpenChange={(open) => { if (!open) guard.stay(); }} title="Rời khỏi trình soạn thảo?"
       description="Bạn có thay đổi chưa lưu. Nếu rời đi bây giờ, các thay đổi này sẽ mất."

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
+import { AI_PROPOSAL_PARAM } from "@/features/org-ai/components/apply-target-dialog";
 
 import "./editor.css";
 import { useDraftProbe } from "../use-draft-probe";
@@ -28,12 +29,14 @@ export function ScenarioEditor({ buildingId, scenarioId }: { buildingId: string;
   const router = useRouter();
   const pathname = usePathname();
   const draftId = params.get("draft");
+  // A stored AI proposal chosen on /workspace/ai follows the author to the draft they open; it is only a request id.
+  const aiRequest = params.get(AI_PROPOSAL_PARAM);
   const probe = useDraftProbe(accessToken, draftId);
   const backHref = `${routes.workspaceBuildings}/${buildingId}/scenarios/${scenarioId}`;
 
   if (!accessToken) return <EditorSkeleton />;
   if (!draftId) {
-    return <DraftStart accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} onOpen={(id) => router.replace(`${pathname}?draft=${encodeURIComponent(id)}`)} />;
+    return <DraftStart accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} onOpen={(id) => router.replace(`${pathname}?draft=${encodeURIComponent(id)}${aiRequest ? `&${AI_PROPOSAL_PARAM}=${encodeURIComponent(aiRequest)}` : ""}`)} />;
   }
   const state = probe.state;
   if (state.phase === "loading") return <EditorSkeleton />;
@@ -62,5 +65,8 @@ export function ScenarioEditor({ buildingId, scenarioId }: { buildingId: string;
   if (mode === "v1") {
     return <V1Workspace key={`${probe.key}:${loaded.etag}`} accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} draftId={draftId} initial={loaded} />;
   }
-  return <LegacyHost key={probe.key} accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} draftId={draftId} initial={loaded} />;
+  return <>
+    {aiRequest && <div className="se-banners"><Alert tone="warning" title="Đề xuất AI chỉ áp dụng được vào bản nháp fet3d.editor/1">Bản nháp này theo định dạng cũ nên không nhận đề xuất AI. Chọn hoặc tạo bản nháp fet3d.editor/1 của kịch bản, hoặc quay lại Trợ lý AI.</Alert></div>}
+    <LegacyHost key={probe.key} accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} draftId={draftId} initial={loaded} />
+  </>;
 }
