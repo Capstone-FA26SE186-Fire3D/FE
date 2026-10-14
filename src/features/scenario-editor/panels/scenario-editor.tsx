@@ -3,7 +3,6 @@
 import { FileX2, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -16,15 +15,6 @@ import "./editor.css";
 import { useScenarioEditor } from "../use-scenario-editor";
 import { DraftStart } from "./draft-start";
 import { EditorWorkspace } from "./editor-workspace";
-
-function remember(scenarioId: string, draftId: string | null) {
-  try {
-    const key = `fire3d-editor-draft:${scenarioId}`;
-    if (draftId) window.localStorage.setItem(key, draftId);
-  } catch {
-    // Convenience only (BE#53: drafts cannot be listed); the editor works without it.
-  }
-}
 
 function EditorSkeleton() {
   return <div className="se-root" role="status" aria-live="polite" aria-busy="true">
@@ -42,10 +32,6 @@ export function ScenarioEditor({ buildingId, scenarioId }: { buildingId: string;
   const pathname = usePathname();
   const draftId = params.get("draft");
   const editor = useScenarioEditor(accessToken, draftId);
-
-  useEffect(() => {
-    remember(scenarioId, draftId);
-  }, [scenarioId, draftId]);
 
   if (!accessToken) return <EditorSkeleton />;
   if (!draftId) {
