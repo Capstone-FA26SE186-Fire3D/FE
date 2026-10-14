@@ -1,0 +1,53 @@
+/* Trainee history inside the Learning Hub. Colors are the operations tokens (.ops-theme), never new hex values. */
+.th-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 12px; align-items: end; margin-bottom: 14px; }
+.th-filters .ops-field { min-width: 0; }
+.th-filters-actions { display: flex; align-items: center; gap: 8px; }
+.th-note { margin: 0 0 14px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.th-summary { margin: 0 0 10px; color: var(--dim); font-size: 13px; }
+
+.th-list { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.th-row { min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.th-row[data-stale="true"] { opacity: .6; }
+.th-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.th-head > div { min-width: 0; }
+.th-title { display: block; color: var(--text); font-size: 15px; font-weight: 650; overflow-wrap: anywhere; }
+.th-sub { display: block; margin-top: 2px; color: var(--dim); font-size: 12px; overflow-wrap: anywhere; }
+.th-head button { flex: 0 0 auto; }
+.th-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px 16px; margin: 14px 0 0; }
+.th-fields > div { min-width: 0; }
+.th-fields dt { margin-bottom: 4px; color: var(--dim); font-size: 12px; }
+.th-fields dd { margin: 0; color: var(--text); font-size: 14px; overflow-wrap: anywhere; }
+.th-fields dd small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
+
+.th-state { display: grid; gap: 12px; justify-items: start; padding: 24px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.th-state h2, .th-state h3 { margin: 0; font-size: 18px; }
+.th-state p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.th-state ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+
+/* Detail drawer */
+.th-detail { display: grid; gap: 18px; min-width: 0; }
+.th-detail h3 { margin: 0 0 8px; font-size: 14px; font-weight: 650; color: var(--text); }
+.th-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 12px; }
+.th-pair > div { min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-soft); }
+.th-pair > div > span:first-child { display: block; margin-bottom: 6px; color: var(--dim); font-size: 12px; }
+.th-pair p { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.th-score { color: var(--text); font-size: 28px; font-weight: 700; letter-spacing: -.02em; }
+.th-score[data-empty="true"] { font-size: 16px; font-weight: 600; color: var(--muted); }
+.th-criteria { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.th-criterion { min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.th-criterion header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.th-criterion strong { color: var(--text); font-size: 14px; overflow-wrap: anywhere; }
+.th-criterion p { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; }
+.th-metrics { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; margin: 0; font-size: 14px; }
+.th-metrics dt { color: var(--muted); overflow-wrap: anywhere; }
+.th-metrics dd { margin: 0; color: var(--text); font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+.th-code { color: var(--dim); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; overflow-wrap: anywhere; }
+.th-foot { margin: 0; color: var(--dim); font-size: 12px; line-height: 1.6; }
+
+@media (max-width: 520px) {
+  .th-head { flex-direction: column; }
+  .th-head button { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .th-row { transition: none; }
+}

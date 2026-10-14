@@ -1,10 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import { installLearnBackend, LearnBackend, signIn, type Actor } from "./learn-mock";
+import { installTrainingBackend, TrainingBackend } from "./training-history-mock";
 
 /*
- * Learning Hub + public Learn layout. Bookmarks are REAL (mock backend, learn-mock.ts). Q&A and history/results wait for
- * the Trainee AI and session-list contracts (BE#77/#78), so those views must say "chưa khả dụng" with the reason and next
- * steps, and must not show a chat, a composer, sample answers or any sample result.
+ * Learning Hub + public Learn layout. Bookmarks are REAL (mock backend, learn-mock.ts) and so is the history/result view
+ * (mock backend, training-history-mock.ts; its own cases are in training-history.spec.ts). Q&A still waits for the Trainee
+ * AI contract (BE#77), so it must say "chưa khả dụng" with the reason and next steps, and must not show a chat, a composer
+ * or sample answers.
  */
 
 const slug = "doc-khong-gian";
@@ -21,6 +23,7 @@ async function restore(page: Page, who: Actor = "trainee", extra: (backend: Lear
   extra(backend);
   await signIn(page, backend, who);
   await installLearnBackend(page, backend);
+  await installTrainingBackend(page, new TrainingBackend());
   return backend;
 }
 
@@ -45,12 +48,12 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 980, height: 650 
     await page.screenshot({ path: testInfo.outputPath(`hub-${viewport.width}.png`), fullPage: true });
     if (viewport.width < 768) await page.getByRole("button", { name: "Mở menu học tập" }).click();
     await page.getByRole("link", { name: /^Lịch sử/ }).click();
-    await expect(page.getByTestId("capability-unavailable")).toContainText("Lịch sử và kết quả cá nhân chưa khả dụng");
+    await expect(page.getByTestId("history-empty")).toContainText("Bạn chưa có lượt tập nào");
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
   });
 }
 
-test("Q&A and history say why they are unavailable, offer next steps and show no demo content", async ({ page }) => {
+test("Q&A says why it is unavailable and offers next steps; history is a real view with no demo content", async ({ page }) => {
   await restore(page);
   await page.goto("/learning-hub?view=questions");
   const panel = page.getByTestId("capability-unavailable");
@@ -66,9 +69,10 @@ test("Q&A and history say why they are unavailable, offer next steps and show no
 
   await page.getByRole("link", { name: /^Lịch sử/ }).click();
   await expect(page).toHaveURL(/view=history/);
-  await expect(panel).toContainText("Lịch sử và kết quả cá nhân chưa khả dụng");
-  await expect(panel).toContainText("một danh sách trống không có nghĩa là bạn chưa tập");
-  await expect(page.getByText(/Chưa có câu hỏi|Kết quả mô phỏng|minh họa/i)).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /^Lịch sử/ })).not.toContainText(/chưa khả dụng/i);
+  await expect(panel).toHaveCount(0);
+  await expect(page.getByTestId("history-empty")).toContainText("Bạn chưa có lượt tập nào");
+  await expect(page.getByText(/Chưa có câu hỏi|minh họa|soạn sẵn/i)).toHaveCount(0);
   expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.includes("prototype")))).toEqual([]);
 });
 
@@ -123,7 +127,7 @@ test("mobile organization form and OTP step scroll without overflow", async ({ p
 });
 
 test.describe("saved posts (real bookmark API)", () => {
-  test("default view lists the bookmarks from the server; the unavailable views do not touch them", async ({ page }) => {
+  test("default view lists the bookmarks from the server; the other views do not touch them", async ({ page }) => {
     const backend = await restore(page, "trainee", (b) => b.addBookmark(slug));
     await page.goto("/learning-hub");
     await expect(page.getByRole("heading", { name: "Bài đã lưu", exact: true })).toBeVisible();
