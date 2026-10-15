@@ -130,3 +130,17 @@ Khi Docs có cạnh repo, đọc requirements/features/workflows phù hợp. UI 
 - **Module chờ BE:** `PendingModule` (`src/components/ops/pending-module.tsx`) hiện blocker, điều kiện mở và link issue. Prototype có dữ liệu mẫu chỉ chạy khi `NODE_ENV !== "production"` (`src/features/dev-prototype`), có banner "Dữ liệu mẫu"; production không có nút giả thành công hay số liệu mẫu.
 - **Editor kịch bản 3D** (`src/features/scenario-editor`): state thuần + command stack undo/redo tách khỏi renderer Three.js; lưu bằng `If-Match` ETag draft, 412 giữ nội dung và cho đối chiếu từng field; field draft chưa hỗ trợ được giữ nguyên khi ghi. Editor theo contract `fet3d.editor/1` của BE (`contracts/editor/v1`): chế độ theo `state.schemaVersion` (v1 / `{}` khởi tạo / legacy giữ nguyên, không chuyển tọa độ); module thuần ở `src/features/scenario-editor/v1/` (ma trận column-major, floor-local↔GLB, validate-state + `stateHash` theo serialize của System.Text.Json); sáu loại object và năng lực lấy từ catalog thật, không có cờ khóa (chỉ còn `playtest`, chờ BE#55). Chưa kiểm với artifact worker thật.
 - **Thử với API thật từ localhost:** API chỉ cho CORS từ origin triển khai. Đặt `FET3D_DEV_API_PROXY=https://api.fet3d.io.vn` và `NEXT_PUBLIC_API_BASE_URL=` (rỗng) khi chạy `next dev`; `/api/*` được rewrite phía server. Production không đổi. Người dùng tự nhập mật khẩu; không lưu credential.
+
+## IFC ingestion, hiển thị và tương tác — 2026-10-15
+
+Nguồn: [IFC ingestion, hiển thị và tương tác](../../Docs/ifc_ingestion_visual_interaction.md) (Docs PR #15/#16). Đây là **đề xuất thiết kế** có bằng chứng spike cục bộ trên 32 file IFC công khai; chưa có worker, API, migration hay code Unity tương ứng. Mục 4 (nhiều IFC cho một revision), ngân sách tam giác và preset vật liệu còn chờ team chốt.
+
+Quy tắc chung đã chốt với nhóm: chỉ nhận IFC (RVT tự xuất IFC ở ngoài); **IFC có thiết bị PCCC/nguồn nước thì pipeline tự tạo, không có thì OrganizationUser đặt trong editor**; mô hình 3D thiết bị luôn lấy từ thư viện dùng chung (có thể tạo bằng công cụ AI như Tripo rồi dọn lưới), không lấy từ IFC; IFC hầu như không mang màu/texture dùng được nên vật liệu lấy từ thư viện PBR CC0 theo preset.
+
+Phụ trách: Phạm Gia Bảo (FE) và Nguyễn Phúc Lộc (FE). Việc liên quan repo này:
+
+- Màn hình upload: checklist xuất IFC từ Revit/ArchiCAD (mục 3), thông báo rõ khi tải `.rvt`/`.pln`/`.skp`.
+- Hiển thị issue QA theo mã ở mục 5.9 kèm hành động người dùng.
+- Màn hình **"Thiết bị phát hiện được"**: xác nhận, sửa loại hoặc bỏ ứng viên từ IFC theo `confidence`.
+- Editor kịch bản (`src/features/scenario-editor`): đặt thiết bị PCCC và vật dụng (catalog đợt 1 ở mục 6.1, sprinkler mục 6.3) bám bề mặt, chỉ thêm vật lên artifact, không sửa tường/cửa/sàn; dòng thời gian sự kiện (đầu báo kích hoạt/vô hiệu, mất điện, cầu thang bị khói chặn); cảnh báo thiếu nguồn nước/báo cháy (mục 9). Đồng bộ danh sách object type với `catalogKey`.
+- Chọn preset phong cách công trình và đổi vật liệu theo nhóm (mục 5.5).
