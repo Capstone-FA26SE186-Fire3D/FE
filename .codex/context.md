@@ -142,5 +142,5 @@ Phụ trách: Phạm Gia Bảo (FE) và Nguyễn Phúc Lộc (FE). Việc liên 
 - Màn hình upload: checklist xuất IFC từ Revit/ArchiCAD (mục 3), thông báo rõ khi tải `.rvt`/`.pln`/`.skp`.
 - Hiển thị issue QA theo mã ở mục 5.9 kèm hành động người dùng.
 - Màn hình **"Thiết bị phát hiện được"**: xác nhận, sửa loại hoặc bỏ ứng viên từ IFC theo `confidence`.
-- Editor kịch bản (`src/features/scenario-editor`): đặt thiết bị PCCC và vật dụng (catalog đợt 1 ở mục 6.1, sprinkler mục 6.3) bám bề mặt, chỉ thêm vật lên artifact, không sửa tường/cửa/sàn; dòng thời gian sự kiện (đầu báo kích hoạt/vô hiệu, mất điện, cầu thang bị khói chặn); cảnh báo thiếu nguồn nước/báo cháy (mục 9). Đồng bộ danh sách object type với `catalogKey`.
+- Editor kịch bản (`src/features/scenario-editor`): đặt thiết bị PCCC và vật dụng (catalog đợt 1 ở mục 6.1, sprinkler mục 6.3) bám bề mặt, chỉ thêm vật lên artifact, không sửa tường/cửa/sàn; dòng thời gian sự kiện (đầu báo kích hoạt/vô hiệu, mất điện, cầu thang bị khói chặn); cảnh báo thiếu nguồn nước/báo cháy (mục 9). Editor `fet3d.editor/1` đã có object `Equipment` với capability từ `GET /api/scenario-interactions/catalog`: `catalogKey` trong Docs chính là capability id; ứng viên từ IFC hiện như `Equipment` chờ xác nhận.
 - Chọn preset phong cách công trình và đổi vật liệu theo nhóm (mục 5.5).
