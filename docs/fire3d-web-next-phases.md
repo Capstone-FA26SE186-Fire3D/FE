@@ -34,7 +34,7 @@ Phạm vi roadmap này là Web. Mobile Expo và Unity nhận handoff sau khi con
 
 1. Thay dashboard tĩnh bằng operations analytics của tổ chức.
 2. Hoàn thiện luồng Building → IFC revision → processing/provenance → preview → scenario draft.
-3. Nâng scenario editor từ dữ liệu thô sang form dựa trên interaction catalog; giữ autosave, ETag conflict, validation cấu trúc và snapshot/version history.
+3. Nâng scenario editor từ dữ liệu thô sang form dựa trên interaction catalog; giữ autosave, ETag conflict, validation cấu trúc và snapshot/version history. Catalog vật thể đợt 1, luật tương tác và màn xác nhận thiết bị từ IFC: [IFC ingestion, hiển thị và tương tác](../../Docs/ifc_ingestion_visual_interaction.md) mục 6, 7, 9.
 4. Không gắn nhãn validation cấu trúc là geometry validation, PCCC certification hoặc publish readiness.
 
 ### Học viên
