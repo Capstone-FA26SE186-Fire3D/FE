@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Eye, EyeOff, Flag, Flame, Layers, MapPinPlus, Plus, UserRound, Wrench } from "lucide-react";
+import { Ban, Eye, EyeOff, Flag, Flame, Layers, ListPlus, MapPinPlus, Plus, UserRound, Wrench } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -16,7 +16,7 @@ import type { Issue } from "../../store/validation";
 const KIND_ICON: Record<ObjectKind, typeof MapPinPlus> = { Spawn: MapPinPlus, Hazard: Flame, Goal: Flag, Npc: UserRound, BlockedElement: Ban, Equipment: Wrench };
 const fmt = (value: number) => (Math.round(value * 100) / 100).toString();
 
-export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, selected, issues, onSelect, onAdd, kindStatus, addDisabledReason, modelLayers, layerVisibility, onLayer, modelVisible, onModelVisible, hasModel }: {
+export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, selected, issues, onSelect, onAdd, kindStatus, addDisabledReason, modelLayers, layerVisibility, onLayer, modelVisible, onModelVisible, hasModel, onImportEquipment }: {
   floors: FloorV1[];
   geometryNote: string | null;
   activeFloor: string | null;
@@ -34,6 +34,8 @@ export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, se
   modelVisible: boolean;
   onModelVisible: (visible: boolean) => void;
   hasModel: boolean;
+  /** Opens the "Thêm thiết bị đã xác nhận" preview (IFC equipment decisions); absent hides the action. */
+  onImportEquipment?: () => void;
 }) {
   const layerToggle = (key: string, label: string) => {
     const visible = layerVisibility[key] !== false;
@@ -92,6 +94,9 @@ export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, se
         <Button type="button" variant="quiet" size="sm" className="se-add" data-testid={`add-${kind}`} disabled={blocked} title={addDisabledReason ?? (blocked ? "Xem tab “Khả dụng” để biết điều kiện" : undefined)} onClick={() => onAdd(kind)}>
           <Plus size={14} aria-hidden="true" /> Thêm {KIND_META[kind].lower}
         </Button>
+        {kind === "Equipment" && onImportEquipment && <Button type="button" variant="quiet" size="sm" className="se-add se-equipment-import" data-testid="import-equipment" onClick={onImportEquipment}>
+          <ListPlus size={14} aria-hidden="true" /> Thêm thiết bị đã xác nhận
+        </Button>}
       </section>;
     })}
   </div>;

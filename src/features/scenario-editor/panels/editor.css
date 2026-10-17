@@ -130,6 +130,10 @@
 .se-mobile-tabs { display: none; }
 
 /* Tablet: left panel moves into a drawer opened from the toolbar. */
+.se-import-modal.se-import-modal { width: min(820px, calc(100vw - 24px)); }
+.se-import-title { margin: 4px 0 0; font-size: 14px; font-weight: 600; }
+.se-equipment-import { width: 100%; justify-content: flex-start; }
+
 @media (min-width: 768px) and (max-width: 1099px) {
   .se-body { grid-template-columns: minmax(0, 1fr) 320px; }
   .se-left { display: none; }
