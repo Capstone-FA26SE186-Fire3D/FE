@@ -1,12 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { installLearnBackend, LearnBackend, signIn, type Actor } from "./learn-mock";
+import { installTraineeAi, TraineeAiBackend } from "./trainee-ai-mock";
 import { installTrainingBackend, TrainingBackend } from "./training-history-mock";
 
 /*
- * Learning Hub + public Learn layout. Bookmarks are REAL (mock backend, learn-mock.ts) and so is the history/result view
- * (mock backend, training-history-mock.ts; its own cases are in training-history.spec.ts). Q&A still waits for the Trainee
- * AI contract (BE#77), so it must say "chưa khả dụng" with the reason and next steps, and must not show a chat, a composer
- * or sample answers.
+ * Learning Hub + public Learn layout. Bookmarks (learn-mock.ts), history/result (training-history-mock.ts) and the Trainee
+ * AI Q&A (trainee-ai-mock.ts, BE#77) all run against stateful mock backends. Mock evidence only.
  */
 
 const slug = "doc-khong-gian";
@@ -17,18 +16,19 @@ function seed(backend: LearnBackend) {
   backend.seedPost("tu-bai-doc", { title: "Từ bài đọc đến lượt tập", summary: "Nối kiến thức với trải nghiệm.", status: "Published" });
 }
 
-async function restore(page: Page, who: Actor = "trainee", extra: (backend: LearnBackend) => void = () => undefined) {
+async function restore(page: Page, who: Actor = "trainee", extra: (backend: LearnBackend) => void = () => undefined, ai = new TraineeAiBackend()) {
   const backend = new LearnBackend();
   seed(backend);
   extra(backend);
   await signIn(page, backend, who);
   await installLearnBackend(page, backend);
   await installTrainingBackend(page, new TrainingBackend());
+  await installTraineeAi(page, ai);
   return backend;
 }
 
 for (const viewport of [{ width: 1440, height: 900 }, { width: 980, height: 650 }, { width: 820, height: 650 }, { width: 375, height: 667 }]) {
-  test(`hub and login fit ${viewport.width}px with the Google visible and the unavailable view fitting`, async ({ page }, testInfo) => {
+  test(`hub and login fit ${viewport.width}px with the Google visible and the Q&A view fitting`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     await page.goto("/login");
     const google = page.getByRole("button", { name: "Tiếp tục với Google" });
@@ -40,10 +40,8 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 980, height: 650 
 
     await restore(page);
     await page.goto(`/learning-hub?view=questions&article=${slug}`);
-    const unavailable = page.getByTestId("capability-unavailable");
-    await expect(unavailable).toContainText("Chưa khả dụng");
-    await expect(page.getByTestId("capability-context")).toContainText("Đọc không gian trước khi hành động");
-    await expect(unavailable.getByRole("link", { name: "Xem trang ứng dụng" })).toBeVisible();
+    await expect(page.getByTestId("trainee-ai-context")).toContainText("Đọc không gian trước khi hành động");
+    await expect(page.getByTestId("trainee-ai-quota")).toContainText("160 tokens");
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
     await page.screenshot({ path: testInfo.outputPath(`hub-${viewport.width}.png`), fullPage: true });
     if (viewport.width < 768) await page.getByRole("button", { name: "Mở menu học tập" }).click();
@@ -53,37 +51,113 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 980, height: 650 
   });
 }
 
-test("Q&A says why it is unavailable and offers next steps; history is a real view with no demo content", async ({ page }) => {
-  await restore(page);
-  await page.goto("/learning-hub?view=questions");
-  const panel = page.getByTestId("capability-unavailable");
-  await expect(panel).toContainText("Hỏi đáp AI cho học viên chưa khả dụng");
-  await expect(panel).toContainText("AI cho Trainee đang chờ hệ thống");
-  await expect(panel.getByRole("link", { name: "Đọc bài trong Learn" })).toHaveAttribute("href", "/learn");
-  await expect(panel.getByRole("link", { name: "Xem bài đã lưu" })).toHaveAttribute("href", "/learning-hub?view=saved");
-  await expect(panel.getByRole("link", { name: "Xem trang ứng dụng" })).toHaveAttribute("href", "/download");
-  await expect(page.getByLabel("Câu hỏi trong Góc học tập")).toHaveCount(0);
-  await expect(page.getByRole("log")).toHaveCount(0);
-  await expect(page.getByText(/minh họa|soạn sẵn|mô phỏng/i)).toHaveCount(0);
-  await expect(page.getByRole("link", { name: /^Hỏi đáp/ })).toContainText(/chưa khả dụng/i);
-
-  await page.getByRole("link", { name: /^Lịch sử/ }).click();
-  await expect(page).toHaveURL(/view=history/);
-  await expect(page.getByRole("link", { name: /^Lịch sử/ })).not.toContainText(/chưa khả dụng/i);
-  await expect(panel).toHaveCount(0);
-  await expect(page.getByTestId("history-empty")).toContainText("Bạn chưa có lượt tập nào");
-  await expect(page.getByText(/Chưa có câu hỏi|minh họa|soạn sẵn/i)).toHaveCount(0);
-  expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.includes("prototype")))).toEqual([]);
+test("Q&A shows today's allowance, asks with the article as context and polls the answer with a Learn citation", async ({ page }) => {
+  const ai = new TraineeAiBackend();
+  let ids = { post: "", version: "" };
+  await restore(page, "trainee", (backend) => { const seeded = backend.seedPost("hoi-dap", { title: "Thang máy khi có cháy", summary: "x", status: "Published" }); ids = { post: seeded.post.id, version: seeded.version.id }; }, ai);
+  await page.goto("/learning-hub?view=questions&article=hoi-dap");
+  await expect(page.getByRole("link", { name: /^Hỏi đáp/ })).not.toContainText(/chưa khả dụng/i);
+  await expect(page.getByTestId("trainee-ai-quota")).toContainText("Hôm nay còn 160 tokens / 200 tokens");
+  await expect(page.getByTestId("trainee-ai-context")).toContainText("Thang máy khi có cháy");
+  await page.getByLabel("Câu hỏi", { exact: true }).fill("  Vì sao không nên dùng thang máy?  ");
+  await page.getByTestId("ai-send").click();
+  await expect(page.getByTestId("ai-answer")).toContainText("Không dùng thang máy", { timeout: 15_000 });
+  await expect(page.getByTestId("ai-citation-link").first()).toHaveAttribute("href", "/learn/doc-khong-gian");
+  expect(ai.posts()).toHaveLength(1);
+  expect(ai.posts()[0].body).toEqual({ question: "Vì sao không nên dùng thang máy?", context: { kind: "Learn", postId: ids.post, versionId: ids.version } });
+  expect(ai.posts()[0].headers["idempotency-key"]).toBeTruthy();
+  await expect(page).toHaveURL(/request=eeeeeeee/);
+  await page.reload();
+  await expect(page.getByTestId("ai-answer")).toBeVisible();
+  await expect(page.getByTestId("trainee-ai-recent")).toContainText("Vì sao không nên dùng thang máy?");
 });
 
-test("the article the learner came from is kept as context, and an unknown one is explained", async ({ page }) => {
-  await restore(page);
+test("a result or a Training from the URL becomes the context; 'Hỏi chung' drops it", async ({ page }) => {
+  const ai = new TraineeAiBackend();
+  await restore(page, "trainee", () => undefined, ai);
+  const session = "aaaaaaaa-0000-4000-8000-000000000001";
+  await page.goto(`/learning-hub?view=questions&session=${session}`);
+  await expect(page.getByTestId("trainee-ai-context")).toContainText("một kết quả tập huấn của bạn");
+  await page.getByLabel("Câu hỏi", { exact: true }).fill("Vì sao tôi chưa đạt?");
+  await page.getByTestId("ai-send").click();
+  await expect.poll(() => ai.posts().length).toBe(1);
+  expect(ai.posts()[0].body).toEqual({ question: "Vì sao tôi chưa đạt?", context: { kind: "Result", sessionId: session } });
+
+  await page.goto("/learning-hub?view=questions&training=bbbbbbbb-0000-4000-8000-000000000001");
+  await expect(page.getByTestId("trainee-ai-context")).toContainText("bài tập huấn bạn đã chọn");
+  await page.getByRole("button", { name: "Hỏi chung" }).click();
+  await expect(page.getByTestId("trainee-ai-context")).toHaveCount(0);
+  await page.getByLabel("Câu hỏi", { exact: true }).fill("Bình chữa cháy CO2 dùng thế nào?");
+  await page.getByTestId("ai-send").click();
+  await expect.poll(() => ai.posts().length).toBe(2);
+  expect(ai.posts()[1].body).toEqual({ question: "Bình chữa cháy CO2 dùng thế nào?" });
+});
+
+test("no allowance left, an Assessment in progress or no policy blocks before anything is sent", async ({ page }) => {
+  const ai = new TraineeAiBackend();
+  ai.quota = { ...ai.quota, remainingUnits: 0, canSubmit: false };
+  await restore(page, "trainee", () => undefined, ai);
+  await page.goto("/learning-hub?view=questions");
+  await expect(page.getByTestId("trainee-ai-blocked")).toContainText("Đã hết lượt hỏi hôm nay");
+  await page.getByLabel("Câu hỏi", { exact: true }).fill("Còn lượt không?");
+  await expect(page.getByTestId("ai-send")).toBeDisabled();
+
+  ai.quota = { ...ai.quota, canSubmit: false, blockedByAssessment: true };
+  await page.reload();
+  await expect(page.getByTestId("trainee-ai-blocked")).toContainText("AI tạm khóa trong bài đánh giá");
+
+  ai.quota = { ...ai.quota, policyActive: false, blockedByAssessment: false };
+  await page.reload();
+  await expect(page.getByTestId("trainee-ai-blocked")).toContainText("Hỏi đáp AI chưa được bật");
+  expect(ai.posts()).toHaveLength(0);
+});
+
+test("a lost response is recovered with the same key or found again by its text, never sent twice", async ({ page }) => {
+  const ai = new TraineeAiBackend();
+  ai.submitFaults.push("lost-response");
+  await restore(page, "trainee", () => undefined, ai);
+  await page.goto("/learning-hub?view=questions");
+  await page.getByLabel("Câu hỏi", { exact: true }).fill("Câu hỏi bị mất phản hồi");
+  await page.getByTestId("ai-send").click();
+  await expect(page.getByTestId("ai-unknown")).toBeVisible();
+  await page.getByRole("button", { name: "Tra yêu cầu gần nhất của tôi" }).click();
+  await expect(page.getByTestId("ai-candidate")).toHaveCount(1);
+  await page.getByRole("button", { name: "Theo dõi yêu cầu này" }).click();
+  await expect(page.getByTestId("ai-answer")).toBeVisible({ timeout: 15_000 });
+  expect(ai.posts()).toHaveLength(1);
+  expect(ai.requests.filter((item) => (item.input as { text: string }).text === "Câu hỏi bị mất phản hồi")).toHaveLength(1);
+});
+
+test("a withheld answer (access lost) is explained without content; other roles are pointed to their own AI", async ({ page }) => {
+  const ai = new TraineeAiBackend();
+  const withheld = ai.seed({ resultWithheld: true, result: null, citations: [] });
+  await restore(page, "trainee", () => undefined, ai);
+  await page.goto(`/learning-hub?view=questions&request=${withheld.requestId}`);
+  await expect(page.getByTestId("ai-withheld")).toContainText("không còn truy cập được");
+  await expect(page.getByTestId("ai-citations")).toHaveCount(0);
+
+  await restore(page, "org");
+  await page.goto("/learning-hub?view=questions");
+  await expect(page.getByText("Hỏi đáp AI ở đây dành cho tài khoản học viên")).toBeVisible();
+});
+
+test("an unknown article from Learn is explained and the question is sent without it", async ({ page }) => {
+  const ai = new TraineeAiBackend();
+  await restore(page, "trainee", () => undefined, ai);
   await page.goto("/learning-hub?article=khong-co-bai-nay");
-  await expect(page.getByTestId("capability-context")).toContainText("Không tìm thấy bài bạn mở từ Learn");
-  await expect(page.getByTestId("capability-unavailable")).toContainText("Hỏi đáp AI cho học viên chưa khả dụng");
-  await page.goto(`/learning-hub?article=${slug}`);
-  await expect(page.getByTestId("capability-context")).toContainText("Đọc không gian trước khi hành động");
-  await expect(page.getByTestId("capability-unavailable").getByRole("link", { name: "Đọc lại bài này" })).toHaveAttribute("href", `/learn/${slug}`);
+  await expect(page.getByTestId("trainee-ai-article-missing")).toContainText("Không tìm thấy bài bạn mở từ Learn");
+  await page.getByLabel("Câu hỏi", { exact: true }).fill("Hỏi chung");
+  await page.getByTestId("ai-send").click();
+  await expect.poll(() => ai.posts().length).toBe(1);
+  expect(ai.posts()[0].body).toEqual({ question: "Hỏi chung" });
+});
+
+test("history is a real view with no demo content", async ({ page }) => {
+  await restore(page);
+  await page.goto("/learning-hub?view=history");
+  await expect(page.getByTestId("history-empty")).toContainText("Bạn chưa có lượt tập nào");
+  await expect(page.getByText(/minh họa|soạn sẵn/i)).toHaveCount(0);
+  expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.includes("prototype")))).toEqual([]);
 });
 
 test("an article page offers saving but no fake ask button", async ({ page }) => {
@@ -94,11 +168,11 @@ test("an article page offers saving but no fake ask button", async ({ page }) =>
   await expect(page.getByRole("button", { name: "Hỏi về bài này" })).toHaveCount(0);
 });
 
-test("logout returns home even on backend failure and unavailable views respect reduced motion", async ({ page }) => {
+test("logout returns home even on backend failure and the Q&A view respects reduced motion", async ({ page }) => {
   await restore(page);
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/learning-hub?view=questions");
-  await expect(page.getByTestId("capability-unavailable")).toBeVisible();
+  await expect(page.getByTestId("trainee-ai")).toBeVisible();
   await page.route("**/api/auth/logout", (route) => route.fulfill({ status: 503 }));
   await page.getByRole("button", { name: "Đăng xuất", exact: true }).click();
   await expect(page).toHaveURL(/\/$/);

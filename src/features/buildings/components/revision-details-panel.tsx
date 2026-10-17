@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buildingsApi } from "../api";
 import { describeApiError, formatDateTime, shortHash } from "../format";
 import { countBySeverity, severityLabel, severityOrder, severityRank } from "../pipeline";
+import { issueGlobalIds, qaGuide } from "../qa-codes";
 import type { RevisionIssue } from "../types";
 
 type IssueState = { data: RevisionIssue[] | undefined; error: unknown; loading: boolean; reload: () => void };
@@ -25,7 +26,7 @@ function valueText(value: unknown) {
   return text.length > 120 ? `${text.slice(0, 120)}…` : text;
 }
 
-function IssuesTab({ issues }: { issues: IssueState }) {
+function IssuesTab({ issues, onHighlight }: { issues: IssueState; onHighlight?: (ids: string[]) => void }) {
   const [severity, setSeverity] = useState("all");
   const [currentOnly, setCurrentOnly] = useState(true);
   const all = useMemo(() => issues.data ?? [], [issues.data]);
@@ -58,10 +59,18 @@ function IssuesTab({ issues }: { issues: IssueState }) {
         {issues.loading && !issues.data && <TableMessage colSpan={5}><SkeletonRows rows={3} label="Đang tải issue…" /></TableMessage>}
         {rows.map((issue) => {
           const level = severityLabel(issue.severity);
-          return <tr key={issue.id}>
+          const guide = qaGuide(issue.issueCode);
+          const ids = issueGlobalIds(issue);
+          return <tr key={issue.id} data-testid="issue-row" data-code={issue.issueCode}>
             <td><StatusBadge tone={level.tone}>{level.label}</StatusBadge></td>
             <td className="ops-mono">{issue.issueCode}</td>
-            <td>{issue.message}</td>
+            <td>
+              {guide ? <strong>{guide.title}</strong> : null}
+              {issue.message && <span className={guide ? "ops-cell-sub" : undefined}>{issue.message}</span>}
+              {guide?.guidance && <span className="ops-cell-sub" data-testid="issue-guidance">Cách xử lý: {guide.guidance}</span>}
+              {ids.length > 0 && <span className="ops-cell-sub">Cấu kiện: <span className="ops-mono">{ids.slice(0, 3).join(", ")}{ids.length > 3 ? ` +${ids.length - 3}` : ""}</span>
+                {onHighlight && <Button type="button" size="sm" variant="quiet" onClick={() => onHighlight(ids)} data-testid="issue-highlight">Đánh dấu trong preview</Button>}</span>}
+            </td>
             <td>{issue.status}</td>
             <td>{issue.isCurrentAttempt ? "Hiện hành" : "Lịch sử"}<span className="ops-cell-sub">{formatDateTime(issue.createdAt)}</span></td>
           </tr>;
@@ -125,7 +134,7 @@ function FactsTab({ accessToken, revisionId, reloadKey }: { accessToken: string;
 }
 
 /** Technical detail of the selected revision: issues (severity filter), processing logs, artifacts, BIM facts. */
-export function RevisionDetailsPanel({ accessToken, revisionId, issues, reloadKey }: { accessToken: string; revisionId: string; issues: IssueState; reloadKey: string }) {
+export function RevisionDetailsPanel({ accessToken, revisionId, issues, reloadKey, onHighlight }: { accessToken: string; revisionId: string; issues: IssueState; reloadKey: string; onHighlight?: (ids: string[]) => void }) {
   return <Panel title="Chi tiết kỹ thuật" description="Issue của validator, nhật ký worker, artifact và dữ liệu BIM của revision đang chọn.">
     <Tabs defaultValue="issues">
       <TabsList aria-label="Chi tiết kỹ thuật">
@@ -134,7 +143,7 @@ export function RevisionDetailsPanel({ accessToken, revisionId, issues, reloadKe
         <TabsTrigger value="artifacts">Artifact</TabsTrigger>
         <TabsTrigger value="facts">BIM facts</TabsTrigger>
       </TabsList>
-      <TabsContent value="issues"><IssuesTab issues={issues} /></TabsContent>
+      <TabsContent value="issues"><IssuesTab issues={issues} onHighlight={onHighlight} /></TabsContent>
       <TabsContent value="logs"><LogsTab accessToken={accessToken} revisionId={revisionId} reloadKey={reloadKey} /></TabsContent>
       <TabsContent value="artifacts"><ArtifactsTab accessToken={accessToken} revisionId={revisionId} reloadKey={reloadKey} /></TabsContent>
       <TabsContent value="facts"><FactsTab accessToken={accessToken} revisionId={revisionId} reloadKey={reloadKey} /></TabsContent>

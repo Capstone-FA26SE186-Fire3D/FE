@@ -87,14 +87,19 @@ test.describe("list: session state and result are shown apart", () => {
     await expect(row(page, ids.unsurvivable).getByTestId("row-result-status")).toContainText("Không có kết quả");
   });
 
-  test("each BE status is reachable through the status filter and answered by the matching label", async ({ page }) => {
+  test("each v7 status is reachable through the status filter; legacy states are labelled but not offered as filters", async ({ page }) => {
     const backend = new TrainingBackend();
     seedMix(backend);
     await start(page, backend);
     const labels: Record<string, [string, number]> = {
-      Launching: ["Đang khởi động", 1], Running: ["Đang chơi", 1], AwaitingSync: ["Chờ đồng bộ", 1], Completed: ["Đã hoàn thành", 4], CompletedWithSupersededRelease: ["Hoàn thành, bản phát hành đã thay", 1],
-      ScenarioUnsurvivable: ["Kịch bản không khả thi", 1], Aborted: ["Đã hủy", 1], Abandoned: ["Đã bỏ dở", 1], Crashed: ["Gặp lỗi", 1],
+      Launching: ["Đang khởi động", 1], Running: ["Đang chơi", 1], AwaitingSync: ["Chờ đồng bộ", 1], Completed: ["Đã hoàn thành", 4],
     };
+    await expect(page.getByLabel("Trạng thái phiên").locator("option")).toHaveCount(5);
+    // An old link with a legacy status shows the unfiltered list instead of a 400.
+    await page.goto("/learning-hub?view=history&status=Crashed");
+    await expect(rows(page)).toHaveCount(10);
+    await expect(page.getByLabel("Trạng thái phiên")).toHaveValue("");
+    expect(backend.lists().every((call) => !["Crashed", "Aborted", "Abandoned"].includes(call.params.get("status") ?? ""))).toBe(true);
     for (const [status, [label, count]] of Object.entries(labels)) {
       await page.goto(`/learning-hub?view=history&status=${status}`);
       await expect(rows(page), status).toHaveCount(count);
@@ -189,7 +194,7 @@ test.describe("list: empty, loading, errors", () => {
     await expect(page.getByTestId("history-filtered-empty")).toHaveCount(0);
 
     backend.add({ status: "Completed", mode: "Learn", startedAt: at(12), result: { outcome: "NotAssessed", reason: "MODE_NOT_ASSESSED", scorePercent: null, criteria: null, metrics: {} } });
-    await page.goto("/learning-hub?view=history&status=Crashed");
+    await page.goto("/learning-hub?view=history&status=Running");
     const filtered = page.getByTestId("history-filtered-empty");
     await expect(filtered).toContainText("Không có lượt tập nào khớp bộ lọc");
     await expect(page.getByTestId("history-empty")).toHaveCount(0);
@@ -315,8 +320,7 @@ test.describe("detail drawer: result", () => {
     await expect(metrics).toContainText("1 phút 36 giây");
     await expect(metrics).toContainText("184,25 m");
     await expect(drawer).toContainText("không phải chứng nhận");
-    await expect(drawer).toContainText("Giải thích kết quả bằng AI chưa khả dụng");
-    await expect(drawer.getByRole("button", { name: /Hỏi AI|Hỏi về kết quả/ })).toHaveCount(0);
+    await expect(drawer.getByTestId("ask-about-result")).toHaveAttribute("href", `/learning-hub?view=questions&session=${ids.passed}`);
     expect(backend.callsTo("GET", new RegExp(`/${ids.passed}/result$`))).toHaveLength(1);
     // The row was known: no extra state read.
     expect(backend.callsTo("GET", new RegExp(`/${ids.passed}$`))).toHaveLength(0);
@@ -510,13 +514,12 @@ test.describe("detail drawer: result", () => {
 });
 
 test.describe("hub integration", () => {
-  test("Lịch sử is a real view now, Hỏi đáp is still marked unavailable and untouched", async ({ page }) => {
+  test("Lịch sử and Hỏi đáp are both real views", async ({ page }) => {
     const backend = new TrainingBackend();
     seedMix(backend);
-    await start(page, backend, "/learning-hub?view=questions");
-    await expect(page.getByRole("link", { name: /^Hỏi đáp/ })).toContainText(/chưa khả dụng/i);
+    await start(page, backend, "/learning-hub?view=history");
+    await expect(page.getByRole("link", { name: /^Hỏi đáp/ })).not.toContainText(/chưa khả dụng/i);
     await expect(page.getByRole("link", { name: /^Lịch sử/ })).not.toContainText(/chưa khả dụng/i);
-    await expect(page.getByTestId("capability-unavailable")).toContainText("Hỏi đáp AI cho học viên chưa khả dụng");
     await page.getByRole("link", { name: /^Lịch sử/ }).click();
     await expect(page).toHaveURL(/view=history/);
     await expect(page.getByTestId("capability-unavailable")).toHaveCount(0);
@@ -576,3 +579,29 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 375, height: 667 
     });
   }
 }
+
+test.describe("v7 contract details", () => {
+  test("the Building filter comes from /api/training/buildings, including Buildings older than the latest sessions", async ({ page }) => {
+    const backend = new TrainingBackend();
+    seedMix(backend);
+    // 120 newer sessions in one Building would push Hoa Sen out of a "latest 100 sessions" sample.
+    for (let n = 0; n < 120; n += 1) backend.add({ status: "Completed", mode: "Learn", startedAt: `2026-10-20T${String(n % 24).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}:00Z`, building: ANH_DUONG, training: `Bài ${n}`, result: { outcome: "NotAssessed", reason: "MODE_NOT_ASSESSED", scorePercent: null, criteria: null, metrics: {} } });
+    await start(page, backend);
+    await expect(page.getByLabel("Building").locator("option", { hasText: HOA_SEN })).toHaveCount(1);
+    await expect(page.getByLabel("Building").locator("option", { hasText: ANH_DUONG })).toHaveCount(1);
+    expect(backend.callsTo("GET", /^\/api\/training\/buildings$/).length).toBeGreaterThan(0);
+    // The filter options no longer come from a 100-session read of the history list.
+    expect(backend.lists().some((call) => call.params.get("pageSize") === "100")).toBe(false);
+  });
+
+  test("an Assessment result shows the pass threshold and the author's criterion label", async ({ page }) => {
+    const backend = new TrainingBackend();
+    backend.add({ id: ids.passed, status: "Completed", mode: "Assessment", startedAt: at(12, 9), endedAt: at(12, 10), endReason: "Finished", training: "Sơ tán tầng 3", result: { outcome: "Passed", reason: "ALL_REQUIREMENTS_MET", scorePercent: 80, criteria: criteriaFixture().map((criterion, index) => (index === 0 ? { ...criterion, label: "Thoát ra ngoài an toàn", description: "Tới lối ra cuối cùng trước khi hết giờ." } : criterion)), metrics: metricsFixture }, resultCreatedAt: at(12, 10) });
+    await start(page, backend);
+    await openDetail(page, ids.passed);
+    const drawer = page.getByRole("dialog");
+    await expect(drawer.getByTestId("result-threshold")).toContainText("70");
+    await expect(drawer.getByTestId("criterion-label").first()).toHaveText("Thoát ra ngoài an toàn");
+    await expect(drawer.getByTestId("criterion").first()).toContainText("Tới lối ra cuối cùng trước khi hết giờ.");
+  });
+});

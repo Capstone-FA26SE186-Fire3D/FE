@@ -149,6 +149,10 @@ export function classifyUploadError(stage: IfcUploadStage, cause: unknown): IfcU
     if (cause.status === 410 || cause.code === "IFC_UPLOAD_EXPIRED") {
       return new IfcUploadError(stage, "Phiên tải lên đã hết hạn. Hãy bắt đầu lại để tạo phiên tải lên mới.", { ...base, restart: true });
     }
+    if (cause.code === "IFC_UNSUPPORTED_FORMAT") {
+      // 400 at initiate (name is not .ifc) or 422 at upload-complete (bytes do not start with ISO-10303-21;): not an IFC file.
+      return new IfcUploadError(stage, "Tệp không phải IFC (ví dụ tệp .rvt đổi tên hoặc tệp nén). Hãy xuất IFC (IFC2X3, IFC4 hoặc IFC4X3) từ phần mềm thiết kế rồi tải lên lại.", { ...base, restart: true });
+    }
     if (cause.code === "IDEMPOTENCY_KEY_CONFLICT" || cause.code === "IFC_UPLOAD_ALREADY_COMPLETED" || cause.code === "IFC_SOURCE_CHANGED") {
       return new IfcUploadError(stage, cause.message, { ...base, restart: true });
     }

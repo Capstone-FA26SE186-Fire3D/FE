@@ -3,7 +3,12 @@ import type { Tone } from "@/components/ui/status-badge";
 
 import type { AiRequest, AiRequestStatus, AiResultType } from "./types";
 
-export const operationLabel = (operation: string) => (operation === "ScenarioDraft" ? "Đề xuất kịch bản" : operation === "Answer" ? "Hỏi đáp" : operation);
+const OPERATION: Record<string, string> = { ScenarioDraft: "Đề xuất kịch bản", Answer: "Hỏi đáp", TraineeAnswer: "Hỏi đáp của Trainee" };
+export const operationLabel = (operation: string) => OPERATION[operation] ?? operation;
+const AUDIENCE: Record<string, string> = { organization: "Tổ chức", trainee: "Trainee" };
+export const audienceLabel = (audience: string) => AUDIENCE[audience] ?? audience;
+const CONFIDENCE: Record<string, string> = { low: "Thấp", medium: "Trung bình", high: "Cao" };
+export const confidenceLabel = (value: string) => CONFIDENCE[value] ?? value;
 
 const STATUS: Record<AiRequestStatus, { label: string; tone: Tone }> = {
   Accepted: { label: "Đang chờ xử lý", tone: "pending" },
@@ -53,6 +58,11 @@ const FAILURE: Record<string, string> = {
   AI_USAGE_INVALID: "Số liệu sử dụng do dịch vụ AI báo không hợp lệ.",
   AI_USAGE_EXCEEDS_RESERVATION: "Mức sử dụng vượt phần quota đã giữ chỗ nên không được chấp nhận.",
   AI_REQUEST_NOT_RECEIVED: "Dịch vụ AI xác nhận chưa nhận được yêu cầu này.",
+  AI_SOURCE_HASH_MISMATCH: "Tài liệu nguồn đã thay đổi so với bản được ghim (mã băm không khớp) nên dịch vụ AI không dùng được.",
+  AI_SOURCE_UNAVAILABLE: "Dịch vụ AI không đọc được tài liệu nguồn đã ghim.",
+  AI_REVISION_NOT_PINNED: "Dịch vụ AI không nhận được revision mô hình đã ghim cho đề xuất.",
+  AI_BIM_ANCHOR_INVALID: "Đề xuất neo vào phần tử không thuộc revision mô hình đã ghim nên bị giữ lại.",
+  AI_REVISION_STALE: "Revision mô hình đã mất hình học được chấp nhận trong lúc xử lý nên đề xuất bị giữ lại.",
 };
 export const failureText = (code: string | null | undefined) => (code ? FAILURE[code] ?? `Mã lỗi: ${code}` : undefined);
 
@@ -95,6 +105,10 @@ const CODE: Record<string, string> = {
   AI_SOURCE_NOT_ALLOWED: "Có nguồn không còn đủ điều kiện (đã hết hiệu lực hoặc không thuộc tổ chức). Tải lại danh sách nguồn rồi chọn lại.",
   AI_RECONCILE_NOT_ALLOWED: "Chỉ yêu cầu đang ở trạng thái Chờ đối soát mới đối soát được. Trạng thái đã thay đổi; hãy tải lại.",
   AI_POLICY_OVERLAP: "Khoảng hiệu lực chồng lên một chính sách khác của cùng thao tác. Chọn khoảng không giao nhau.",
+  AI_REVISION_NOT_READY: "Công trình chưa có revision mô hình sẵn sàng cho kịch bản (hình học đã được chấp nhận, QA đạt). Hoàn tất xử lý IFC trước.",
+  AI_DAILY_QUOTA_EXHAUSTED: "Bạn đã dùng hết lượt hỏi AI hôm nay. Lượt mới có lại vào đầu ngày hôm sau.",
+  AI_BLOCKED_DURING_ASSESSMENT: "AI tạm khóa khi bạn đang có một bài đánh giá (Assessment) đang chạy. Hoàn tất bài rồi hỏi lại.",
+  AI_CONTEXT_NOT_FOUND: "Nội dung bạn hỏi kèm (bài Learn, bài tập huấn hoặc kết quả) không còn truy cập được.",
   KNOWLEDGE_SOURCE_EXISTS: "Nguồn này (cùng phiên bản và nội dung) đã được đăng ký.",
   KNOWLEDGE_SOURCE_STATE_CONFLICT: "Trạng thái nguồn đã thay đổi nên không thực hiện được thao tác này. Hãy tải lại.",
   PRECONDITION_FAILED: "Nguồn vừa được thay đổi ở nơi khác (phiên bản không còn khớp). Hãy tải bản mới rồi thao tác lại.",

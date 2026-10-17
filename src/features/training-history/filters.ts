@@ -1,5 +1,5 @@
 import { parseDateOnly } from "@/utils/date-range";
-import { SESSION_STATUSES, TRAINING_MODES, type HistoryFilters } from "./types";
+import { FILTER_STATUSES, TRAINING_MODES, type HistoryFilters } from "./types";
 
 export const PAGE_SIZE = 10;
 
@@ -14,7 +14,7 @@ export function readFilters(get: (key: string) => string): HistoryFilters {
   const from = get("from");
   const to = get("to");
   return {
-    status: (SESSION_STATUSES as readonly string[]).includes(status) ? status : "",
+    status: (FILTER_STATUSES as readonly string[]).includes(status) ? status : "",
     mode: (TRAINING_MODES as readonly string[]).includes(mode) ? mode : "",
     buildingId: isUuid(building) ? building.toLowerCase() : "",
     from: parseDateOnly(from) === null ? "" : from,

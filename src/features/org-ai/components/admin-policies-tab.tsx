@@ -3,6 +3,8 @@
 import { Plus, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 
+import { useUrlParams } from "@/api/use-url-params";
+
 import { useIdempotencyKey } from "@/api/idempotency";
 import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
@@ -12,19 +14,21 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Field, Input, Select } from "@/components/ui/field";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge, type Tone } from "@/components/ui/status-badge";
-import { Table, TableMessage } from "@/components/ui/table";
+import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { formatDateTime, formatNumber } from "@/features/billing/format";
 
 import { adminAiApi } from "../api";
 import { aiErrorText, fieldIssue, operationLabel } from "../labels";
-import { AI_OPERATIONS, type AiPolicy, type CreateAiPolicyInput } from "../types";
+import { ADMIN_AI_OPERATIONS, urlFilter, type AiPolicy, type CreateAiPolicyInput } from "../types";
 import styles from "../org-ai.module.css";
 
 const QUOTA_UNIT = /^[a-z][a-z0-9_-]{0,49}$/;
 
-type Form = { operation: string; quotaUnit: string; reserveUnits: string; maxInputChars: string; maxSources: string; effectiveFrom: string; effectiveUntil: string };
-const EMPTY: Form = { operation: "", quotaUnit: "", reserveUnits: "", maxInputChars: "", maxSources: "", effectiveFrom: "", effectiveUntil: "" };
+const PAGE_SIZE = 20;
+
+type Form = { operation: string; quotaUnit: string; reserveUnits: string; maxInputChars: string; maxSources: string; dailyUnits: string; effectiveFrom: string; effectiveUntil: string };
+const EMPTY: Form = { operation: "", quotaUnit: "", reserveUnits: "", maxInputChars: "", maxSources: "", dailyUnits: "", effectiveFrom: "", effectiveUntil: "" };
 type Errors = Partial<Record<keyof Form, string>>;
 
 const toIso = (local: string) => new Date(local).toISOString();
@@ -33,7 +37,7 @@ const wholeNumber = (text: string) => (/^\d+$/.test(text.trim()) ? Number(text.t
 /** Same bounds the controller enforces; values are never preset: an empty field stays empty until an admin decides. */
 export function validatePolicy(form: Form): { errors: Errors; input?: CreateAiPolicyInput } {
   const errors: Errors = {};
-  if (form.operation !== "ScenarioDraft" && form.operation !== "Answer") errors.operation = "Chọn thao tác.";
+  if (!(ADMIN_AI_OPERATIONS as readonly string[]).includes(form.operation)) errors.operation = "Chọn thao tác.";
   if (!QUOTA_UNIT.test(form.quotaUnit.trim())) errors.quotaUnit = "Chữ thường, bắt đầu bằng chữ cái; gồm a-z, 0-9, _ hoặc -, tối đa 50 ký tự. Phải khớp đơn vị của quota đã cấp.";
   const reserve = wholeNumber(form.reserveUnits);
   if (!(reserve >= 1 && reserve <= 100_000_000)) errors.reserveUnits = "Số nguyên từ 1 đến 100.000.000.";
@@ -41,6 +45,11 @@ export function validatePolicy(form: Form): { errors: Errors; input?: CreateAiPo
   if (!(maxChars >= 1 && maxChars <= 20_000)) errors.maxInputChars = "Số nguyên từ 1 đến 20.000.";
   const maxSources = wholeNumber(form.maxSources);
   if (!(maxSources >= 1 && maxSources <= 100)) errors.maxSources = "Số nguyên từ 1 đến 100.";
+  // TraineeAnswer has no billing grant: each Trainee gets `dailyUnits` per day, at least one reservation.
+  const trainee = form.operation === "TraineeAnswer";
+  const daily = wholeNumber(form.dailyUnits);
+  if (trainee && !(daily >= 1 && daily <= 100_000_000)) errors.dailyUnits = "Số nguyên từ 1 đến 100.000.000.";
+  else if (trainee && reserve >= 1 && daily < reserve) errors.dailyUnits = "Phải lớn hơn hoặc bằng mức giữ chỗ mỗi yêu cầu.";
   const from = form.effectiveFrom ? new Date(form.effectiveFrom).getTime() : null;
   const until = form.effectiveUntil ? new Date(form.effectiveUntil).getTime() : null;
   if (from !== null && Number.isNaN(from)) errors.effectiveFrom = "Thời điểm không hợp lệ.";
@@ -50,7 +59,7 @@ export function validatePolicy(form: Form): { errors: Errors; input?: CreateAiPo
   return {
     errors,
     input: {
-      operation: form.operation, quotaUnit: form.quotaUnit.trim(), reserveUnits: reserve, maxInputChars: maxChars, maxSources,
+      operation: form.operation, quotaUnit: form.quotaUnit.trim(), reserveUnits: reserve, maxInputChars: maxChars, maxSources, ...(trainee ? { dailyUnits: daily } : {}),
       ...(form.effectiveFrom ? { effectiveFrom: toIso(form.effectiveFrom) } : {}), ...(form.effectiveUntil ? { effectiveUntil: toIso(form.effectiveUntil) } : {}),
     },
   };
@@ -99,7 +108,7 @@ function PolicyForm({ accessToken, onCreated, onClose }: { accessToken: string; 
   return <form className={styles.stack} onSubmit={submit} aria-label="Tạo chính sách AI" noValidate>
     <Alert tone="info" title="Chính sách bất biến">Chính sách không sửa được sau khi tạo. Muốn đổi, tạo kỳ hiệu lực mới cho thao tác đó (các kỳ của cùng thao tác không được chồng nhau). Không có giá trị mặc định: mọi con số do bạn quyết định.</Alert>
     <Field label="Thao tác" required error={server("$.operation", "operation")}>
-      {(props) => <Select {...props} value={form.operation} onChange={set("operation")}><option value="">Chọn thao tác…</option>{AI_OPERATIONS.map((value) => <option key={value} value={value}>{operationLabel(value)} ({value})</option>)}</Select>}
+      {(props) => <Select {...props} value={form.operation} onChange={set("operation")}><option value="">Chọn thao tác…</option>{ADMIN_AI_OPERATIONS.map((value) => <option key={value} value={value}>{operationLabel(value)} ({value})</option>)}</Select>}
     </Field>
     <Field label="Đơn vị quota" required hint="Khớp đơn vị của quota đã cấp (ví dụ đơn vị trong chính sách quota của gói). Backend không quy đổi tiền hay token." error={server("$.quotaUnit", "quotaUnit")}>
       {(props) => <Input {...props} value={form.quotaUnit} onChange={set("quotaUnit")} autoComplete="off" spellCheck={false} />}
@@ -108,6 +117,7 @@ function PolicyForm({ accessToken, onCreated, onClose }: { accessToken: string; 
       <Field label="Giữ chỗ mỗi yêu cầu" required error={server("$.reserveUnits", "reserveUnits")}>{(props) => <Input {...props} inputMode="numeric" value={form.reserveUnits} onChange={set("reserveUnits")} />}</Field>
       <Field label="Số ký tự đầu vào tối đa" required error={server("$.maxInputChars", "maxInputChars")}>{(props) => <Input {...props} inputMode="numeric" value={form.maxInputChars} onChange={set("maxInputChars")} />}</Field>
       <Field label="Số nguồn tối đa" required error={server("$.maxSources", "maxSources")}>{(props) => <Input {...props} inputMode="numeric" value={form.maxSources} onChange={set("maxSources")} />}</Field>
+      {form.operation === "TraineeAnswer" && <Field label="Hạn mức mỗi Trainee mỗi ngày" required hint="Theo ngày Asia/Ho_Chi_Minh; gồm phần đã tính và phần đang giữ chỗ. Không lấy từ quota của tổ chức." error={server("$.dailyUnits", "dailyUnits")}>{(props) => <Input {...props} inputMode="numeric" value={form.dailyUnits} onChange={set("dailyUnits")} data-testid="policy-daily-units" />}</Field>}
     </div>
     <div className={styles.grid2}>
       <Field label="Hiệu lực từ" hint="Để trống: có hiệu lực ngay khi tạo." error={server("$.effectiveFrom", "effectiveFrom")}>{(props) => <Input {...props} type="datetime-local" value={form.effectiveFrom} onChange={set("effectiveFrom")} />}</Field>
@@ -120,21 +130,27 @@ function PolicyForm({ accessToken, onCreated, onClose }: { accessToken: string; 
 
 export function AdminPoliciesTab({ accessToken }: { accessToken: string }) {
   const toast = useToast();
-  const list = useAsyncData("admin-ai:policies", (signal) => adminAiApi.listPolicies(accessToken, signal));
+  const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
+  const operation = urlFilter(get("operation"), ADMIN_AI_OPERATIONS);
+  const list = useAsyncData(`admin-ai:policies:${page}:${operation}`, (signal) => adminAiApi.listPolicies(accessToken, { page, pageSize: PAGE_SIZE, operation: operation || undefined }, signal));
   const [creating, setCreating] = useState(false);
   const items = list.data?.items ?? [];
+  const total = list.data?.total ?? 0;
   const [now] = useState(() => Date.now());
 
   return <>
     <div className="ops-toolbar">
+      <Select aria-label="Thao tác" style={{ width: 220 }} value={operation} onChange={(event) => setParams({ operation: event.target.value })}>
+        <option value="">Mọi thao tác</option>{ADMIN_AI_OPERATIONS.map((value) => <option key={value} value={value}>{operationLabel(value)}</option>)}
+      </Select>
       <Button onClick={() => setCreating(true)} data-testid="policy-new"><Plus size={16} aria-hidden="true" />Tạo chính sách</Button>
       <Button variant="quiet" onClick={list.reload} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
     </div>
     {list.error !== undefined && <Alert tone="danger" title="Không tải được chính sách AI" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{aiErrorText(list.error)}</Alert>}
     <Table caption="Chính sách giữ chỗ quota AI" data-testid="admin-ai-policies">
-      <thead><tr><th>Thao tác</th><th>Đơn vị</th><th>Giữ chỗ</th><th>Ký tự tối đa</th><th>Nguồn tối đa</th><th>Hiệu lực</th><th>Trạng thái</th></tr></thead>
+      <thead><tr><th>Thao tác</th><th>Đơn vị</th><th>Giữ chỗ</th><th>Ký tự tối đa</th><th>Nguồn tối đa</th><th>Hạn mức/ngày</th><th>Hiệu lực</th><th>Trạng thái</th></tr></thead>
       <tbody>
-        {list.loading && !list.data && <TableMessage colSpan={7}><SkeletonRows rows={4} label="Đang tải chính sách…" /></TableMessage>}
+        {list.loading && !list.data && <TableMessage colSpan={8}><SkeletonRows rows={4} label="Đang tải chính sách…" /></TableMessage>}
         {items.map((policy) => {
           const state = periodState(policy, now);
           return <tr key={policy.id} data-testid="policy-row">
@@ -143,13 +159,16 @@ export function AdminPoliciesTab({ accessToken }: { accessToken: string }) {
             <td>{formatNumber(policy.reserveUnits)}</td>
             <td>{formatNumber(policy.maxInputChars)}</td>
             <td>{formatNumber(policy.maxSources)}</td>
+            <td>{policy.dailyUnits != null ? formatNumber(policy.dailyUnits) : "—"}</td>
             <td>{formatDateTime(policy.effectiveFrom)}<span className="ops-cell-sub">{policy.effectiveUntil ? `đến ${formatDateTime(policy.effectiveUntil)}` : "không có ngày kết thúc"}</span></td>
             <td><StatusBadge tone={state.tone}>{state.label}</StatusBadge></td>
           </tr>;
         })}
-        {list.data && !items.length && <TableMessage colSpan={7}><EmptyState icon={SlidersHorizontal} title="Chưa có chính sách AI" description="Không có chính sách đang hiệu lực thì yêu cầu AI của tổ chức bị từ chối (AI_POLICY_UNAVAILABLE). Tạo chính sách cho từng thao tác; hệ thống không có giá trị seed." action={<Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo chính sách</Button>} /></TableMessage>}
+        {list.data && !items.length && operation && <TableMessage colSpan={8}><EmptyState icon={SlidersHorizontal} title="Không có chính sách cho thao tác này" description="Đổi hoặc xóa bộ lọc thao tác." /></TableMessage>}
+        {list.data && !items.length && !operation && <TableMessage colSpan={8}><EmptyState icon={SlidersHorizontal} title="Chưa có chính sách AI" description="Không có chính sách đang hiệu lực thì yêu cầu AI của tổ chức bị từ chối (AI_POLICY_UNAVAILABLE). Tạo chính sách cho từng thao tác; hệ thống không có giá trị seed." action={<Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo chính sách</Button>} /></TableMessage>}
       </tbody>
     </Table>
+    {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
     <p className={styles.dim}>Trạng thái hiệu lực chỉ so ngày giờ của kỳ với đồng hồ trình duyệt; máy chủ quyết định chính sách áp dụng lúc gửi yêu cầu.</p>
 
     <Drawer open={creating} onOpenChange={setCreating} title="Tạo chính sách AI" description="Một kỳ hiệu lực cho một thao tác; không sửa được sau khi tạo.">
