@@ -41,16 +41,42 @@ function disposeModel(root: THREE.Object3D) {
 }
 
 type ViewerStatus = "loading" | "ready" | "error" | "context-lost";
-type Rig = { setTheme: (theme: ResolvedTheme) => void };
+type Rig = { setTheme: (theme: ResolvedTheme) => void; setHighlight: (ids: string[]) => number };
+
+/** GlobalId → glTF node names from `semanticMapping` (`[{ ifcGlobalId, nodeId }]`); a node named after the GlobalId also counts. */
+export function nodeNamesFor(ids: string[], semanticMapping: unknown): Set<string> {
+  const names = new Set<string>(ids);
+  if (Array.isArray(semanticMapping)) {
+    const wanted = new Set(ids);
+    for (const entry of semanticMapping) {
+      if (entry && typeof entry === "object") {
+        const row = entry as Record<string, unknown>;
+        if (typeof row.ifcGlobalId === "string" && wanted.has(row.ifcGlobalId) && typeof row.nodeId === "string") names.add(row.nodeId);
+      }
+    }
+  }
+  return names;
+}
+
+const HIGHLIGHT = 0xff7a1a;
 
 /**
  * Orbit viewer for the processed GLB artifact. Renders on demand (no permanent animation loop), caps the pixel
  * ratio, follows the operations theme and releases GPU resources on unmount. `onLoadError` lets the owner fetch
  * a new signed URL (they expire after ~5 minutes); a lost WebGL context can be recovered with a new renderer.
  */
-export function RuntimePreviewViewer({ downloadUrl, onLoadError }: { downloadUrl: string; onLoadError?: () => void }) {
+export function RuntimePreviewViewer({ downloadUrl, onLoadError, highlight, semanticMapping }: {
+  downloadUrl: string;
+  onLoadError?: () => void;
+  /** IFC GlobalIds to emphasize (QA issue, equipment candidate); the camera frames them. */
+  highlight?: string[];
+  semanticMapping?: unknown;
+}) {
   const hostRef = useRef<HTMLDivElement>(null);
   const rig = useRef<Rig | null>(null);
+  const highlightRef = useRef<string[]>(highlight ?? []);
+  const mappingRef = useRef(semanticMapping);
+  const [found, setFound] = useState<number | null>(null);
   const { resolved } = useTheme();
   const themeRef = useRef(resolved);
   const errorRef = useRef(onLoadError);
@@ -65,6 +91,15 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError }: { downloadUrl
     themeRef.current = resolved;
     rig.current?.setTheme(resolved);
   }, [resolved]);
+
+  const highlightKey = (highlight ?? []).join("|");
+  useEffect(() => {
+    highlightRef.current = highlight ?? [];
+    mappingRef.current = semanticMapping;
+    const count = rig.current?.setHighlight(highlightRef.current);
+    if (count !== undefined) setFound(highlightRef.current.length ? count : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the joined ids are the dependency
+  }, [highlightKey, semanticMapping]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -120,7 +155,47 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError }: { downloadUrl
       attribute.needsUpdate = true;
       requestRender();
     };
-    rig.current = { setTheme: applyTheme };
+    let model: THREE.Object3D | null = null;
+    // Original materials of highlighted meshes, restored when the highlight changes.
+    const originals = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
+    const setHighlight = (ids: string[]) => {
+      for (const [mesh, material] of originals) {
+        const current = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+        current.forEach((item) => item.dispose());
+        mesh.material = material;
+      }
+      originals.clear();
+      if (!model || ids.length === 0) { requestRender(); return 0; }
+      const names = nodeNamesFor(ids, mappingRef.current);
+      const roots: THREE.Object3D[] = [];
+      model.traverse((object) => { if (names.has(object.name) || names.has(String(object.userData?.name ?? ""))) roots.push(object); });
+      const bounds = new THREE.Box3();
+      for (const root of roots) {
+        bounds.expandByObject(root);
+        root.traverse((object) => {
+          if (!(object instanceof THREE.Mesh) || originals.has(object)) return;
+          originals.set(object, object.material);
+          const tint = (material: THREE.Material) => {
+            const copy = material.clone();
+            if ("emissive" in copy && copy.emissive instanceof THREE.Color) { copy.emissive.setHex(HIGHLIGHT); (copy as THREE.MeshStandardMaterial).emissiveIntensity = 0.9; }
+            else if ("color" in copy && copy.color instanceof THREE.Color) copy.color.setHex(HIGHLIGHT);
+            return copy;
+          };
+          object.material = Array.isArray(object.material) ? object.material.map(tint) : tint(object.material);
+        });
+      }
+      if (!bounds.isEmpty()) {
+        const center = bounds.getCenter(new THREE.Vector3());
+        const distance = Math.max(bounds.getSize(new THREE.Vector3()).length() * 2.2, 4);
+        controls.target.copy(center);
+        camera.position.copy(center).add(new THREE.Vector3(distance, distance * 0.7, distance));
+        camera.updateProjectionMatrix();
+        controls.update();
+      }
+      requestRender();
+      return roots.length;
+    };
+    rig.current = { setTheme: applyTheme, setHighlight };
     applyTheme(themeRef.current);
 
     controls.addEventListener("change", requestRender);
@@ -149,7 +224,6 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError }: { downloadUrl
     canvas.addEventListener("webglcontextlost", onLost);
     canvas.addEventListener("webglcontextrestored", onRestored);
 
-    let model: THREE.Object3D | null = null;
     new GLTFLoader().load(
       downloadUrl,
       (gltf) => {
@@ -161,6 +235,8 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError }: { downloadUrl
         scene.add(model);
         fitCamera(camera, controls, model);
         setStatus("ready");
+        const count = setHighlight(highlightRef.current);
+        setFound(highlightRef.current.length ? count : null);
         requestRender();
       },
       undefined,
@@ -180,6 +256,10 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError }: { downloadUrl
       canvas.removeEventListener("webglcontextrestored", onRestored);
       controls.removeEventListener("change", requestRender);
       controls.dispose();
+      for (const [mesh, material] of originals) {
+        (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach((item) => item.dispose());
+        mesh.material = material;
+      }
       if (model) disposeModel(model);
       grid.geometry.dispose();
       (Array.isArray(grid.material) ? grid.material : [grid.material]).forEach((material) => material.dispose());
@@ -192,6 +272,9 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError }: { downloadUrl
   return <div className="ops-preview">
     <div ref={hostRef} role="img" aria-label="Mô hình 3D từ artifact IFC đã xử lý" style={{ position: "absolute", inset: 0 }} />
     {status === "loading" && <div className="ops-preview-overlay" role="status"><p className="ops-muted">Đang tải mô hình 3D…</p></div>}
+    {status === "ready" && found !== null && <p className="ops-preview-note" role="status" data-testid="preview-highlight" style={{ position: "absolute", left: 8, bottom: 8, margin: 0, padding: "4px 8px", borderRadius: 6, background: "var(--surface)", fontSize: 12 }}>
+      {found > 0 ? `Đang đánh dấu ${found} cấu kiện (màu cam).` : "Không tìm thấy cấu kiện này trong mô hình xem trước."}
+    </p>}
     {status === "error" && <div className="ops-preview-overlay" role="alert">
       <TriangleAlert size={24} aria-hidden="true" style={{ color: "var(--danger)" }} />
       <p className="ops-muted">Không tải được mô hình. Liên kết có thể đã hết hạn hoặc mất kết nối.</p>

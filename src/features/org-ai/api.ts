@@ -2,7 +2,10 @@ import { apiClient } from "@/api/client";
 
 import type {
   AdminAiRequestFilters,
+  AiLimits,
   AiPolicy,
+  AiPolicyFilters,
+  AiPolicyPage,
   AiRequest,
   AiRequestFilters,
   AiRequestPage,
@@ -14,6 +17,8 @@ import type {
   KnowledgeSourceFilters,
   KnowledgeSourcePage,
   ScenarioDraftInput,
+  TraineeAiQuota,
+  TraineeAnswerInput,
   WithEtag,
 } from "./types";
 
@@ -25,6 +30,10 @@ export const knowledgeEtag = (revision: number) => `"${revision}"`;
 export const orgAiApi = {
   sources(accessToken: string, signal?: AbortSignal) {
     return apiClient.request<AiSourceList>("/api/ai/organization/sources", { headers: auth(accessToken), signal });
+  },
+  /** Per operation: policy, estimated reserve, balance and `canSubmit`. Read before every submit; nothing is reserved here. */
+  limits(accessToken: string, signal?: AbortSignal) {
+    return apiClient.request<AiLimits>("/api/ai/organization/limits", { headers: auth(accessToken), signal });
   },
   /** 202 + the queued request. The same Idempotency-Key replays the SAME request (never a second reservation). */
   submitAnswer(accessToken: string, input: AnswerInput, idempotencyKey: string, signal?: AbortSignal) {
@@ -42,6 +51,23 @@ export const orgAiApi = {
   },
 };
 
+/** Trainee AI (`docs/organization-ai.md` #77): own requests only, a personal daily allowance, Common/Learn sources. */
+export const traineeAiApi = {
+  quota(accessToken: string, signal?: AbortSignal) {
+    return apiClient.request<TraineeAiQuota>("/api/ai/trainee/quota", { headers: auth(accessToken), signal });
+  },
+  /** 202 + the request; the same Idempotency-Key replays it without a second reservation. */
+  submit(accessToken: string, input: TraineeAnswerInput, idempotencyKey: string, signal?: AbortSignal) {
+    return apiClient.request<AiRequest>("/api/ai/trainee/answer", { headers: auth(accessToken), json: input, idempotencyKey, signal });
+  },
+  listRequests(accessToken: string, filters: { status?: string; page?: number; pageSize?: number }, signal?: AbortSignal) {
+    return apiClient.request<AiRequestPage>("/api/ai/trainee/requests", { headers: auth(accessToken), query: { ...filters }, signal });
+  },
+  getRequest(accessToken: string, requestId: string, signal?: AbortSignal) {
+    return apiClient.request<AiRequest>(`/api/ai/trainee/requests/${encodeURIComponent(requestId)}`, { headers: auth(accessToken), signal });
+  },
+};
+
 export const adminAiApi = {
   listRequests(accessToken: string, filters: AdminAiRequestFilters, signal?: AbortSignal) {
     return apiClient.request<AiRequestPage>("/api/admin/ai/requests", { headers: auth(accessToken), query: { ...filters }, signal });
@@ -54,8 +80,8 @@ export const adminAiApi = {
     return apiClient.request<AiRequest>(`/api/admin/ai/requests/${encodeURIComponent(requestId)}/reconcile`, { headers: auth(accessToken), method: "POST", idempotencyKey });
   },
 
-  listPolicies(accessToken: string, signal?: AbortSignal) {
-    return apiClient.request<{ items: AiPolicy[] }>("/api/admin/ai/policies", { headers: auth(accessToken), signal });
+  listPolicies(accessToken: string, filters: AiPolicyFilters, signal?: AbortSignal) {
+    return apiClient.request<AiPolicyPage>("/api/admin/ai/policies", { headers: auth(accessToken), query: { ...filters }, signal });
   },
   /** Policies are immutable: a change is a new period for the operation (overlap -> 409 AI_POLICY_OVERLAP). */
   createPolicy(accessToken: string, input: CreateAiPolicyInput, idempotencyKey: string) {

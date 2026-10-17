@@ -14,14 +14,16 @@ import type {
   BuildingSummary,
   ConfirmTrainingInput,
   EditorPreview,
+  EquipmentCandidates,
+  EquipmentDecisionInput,
   FinalizeIfcUploadInput,
-  InitiatedIfcUpload,
   InitiateIfcUploadInput,
+  InitiatedIfcUpload,
   JobQa,
+  ProcessRevisionResult,
   ProcessingJobDetail,
   ProcessingJobPage,
   ProcessingLogPage,
-  ProcessRevisionResult,
   RetryJobResult,
   RevisionArtifactPage,
   RevisionIssuePage,
@@ -152,6 +154,16 @@ export const buildingsApi = {
       headers: headers(accessToken),
       json: input,
     });
+  },
+  /** Candidates with their latest decision; ETag = overlay version. 409 EQUIPMENT_CANDIDATES_UNAVAILABLE without accepted geometry. */
+  async getEquipmentCandidates(accessToken: string, revisionId: string, signal?: AbortSignal): Promise<VersionedBuilding<EquipmentCandidates>> {
+    const response = await apiClient.requestWithMeta<EquipmentCandidates>(`/api/revisions/${revisionId}/equipment-candidates`, { headers: headers(accessToken), signal });
+    return { data: response.data, etag: response.headers.get("etag") ?? `"${response.data.version}"` };
+  },
+  /** Merged over the latest decisions; If-Match required (412 when someone saved meanwhile). Returns the new view and ETag. */
+  async saveEquipmentDecisions(accessToken: string, revisionId: string, items: EquipmentDecisionInput[], etag: string): Promise<VersionedBuilding<EquipmentCandidates>> {
+    const response = await apiClient.requestWithMeta<EquipmentCandidates>(`/api/revisions/${revisionId}/equipment-decisions`, { headers: headers(accessToken), method: "PATCH", ifMatch: etag, json: { items } });
+    return { data: response.data, etag: response.headers.get("etag") ?? `"${response.data.version}"` };
   },
   listIssues(accessToken: string, revisionId: string, page = 1, pageSize = 100, signal?: AbortSignal) {
     return apiClient.request<RevisionIssuePage>(`/api/revisions/${revisionId}/issues`, {

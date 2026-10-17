@@ -46,7 +46,7 @@ test("RAG demo keeps the chat contract (development server only)", async ({ page
   await expect(page.getByText("guide.md · chunk 0")).toBeVisible();
 });
 
-test("an article offers no ask button while Trainee AI is unavailable, and the hub explains it", async ({ page }) => {
+test("an article offers saving, and the hub Q&A opens after sign-in", async ({ page }) => {
   await guestWithPost(page);
   await page.goto(`/learn/${slug}`);
   await expect(page.getByRole("heading", { level: 1, name: "Đọc không gian trước khi hành động" })).toBeVisible();
@@ -57,6 +57,6 @@ test("an article offers no ask button while Trainee AI is unavailable, and the h
   await page.getByRole("link", { name: "Đăng nhập" }).click();
   await login(page);
   await expect(page).toHaveURL(/\/learning-hub\?view=questions/);
-  await expect(page.getByTestId("capability-unavailable")).toContainText("Hỏi đáp AI cho học viên chưa khả dụng");
+  await expect(page.getByRole("link", { name: /^Hỏi đáp/ })).not.toContainText(/chưa khả dụng/i);
   expect(await page.evaluate(() => sessionStorage.getItem("fire3d-prototype-content"))).toBeNull();
 });

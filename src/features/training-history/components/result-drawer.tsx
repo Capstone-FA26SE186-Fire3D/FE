@@ -1,6 +1,7 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/dialog";
@@ -33,6 +34,8 @@ function Criterion({ criterion }: { criterion: CriterionResult }) {
       <strong>{metricName(criterion.metric)}</strong>
       <StatusBadge tone={criterion.passed ? "success" : "danger"}>{criterion.passed ? "Đạt" : "Chưa đạt"}</StatusBadge>
     </header>
+    {criterion.label && <p className="th-criterion-label" data-testid="criterion-label">{criterion.label}</p>}
+    {criterion.description && <p className="ops-muted">{criterion.description}</p>}
     <p>Yêu cầu: {operatorSymbol(criterion.operator)}{threshold} · {criterion.mandatory ? "Bắt buộc" : "Không bắt buộc"}{criterion.weight === null ? "" : ` · Trọng số ${criterion.weight.toLocaleString("vi-VN")}`}</p>
     <p>Đo được: {formatMetricValue(criterion.metric, criterion.value)}</p>
     {criterion.reason && <p>{criterionReasonText(criterion.reason)}</p>}
@@ -56,6 +59,7 @@ function ResultBody({ result }: { result: TrainingResult }) {
         <div data-testid="result-score">
           <span>Điểm</span>
           <strong className="th-score" data-empty={result.scorePercent === null}>{formatScore(result.scorePercent)}</strong>
+          {result.passThresholdPercent !== null && <p data-testid="result-threshold">Ngưỡng đạt: {formatScore(result.passThresholdPercent)}</p>}
         </div>
       </div>
     </section>
@@ -128,6 +132,7 @@ function Body({ sessionId, known, onRefresh, onClose, accessToken }: { sessionId
     </div>}
 
     {data.load?.kind === "result" && <ResultBody result={data.load.result} />}
+    {data.load?.kind === "result" && <p><Link className="underline" href={`/learning-hub?view=questions&session=${encodeURIComponent(sessionId)}`} data-testid="ask-about-result">Hỏi AI về kết quả này</Link> <span className="ops-muted">(AI chỉ đọc kết quả của riêng bạn; không đổi điểm.)</span></p>}
 
     {data.load?.kind === "not-ready" && <Alert tone="info" title="Kết quả chưa sẵn sàng" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reload} disabled={detail.loading}><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>}>
       Máy chủ chưa lưu kết quả cho lượt tập này (mã RESULT_NOT_READY). Thường là lượt tập đang chờ thiết bị đồng bộ nốt dữ liệu. Đây không phải lỗi: hãy mở ứng dụng để đồng bộ rồi tải lại.
@@ -137,7 +142,7 @@ function Body({ sessionId, known, onRefresh, onClose, accessToken }: { sessionId
       {sessionView?.hint} Máy chủ không có kết quả đã lưu cho lượt tập này, nên không có điểm hay tiêu chí để hiển thị.
     </Alert>}
 
-    <p className="th-foot">Kết quả mô phỏng của riêng bạn, không phải chứng nhận hay kết luận an toàn công trình. Giải thích kết quả bằng AI chưa khả dụng.</p>
+    <p className="th-foot">Kết quả mô phỏng của riêng bạn, không phải chứng nhận hay kết luận an toàn công trình.</p>
   </div>;
 }
 

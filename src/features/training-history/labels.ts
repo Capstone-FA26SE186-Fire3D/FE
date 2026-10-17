@@ -77,6 +77,16 @@ export const operatorSymbol = (operator: string) => operators[operator] ?? opera
 
 const metricNames: Record<string, string> = {
   reached_exit: "Đã tới lối ra",
+  alarm_raised: "Số lần kích hoạt báo cháy",
+  extinguisher_used: "Số lần dùng bình chữa cháy",
+  extinguish_attempt_large_fire: "Số lần dập đám cháy lớn",
+  item_wetted: "Số lần làm ướt vật dụng",
+  nose_covered_in_smoke: "Số lần che mũi khi có khói",
+  checked_door_heat: "Số lần kiểm tra nhiệt cửa",
+  closed_door: "Số lần đóng cửa",
+  used_elevator: "Số lần dùng thang máy",
+  went_back_for_belongings: "Số lần quay lại lấy đồ",
+  npc_guided: "Số người được hướng dẫn",
   completion_time_seconds: "Thời gian hoàn thành",
   wrong_exits: "Số lần ra sai lối",
   hazard_exposure: "Mức tiếp xúc nguy hiểm",

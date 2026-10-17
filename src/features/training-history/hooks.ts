@@ -5,18 +5,23 @@ import { trainingHistoryApi } from "./api";
 import { isUuid } from "./filters";
 import type { HistoryItem, NamedRef, ResultLoad, SessionState } from "./types";
 
+/** Pages of 100 read for the Building filter; a learner with more Buildings than this keeps the URL `building=` working. */
+const BUILDING_PAGES = 10;
+
 /**
- * Building filter options. A Trainee has no Building catalog (the API lists Buildings for organizations only), so the
- * choices are the Buildings of the learner's own latest sessions (one read of up to 100 sessions). A Building the learner
- * trained in long ago may be missing here; the filter then cannot select it, but the URL `building=` still works.
+ * Building filter options from `GET /api/training/buildings`: every Building of the learner's own started sessions (not a
+ * sample of the latest sessions), kept after Building access is lost. Shown alphabetically.
  */
 export function useHistoryBuildings(accessToken: string | null, userId: string): NamedRef[] {
   const options = useAsyncData(
     `history:buildings:${userId}`,
     async (signal) => {
-      const page = await trainingHistoryApi.list(accessToken ?? "", { status: "", mode: "", buildingId: "", from: "", to: "", page: 1, pageSize: 100 }, signal);
       const byId = new Map<string, NamedRef>();
-      for (const item of page.items) if (item.building.id && !byId.has(item.building.id)) byId.set(item.building.id, item.building);
+      for (let page = 1; page <= BUILDING_PAGES; page += 1) {
+        const result = await trainingHistoryApi.buildings(accessToken ?? "", page, 100, signal);
+        for (const item of result.items) if (!byId.has(item.id)) byId.set(item.id, { id: item.id, name: item.name });
+        if (page * 100 >= result.totalCount || result.items.length === 0) break;
+      }
       return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, "vi"));
     },
     !!accessToken && !!userId,

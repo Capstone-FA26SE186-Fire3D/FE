@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, ShieldAlert, SearchX } from "lucide-react";
+import { Check, Copy, ExternalLink, ShieldAlert, SearchX } from "lucide-react";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 
@@ -12,9 +12,9 @@ import { formatDateTime, formatNumber, formatQuota } from "@/features/billing/fo
 import { isObject, type JsonObject } from "@/features/scenario-editor/store/json";
 import { KIND_META, type ObjectKind } from "@/features/scenario-editor/v1/contract";
 
-import { failureText, hasResultType, isInFlight, isSuccessfulDraft, operationLabel, sourceKindLabel, statusLabel, statusTone } from "../labels";
+import { confidenceLabel, failureText, hasResultType, isInFlight, isSuccessfulDraft, operationLabel, sourceKindLabel, statusLabel, statusTone } from "../labels";
 import { readProposalNotes, readProposalState } from "../apply-plan";
-import type { AiCitation, AiRequest } from "../types";
+import type { AiCitation, AiRequest, AiSourceLink } from "../types";
 import styles from "../org-ai.module.css";
 
 export const BILLING_AI_HREF = `${routes.workspaceBilling}?tab=ai`;
@@ -30,7 +30,19 @@ function CopyId({ value }: { value: string }) {
 /** v7 returns citations on the request; `result.citations` is read only for responses from before BE#89. */
 const citationsOf = (request: AiRequest): AiCitation[] => (Array.isArray(request.citations) ? request.citations : Array.isArray(request.result?.citations) ? request.result.citations : []);
 
-export function Citations({ request }: { request: AiRequest }) {
+/**
+ * Where a citation opens: a Learn post (public page), the organization Library item, or the knowledge source document.
+ * Only an https `sourceUri` is linked; anything else is shown as text, never as a link.
+ */
+export function citationHref(link: AiSourceLink | null | undefined, library: "workspace" | "admin" = "workspace"): { href: string; external: boolean } | null {
+  if (!link) return null;
+  if (link.learnSlug) return { href: `${routes.learn}/${encodeURIComponent(link.learnSlug)}`, external: false };
+  if (link.libraryItemId) return { href: `${library === "admin" ? routes.adminLibrary : routes.workspaceLibrary}?item=${encodeURIComponent(link.libraryItemId)}`, external: false };
+  if (link.sourceUri && /^https:\/\//i.test(link.sourceUri)) return { href: link.sourceUri, external: true };
+  return null;
+}
+
+export function Citations({ request, admin }: { request: AiRequest; admin?: boolean }) {
   const citations = citationsOf(request);
   if (citations.length === 0) return null;
   const sources = request.sources ?? [];
@@ -40,10 +52,17 @@ export function Citations({ request }: { request: AiRequest }) {
     <ul className={styles.list}>
       {citations.map((citation, index) => {
         const source = sources.find((item) => item.kind === citation.kind && item.id === citation.id);
+        const title = citation.title ?? source?.title ?? `${sourceKindLabel(citation.kind)} · ${citation.id.slice(0, 8)}`;
+        const version = citation.versionLabel ?? source?.versionLabel;
+        const target = citationHref(citation.link ?? source?.link, admin ? "admin" : "workspace");
         return <li key={`${citation.kind}:${citation.id}:${index}`} className={styles.item} data-testid="ai-citation">
-          <span className={styles.itemTitle}>{source?.title ?? `${sourceKindLabel(citation.kind)} · ${citation.id.slice(0, 8)}`}</span>
+          <span className={styles.itemTitle}>{target
+            ? target.external
+              ? <a href={target.href} target="_blank" rel="noopener noreferrer" data-testid="ai-citation-link">{title} <ExternalLink size={12} aria-hidden="true" /><span className="sr-only"> (mở tab mới)</span></a>
+              : <Link href={target.href} data-testid="ai-citation-link">{title}</Link>
+            : title}</span>
           <span className={styles.dim}>
-            {sourceKindLabel(citation.kind)}{source?.versionLabel ? ` · phiên bản ${source.versionLabel}` : ""}{citation.locator ? ` · vị trí: ${citation.locator}` : ""}
+            {sourceKindLabel(citation.kind)}{version ? ` · phiên bản ${version}` : ""}{citation.locator ? ` · vị trí: ${citation.locator}` : ""}{typeof citation.relevance === "number" ? ` · độ liên quan ${Math.round(citation.relevance * 100)}%` : ""}
           </span>
           {source?.contentHash && <span className={styles.dim}>Mã băm nội dung <span className={styles.mono}>{source.contentHash.slice(0, 16)}…</span></span>}
         </li>;
@@ -52,7 +71,20 @@ export function Citations({ request }: { request: AiRequest }) {
   </section>;
 }
 
-export function Usage({ request, admin }: { request: AiRequest; admin?: boolean }) {
+/** Confidence, assumptions and limitations the AI stated: shown so the reader can judge the answer, never as a verdict. */
+export function ResultNotes({ request }: { request: AiRequest }) {
+  const result = request.result;
+  const assumptions = (result?.assumptions ?? []).filter((item) => typeof item === "string" && item.trim());
+  const limitations = (result?.limitations ?? []).filter((item) => typeof item === "string" && item.trim());
+  if (!result?.confidence && assumptions.length === 0 && limitations.length === 0) return null;
+  return <section className={styles.section} aria-label="Độ tin cậy và giới hạn" data-testid="ai-notes">
+    {result?.confidence && <p><strong>Độ tin cậy AI tự đánh giá:</strong> {confidenceLabel(result.confidence)}</p>}
+    {assumptions.length > 0 && <div><strong>Giả định</strong><ul className={styles.list}>{assumptions.map((item, index) => <li key={index}>{item}</li>)}</ul></div>}
+    {limitations.length > 0 && <div><strong>Giới hạn</strong><ul className={styles.list}>{limitations.map((item, index) => <li key={index}>{item}</li>)}</ul></div>}
+  </section>;
+}
+
+export function Usage({ request, admin, trainee }: { request: AiRequest; admin?: boolean; trainee?: boolean }) {
   const unit = request.quotaUnit;
   return <section className={styles.section} aria-label="Sử dụng" data-testid="ai-usage">
     <h3>Sử dụng kỹ thuật</h3>
@@ -62,7 +94,8 @@ export function Usage({ request, admin }: { request: AiRequest; admin?: boolean 
       <dt>Đã tính</dt><dd>{request.consumedUnits !== undefined ? formatQuota(request.consumedUnits, unit) : isInFlight(request.status) || request.status === "NeedsReconcile" ? "Chưa có (chưa chốt)" : "—"}</dd>
       {admin && request.allocations && request.allocations.length > 0 && <><dt>Theo đợt cấp</dt><dd>{request.allocations.map((allocation) => `${allocation.grantId.slice(0, 8)}: giữ ${formatNumber(allocation.reservedUnits)}, tính ${allocation.consumedUnits === null ? "—" : formatNumber(allocation.consumedUnits)} (${allocation.status})`).join(" · ")}</dd></>}
     </dl>
-    {!admin && <p className={styles.dim}>Quota được giữ chỗ trước và chốt theo mức dùng thực tế; số dư và lịch sử nằm ở <Link href={BILLING_AI_HREF}>Quota AI</Link>.</p>}
+    {!admin && !trainee && <p className={styles.dim}>Quota được giữ chỗ trước và chốt theo mức dùng thực tế; số dư và lịch sử nằm ở <Link href={BILLING_AI_HREF}>Quota AI</Link>.</p>}
+    {trainee && <p className={styles.dim}>Mỗi câu hỏi giữ chỗ trong hạn mức hôm nay của bạn và chốt theo mức dùng thực tế; phần không dùng được trả lại.</p>}
   </section>;
 }
 
@@ -104,7 +137,7 @@ export function DraftPreview({ state, notes }: { state: JsonObject; notes: strin
  * One AI request as the server describes it. Status and content come from the BE only: nothing is inferred from the
  * absence of a field. `onApply` is offered only for a successful scenario draft and only opens the apply flow.
  */
-export function RequestView({ request, admin, onApply, extra }: { request: AiRequest; admin?: boolean; onApply?: (request: AiRequest) => void; extra?: ReactNode }) {
+export function RequestView({ request, admin, trainee, onApply, extra }: { request: AiRequest; admin?: boolean; trainee?: boolean; onApply?: (request: AiRequest) => void; extra?: ReactNode }) {
   const result = request.result;
   const state = isSuccessfulDraft(request) ? readProposalState(result) : null;
   const notes = readProposalNotes(result);
@@ -112,22 +145,30 @@ export function RequestView({ request, admin, onApply, extra }: { request: AiReq
 
   return <article className={styles.stack} data-testid="ai-request" data-status={request.status} data-operation={request.operation}>
     <div className={styles.row}>
-      <div className="ops-actions"><strong>{operationLabel(request.operation)}</strong><StatusBadge tone={statusTone(request.status, request.resultType)} data-testid="ai-status">{statusLabel(request.status, request.resultType)}</StatusBadge>
+      <div className="ops-actions"><strong>{trainee ? "Câu hỏi của bạn" : operationLabel(request.operation)}</strong><StatusBadge tone={statusTone(request.status, request.resultType)} data-testid="ai-status">{statusLabel(request.status, request.resultType)}</StatusBadge>
         {isSuccessfulDraft(request) && <StatusBadge tone="info">Cần bạn chỉnh sửa trước khi dùng</StatusBadge>}</div>
       <span className={styles.dim}>{formatDateTime(request.createdAt)}</span>
     </div>
     <dl className={styles.meta}>
       <dt>Mã yêu cầu</dt><dd><CopyId value={request.requestId} /></dd>
       {request.completedAt && <><dt>Hoàn tất lúc</dt><dd>{formatDateTime(request.completedAt)}</dd></>}
+      {request.input?.buildingName && <><dt>Công trình</dt><dd>{request.input.buildingName}</dd></>}
+      {request.input?.revisionId && <><dt>Revision mô hình ghim</dt><dd className={styles.mono}>{request.input.revisionId}</dd></>}
     </dl>
+    {request.input?.text && <section className={styles.section} aria-label="Nội dung đã gửi" data-testid="ai-input">
+      <h3>{request.operation === "ScenarioDraft" ? "Yêu cầu đã gửi" : "Câu hỏi đã gửi"}</h3>
+      <p className={styles.quote}>{request.input.text}</p>
+    </section>}
 
     {isInFlight(request.status) && <Alert tone="info" title={request.status === "Accepted" ? "Yêu cầu đang chờ xử lý" : "Dịch vụ AI đang xử lý"}>Đây là xử lý bất đồng bộ; trang tự cập nhật khi có kết quả. Không cần gửi lại.</Alert>}
 
     {request.status === "NeedsReconcile" && <Alert tone="warning" title="Chưa rõ kết quả, đang chờ đối soát">
-      {failure ?? "Hệ thống chưa xác nhận được kết quả từ dịch vụ AI."} Quota của yêu cầu này đang được giữ chỗ và không bị tính hay hoàn lại tự động; PlatformAdmin sẽ đối soát. Không gửi lại câu hỏi này để tránh trừ trùng.
+      {failure ?? "Hệ thống chưa xác nhận được kết quả từ dịch vụ AI."} {trainee ? "Phần lượt hỏi" : "Quota"} của yêu cầu này đang được giữ chỗ và không bị tính hay hoàn lại tự động; PlatformAdmin sẽ đối soát. Không gửi lại câu hỏi này để tránh trừ trùng.
     </Alert>}
 
-    {request.status === "Failed" && <Alert tone="danger" title="Yêu cầu thất bại">{failure ?? "Dịch vụ AI không trả được kết quả."} Xem phần hoàn lại quota ở lịch sử sử dụng của Quota AI.</Alert>}
+    {request.status === "Failed" && <Alert tone="danger" title="Yêu cầu thất bại">{failure ?? "Dịch vụ AI không trả được kết quả."} {trainee ? "Phần lượt hỏi đã giữ chỗ được trả lại." : "Xem phần hoàn lại quota ở lịch sử sử dụng của Quota AI."}</Alert>}
+
+    {request.resultWithheld && <div data-testid="ai-withheld"><Alert tone="info" title="Không còn hiển thị câu trả lời">Bài tập huấn hoặc bài Learn bạn hỏi kèm không còn truy cập được (đã hết quyền, bị gỡ hoặc ẩn), nên câu trả lời và trích dẫn không còn được hiển thị.</Alert></div>}
 
     {hasResultType(request, "InsufficientEvidence") && <div data-testid="ai-insufficient"><Alert tone="warning" title="Chưa đủ căn cứ để trả lời">{result?.message?.trim() || "Các nguồn đã chọn chưa đủ thông tin để trả lời có trích dẫn. Hãy mở rộng phạm vi nguồn hoặc hỏi cụ thể hơn."}</Alert></div>}
 
@@ -146,10 +187,11 @@ export function RequestView({ request, admin, onApply, extra }: { request: AiReq
       </section>
       : <Alert tone="warning" title="Không đọc được đề xuất">Máy chủ báo hoàn tất nhưng nội dung không theo fet3d.editor/1, nên không thể áp dụng.</Alert>)}
 
-    {request.status === "Succeeded" && <Citations request={request} />}
+    {request.status === "Succeeded" && <ResultNotes request={request} />}
+    {request.status === "Succeeded" && <Citations request={request} admin={admin} />}
     {hasResultType(request, "KnowledgeAnswer") && citationsOf(request).length === 0 && <p className={styles.dim}><SearchX size={14} aria-hidden="true" style={{ verticalAlign: "-2px", marginRight: 4 }} />Kết quả không kèm trích dẫn.</p>}
 
-    <Usage request={request} admin={admin} />
+    <Usage request={request} admin={admin} trainee={trainee} />
     {extra}
   </article>;
 }

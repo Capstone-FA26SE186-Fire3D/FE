@@ -171,9 +171,47 @@ export type RevisionIssue = {
   status: string;
   message: string;
   evidence: unknown;
+  /** IFC elements the worker reported for this issue (`[]` when none); highlighted in the preview. */
+  ifcGlobalIds?: string[] | null;
   isCurrentAttempt: boolean;
   createdAt: string;
 };
+
+export type EquipmentDecisionKind = "Confirmed" | "Retyped" | "Rejected";
+
+/** Candidate of `GET /api/revisions/{id}/equipment-candidates` (IFC-04, BE `docs/ifc-equipment-candidates.md`). */
+export type EquipmentCandidate = {
+  id: string;
+  ifcGlobalId: string;
+  /** Capability the worker detected (for example `extinguisher.portable`, `door.standard`). */
+  catalogKey: string;
+  source: "ifc" | "inferred" | (string & {});
+  ifcClass?: string | null;
+  confidence: number;
+  floorId?: string | null;
+  position: number[];
+  rotationY?: number | null;
+  bbox?: number[] | null;
+  /** Below confidence 0.9: the worker is not sure. */
+  needsConfirmation: boolean;
+  decision?: { decision: EquipmentDecisionKind | (string & {}); catalogKey?: string | null; note?: string | null; decidedBy?: string; decidedAt?: string } | null;
+  /** The decision on the same GlobalId in the newest earlier revision; never applied until saved. */
+  suggestedDecision?: { decision: EquipmentDecisionKind | (string & {}); catalogKey?: string | null; fromRevisionId: string } | null;
+};
+
+export type EquipmentCandidates = {
+  revisionId: string;
+  artifactId?: string | null;
+  metadataAvailable: boolean;
+  /** Overlay version = ETag (`"0"` before the first save). */
+  version: number;
+  items: EquipmentCandidate[];
+  revisionStatus?: string | null;
+  /** IFC_EXIT_UNKNOWN: the revision stays NeedsFix until an IfcDoor candidate is Confirmed/Retyped as `door.exit`. */
+  exitConfirmationRequired?: boolean;
+};
+
+export type EquipmentDecisionInput = { candidateId: string; decision: EquipmentDecisionKind; catalogKey?: string; note?: string };
 
 export type RevisionArtifact = {
   id: string;
