@@ -21,7 +21,7 @@ import { formatDateTime, formatQuota } from "@/features/billing/format";
 
 import { adminAiApi } from "../api";
 import { aiErrorText, failureText, operationLabel, statusLabel, statusTone } from "../labels";
-import { AI_STATUSES, type AiRequest } from "../types";
+import { AI_STATUSES, urlFilter, urlId, type AiRequest } from "../types";
 import styles from "../org-ai.module.css";
 import { RequestPanel } from "./request-panel";
 
@@ -94,9 +94,9 @@ function AdminDetail({ accessToken, request, refresh, orgName }: { accessToken: 
 
 export function AdminRequestsTab({ accessToken }: { accessToken: string }) {
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
-  const status = get("status");
+  const status = urlFilter(get("status"), AI_STATUSES);
   const organizationId = get("organizationId");
-  const requestId = get("request");
+  const requestId = urlId(get("request"));
 
   const list = useAsyncData(
     `admin-ai:requests:${page}:${status}:${organizationId}`,

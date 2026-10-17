@@ -20,7 +20,7 @@ import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
-import { buildingConflict, buildingsApi } from "../api";
+import { buildingConflict, buildingsApi, sameBuildingVersion } from "../api";
 import { describeApiError, describeBuildingWriteError, formatDateTime } from "../format";
 import { organizationsApi } from "@/features/organizations/api";
 import type { Building, BuildingSummary } from "../types";
@@ -139,7 +139,19 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
         router.push(`${routes.workspaceBuildings}/${created.data.id}`);
       } else {
         // No ETag yet (header not readable on the first read): read it now rather than send a PUT the server rejects with 428.
-        const etag = editEtag ?? (await buildingsApi.getVersioned(accessToken, drawer.id)).etag;
+        let etag = editEtag;
+        if (!etag) {
+          // The ETag read now belongs to the data read with it: if that data moved on since the drawer opened, show it as a
+          // conflict instead of sending the old fields under the new ETag.
+          const fresh = await buildingsApi.getVersioned(accessToken, drawer.id);
+          if (!editing || !sameBuildingVersion(fresh.data, editing)) {
+            setEditing(fresh.data);
+            setEditEtag(fresh.etag);
+            setConflict(fresh.data);
+            return;
+          }
+          etag = fresh.etag;
+        }
         if (!etag) { setFormError("Không đọc được phiên bản công trình (ETag). Hãy tải lại trang rồi thử lại."); return; }
         await buildingsApi.update(accessToken, drawer.id, buildingFormToInput(form, editing ?? undefined), etag, scopedOrgId);
         setDrawer(null);
