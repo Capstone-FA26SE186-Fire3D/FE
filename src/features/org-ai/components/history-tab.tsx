@@ -16,7 +16,7 @@ import { formatDateTime, formatQuota } from "@/features/billing/format";
 
 import { orgAiApi } from "../api";
 import { aiErrorText, operationLabel, resultTypeLabel, statusLabel, statusTone } from "../labels";
-import { AI_OPERATIONS, AI_RESULT_TYPES, AI_STATUSES, type AiRequest } from "../types";
+import { AI_OPERATIONS, AI_RESULT_TYPES, AI_STATUSES, urlFilter, urlId, type AiRequest } from "../types";
 import styles from "../org-ai.module.css";
 import { RequestPanel } from "./request-panel";
 
@@ -25,11 +25,11 @@ const PAGE_SIZE = 20;
 /** Requests of the caller's organization, newest first (`GET /api/ai/requests`). Filters and page live in the URL. */
 export function HistoryTab({ accessToken, onApply }: { accessToken: string; onApply: (request: AiRequest) => void }) {
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
-  const status = get("status");
-  const resultType = get("resultType");
-  const operation = get("operation");
+  const status = urlFilter(get("status"), AI_STATUSES);
+  const resultType = urlFilter(get("resultType"), AI_RESULT_TYPES);
+  const operation = urlFilter(get("operation"), AI_OPERATIONS);
   const mine = get("mine") === "1";
-  const requestId = get("request");
+  const requestId = urlId(get("request"));
 
   const list = useAsyncData(
     `org-ai:history:${page}:${status}:${resultType}:${operation}:${mine}`,

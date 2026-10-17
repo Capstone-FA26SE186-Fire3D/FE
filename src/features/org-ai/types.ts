@@ -18,6 +18,20 @@ export const AI_STATUSES: readonly AiRequestStatus[] = ["Accepted", "Processing"
 export type AiResultType = "KnowledgeAnswer" | "ScenarioDraft" | "InsufficientEvidence" | "RejectedBySafetyGate";
 export const AI_RESULT_TYPES: readonly AiResultType[] = ["KnowledgeAnswer", "ScenarioDraft", "InsufficientEvidence", "RejectedBySafetyGate"];
 
+/**
+ * A filter value read from the URL, or "" when it is not one of `allowed`. Old links (pre-v7 statuses such as Queued or
+ * Running) and hand-edited URLs then show the unfiltered list instead of sending a value the API rejects with 400.
+ */
+export function urlFilter<T extends string>(value: string, allowed: readonly T[]): T | "" {
+  return (allowed as readonly string[]).includes(value) ? (value as T) : "";
+}
+
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** An id read from the URL, or "" when it is not a GUID (the API answers 400 for anything else). */
+export function urlId(value: string): string {
+  return GUID.test(value) ? value : "";
+}
+
 /** `result.status`: Answered (KnowledgeAnswer), NeedsUserEdit (ScenarioDraft only), InsufficientEvidence, RejectedBySafetyGate. */
 export type AiResultStatus = "Answered" | "NeedsUserEdit" | "InsufficientEvidence" | "RejectedBySafetyGate";
 
