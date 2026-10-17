@@ -132,7 +132,7 @@ export function AdminRequestsTab({ accessToken }: { accessToken: string }) {
             <span className="ops-cell-sub"><span className={styles.mono}>{item.requestId.slice(0, 8)}…</span></span>
           </td>
           <td>{orgName(item.organizationId)}</td>
-          <td><StatusBadge tone={statusTone(item.status)}>{statusLabel(item.status)}</StatusBadge>{item.reconcileRequestedAt && <span className="ops-cell-sub">Đã yêu cầu đối soát</span>}</td>
+          <td><StatusBadge tone={statusTone(item.status, item.resultType)}>{statusLabel(item.status, item.resultType)}</StatusBadge>{item.reconcileRequestedAt && <span className="ops-cell-sub">Đã yêu cầu đối soát</span>}</td>
           <td>{item.consumedUnits !== undefined ? formatQuota(item.consumedUnits, item.quotaUnit) : item.reservedUnits !== undefined ? `Giữ chỗ ${formatQuota(item.reservedUnits, item.quotaUnit)}` : "—"}</td>
           <td>{formatDateTime(item.createdAt)}</td>
         </tr>)}

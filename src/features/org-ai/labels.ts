@@ -1,27 +1,47 @@
 import { ApiError } from "@/api/types/common";
 import type { Tone } from "@/components/ui/status-badge";
 
-import type { AiOperation, AiRequestStatus } from "./types";
+import type { AiRequest, AiRequestStatus, AiResultType } from "./types";
 
 export const operationLabel = (operation: string) => (operation === "ScenarioDraft" ? "Đề xuất kịch bản" : operation === "Answer" ? "Hỏi đáp" : operation);
 
 const STATUS: Record<AiRequestStatus, { label: string; tone: Tone }> = {
-  Queued: { label: "Đang chờ xử lý", tone: "pending" },
-  Running: { label: "Đang xử lý", tone: "pending" },
+  Accepted: { label: "Đang chờ xử lý", tone: "pending" },
+  Processing: { label: "Đang xử lý", tone: "pending" },
   Succeeded: { label: "Hoàn tất", tone: "success" },
-  InsufficientEvidence: { label: "Chưa đủ căn cứ", tone: "warning" },
-  SafetyRejected: { label: "Bị cổng an toàn từ chối", tone: "danger" },
   Failed: { label: "Thất bại", tone: "danger" },
   NeedsReconcile: { label: "Chờ đối soát", tone: "warning" },
+  Rejected: { label: "Bị từ chối", tone: "danger" },
 };
 
-export const statusLabel = (status: string) => STATUS[status as AiRequestStatus]?.label ?? status;
-export const statusTone = (status: string): Tone => STATUS[status as AiRequestStatus]?.tone ?? "neutral";
+const RESULT_TYPE: Record<AiResultType, { label: string; tone: Tone }> = {
+  KnowledgeAnswer: { label: "Câu trả lời", tone: "success" },
+  ScenarioDraft: { label: "Đề xuất kịch bản", tone: "success" },
+  InsufficientEvidence: { label: "Chưa đủ căn cứ", tone: "warning" },
+  RejectedBySafetyGate: { label: "Bị cổng an toàn từ chối", tone: "danger" },
+};
+
+export const resultTypeLabel = (resultType: string) => RESULT_TYPE[resultType as AiResultType]?.label ?? resultType;
+
+/**
+ * Badge of a request. A Succeeded request that produced no content (InsufficientEvidence, RejectedBySafetyGate) shows
+ * its `resultType` instead of "Hoàn tất", so it is never read as an answer.
+ */
+const badge = (status: string, resultType?: string | null) => {
+  if (status === "Succeeded" && (resultType === "InsufficientEvidence" || resultType === "RejectedBySafetyGate")) return RESULT_TYPE[resultType];
+  return STATUS[status as AiRequestStatus];
+};
+export const statusLabel = (status: string, resultType?: string | null) => badge(status, resultType)?.label ?? status;
+export const statusTone = (status: string, resultType?: string | null): Tone => badge(status, resultType)?.tone ?? "neutral";
 
 /** States the service may still change by itself: poll these, stop on anything else. NeedsReconcile waits for an admin, not for polling. */
-export const isInFlight = (status: string) => status === "Queued" || status === "Running";
+export const isInFlight = (status: string) => status === "Accepted" || status === "Processing";
 
-export const isSuccessfulDraft = (operation: string, status: string) => operation === ("ScenarioDraft" satisfies AiOperation) && status === "Succeeded";
+type Outcome = Pick<AiRequest, "status" | "resultType">;
+export const hasResultType = (request: Outcome, resultType: AiResultType) => request.status === "Succeeded" && request.resultType === resultType;
+
+/** Only a Succeeded ScenarioDraft carries a proposal (result.status NeedsUserEdit) that may be applied in the editor. */
+export const isSuccessfulDraft = (request: Outcome) => hasResultType(request, "ScenarioDraft");
 
 /** Stable failure codes the BE writes on a request (`OrganizationAi.cs`, `docs/organization-ai.md`). */
 const FAILURE: Record<string, string> = {
@@ -34,7 +54,7 @@ const FAILURE: Record<string, string> = {
   AI_USAGE_EXCEEDS_RESERVATION: "Mức sử dụng vượt phần quota đã giữ chỗ nên không được chấp nhận.",
   AI_REQUEST_NOT_RECEIVED: "Dịch vụ AI xác nhận chưa nhận được yêu cầu này.",
 };
-export const failureText = (code: string | undefined) => (code ? FAILURE[code] ?? `Mã lỗi: ${code}` : undefined);
+export const failureText = (code: string | null | undefined) => (code ? FAILURE[code] ?? `Mã lỗi: ${code}` : undefined);
 
 export const SOURCE_KIND_LABEL: Record<string, string> = {
   KnowledgeSource: "Tri thức chuẩn (đã duyệt)",

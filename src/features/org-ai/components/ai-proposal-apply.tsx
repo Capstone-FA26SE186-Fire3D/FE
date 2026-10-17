@@ -43,7 +43,7 @@ export function AiProposalApply<S>({ accessToken, requestId, draft, floorIds, on
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
 
   const found = request.data;
-  const proposal = found && isSuccessfulDraft(found.operation, found.status) ? readProposalState(found.result) : null;
+  const proposal = found && isSuccessfulDraft(found) ? readProposalState(found.result) : null;
   const notes = found ? readProposalNotes(found.result) : null;
   const plan = useMemo(() => (proposal ? buildApplyPlan(proposal, draft, floorIds) : null), [proposal, draft, floorIds]);
 
