@@ -144,3 +144,18 @@ Phụ trách: Phạm Gia Bảo (FE) và Nguyễn Phúc Lộc (FE). Việc liên 
 - Màn hình **"Thiết bị phát hiện được"**: xác nhận, sửa loại hoặc bỏ ứng viên từ IFC theo `confidence`.
 - Editor kịch bản (`src/features/scenario-editor`): đặt thiết bị PCCC và vật dụng (catalog đợt 1 ở mục 6.1, sprinkler mục 6.3) bám bề mặt, chỉ thêm vật lên artifact, không sửa tường/cửa/sàn; dòng thời gian sự kiện (đầu báo kích hoạt/vô hiệu, mất điện, cầu thang bị khói chặn); cảnh báo thiếu nguồn nước/báo cháy (mục 9). Editor `fet3d.editor/1` đã có object `Equipment` với capability từ `GET /api/scenario-interactions/catalog`: `catalogKey` trong Docs chính là capability id; ứng viên từ IFC hiện như `Equipment` chờ xác nhận.
 - Chọn preset phong cách công trình và đổi vật liệu theo nhóm (mục 5.5).
+
+## Unity runtime và pipeline bake — 2026-10-17
+
+Quyết định của trưởng nhóm, đã vào Docs (PR #21–#24) và issue:
+- Unity runtime đã chạy trong Editor 6000.6.3f1: mô phỏng lửa/khói/nhiệt + NPC bằng **Entities**, camera third-person, tương tác theo ngữ cảnh, HUD, telemetry, nạp AssetBundle. APK demo build được (IL2CPP/ARM64). Code đang ở nhánh `feature/third-person-player-camera` của repo Unity, chưa lên `develop`.
+- **Ưu tiên hình ảnh:** Unity build worker chạy batch trên **Azure VM Windows do BE vận hành** (BE#110). Worker import GLB, gán material theo `libraryKey`, bake lightmap + light/reflection probe cho 2 bộ ánh sáng (bình thường, mất điện), xuất AssetBundle theo tầng + `manifest.json` (`fet3d.package/1`, SHA-256 từng file). Không dùng Addressables.
+- Texture PBR chỉ nằm trong project Unity (bundle `fet3d-materials` cài sẵn trong app). GLB chỉ mang `libraryKey`; BE và worker không lưu file ảnh.
+- `IFC_EXIT_UNKNOWN` = phương án B, chỉ dùng `door.exit` (BE#100).
+- Event Unity gửi (BE#101): `eventId` là GUID, `schemaVersion` = `"1"` (chuỗi), `objectId` = id object trong `fet3d.editor/1`; core `Moved`/`HazardExposure` mỗi 5 giây; Unity không chấm Đạt/Chưa đạt.
+
+Việc của repo FE (editor `fet3d.editor/1`):
+- Unity đã hỗ trợ và đề xuất thêm vào catalog (BE#101): `fire.source` (`intensity` 0–10, `activationSeconds`), `smoke.source`, `event.power_outage` (`atSeconds`), `event.alarm` (`atSeconds`, `fails`), `npc.guide` (`behaviour` calm/panic, `mobilityImpaired`). Editor nên cho đặt các object này khi catalog đã đăng ký.
+- `placement.position.y` được Unity hiểu là **độ cao tính từ mặt sàn** của `placement.floorId`, không phải tọa độ tuyệt đối.
+- Preview web có thể hiện màu đơn hoặc tự đóng gói cùng bộ texture CC0; Unity không đọc material từ FE.
+- Bước "Chọn cửa thoát" (`door.exit`) và màn thiết bị IFC-04: FE#49, BE#100.
