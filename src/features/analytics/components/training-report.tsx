@@ -11,11 +11,14 @@ import { DataTable, EmptyReport, outcomeLabels, OutcomeBar, PairBars } from "./c
 import styles from "./analytics.module.css";
 
 const modeLabels: Record<string, string> = { Learn: "Learn", Guided: "Hướng dẫn (Guided Drill)", Assessment: "Đánh giá (Assessment)" };
-const aiStatusLabels: Record<string, string> = { Queued: "Đang chờ", Running: "Đang chạy", Succeeded: "Thành công", InsufficientEvidence: "Thiếu căn cứ", SafetyRejected: "Bị chặn an toàn", Failed: "Thất bại", NeedsReconcile: "Cần đối soát" };
+// v7 request statuses (BE#89). analytics_ai_usage on BE main still keys `requests` by the pre-v7 names, which no row has
+// after the migration (always 0): those keys are hidden rather than shown as statuses that no longer exist.
+const aiStatusLabels: Record<string, string> = { Accepted: "Đang chờ", Processing: "Đang xử lý", Succeeded: "Thành công", Failed: "Thất bại", NeedsReconcile: "Cần đối soát", Rejected: "Bị từ chối" };
+const LEGACY_AI_STATUSES = new Set(["Queued", "Running", "InsufficientEvidence", "SafetyRejected"]);
 
 function AiUsagePanel({ usage }: { usage: AiUsage }) {
   const settled = usage.settledUnits;
-  const statuses = Object.entries(usage.requests);
+  const statuses = Object.entries(usage.requests).filter(([status]) => !LEGACY_AI_STATUSES.has(status));
   return <Panel title="Sử dụng AI" description="Đơn vị quota đã chốt trong kỳ; đặt trước và cần đối soát là số hiện tại, tính riêng.">
     <div className="ops-stack">
       <div className="ops-grid ops-grid-3">

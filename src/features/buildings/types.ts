@@ -32,11 +32,11 @@ export type BuildingSummary = {
   totalFloors: number;
   isActive: boolean;
   createdAt: string;
+  updatedAt: string;
 };
 
 export type Building = BuildingSummary & {
   organizationId: string;
-  updatedAt: string;
   location: (BuildingLocationInput & { id: string }) | null;
   contact: (BuildingContactInput & { id: string }) | null;
 };
@@ -275,3 +275,6 @@ export type BimFactPage = PageResponse<BimFact>;
 export type RevisionArtifactPage = PageResponse<RevisionArtifact>;
 export type ProcessingLogPage = PageResponse<ProcessingLog>;
 export type ScenarioVersionPage = PageResponse<ScenarioVersionSummary>;
+
+/** A Building read or write together with its `ETag` (`"<number>"`); PUT/DELETE must send it back as If-Match. */
+export type VersionedBuilding<T = Building> = { data: T; etag: string | null };

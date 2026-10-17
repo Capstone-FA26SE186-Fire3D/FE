@@ -59,7 +59,7 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "overview" }:
   const [qrOpened, setQrOpened] = useState(false);
   if (tab === "qr" && !qrOpened) setQrOpened(true);
 
-  const building = useAsyncData(`building:${buildingId}`, (signal) => buildingsApi.get(token, buildingId, signal), enabled);
+  const building = useAsyncData(`building:${buildingId}`, (signal) => buildingsApi.getVersioned(token, buildingId, signal), enabled);
   const revisions = useAsyncData(`revisions:${buildingId}`, (signal) => buildingsApi.listRevisions(token, buildingId, 1, 50, signal), enabled);
   const scenarios = useAsyncData(`scenarios:${buildingId}:${scenarioPage}`, (signal) => buildingsApi.listScenarios(token, buildingId, scenarioPage, SCENARIO_PAGE_SIZE, signal), enabled);
 
@@ -125,10 +125,10 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "overview" }:
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
 
   const crumbs: Crumb[] = isAdmin && building.data
-    ? [{ label: "Quản trị", href: routes.adminOverview }, { label: "Tổ chức", href: routes.adminOrganizations }, { label: "Công trình", href: `${routes.adminOrganizations}/${building.data.organizationId}/buildings` }, { label: building.data.name }]
+    ? [{ label: "Quản trị", href: routes.adminOverview }, { label: "Tổ chức", href: routes.adminOrganizations }, { label: "Công trình", href: `${routes.adminOrganizations}/${building.data.data.organizationId}/buildings` }, { label: building.data.data.name }]
     : isAdmin
       ? [{ label: "Quản trị", href: routes.adminOverview }, { label: "Tổ chức", href: routes.adminOrganizations }, { label: "Công trình" }]
-      : [{ label: "Công trình", href: routes.workspaceBuildings }, { label: building.data?.name ?? "Chi tiết" }];
+      : [{ label: "Công trình", href: routes.workspaceBuildings }, { label: building.data?.data.name ?? "Chi tiết" }];
 
   if (building.error !== undefined && !building.data) {
     const notFound = isStatus(building.error, 404);
@@ -140,7 +140,7 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "overview" }:
     </>;
   }
 
-  const data = building.data;
+  const data = building.data?.data;
   const rev = revision ? revisionLabel(revision.status) : null;
 
   return <>
@@ -169,7 +169,7 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "overview" }:
       </TabsList>
 
       <TabsContent value="overview">
-        {!data ? <Skeleton style={{ height: 240 }} /> : <OverviewTab accessToken={token} building={data} revision={revision} pipeline={pipeline} issues={issues.data?.items} scenarioCount={scenarios.data?.totalCount} isAdmin={isAdmin} onSaved={building.reload} onGoTo={selectTab} />}
+        {!data ? <Skeleton style={{ height: 240 }} /> : <OverviewTab accessToken={token} building={data} etag={building.data?.etag ?? null} revision={revision} pipeline={pipeline} issues={issues.data?.items} scenarioCount={scenarios.data?.totalCount} isAdmin={isAdmin} onSaved={building.reload} onGoTo={selectTab} />}
       </TabsContent>
 
       <TabsContent value="ifc">

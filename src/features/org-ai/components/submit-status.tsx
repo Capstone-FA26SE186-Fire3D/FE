@@ -58,7 +58,7 @@ export function SubmitStatus({ phase, operation, onRetry, onLook, onTrack }: {
         <p className={styles.muted}>Các yêu cầu {operationLabel(operation).toLowerCase()} của bạn tạo từ lúc gửi:</p>
         <ul className={styles.list}>{phase.candidates.map((candidate) => <li key={candidate.requestId} className={styles.item} data-testid="ai-candidate">
           <span className={styles.mono}>{candidate.requestId}</span>
-          <span className={styles.dim}>{statusLabel(candidate.status)} · {new Date(candidate.createdAt).toLocaleString("vi-VN")}</span>
+          <span className={styles.dim}>{statusLabel(candidate.status, candidate.resultType)} · {new Date(candidate.createdAt).toLocaleString("vi-VN")}</span>
           <div><Button size="sm" variant="secondary" onClick={() => onTrack(candidate.requestId)}><LifeBuoy size={14} aria-hidden="true" />Theo dõi yêu cầu này</Button></div>
         </li>)}</ul>
       </div>}

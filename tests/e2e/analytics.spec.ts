@@ -16,7 +16,7 @@ async function signIn(page: Page, user: object) {
 }
 
 const head = { asOf: "2026-10-12T03:00:00Z", from: "2026-09-12T03:00:00Z", to: "2026-10-12T03:00:00Z", activeWindowSeconds: 120, definitions: { plays: "Contract-7 learner sessions started in UTC [from,to); prepare and playtest are not counted." } };
-const aiUsage = { settledUnits: [{ quotaUnit: "tokens", units: 12000 }], openReservations: [{ quotaUnit: "tokens", units: 500 }], needsReconcile: { requests: 1, reservedUnits: 200 }, requests: { Queued: 0, Running: 1, Succeeded: 9, InsufficientEvidence: 2, SafetyRejected: 0, Failed: 1, NeedsReconcile: 1 } };
+const aiUsage = { settledUnits: [{ quotaUnit: "tokens", units: 12000 }], openReservations: [{ quotaUnit: "tokens", units: 500 }], needsReconcile: { requests: 1, reservedUnits: 200 }, requests: { Accepted: 0, Processing: 1, Succeeded: 11, Failed: 1, NeedsReconcile: 1, SafetyRejected: 0 } };
 const training = (over: Record<string, unknown> = {}) => ({
   ...head, plays: 40, uniqueTrainees: 18, completed: 30, completionRate: 0.75, activeSessions: 3,
   outcomes: { Passed: 14, NotPassed: 6, Incomplete: 7, NotAssessed: 3 },
@@ -83,6 +83,9 @@ test.describe("organization analytics", () => {
     await expect(page.getByText("70%").first()).toBeVisible();
     await expect(page.getByText("3 phút 36 giây")).toBeVisible();
     await expect(page.getByText("Sử dụng AI")).toBeVisible();
+    const aiStatuses = page.getByRole("list", { name: "Yêu cầu AI theo trạng thái (tạo trong kỳ)" });
+    await expect(aiStatuses).toContainText("Đang xử lý");
+    await expect(aiStatuses).not.toContainText("Bị chặn an toàn"); // pre-v7 key from the BE aggregate is hidden
     expect(urls).toEqual(["/api/organizations/me/analytics/training?from=2026-09-01T00%3A00%3A00.000Z&to=2026-10-01T00%3A00%3A00.000Z"]);
 
     await page.getByRole("tab", { name: "Vận hành" }).click();

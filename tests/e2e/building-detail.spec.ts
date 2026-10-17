@@ -23,7 +23,7 @@ type Mock = { revisions?: unknown[]; jobs?: () => unknown[]; qa?: unknown; issue
 
 /** Default happy-path mocks; each test overrides the routes it cares about (later routes win). */
 async function mockBuilding(page: Page, mock: Mock = {}) {
-  await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building }));
+  await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ETag: '"3"' } }));
   await page.route("**/api/buildings/building-1/revisions?*", (route) => route.fulfill({ json: page1(mock.revisions ?? [rev2, rev1]) }));
   await page.route("**/api/buildings/building-1/scenarios?*", (route) => route.fulfill({ json: page1(mock.scenarios ?? []) }));
   await page.route("**/api/scenarios/*/versions?*", (route) => route.fulfill({ json: page1([]) }));
@@ -538,12 +538,14 @@ test.describe("overview quick edit", () => {
     await mockBuilding(page);
     let attempts = 0;
     let query = "";
+    const ifMatch: Array<string | undefined> = [];
     await page.route("**/api/buildings/building-1?*", async (route) => { query = new URL(route.request().url()).search; await route.fulfill({ json: building }); });
     await page.route("**/api/buildings/building-1", async (route) => {
-      if (route.request().method() !== "PUT") return route.fulfill({ json: building });
+      if (route.request().method() !== "PUT") return route.fulfill({ json: building, headers: { ETag: '"7"' } });
       attempts++;
+      ifMatch.push(route.request().headers()["if-match"]);
       if (attempts === 1) return route.fulfill({ status: 500, json: { title: "x" } });
-      return route.fulfill({ json: { ...building, name: "Tên mới" } });
+      return route.fulfill({ json: { ...building, name: "Tên mới" }, headers: { ETag: '"8"' } });
     });
     await page.goto("/workspace/buildings/building-1");
     await page.getByRole("button", { name: "Sửa nhanh" }).click();
@@ -554,13 +556,14 @@ test.describe("overview quick edit", () => {
     await page.getByRole("button", { name: "Lưu thay đổi" }).click();
     await expect(page.getByText("Đã lưu công trình")).toBeVisible();
     expect(attempts).toBe(2);
+    expect(ifMatch).toEqual(['"7"', '"7"']); // the ETag of the detail GET, unchanged by a failed write
     expect(query).toBe(""); // OrganizationUser never sends organizationId
   });
 });
 
 test.describe("PlatformAdmin by organization", () => {
   const orgs = { items: [{ id: "org-1", name: "FET3D Lab", slug: "fet3d-lab", isActive: true, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" }, { id: "org-2", name: "Trường ABC", slug: "abc", isActive: true, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" }], totalCount: 2, page: 1, pageSize: 100 };
-  const summary = { id: "building-1", name: "Trường Tiểu học", buildingType: "Trường học", totalFloors: 3, isActive: true, createdAt: "2026-10-05T00:00:00Z" };
+  const summary = { id: "building-1", name: "Trường Tiểu học", buildingType: "Trường học", totalFloors: 3, isActive: true, createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z" };
 
   test("lists, creates and archives buildings of the selected organization through organizationId", async ({ page }) => {
     await signIn(page, admin);
@@ -569,7 +572,8 @@ test.describe("PlatformAdmin by organization", () => {
     await page.route("**/api/organizations/org-1", (route) => route.fulfill({ json: orgs.items[0] }));
     await page.route("**/api/buildings?*", (route) => { requests.push({ method: "GET", url: new URL(route.request().url()) }); return route.fulfill({ json: page1([summary]) }); });
     await page.route("**/api/buildings", async (route) => { requests.push({ method: route.request().method(), url: new URL(route.request().url()), body: route.request().postDataJSON() }); await route.fulfill({ status: 201, json: building }); });
-    await page.route("**/api/buildings/building-1?*", async (route) => { requests.push({ method: route.request().method(), url: new URL(route.request().url()) }); await route.fulfill({ json: summary }); });
+    await page.route("**/api/buildings/building-1?*", async (route) => { requests.push({ method: route.request().method(), url: new URL(route.request().url()), body: route.request().headers()["if-match"] }); await route.fulfill({ json: summary, headers: { ETag: '"10"' } }); });
+    await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ETag: '"9"' } }));
 
     await page.goto("/admin/organizations/org-1/buildings");
     await expect(page.getByRole("heading", { name: "Công trình · FET3D Lab" })).toBeVisible();
@@ -583,6 +587,7 @@ test.describe("PlatformAdmin by organization", () => {
     await page.getByRole("dialog").getByRole("button", { name: "Lưu trữ" }).click();
     await expect.poll(() => requests.some((request) => request.method === "DELETE")).toBe(true);
     expect(requests.find((request) => request.method === "DELETE")?.url.searchParams.get("organizationId")).toBe("org-1");
+    expect(requests.find((request) => request.method === "DELETE")?.body).toBe('"9"'); // If-Match from the detail read
 
     await page.getByRole("button", { name: "Tạo công trình", exact: true }).click();
     await page.getByLabel("Tên công trình", { exact: true }).fill("Công trình của tổ chức");

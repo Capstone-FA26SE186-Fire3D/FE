@@ -12,7 +12,7 @@ import { formatDateTime, formatNumber, formatQuota } from "@/features/billing/fo
 import { isObject, type JsonObject } from "@/features/scenario-editor/store/json";
 import { KIND_META, type ObjectKind } from "@/features/scenario-editor/v1/contract";
 
-import { failureText, isInFlight, isSuccessfulDraft, operationLabel, sourceKindLabel, statusLabel, statusTone } from "../labels";
+import { failureText, hasResultType, isInFlight, isSuccessfulDraft, operationLabel, sourceKindLabel, statusLabel, statusTone } from "../labels";
 import { readProposalNotes, readProposalState } from "../apply-plan";
 import type { AiCitation, AiRequest } from "../types";
 import styles from "../org-ai.module.css";
@@ -27,8 +27,11 @@ function CopyId({ value }: { value: string }) {
     </button></span>;
 }
 
+/** v7 returns citations on the request; `result.citations` is read only for responses from before BE#89. */
+const citationsOf = (request: AiRequest): AiCitation[] => (Array.isArray(request.citations) ? request.citations : Array.isArray(request.result?.citations) ? request.result.citations : []);
+
 export function Citations({ request }: { request: AiRequest }) {
-  const citations: AiCitation[] = Array.isArray(request.result?.citations) ? request.result.citations : [];
+  const citations = citationsOf(request);
   if (citations.length === 0) return null;
   const sources = request.sources ?? [];
   return <section className={styles.section} aria-label="Nguồn trích dẫn" data-testid="ai-citations">
@@ -103,14 +106,14 @@ export function DraftPreview({ state, notes }: { state: JsonObject; notes: strin
  */
 export function RequestView({ request, admin, onApply, extra }: { request: AiRequest; admin?: boolean; onApply?: (request: AiRequest) => void; extra?: ReactNode }) {
   const result = request.result;
-  const state = isSuccessfulDraft(request.operation, request.status) ? readProposalState(result) : null;
+  const state = isSuccessfulDraft(request) ? readProposalState(result) : null;
   const notes = readProposalNotes(result);
   const failure = failureText(request.failureCode);
 
   return <article className={styles.stack} data-testid="ai-request" data-status={request.status} data-operation={request.operation}>
     <div className={styles.row}>
-      <div className="ops-actions"><strong>{operationLabel(request.operation)}</strong><StatusBadge tone={statusTone(request.status)} data-testid="ai-status">{statusLabel(request.status)}</StatusBadge>
-        {isSuccessfulDraft(request.operation, request.status) && <StatusBadge tone="info">Cần bạn chỉnh sửa trước khi dùng</StatusBadge>}</div>
+      <div className="ops-actions"><strong>{operationLabel(request.operation)}</strong><StatusBadge tone={statusTone(request.status, request.resultType)} data-testid="ai-status">{statusLabel(request.status, request.resultType)}</StatusBadge>
+        {isSuccessfulDraft(request) && <StatusBadge tone="info">Cần bạn chỉnh sửa trước khi dùng</StatusBadge>}</div>
       <span className={styles.dim}>{formatDateTime(request.createdAt)}</span>
     </div>
     <dl className={styles.meta}>
@@ -118,7 +121,7 @@ export function RequestView({ request, admin, onApply, extra }: { request: AiReq
       {request.completedAt && <><dt>Hoàn tất lúc</dt><dd>{formatDateTime(request.completedAt)}</dd></>}
     </dl>
 
-    {isInFlight(request.status) && <Alert tone="info" title={request.status === "Queued" ? "Yêu cầu đang chờ xử lý" : "Dịch vụ AI đang xử lý"}>Đây là xử lý bất đồng bộ; trang tự cập nhật khi có kết quả. Không cần gửi lại.</Alert>}
+    {isInFlight(request.status) && <Alert tone="info" title={request.status === "Accepted" ? "Yêu cầu đang chờ xử lý" : "Dịch vụ AI đang xử lý"}>Đây là xử lý bất đồng bộ; trang tự cập nhật khi có kết quả. Không cần gửi lại.</Alert>}
 
     {request.status === "NeedsReconcile" && <Alert tone="warning" title="Chưa rõ kết quả, đang chờ đối soát">
       {failure ?? "Hệ thống chưa xác nhận được kết quả từ dịch vụ AI."} Quota của yêu cầu này đang được giữ chỗ và không bị tính hay hoàn lại tự động; PlatformAdmin sẽ đối soát. Không gửi lại câu hỏi này để tránh trừ trùng.
@@ -126,15 +129,15 @@ export function RequestView({ request, admin, onApply, extra }: { request: AiReq
 
     {request.status === "Failed" && <Alert tone="danger" title="Yêu cầu thất bại">{failure ?? "Dịch vụ AI không trả được kết quả."} Xem phần hoàn lại quota ở lịch sử sử dụng của Quota AI.</Alert>}
 
-    {request.status === "InsufficientEvidence" && <div data-testid="ai-insufficient"><Alert tone="warning" title="Chưa đủ căn cứ để trả lời">{result?.message?.trim() || "Các nguồn đã chọn chưa đủ thông tin để trả lời có trích dẫn. Hãy mở rộng phạm vi nguồn hoặc hỏi cụ thể hơn."}</Alert></div>}
+    {hasResultType(request, "InsufficientEvidence") && <div data-testid="ai-insufficient"><Alert tone="warning" title="Chưa đủ căn cứ để trả lời">{result?.message?.trim() || "Các nguồn đã chọn chưa đủ thông tin để trả lời có trích dẫn. Hãy mở rộng phạm vi nguồn hoặc hỏi cụ thể hơn."}</Alert></div>}
 
-    {request.status === "SafetyRejected" && <div data-testid="ai-rejected"><Alert tone="danger" title="Bị cổng an toàn từ chối">{result?.message?.trim() || "Yêu cầu hoặc kết quả bị chặn bởi cổng an toàn nên không có nội dung để hiển thị."}</Alert></div>}
+    {hasResultType(request, "RejectedBySafetyGate") && <div data-testid="ai-rejected"><Alert tone="danger" title="Bị cổng an toàn từ chối">{result?.message?.trim() || "Yêu cầu hoặc kết quả bị chặn bởi cổng an toàn nên không có nội dung để hiển thị."}</Alert></div>}
 
-    {request.status === "Succeeded" && request.operation === "Answer" && (typeof result?.answer === "string"
+    {hasResultType(request, "KnowledgeAnswer") && (typeof result?.answer === "string"
       ? <section className={styles.section} aria-label="Câu trả lời"><h3>Câu trả lời</h3><p className={styles.answer} data-testid="ai-answer">{result.answer}</p></section>
       : <Alert tone="warning" title="Chưa có nội dung câu trả lời">Máy chủ báo hoàn tất nhưng không kèm nội dung. Hãy tải lại.</Alert>)}
 
-    {request.status === "Succeeded" && request.operation === "ScenarioDraft" && (state
+    {isSuccessfulDraft(request) && (state
       ? <section className={styles.section} aria-label="Đề xuất kịch bản">
         <h3>Đề xuất kịch bản (chỉ xem)</h3>
         <Alert tone="info" title="AI chỉ đề xuất">Không có gì được lưu, đưa vào bản nháp hay phát hành cho tới khi bạn xem trước, xác nhận và lưu trong trình soạn thảo.</Alert>
@@ -144,7 +147,7 @@ export function RequestView({ request, admin, onApply, extra }: { request: AiReq
       : <Alert tone="warning" title="Không đọc được đề xuất">Máy chủ báo hoàn tất nhưng nội dung không theo fet3d.editor/1, nên không thể áp dụng.</Alert>)}
 
     {request.status === "Succeeded" && <Citations request={request} />}
-    {request.status === "Succeeded" && (request.result?.citations?.length ?? 0) === 0 && request.operation === "Answer" && <p className={styles.dim}><SearchX size={14} aria-hidden="true" style={{ verticalAlign: "-2px", marginRight: 4 }} />Kết quả không kèm trích dẫn.</p>}
+    {hasResultType(request, "KnowledgeAnswer") && citationsOf(request).length === 0 && <p className={styles.dim}><SearchX size={14} aria-hidden="true" style={{ verticalAlign: "-2px", marginRight: 4 }} />Kết quả không kèm trích dẫn.</p>}
 
     <Usage request={request} admin={admin} />
     {extra}

@@ -17,7 +17,7 @@ import { RequestView } from "./request-view";
 
 /**
  * A request followed by id: the server is the only source of truth (`GET /api/ai/requests/{id}`), so a reload, another
- * tab or a recovered lost response all end up here. Polls only while the service may still change it (Queued/Running; for
+ * tab or a recovered lost response all end up here. Polls only while the service may still change it (Accepted/Processing; for
  * the admin also a NeedsReconcile that has a reconcile scheduled), backs off on errors, honors Retry-After and pauses while
  * the tab is hidden (`usePolling`). An answer for another id than the one shown is never displayed.
  */

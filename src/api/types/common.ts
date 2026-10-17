@@ -42,8 +42,10 @@ export class ApiError extends Error {
   readonly code?: string;
   /** Normalized field errors from `errors` (array of {code,path,message} or a field → messages map). */
   readonly fieldErrors: ApiFieldError[];
+  /** Response headers of the failed call (e.g. the new `ETag` sent with a 412). Absent for errors not built from a response. */
+  readonly headers?: Headers;
 
-  constructor(message: string, status: number, payload?: ApiErrorPayload, retryAfterSeconds?: number, code?: string, fieldErrors: ApiFieldError[] = []) {
+  constructor(message: string, status: number, payload?: ApiErrorPayload, retryAfterSeconds?: number, code?: string, fieldErrors: ApiFieldError[] = [], headers?: Headers) {
     super(message);
     this.name = "ApiError";
     this.payload = payload;
@@ -51,6 +53,7 @@ export class ApiError extends Error {
     this.retryAfterSeconds = retryAfterSeconds;
     this.code = code;
     this.fieldErrors = fieldErrors;
+    this.headers = headers;
   }
 
   /** ETag/If-Match mismatch: keep the user's input and offer to reload the newer version. */

@@ -8,15 +8,17 @@ import { Drawer } from "@/components/ui/dialog";
 import { Panel, Stat } from "@/components/ui/panel";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
-import { buildingsApi } from "../api";
-import { describeApiError, formatDateTime } from "../format";
+import { buildingConflict, buildingsApi } from "../api";
+import { describeBuildingWriteError, formatDateTime } from "../format";
 import { deriveQaVerdict, jobLabel, revisionLabel, type RevisionPipeline } from "../pipeline";
 import type { Building, BuildingRevision, RevisionIssue } from "../types";
-import { BuildingForm, buildingFormToInput, formFromBuilding, validateBuildingForm, type FormState } from "./building-form";
+import { BuildingConflictAlert, BuildingForm, buildingFormToInput, formFromBuilding, validateBuildingForm, type FormState } from "./building-form";
 
-export function OverviewTab({ accessToken, building, revision, pipeline, issues, scenarioCount, isAdmin, onSaved, onGoTo }: {
+export function OverviewTab({ accessToken, building, etag, revision, pipeline, issues, scenarioCount, isAdmin, onSaved, onGoTo }: {
   accessToken: string;
   building: Building;
+  /** ETag of `building` from the last GET; null when the header was not readable (the save then reads it again). */
+  etag: string | null;
   revision: BuildingRevision | null;
   pipeline: RevisionPipeline;
   issues: RevisionIssue[] | undefined;
@@ -32,8 +34,11 @@ export function OverviewTab({ accessToken, building, revision, pipeline, issues,
   const [errors, setErrors] = useState<ReturnType<typeof validateBuildingForm>>({});
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  // After a 412 the save targets the server's newer version (body `current` + new ETag) until the page reloads the detail.
+  const [stale, setStale] = useState<{ current: Building; etag: string | null; adopted?: boolean } | null>(null);
+  const base = stale?.current ?? building;
 
-  const openEdit = () => { setForm(formFromBuilding(building)); setErrors({}); setFormError(""); setOpen(true); };
+  const openEdit = () => { setForm(formFromBuilding(building)); setErrors({}); setFormError(""); setStale(null); setOpen(true); };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -45,13 +50,18 @@ export function OverviewTab({ accessToken, building, revision, pipeline, issues,
     setSaving(true);
     setFormError("");
     try {
+      const ifMatch = (stale ? stale.etag : etag) ?? (await buildingsApi.getVersioned(accessToken, building.id)).etag;
+      if (!ifMatch) { setFormError("Không đọc được phiên bản công trình (ETag). Hãy tải lại trang rồi thử lại."); return; }
       // PlatformAdmin edits on behalf of the building's organization; an OrganizationUser never sends the parameter.
-      await buildingsApi.update(accessToken, building.id, buildingFormToInput(form, building), isAdmin ? building.organizationId : undefined);
+      await buildingsApi.update(accessToken, building.id, buildingFormToInput(form, base), ifMatch, isAdmin ? building.organizationId : undefined);
       setOpen(false);
+      setStale(null);
       toast.notify({ tone: "success", title: "Đã lưu công trình" });
       onSaved();
     } catch (cause) {
-      setFormError(`${describeApiError(cause, "Không thể lưu công trình.")} Nội dung bạn nhập vẫn được giữ lại.`);
+      const conflict = buildingConflict(cause);
+      if (conflict) setStale({ current: conflict.current ?? base, etag: conflict.etag });
+      else setFormError(`${describeBuildingWriteError(cause, "Không thể lưu công trình.")} Nội dung bạn nhập vẫn được giữ lại.`);
     } finally {
       submitting.current = false;
       setSaving(false);
@@ -88,6 +98,7 @@ export function OverviewTab({ accessToken, building, revision, pipeline, issues,
 
     <Drawer open={open} onOpenChange={(next) => { if (!next && !saving) setOpen(false); }} title="Sửa nhanh công trình" description="Tọa độ và liên hệ không hiển thị ở đây được giữ nguyên.">
       <form onSubmit={(event) => void submit(event)} noValidate className="ops-stack">
+        {stale && !stale.adopted && <BuildingConflictAlert current={stale.current} onUseLatest={() => { setForm(formFromBuilding(stale.current)); setStale({ ...stale, adopted: true }); }} />}
         <BuildingForm form={form} errors={errors} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} />
         {formError && <Alert tone="danger">{formError}</Alert>}
         <div className="ops-actions" style={{ justifyContent: "flex-end" }}>

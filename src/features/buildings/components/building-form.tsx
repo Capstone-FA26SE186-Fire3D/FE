@@ -1,5 +1,8 @@
 import type { Building, BuildingInput } from "../types";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
+import { formatDateTime } from "../format";
 
 export type FormState = { name: string; buildingType: string; totalFloors: string; address: string; city: string; district: string };
 export const emptyForm: FormState = { name: "", buildingType: "", totalFloors: "1", address: "", city: "", district: "" };
@@ -66,4 +69,15 @@ export function BuildingForm({ form, errors, onChange }: { form: FormState; erro
       </div>
     </fieldset>
   </div>;
+}
+
+/**
+ * 412 on save: someone changed the Building since it was opened. The form keeps what the user typed; saving again
+ * applies it on top of the version shown here (its ETag is already kept), or the user can load that version instead.
+ */
+export function BuildingConflictAlert({ current, onUseLatest }: { current: Building; onUseLatest: () => void }) {
+  return <div data-testid="building-conflict"><Alert tone="warning" title="Công trình vừa được thay đổi ở nơi khác" action={<Button type="button" size="sm" variant="secondary" className="mt-3" onClick={onUseLatest}>Dùng bản mới nhất</Button>}>
+    Bản mới nhất (cập nhật {formatDateTime(current.updatedAt)}): “{current.name}”, {current.buildingType || "chưa phân loại"}, {current.totalFloors} tầng.
+    {" "}Nội dung bạn nhập vẫn được giữ; bấm lưu lần nữa để ghi đè lên bản mới nhất này.
+  </Alert></div>;
 }

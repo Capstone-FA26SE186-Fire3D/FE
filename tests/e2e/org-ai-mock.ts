@@ -4,8 +4,8 @@ import { BUILDING_ID, SCENARIO_ID } from "../fixtures/scenario-editor/fixture-bu
 import { ARTIFACT_ID, GEOMETRY_HASH } from "../fixtures/scenario-editor/v1-fixtures";
 
 /**
- * Stateful route mock of the AI endpoints (BE `docs/organization-ai.md`, OpenAPI @ 1eaf988). The OpenAPI only types the
- * bodies as JsonElement, so the shapes follow the BE source (`ai_request_representation`, the admin gates). It keeps state
+ * Stateful route mock of the AI endpoints (BE `docs/organization-ai.md`, OpenAPI `AiRequestView`, Docs v7 vocabulary since
+ * BE#89: status Accepted|Processing|Succeeded|Failed|NeedsReconcile, resultType once Succeeded, result.status). It keeps state
  * the way the server does (requests, idempotency receipts, quota, policies, knowledge sources with revisions) so a reload
  * proves recovery from "server" data. Mock evidence only, never evidence against the real API.
  */
@@ -24,7 +24,11 @@ export const requestId = (n: number) => `dddddddd-0000-4000-8000-${String(n).pad
 export const iso = (minutes: number) => new Date(Date.now() + minutes * 60_000).toISOString();
 
 type Rec = Record<string, unknown>;
-export type Outcome = "Succeeded" | "InsufficientEvidence" | "SafetyRejected" | "Failed" | "NeedsReconcile";
+/** Scripted end of a request: "Succeeded" is the normal answer/draft; the next two succeed without content. */
+export type Outcome = "Succeeded" | "InsufficientEvidence" | "RejectedBySafetyGate" | "Failed" | "NeedsReconcile";
+
+/** Pre-v7 status names: the BE list filters answer 400 for them. */
+const LEGACY_STATUSES = ["Queued", "Running", "SafetyRejected", "InsufficientEvidence"];
 
 export type Call = { method: string; path: string; search: string; headers: Record<string, string>; body: unknown };
 
@@ -34,7 +38,7 @@ export type AiMock = {
   quota: { units: Rec[] };
   /** Scripted result per operation. */
   outcome: { Answer: Outcome; ScenarioDraft: Outcome };
-  /** How many GETs of a new request still answer Queued before the final state (polling proof). */
+  /** How many GETs of a new request still answer Accepted before the final state (polling proof). */
   pendingPolls: number;
   /** Queue for the next POST submits: the server stores the request and the response is lost, or the call never arrives. */
   submitFaults: Array<"lost-response" | "never-arrives" | "status-503" | "status-429" | { status: number; json: Rec; headers?: Record<string, string> }>;
@@ -121,7 +125,7 @@ export function seedRequest(mock: AiMock, partial: Rec = {}): Rec {
   const operation = (partial.operation as "Answer" | "ScenarioDraft") ?? "Answer";
   const request: Rec = {
     requestId: requestId(mock.counter), operation, status: "Succeeded", quotaUnit: "tokens", reservedUnits: 50, consumedUnits: 42, sources: pinnedSources(),
-    result: resultFor(mock, operation, "Succeeded"), createdAt: iso(-10 - mock.counter), completedAt: iso(-9 - mock.counter), revision: 3,
+    ...outcomeFields(mock, operation, "Succeeded"), createdAt: iso(-10 - mock.counter), completedAt: iso(-9 - mock.counter), revision: 3,
     organizationId: "org-1", actorUserId: "owner", policyId: ids.policy, attempts: 1, updatedAt: iso(-9),
     ...partial,
   };
@@ -129,15 +133,16 @@ export function seedRequest(mock: AiMock, partial: Rec = {}): Rec {
   return request;
 }
 
-function resultFor(mock: AiMock, operation: "Answer" | "ScenarioDraft", outcome: Outcome): Rec | undefined {
+/** `status`, `resultType`, `result` and top-level `citations` of a Succeeded request, as `AiRequestView` returns them. */
+export function outcomeFields(mock: AiMock, operation: "Answer" | "ScenarioDraft", outcome: Outcome): Rec {
   if (outcome === "Succeeded") {
     return operation === "Answer"
-      ? { outcome, citations: citationsFor(), answer: "Lối thoát nạn phải đảm bảo chiều rộng thông thủy tối thiểu theo quy chuẩn.\nXem Điều 3." }
-      : { outcome, citations: citationsFor(), draft: { state: mock.draftState, notes: "Cần kiểm tra lại vị trí các điểm xuất phát." } };
+      ? { status: "Succeeded", resultType: "KnowledgeAnswer", citations: citationsFor(), result: { status: "Answered", answer: "Lối thoát nạn phải đảm bảo chiều rộng thông thủy tối thiểu theo quy chuẩn.\nXem Điều 3." } }
+      : { status: "Succeeded", resultType: "ScenarioDraft", citations: citationsFor(), result: { status: "NeedsUserEdit", draft: { state: mock.draftState, notes: "Cần kiểm tra lại vị trí các điểm xuất phát." } } };
   }
-  if (outcome === "InsufficientEvidence") return { outcome, citations: [], message: "Các nguồn đã chọn chưa nêu yêu cầu này." };
-  if (outcome === "SafetyRejected") return { outcome, citations: [], message: "Nội dung bị chặn bởi cổng an toàn." };
-  return undefined;
+  if (outcome === "InsufficientEvidence") return { status: "Succeeded", resultType: outcome, citations: [], result: { status: outcome, message: "Các nguồn đã chọn chưa nêu yêu cầu này." } };
+  if (outcome === "RejectedBySafetyGate") return { status: "Succeeded", resultType: outcome, citations: [], result: { status: outcome, message: "Nội dung bị chặn bởi cổng an toàn." } };
+  return { status: outcome, resultType: null, citations: [], result: null };
 }
 
 function finalize(mock: AiMock, request: Rec) {
@@ -145,13 +150,16 @@ function finalize(mock: AiMock, request: Rec) {
   const outcome = mock.outcome[operation];
   if (outcome === "Failed") Object.assign(request, { status: "Failed", failureCode: "AI_PROVIDER_REJECTED", completedAt: iso(0), consumedUnits: undefined, revision: 3 });
   else if (outcome === "NeedsReconcile") Object.assign(request, { status: "NeedsReconcile", failureCode: "AI_OUTCOME_UNKNOWN", consumedUnits: undefined, revision: 3 });
-  else Object.assign(request, { status: outcome, result: resultFor(mock, operation, outcome), completedAt: iso(0), consumedUnits: outcome === "Succeeded" ? 42 : 0, revision: 3 });
+  else Object.assign(request, { ...outcomeFields(mock, operation, outcome), completedAt: iso(0), consumedUnits: outcome === "Succeeded" ? 42 : 0, revision: 3 });
 }
 
 const strip = (request: Rec, admin: boolean): Rec => {
   const copy: Rec = { ...request };
   delete copy.polls;
   delete copy.reconcileReads;
+  // resultType exists only once Succeeded (a seed may override status alone).
+  if (copy.status !== "Succeeded") copy.resultType = null;
+  else if (!copy.resultType) copy.resultType = copy.operation === "ScenarioDraft" ? "ScenarioDraft" : "KnowledgeAnswer";
   if (!admin) for (const key of ["organizationId", "actorUserId", "policyId", "attempts", "reconcileRequestedAt", "providerResult", "updatedAt", "allocations"]) delete copy[key];
   for (const key of Object.keys(copy)) if (copy[key] === undefined) delete copy[key];
   return copy;
@@ -214,7 +222,7 @@ export async function mockAi(page: Page, mock: AiMock) {
         mock.counter += 1;
         const input = (body ?? {}) as { sources?: Array<{ kind: string; id: string }> };
         stored = {
-          requestId: requestId(mock.counter), operation, status: "Queued", quotaUnit: "tokens", reservedUnits: 50,
+          requestId: requestId(mock.counter), operation, status: "Accepted", resultType: null, citations: [], quotaUnit: "tokens", reservedUnits: 50,
           sources: input.sources?.length ? pinnedSources().filter((source) => input.sources!.some((ref) => ref.id === source.id)) : pinnedSources(),
           createdAt: iso(0), revision: 1, organizationId: "org-1", actorUserId: "owner", policyId: ids.policy, attempts: 0, updatedAt: iso(0), polls: 0,
         };
@@ -227,9 +235,11 @@ export async function mockAi(page: Page, mock: AiMock) {
 
     if (method === "GET" && path === "/api/ai/requests") {
       const status = url.searchParams.get("status");
+      const resultType = url.searchParams.get("resultType");
       const operation = url.searchParams.get("operation");
       const mine = url.searchParams.get("mine") === "true";
-      const items = mock.requests.filter((item) => (!status || item.status === status) && (!operation || item.operation === operation) && (!mine || item.actorUserId === "owner"));
+      if (status && LEGACY_STATUSES.includes(status)) return problem(route, 400, "VALIDATION_ERROR", "Unknown status.");
+      const items = mock.requests.filter((item) => (!status || item.status === status) && (!resultType || (item.status === "Succeeded" && item.resultType === resultType)) && (!operation || item.operation === operation) && (!mine || item.actorUserId === "owner"));
       return route.fulfill({ json: page_(url, items, (item) => strip(item, false)) });
     }
     const orgGet = /^\/api\/ai\/requests\/([0-9a-f-]{36})$/.exec(path);
@@ -238,7 +248,7 @@ export async function mockAi(page: Page, mock: AiMock) {
       if (fault) return route.fulfill({ status: fault.status, contentType: "application/problem+json", headers: fault.headers, body: JSON.stringify(fault.json ?? { status: fault.status, title: "x" }) });
       const found = mock.requests.find((item) => item.requestId === orgGet[1]);
       if (!found || found.organizationId !== "org-1") return problem(route, 404, "NOT_FOUND", "Not found.");
-      if (found.status === "Queued" || found.status === "Running") {
+      if (found.status === "Accepted" || found.status === "Processing") {
         found.polls = ((found.polls as number) ?? 0) + 1;
         if ((found.polls as number) > mock.pendingPolls) finalize(mock, found);
       }
@@ -250,6 +260,7 @@ export async function mockAi(page: Page, mock: AiMock) {
     if (method === "GET" && path === "/api/admin/ai/requests") {
       const status = url.searchParams.get("status");
       const org = url.searchParams.get("organizationId");
+      if (status && LEGACY_STATUSES.includes(status)) return problem(route, 400, "VALIDATION_ERROR", "Unknown status.");
       const items = mock.requests.filter((item) => (!status || item.status === status) && (!org || item.organizationId === org));
       return route.fulfill({ json: page_(url, items, (item) => strip(item, true)) });
     }
@@ -259,7 +270,7 @@ export async function mockAi(page: Page, mock: AiMock) {
       if (!found) return problem(route, 404, "NOT_FOUND", "Not found.");
       // After a reconcile the worker looks the id up at the provider: the next reads show the settled request.
       if (found.status === "NeedsReconcile" && found.reconcileRequestedAt && ((found.reconcileReads as number) ?? 0) >= 1) {
-        Object.assign(found, { status: "Succeeded", failureCode: undefined, result: resultFor(mock, found.operation as "Answer" | "ScenarioDraft", "Succeeded"), consumedUnits: 42, completedAt: iso(0), providerResult: undefined });
+        Object.assign(found, { ...outcomeFields(mock, found.operation as "Answer" | "ScenarioDraft", "Succeeded"), failureCode: undefined, consumedUnits: 42, completedAt: iso(0), providerResult: undefined });
       } else if (found.reconcileRequestedAt) found.reconcileReads = ((found.reconcileReads as number) ?? 0) + 1;
       return route.fulfill({ json: strip(found, true) });
     }

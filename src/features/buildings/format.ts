@@ -33,7 +33,20 @@ export function shortHash(hash: string | null | undefined, length = 10) {
   return hash.length > length ? `${hash.slice(0, length)}…` : hash;
 }
 
-export { describeApiError } from "@/api/describe-error";
+import { describeApiError } from "@/api/describe-error";
+
+export { describeApiError };
+
+/** Building create/update/archive failures; 412 is handled by the caller (it shows the newer version). */
+export function describeBuildingWriteError(error: unknown, fallback: string) {
+  if (error instanceof ApiError) {
+    if (error.code === "IDEMPOTENCY_KEY_CONFLICT") return "Khóa chống tạo trùng đã được dùng cho nội dung khác. Bấm lưu lần nữa để gửi như một thao tác mới.";
+    if (error.code === "IDEMPOTENCY_KEY_REQUIRED") return "Yêu cầu thiếu khóa chống tạo trùng. Hãy thử lại.";
+    if (error.status === 428) return "Thiếu phiên bản công trình (If-Match). Hãy tải lại công trình rồi thử lại.";
+    if (error.status === 404) return "Không tìm thấy công trình, hoặc công trình đã được lưu trữ nên không sửa được nữa.";
+  }
+  return describeApiError(error, fallback);
+}
 
 export function isStatus(error: unknown, status: number) {
   return error instanceof ApiError && error.status === status;
