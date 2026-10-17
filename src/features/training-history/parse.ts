@@ -58,6 +58,8 @@ export function parseCriterion(raw: unknown): CriterionResult | null {
   if (!isRecord(raw)) return null;
   return {
     id: str(raw.id),
+    label: strOrNull(raw.label),
+    description: strOrNull(raw.description),
     metric: str(raw.metric),
     value: raw.value ?? null,
     operator: str(raw.operator),
@@ -77,6 +79,7 @@ export function parseResult(raw: unknown): TrainingResult | null {
     outcome: str(raw.outcome),
     reason: str(raw.reason),
     scorePercent: numOrNull(raw.scorePercent),
+    passThresholdPercent: numOrNull(raw.passThresholdPercent),
     rubricHash: strOrNull(raw.rubricHash),
     criteria: Array.isArray(raw.criteria) ? raw.criteria.map(parseCriterion).filter((item): item is CriterionResult => item !== null) : null,
     metrics: isRecord(raw.metrics) ? raw.metrics : {},

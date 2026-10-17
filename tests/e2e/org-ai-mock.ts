@@ -1,6 +1,6 @@
 import type { Page, Route } from "@playwright/test";
 
-import { BUILDING_ID, SCENARIO_ID } from "../fixtures/scenario-editor/fixture-building";
+import { BUILDING_ID, REVISION_ID, SCENARIO_ID } from "../fixtures/scenario-editor/fixture-building";
 import { ARTIFACT_ID, GEOMETRY_HASH } from "../fixtures/scenario-editor/v1-fixtures";
 
 /**
@@ -36,6 +36,8 @@ export type AiMock = {
   calls: Call[];
   sources: Rec[];
   quota: { units: Rec[] };
+  /** Replaces the computed `GET /api/ai/organization/limits` items (e.g. a policy that is not active). */
+  limits?: Rec[];
   /** Scripted result per operation. */
   outcome: { Answer: Outcome; ScenarioDraft: Outcome };
   /** How many GETs of a new request still answer Accepted before the final state (polling proof). */
@@ -53,16 +55,28 @@ export type AiMock = {
   orgs: Rec[];
   /** Knowledge-source writes bump the revision; a test can pre-bump to force 412. */
   buildings: Rec[];
+  /** `GET /api/buildings/{id}/revisions` items (status ReadyForScenario/ConfirmedForTraining are draft-eligible). */
+  revisions?: Rec[];
   scenarios: Rec[];
   counter: number;
 };
 
+export const noLink = { learnSlug: null, learnPostId: null, libraryItemId: null, sourceUri: null };
+
+/** `AiCitationView`: title, version and link resolved by the BE from the pin. */
 export function citationsFor() {
-  return [{ kind: "KnowledgeSource", id: ids.src1, locator: "Điều 3" }];
+  return [{ kind: "KnowledgeSource", id: ids.src1, versionId: ids.src1, title: "QCVN 06:2022/BXD", versionLabel: "2022", chunkId: "c-1", locator: "Điều 3", relevance: 0.82, link: { ...noLink, sourceUri: "https://example.gov.vn/qcvn-06" } }];
 }
 
 export function pinnedSources() {
-  return [{ kind: "KnowledgeSource", id: ids.src1, versionId: ids.src1, title: "QCVN 06:2022/BXD", versionLabel: "2022", contentHash: "a".repeat(64) }];
+  return [{ kind: "KnowledgeSource", id: ids.src1, versionId: ids.src1, title: "QCVN 06:2022/BXD", versionLabel: "2022", contentHash: "a".repeat(64), link: { ...noLink, sourceUri: "https://example.gov.vn/qcvn-06" } }];
+}
+
+/** Limits the BE computes per operation: reserve 50 against the pooled `available` of the mock quota. */
+export function limitsFor(mock: AiMock): Rec[] {
+  if (mock.limits) return mock.limits;
+  const available = mock.quota.units.reduce((sum, unit) => sum + Number(unit.available ?? 0), 0);
+  return ["Answer", "ScenarioDraft"].map((operation) => ({ operation, policyActive: true, quotaUnit: "tokens", estimatedReserve: 50, maxInputChars: 4000, maxSources: 20, availableUnits: available, canSubmit: available >= 50 }));
 }
 
 /** A complete `fet3d.editor/1` proposal pinned to the Geometry of the editor test building. */
@@ -111,6 +125,7 @@ export function newAiMock(overrides: Partial<AiMock> = {}): AiMock {
     ],
     orgs: [{ id: "org-1", name: "Trường Mẫu", isActive: true }, { id: "org-2", name: "Công ty B", isActive: true }],
     buildings: [{ id: BUILDING_ID, name: "Tòa nhà A", buildingType: "Trường học", totalFloors: 2, isActive: true, createdAt: iso(-5000) }],
+    revisions: [{ id: REVISION_ID, buildingId: BUILDING_ID, versionLabel: "IFC rev. 01", status: "ReadyForScenario", createdAt: iso(-4500), sourceDocument: null }],
     scenarios: [{ id: SCENARIO_ID, buildingId: BUILDING_ID, name: "Thoát hiểm tầng một", createdAt: iso(-4000) }],
     counter: 0,
     ...overrides,
@@ -197,6 +212,12 @@ export async function mockAi(page: Page, mock: AiMock) {
     // ───── organization ─────
     if (method === "GET" && path === "/api/organizations/me/ai-quota") return route.fulfill({ json: { organizationId: "org-1", asOf: iso(0), units: mock.quota.units } });
     if (method === "GET" && path === "/api/ai/organization/sources") return route.fulfill({ json: { items: mock.sources } });
+    if (method === "GET" && path === "/api/ai/organization/limits") return route.fulfill({ json: { items: limitsFor(mock) } });
+    const revisions = /^\/api\/buildings\/([^/]+)\/revisions$/.exec(path);
+    if (method === "GET" && revisions && mock.revisions) {
+      const items = (mock.revisions ?? []).filter((revision) => revision.buildingId === revisions[1]);
+      return route.fulfill({ json: { items, totalCount: items.length, page: 1, pageSize: 50 } });
+    }
     if (method === "GET" && path === "/api/buildings") return route.fulfill({ json: { items: mock.buildings, totalCount: mock.buildings.length, page: 1, pageSize: 100 } });
     if (method === "GET" && new RegExp(`^/api/buildings/${BUILDING_ID}/scenarios$`).test(path)) return route.fulfill({ json: { items: mock.scenarios, totalCount: mock.scenarios.length, page: 1, pageSize: 100 } });
     if (!/^\/api\/(ai|admin|organizations)/.test(path)) return route.fallback();
@@ -220,9 +241,15 @@ export async function mockAi(page: Page, mock: AiMock) {
         const exhausted = mock.quota.units.every((unit) => (unit.available as number) <= 0);
         if (exhausted) return problem(route, 409, "AI_QUOTA_EXHAUSTED", "Not enough AI quota.");
         mock.counter += 1;
-        const input = (body ?? {}) as { sources?: Array<{ kind: string; id: string }> };
+        const input = (body ?? {}) as { question?: string; prompt?: string; buildingId?: string; revisionId?: string; sources?: Array<{ kind: string; id: string }> };
+        if (operation === "ScenarioDraft") {
+          const eligible = (mock.revisions ?? []).filter((revision) => revision.buildingId === input.buildingId && ["ReadyForScenario", "ConfirmedForTraining"].includes(String(revision.status)));
+          if (mock.revisions && (input.revisionId ? !eligible.some((revision) => revision.id === input.revisionId) : eligible.length === 0)) return problem(route, 409, "AI_REVISION_NOT_READY", "No revision with accepted geometry.");
+        }
+        const building = mock.buildings.find((item) => item.id === input.buildingId);
         stored = {
-          requestId: requestId(mock.counter), operation, status: "Accepted", resultType: null, citations: [], quotaUnit: "tokens", reservedUnits: 50,
+          requestId: requestId(mock.counter), audience: "organization", operation, status: "Accepted", resultType: null, citations: [], quotaUnit: "tokens", reservedUnits: 50,
+          input: { text: input.question ?? input.prompt ?? "", inputHash: "f".repeat(64), buildingId: input.buildingId ?? null, buildingName: building?.name ?? null, revisionId: input.revisionId ?? null, requestedSources: input.sources ?? [], context: null },
           sources: input.sources?.length ? pinnedSources().filter((source) => input.sources!.some((ref) => ref.id === source.id)) : pinnedSources(),
           createdAt: iso(0), revision: 1, organizationId: "org-1", actorUserId: "owner", policyId: ids.policy, attempts: 0, updatedAt: iso(0), polls: 0,
         };
@@ -260,8 +287,12 @@ export async function mockAi(page: Page, mock: AiMock) {
     if (method === "GET" && path === "/api/admin/ai/requests") {
       const status = url.searchParams.get("status");
       const org = url.searchParams.get("organizationId");
+      const operation = url.searchParams.get("operation");
+      const audience = url.searchParams.get("audience");
       if (status && LEGACY_STATUSES.includes(status)) return problem(route, 400, "VALIDATION_ERROR", "Unknown status.");
-      const items = mock.requests.filter((item) => (!status || item.status === status) && (!org || item.organizationId === org));
+      if (operation && !["Answer", "ScenarioDraft", "TraineeAnswer"].includes(operation)) return problem(route, 400, "VALIDATION_ERROR", "Unknown operation.");
+      if (audience && !["organization", "trainee"].includes(audience)) return problem(route, 400, "VALIDATION_ERROR", "Unknown audience.");
+      const items = mock.requests.filter((item) => (!status || item.status === status) && (!org || item.organizationId === org) && (!operation || item.operation === operation) && (!audience || (item.audience ?? "organization") === audience));
       return route.fulfill({ json: page_(url, items, (item) => strip(item, true)) });
     }
     const adminGet = /^\/api\/admin\/ai\/requests\/([0-9a-f-]{36})$/.exec(path);
@@ -290,7 +321,10 @@ export async function mockAi(page: Page, mock: AiMock) {
       if (fault === "lost-response") return route.abort("timedout");
       return route.fulfill({ status: 202, json: strip(found, true) });
     }
-    if (method === "GET" && path === "/api/admin/ai/policies") return route.fulfill({ json: { items: mock.policies } });
+    if (method === "GET" && path === "/api/admin/ai/policies") {
+      const operation = url.searchParams.get("operation");
+      return route.fulfill({ json: page_(url, mock.policies.filter((item) => !operation || item.operation === operation)) });
+    }
     if (method === "POST" && path === "/api/admin/ai/policies") {
       const key = headers["idempotency-key"];
       if (!key) return problem(route, 400, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key is required.");
@@ -301,7 +335,8 @@ export async function mockAi(page: Page, mock: AiMock) {
       const until = input.effectiveUntil ? new Date(input.effectiveUntil as string).getTime() : Infinity;
       const overlap = mock.policies.some((item) => item.operation === input.operation && from < (item.effectiveUntil ? new Date(item.effectiveUntil as string).getTime() : Infinity) && new Date(item.effectiveFrom as string).getTime() < until);
       if (overlap) return problem(route, 409, "AI_POLICY_OVERLAP", "Policy periods overlap.");
-      const created = { id: `cccccccc-0000-4000-8000-${String(mock.policies.length + 10).padStart(12, "0")}`, operation: input.operation, quotaUnit: input.quotaUnit, reserveUnits: input.reserveUnits, maxInputChars: input.maxInputChars, maxSources: input.maxSources, effectiveFrom: input.effectiveFrom ?? iso(0), effectiveUntil: input.effectiveUntil ?? null, createdAt: iso(0) };
+      if (input.operation === "TraineeAnswer" && !(Number(input.dailyUnits) >= Number(input.reserveUnits))) return problem(route, 422, "CONTENT_INVALID", "Invalid policy.", { issues: [{ code: "FIELD_INVALID", path: "$.dailyUnits", message: "dailyUnits is required for TraineeAnswer." }], errors: { dailyUnits: ["dailyUnits is required for TraineeAnswer."] } });
+      const created = { id: `cccccccc-0000-4000-8000-${String(mock.policies.length + 10).padStart(12, "0")}`, operation: input.operation, quotaUnit: input.quotaUnit, reserveUnits: input.reserveUnits, maxInputChars: input.maxInputChars, maxSources: input.maxSources, dailyUnits: input.operation === "TraineeAnswer" ? input.dailyUnits : null, effectiveFrom: input.effectiveFrom ?? iso(0), effectiveUntil: input.effectiveUntil ?? null, createdAt: iso(0) };
       mock.policies.unshift(created);
       mock.adminReceipts.set(`policy:${key}`, { requestId: created.id as string });
       return route.fulfill({ status: 201, json: created });

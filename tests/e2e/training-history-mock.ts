@@ -40,6 +40,8 @@ const uuid = (prefix: string, n: number) => `${prefix}-0000-4000-8000-${String(n
 export const buildingIds: Record<string, string> = { "Trường Tiểu học Ánh Dương": "b1d00000-0000-4000-8000-000000000001", "Tòa nhà Hoa Sen": "b1d00000-0000-4000-8000-000000000002" };
 
 export const statuses = ["Launching", "Running", "AwaitingSync", "Completed", "CompletedWithSupersededRelease", "ScenarioUnsurvivable", "Aborted", "Abandoned", "Crashed"];
+/** The only `status` filter values the v7 list accepts (BE learner-sessions.md); other values answer 400. */
+export const filterStatuses = ["Launching", "Running", "AwaitingSync", "Completed"];
 const modes = ["Learn", "Guided", "Assessment"];
 
 export class TrainingBackend {
@@ -56,6 +58,8 @@ export class TrainingBackend {
   }
   callsTo(method: string, pattern: RegExp) { return this.calls.filter((call) => call.method === method && pattern.test(call.path)); }
   lists() { return this.callsTo("GET", /^\/api\/training\/sessions$/); }
+  /** Pass threshold returned with Assessment results (0–100). */
+  passThresholdPercent: number | null = 70;
 
   add(seed: SessionSeed): Session {
     const session: Session = { owner: "learner", ...seed, id: seed.id ?? uuid("5e550000", this.counter++) };
@@ -97,6 +101,11 @@ export class TrainingBackend {
 
   handle(method: string, path: string, params: URLSearchParams): Reply | null {
     if (method !== "GET") return null;
+    if (path === "/api/training/buildings") {
+      const denied = this.authFailure();
+      if (denied) return denied;
+      return this.buildings(params);
+    }
     const match = /^\/api\/training\/sessions(?:\/([0-9a-fA-F-]{36}))?(\/result)?$/.exec(path);
     if (!match) return null;
     const denied = this.authFailure();
@@ -108,7 +117,8 @@ export class TrainingBackend {
     if (result) {
       if (!session.result) return this.problem(409, "RESULT_NOT_READY", "Result is not ready.");
       const stored = session.result;
-      return { status: 200, json: { sessionId: session.id, mode: stored.mode ?? session.mode, outcome: stored.outcome, reason: stored.reason, scorePercent: stored.scorePercent, rubricHash: "a".repeat(64), criteria: stored.criteria, metrics: stored.metrics, lastEventSequence: 42, createdAt: session.resultCreatedAt } };
+      const assessment = (stored.mode ?? session.mode) === "Assessment";
+      return { status: 200, json: { sessionId: session.id, mode: stored.mode ?? session.mode, outcome: stored.outcome, reason: stored.reason, scorePercent: stored.scorePercent, passThresholdPercent: assessment ? this.passThresholdPercent : null, rubricHash: "a".repeat(64), criteria: stored.criteria, metrics: stored.metrics, lastEventSequence: 42, createdAt: session.resultCreatedAt } };
     }
     return { status: 200, json: { id: session.id, status: this.state(session), trainingId: uuid("7a000000", 1), releaseId: uuid("4e1e0000", 1), scenarioVersionId: uuid("5c0e0000", 1), buildingId: this.item(session).building.id, mode: session.mode, runtimeVersion: "1.0.0", scenarioHash: "b".repeat(64), rubricHash: null, package: {}, preparedAt: null, expiresAt: null, startedAt: session.startedAt, launchedAt: session.startedAt, endedAt: session.endedAt ?? null, lastHeartbeatAt: null, grant: null, launchSession: null, continuationExpiresAt: null, acknowledgedSequence: 0, completion: session.completionRequested || session.endReason ? { lastEventSequence: 5, endReason: session.endReason ?? "Finished", requestedAt: session.startedAt } : null, hasResult: !!session.result } };
   }
@@ -122,9 +132,9 @@ export class TrainingBackend {
     const page = Number(params.get("page") ?? 1);
     const pageSize = Number(params.get("pageSize") ?? 20);
     const known = (value: string | null, allowed: string[]) => (value === null ? null : allowed.find((item) => item.toLowerCase() === value.trim().toLowerCase()) ?? undefined);
-    const wantedStatus = known(status, statuses);
+    const wantedStatus = known(status, filterStatuses);
     const wantedMode = known(mode, modes);
-    if (wantedStatus === undefined) errors.status = [`status must be one of ${statuses.join(", ")}.`];
+    if (wantedStatus === undefined) errors.status = [`status must be one of ${filterStatuses.join(", ")}.`];
     if (wantedMode === undefined) errors.mode = ["mode must be Learn, Guided or Assessment."];
     if (from && to && Date.parse(from) > Date.parse(to)) errors.from = ["from must not be later than to."];
     if (!(page >= 1)) errors.page = ["page must be at least 1."];
@@ -138,6 +148,22 @@ export class TrainingBackend {
       .filter((session) => !wantedStatus || this.state(session) === wantedStatus)
       .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt) || (b.id < a.id ? -1 : 1));
     return { status: 200, json: { items: rows.slice((page - 1) * pageSize, page * pageSize).map((session) => this.item(session)), totalCount: rows.length, page, pageSize } };
+  }
+
+  /** `GET /api/training/buildings`: Buildings of the caller's own started sessions, most recent first. */
+  private buildings(params: URLSearchParams): Reply {
+    const page = Number(params.get("page") ?? 1);
+    const pageSize = Number(params.get("pageSize") ?? 20);
+    if (!(page >= 1) || !(pageSize >= 1 && pageSize <= 100)) return this.problem(400, "VALIDATION_ERROR", "Invalid paging.");
+    const byId = new Map<string, { id: string; name: string; sessionCount: number; lastSessionAt: string }>();
+    for (const session of this.sessions.filter((item) => item.owner === "learner").sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt))) {
+      const building = this.item(session).building;
+      const entry = byId.get(building.id);
+      if (entry) entry.sessionCount += 1;
+      else byId.set(building.id, { id: building.id, name: building.name, sessionCount: 1, lastSessionAt: session.startedAt });
+    }
+    const items = [...byId.values()];
+    return { status: 200, json: { items: items.slice((page - 1) * pageSize, page * pageSize), totalCount: items.length, page, pageSize } };
   }
 }
 

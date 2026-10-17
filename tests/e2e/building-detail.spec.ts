@@ -34,6 +34,8 @@ async function mockBuilding(page: Page, mock: Mock = {}) {
   await page.route("**/api/revisions/*/bim-facts?*", (route) => route.fulfill({ json: page1([]) }));
   await page.route("**/api/revisions/*/annotations", (route) => route.fulfill({ json: { revisionId: new URL(route.request().url()).pathname.split("/")[3], id: null, version: 0, data: { items: [] }, provenance: null, createdBy: null, createdAt: null } }));
   await page.route("**/api/buildings/building-1/editor-preview?*", (route) => route.fulfill({ json: mock.preview ?? { buildingId: "building-1", revisionId: "rev-2", revisionStatus: "Uploaded", status: "NotReady", artifactId: null, attemptId: null, sha256Hash: null, downloadUrl: null, expiresAt: null, coordinateTransform: null, floors: null, semanticMapping: null } }));
+  await page.route("**/api/revisions/*/equipment-candidates", (route) => route.fulfill({ status: 409, contentType: "application/problem+json", body: JSON.stringify({ status: 409, title: "unavailable", code: "EQUIPMENT_CANDIDATES_UNAVAILABLE" }) }));
+  await page.route("**/api/scenario-interactions/catalog", (route) => route.fulfill({ json: [] }));
   await page.route("**/api/buildings/building-1/access", (route) => route.fulfill({ json: { buildingId: "building-1", visibility: "Private", accessRevision: 3, hasParticipationCode: true }, headers: { ETag: '"access-3"' } }));
 }
 

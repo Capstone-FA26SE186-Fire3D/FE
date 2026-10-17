@@ -38,10 +38,10 @@ test.describe("Organization AI: ask", () => {
     await expect(usage).toContainText("50 tokens");
     await expect(usage).toContainText("42 tokens");
 
-    // The quota gate ran first, then exactly one POST with the stable key and the trimmed question.
+    // The limits gate ran right before the POST, then exactly one POST with the stable key and the trimmed question.
     const order = mock.calls.map((call) => `${call.method} ${call.path}`);
-    expect(order.indexOf("GET /api/organizations/me/ai-quota")).toBeGreaterThan(-1);
-    expect(order.indexOf("GET /api/organizations/me/ai-quota")).toBeLessThan(order.indexOf("POST /api/ai/organization/answer"));
+    const post = order.indexOf("POST /api/ai/organization/answer");
+    expect(order.slice(0, post).lastIndexOf("GET /api/ai/organization/limits")).toBeGreaterThan(-1);
     const posts = calls(mock, "POST", "/api/ai/organization/answer");
     expect(posts).toHaveLength(1);
     expect(posts[0].headers["idempotency-key"]).toMatch(/\S+/);
@@ -107,8 +107,11 @@ test.describe("Organization AI: ask", () => {
     expect(posts).toHaveLength(2);
     expect(posts[1].headers["idempotency-key"]).toBe(posts[0].headers["idempotency-key"]);
     expect(mock.requests).toHaveLength(1);
-    // The retry skipped the quota gate: it is a replay, not a new reservation.
-    expect(calls(mock, "GET", "/api/organizations/me/ai-quota")).toHaveLength(1);
+    // The retry skipped the limits gate: it is a replay, not a new reservation.
+    const order = mock.calls.map((call) => `${call.method} ${call.path}`);
+    const first = order.indexOf("POST /api/ai/organization/answer");
+    const second = order.indexOf("POST /api/ai/organization/answer", first + 1);
+    expect(order.slice(first + 1, second)).not.toContain("GET /api/ai/organization/limits");
   });
 
   test("when the call never arrived, nothing is found and the same-key retry creates it exactly once", async ({ page }) => {
@@ -143,30 +146,53 @@ test.describe("Organization AI: ask", () => {
     await send(page).click();
     const blocked = page.getByTestId("ai-quota-blocked");
     await expect(blocked).toContainText("Quota AI đã hết");
-    await expect(blocked).toContainText("tokens");
+    await expect(blocked).toContainText("50 tokens");
+    await expect(page.getByTestId("ai-limit-hint")).toContainText("Không đủ cho một yêu cầu");
     await expect(page.getByTestId("ai-topup-link")).toHaveAttribute("href", "/workspace/billing?tab=ai");
     expect(calls(mock, "POST", "/api/ai/organization/answer")).toHaveLength(0);
     expect(mock.requests).toHaveLength(0);
   });
 
-  test("no quota unit at all also blocks before the call", async ({ page }) => {
-    const mock = newAiMock({ quota: { units: [] } });
+  test("a balance below the estimated reserve blocks before the call", async ({ page }) => {
+    const mock = newAiMock({ quota: { units: [{ quotaUnit: "tokens", granted: 1000, reserved: 0, consumed: 970, expired: 0, available: 30, scheduled: 0 }] } });
     await open(page, mock, "/workspace/ai");
-    await page.getByLabel("Câu hỏi").fill("Chưa có quota");
+    await page.getByLabel("Câu hỏi").fill("Còn 30 tokens");
     await send(page).click();
-    await expect(page.getByTestId("ai-quota-blocked")).toContainText("Chưa có quota AI");
+    const blocked = page.getByTestId("ai-quota-blocked");
+    await expect(blocked).toContainText("Quota AI không đủ cho một yêu cầu");
+    await expect(blocked).toContainText("còn 30 tokens");
     expect(calls(mock, "POST", "/api/ai/organization/answer")).toHaveLength(0);
+  });
+
+  test("no active policy for the operation blocks before the call", async ({ page }) => {
+    const mock = newAiMock({ limits: [{ operation: "Answer", policyActive: false, quotaUnit: null, estimatedReserve: null, maxInputChars: null, maxSources: null, availableUnits: 900, canSubmit: false }] });
+    await open(page, mock, "/workspace/ai");
+    await page.getByLabel("Câu hỏi").fill("Chưa có chính sách");
+    await send(page).click();
+    await expect(page.getByTestId("ai-policy-blocked")).toContainText("Chưa có chính sách AI cho thao tác này");
+    expect(calls(mock, "POST", "/api/ai/organization/answer")).toHaveLength(0);
+  });
+
+  test("the question is limited to the policy maxInputChars before anything is sent", async ({ page }) => {
+    const mock = newAiMock({ limits: [{ operation: "Answer", policyActive: true, quotaUnit: "tokens", estimatedReserve: 50, maxInputChars: 10, maxSources: 20, availableUnits: 900, canSubmit: true }] });
+    await open(page, mock, "/workspace/ai");
+    await page.getByLabel("Câu hỏi").fill("Câu hỏi dài hơn mười ký tự");
+    await expect(page.getByTestId("ai-char-count")).toHaveAttribute("data-over", "true");
+    await expect(send(page)).toBeDisabled();
+    await expect(page.getByText("Dài hơn giới hạn 10 ký tự")).toBeVisible();
+    await page.getByLabel("Câu hỏi").fill("Ngắn gọn");
+    await expect(send(page)).toBeEnabled();
   });
 
   test("a quota that cannot be read blocks too, with a retry", async ({ page }) => {
     const mock = newAiMock();
     await signInAs(page, owner);
     await mockAi(page, mock);
-    await page.route("**/api/organizations/me/ai-quota", (route) => route.fulfill({ status: 500, contentType: "application/problem+json", body: JSON.stringify({ status: 500, title: "boom" }) }));
+    await page.route("**/api/ai/organization/limits", (route) => route.fulfill({ status: 500, contentType: "application/problem+json", body: JSON.stringify({ status: 500, title: "boom" }) }));
     await page.goto("/workspace/ai");
     await page.getByLabel("Câu hỏi").fill("Không đọc được quota");
     await send(page).click();
-    await expect(page.getByText("Chưa kiểm tra được quota nên chưa gửi")).toBeVisible();
+    await expect(page.getByText("Chưa kiểm tra được chính sách và quota nên chưa gửi")).toBeVisible();
     expect(calls(mock, "POST", "/api/ai/organization/answer")).toHaveLength(0);
   });
 

@@ -13,6 +13,7 @@ import { fieldIssue } from "../labels";
 import { useAiSubmit } from "../use-ai-submit";
 import type { AiEligibleSource } from "../types";
 import styles from "../org-ai.module.css";
+import { CharCount, LimitHint, useOperationLimit } from "./limit-hint";
 import { RequestPanel } from "./request-panel";
 import { ALL_SOURCES, SourcePicker, toSourceRefs, type SourceChoice } from "./source-picker";
 import { SubmitStatus } from "./submit-status";
@@ -22,13 +23,18 @@ export function AskTab({ accessToken, requestId, onRequest }: { accessToken: str
   const [question, setQuestion] = useState("");
   const [choice, setChoice] = useState<SourceChoice>(ALL_SOURCES);
   const [available, setAvailable] = useState<AiEligibleSource[]>([]);
-  const tracked = useCallback((id: string) => onRequest(id), [onRequest]);
+  const limits = useOperationLimit(accessToken, "Answer");
+  const reloadLimits = limits.reload;
+  const tracked = useCallback((id: string) => { onRequest(id); reloadLimits(); }, [onRequest, reloadLimits]);
   const { phase, submit, retry, lookRecent, track, reset, working } = useAiSubmit(accessToken, "Answer", tracked);
 
   const text = question.trim();
   const refs = toSourceRefs(choice, available);
   const noSourceChosen = choice.mode === "selected" && (refs?.length ?? 0) === 0;
-  const canSend = text.length > 0 && !working && !noSourceChosen;
+  const maxChars = limits.limit?.maxInputChars ?? null;
+  const tooLong = maxChars !== null && text.length > maxChars;
+  const tooManySources = Boolean(limits.limit?.maxSources && refs && refs.length > limits.limit.maxSources);
+  const canSend = text.length > 0 && !working && !noSourceChosen && !tooLong && !tooManySources;
 
   const doSubmit = () => {
     if (!canSend) return;
@@ -40,7 +46,7 @@ export function AskTab({ accessToken, requestId, onRequest }: { accessToken: str
     doSubmit();
   };
 
-  const questionError = phase.kind === "failed" ? fieldIssue(phase.error, "$.question") : undefined;
+  const questionError = tooLong ? `Dài hơn giới hạn ${maxChars} ký tự của chính sách AI hiện hành.` : phase.kind === "failed" ? fieldIssue(phase.error, "$.question") : undefined;
   const showPanel = requestId !== "" && (phase.kind === "idle" || phase.kind === "tracking");
 
   return <div className={styles.stack}>
@@ -49,7 +55,10 @@ export function AskTab({ accessToken, requestId, onRequest }: { accessToken: str
         <Field label="Câu hỏi" required error={questionError} hint="Văn bản thuần, không dán HTML. Giới hạn độ dài theo chính sách AI hiện hành.">
           {(props) => <Textarea {...props} rows={4} value={question} onChange={(event) => setQuestion(event.target.value)} disabled={working} placeholder="Ví dụ: Yêu cầu về lối thoát nạn cho nhà trường là gì?" />}
         </Field>
+        <CharCount value={text} max={maxChars} />
         <SourcePicker accessToken={accessToken} value={choice} onChange={setChoice} disabled={working} onLoaded={setAvailable} />
+        {tooManySources && <p className={styles.dim} role="alert">Chính sách hiện hành cho phép tối đa {limits.limit?.maxSources} nguồn; hãy bỏ bớt.</p>}
+        <LimitHint limit={limits.limit} />
         <div className="ops-actions">
           <Button type="submit" disabled={!canSend} data-testid="ai-send"><Send size={16} aria-hidden="true" />{working ? "Đang gửi…" : "Gửi câu hỏi"}</Button>
           {requestId && <Button type="button" variant="quiet" onClick={() => { reset(); onRequest(null); }}>Hỏi câu khác</Button>}

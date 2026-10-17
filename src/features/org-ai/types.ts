@@ -3,8 +3,13 @@
  * Docs v7 vocabulary since BE#89). The FE never talks to the FastAPI adapter.
  */
 
-export type AiOperation = "ScenarioDraft" | "Answer";
+export type AiOperation = "ScenarioDraft" | "Answer" | "TraineeAnswer";
+/** Operations an organization submits (and filters its own history by). */
 export const AI_OPERATIONS: readonly AiOperation[] = ["Answer", "ScenarioDraft"];
+/** Every operation the PlatformAdmin sees: TraineeAnswer comes from the Trainee audience. */
+export const ADMIN_AI_OPERATIONS: readonly AiOperation[] = ["Answer", "ScenarioDraft", "TraineeAnswer"];
+export type AiAudience = "organization" | "trainee";
+export const AI_AUDIENCES: readonly AiAudience[] = ["organization", "trainee"];
 
 /**
  * Request lifecycle (service state only). What the AI produced is `resultType`, set once `Succeeded`.
@@ -35,11 +40,17 @@ export function urlId(value: string): string {
 /** `result.status`: Answered (KnowledgeAnswer), NeedsUserEdit (ScenarioDraft only), InsufficientEvidence, RejectedBySafetyGate. */
 export type AiResultStatus = "Answered" | "NeedsUserEdit" | "InsufficientEvidence" | "RejectedBySafetyGate";
 
-export type AiSourceKind = "KnowledgeSource" | "LibraryVersion" | "LearnPost";
+export type AiSourceKind = "KnowledgeSource" | "LibraryVersion" | "LearnPost" | "TrainingSnapshot" | "SessionResult";
 export const AI_SOURCE_KINDS: readonly AiSourceKind[] = ["KnowledgeSource", "LibraryVersion", "LearnPost"];
 
+/**
+ * Where a source can be opened (`AiSourceLink`): every field is present, the ones that do not apply are null.
+ * LearnPost → `learnSlug` + `learnPostId`, LibraryVersion → `libraryItemId`, KnowledgeSource → `sourceUri` (https).
+ */
+export type AiSourceLink = { learnSlug?: string | null; learnPostId?: string | null; libraryItemId?: string | null; sourceUri?: string | null };
+
 /** `GET /api/ai/organization/sources` item: what the organization may cite right now. */
-export type AiEligibleSource = { kind: AiSourceKind | (string & {}); id: string; versionId: string; title: string; versionLabel: string };
+export type AiEligibleSource = { kind: AiSourceKind | (string & {}); id: string; versionId: string; title: string; versionLabel: string; link?: AiSourceLink | null };
 export type AiSourceList = { items: AiEligibleSource[] };
 
 /** Source as pinned on the request (id, version, content hash). */
@@ -47,7 +58,31 @@ export type AiPinnedSource = AiEligibleSource & { contentHash?: string };
 
 export type AiSourceRef = { kind: string; id: string };
 
-export type AiCitation = { kind: string; id: string; locator?: string };
+/** `AiCitationView`: kind, title, version and link are resolved by the backend against the pins, never taken from the provider. */
+export type AiCitation = {
+  kind: string;
+  id: string;
+  versionId?: string;
+  title?: string;
+  versionLabel?: string;
+  chunkId?: string | null;
+  locator?: string | null;
+  relevance?: number | null;
+  link?: AiSourceLink | null;
+};
+
+export type AiBimAnchor = { ifcGlobalId: string; entityType?: string | null; revisionId: string };
+
+/** What was asked (`AiRequestInputView`); lets a client that lost the submit response find its request again by text. */
+export type AiRequestInput = {
+  text: string;
+  inputHash?: string;
+  buildingId?: string | null;
+  buildingName?: string | null;
+  revisionId?: string | null;
+  requestedSources?: AiSourceRef[];
+  context?: Record<string, unknown> | null;
+};
 
 /** `fet3d.editor/1` document proposed for ScenarioDraft; shape-checked by the BE, content is only a proposal. */
 export type AiDraftProposal = { state: Record<string, unknown>; notes?: string | null };
@@ -61,6 +96,10 @@ export type AiResult = {
   draft?: AiDraftProposal;
   /** Plain text for InsufficientEvidence / RejectedBySafetyGate. */
   message?: string | null;
+  confidence?: "low" | "medium" | "high" | (string & {}) | null;
+  assumptions?: string[] | null;
+  limitations?: string[] | null;
+  bimAnchors?: AiBimAnchor[] | null;
 };
 
 export type AiAllocation = { grantId: string; reservedUnits: number; consumedUnits: number | null; status: string };
@@ -68,6 +107,7 @@ export type AiAllocation = { grantId: string; reservedUnits: number; consumedUni
 /** Same fields for the organization and the admin; `*Admin` fields exist only on `/api/admin/ai/requests`. */
 export type AiRequest = {
   requestId: string;
+  audience?: AiAudience | (string & {});
   operation: AiOperation | (string & {});
   status: AiRequestStatus | (string & {});
   /** Set when `status` is Succeeded, null before. */
@@ -79,10 +119,14 @@ export type AiRequest = {
   result?: AiResult | null;
   citations?: AiCitation[];
   failureCode?: string | null;
+  input?: AiRequestInput | null;
+  /** Trainee only: the context (Training access, Learn post) is gone, so result and citations are withheld. */
+  resultWithheld?: boolean | null;
   createdAt: string;
   completedAt?: string;
   revision?: number;
   // admin only
+  modelVersion?: string | null;
   organizationId?: string;
   actorUserId?: string;
   policyId?: string;
@@ -96,10 +140,46 @@ export type AiRequest = {
 export type AiRequestPage = { items: AiRequest[]; total: number; page: number; pageSize: number };
 
 export type AiRequestFilters = { status?: string; resultType?: string; operation?: string; mine?: boolean; page?: number; pageSize?: number };
-export type AdminAiRequestFilters = { status?: string; organizationId?: string; page?: number; pageSize?: number };
+export type AdminAiRequestFilters = { status?: string; operation?: string; audience?: string; organizationId?: string; page?: number; pageSize?: number };
 
 export type AnswerInput = { question: string; sources?: AiSourceRef[] };
-export type ScenarioDraftInput = { buildingId: string; prompt: string; sources?: AiSourceRef[] };
+/** `revisionId` pins one accepted-geometry revision; without it the BE takes the newest such revision (none → 409 AI_REVISION_NOT_READY). */
+export type ScenarioDraftInput = { buildingId: string; prompt: string; sources?: AiSourceRef[]; revisionId?: string };
+
+/** `GET /api/ai/organization/limits` item: what one request reserves now and whether the pooled balance covers it. */
+export type AiOperationLimit = {
+  operation: AiOperation | (string & {});
+  policyActive: boolean;
+  quotaUnit?: string | null;
+  estimatedReserve?: number | null;
+  maxInputChars?: number | null;
+  maxSources?: number | null;
+  availableUnits: number;
+  canSubmit: boolean;
+};
+export type AiLimits = { items: AiOperationLimit[] };
+
+/** `GET /api/ai/trainee/quota`: today's allowance (Asia/Ho_Chi_Minh day); used + reserved never exceed dailyUnits. */
+export type TraineeAiQuota = {
+  policyActive: boolean;
+  quotaUnit?: string | null;
+  dailyUnits?: number | null;
+  usedUnits: number;
+  reservedUnits: number;
+  remainingUnits: number;
+  estimatedReserve?: number | null;
+  maxInputChars?: number | null;
+  resetsAt: string;
+  blockedByAssessment: boolean;
+  canSubmit: boolean;
+};
+
+/** What a Trainee question is about: a published Learn version, a Training they may play, or one of their results. */
+export type TraineeAiContext =
+  | { kind: "Learn"; postId: string; versionId: string }
+  | { kind: "Training"; trainingId: string }
+  | { kind: "Result"; sessionId: string };
+export type TraineeAnswerInput = { question: string; context?: TraineeAiContext; sources?: AiSourceRef[] };
 
 export type AiPolicy = {
   id: string;
@@ -108,10 +188,14 @@ export type AiPolicy = {
   reserveUnits: number;
   maxInputChars: number;
   maxSources: number;
+  /** TraineeAnswer only: allowance per Trainee per Asia/Ho_Chi_Minh day. */
+  dailyUnits?: number | null;
   effectiveFrom: string;
   effectiveUntil?: string | null;
   createdAt: string;
 };
+export type AiPolicyPage = { items: AiPolicy[]; total: number; page: number; pageSize: number };
+export type AiPolicyFilters = { operation?: string; page?: number; pageSize?: number };
 export type CreateAiPolicyInput = {
   operation: string;
   quotaUnit: string;
@@ -120,6 +204,7 @@ export type CreateAiPolicyInput = {
   maxSources: number;
   effectiveFrom?: string;
   effectiveUntil?: string;
+  dailyUnits?: number;
 };
 
 export type KnowledgeVisibility = "Common" | "Organization";

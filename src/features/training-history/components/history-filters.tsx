@@ -4,7 +4,7 @@ import { Field, Input, Select } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { rangeError, hasFilters } from "../filters";
 import { modeLabel, sessionStatusView } from "../labels";
-import { SESSION_STATUSES, TRAINING_MODES, type HistoryFilters, type NamedRef } from "../types";
+import { FILTER_STATUSES, TRAINING_MODES, type HistoryFilters, type NamedRef } from "../types";
 
 /** Filters live in the URL (status, mode, building, from, to): the parent passes `onChange` that writes them there. */
 export function HistoryFilterBar({ filters, buildings, knownBuildingNames, onChange, onClear }: {
@@ -20,7 +20,7 @@ export function HistoryFilterBar({ filters, buildings, knownBuildingNames, onCha
   return <form className="th-filters" aria-label="Bộ lọc lịch sử" onSubmit={(event) => event.preventDefault()}>
     <Field label="Trạng thái phiên">{(props) => <Select {...props} value={filters.status} onChange={(event) => onChange({ status: event.target.value })}>
       <option value="">Mọi trạng thái</option>
-      {SESSION_STATUSES.map((status) => <option key={status} value={status}>{sessionStatusView(status).label}</option>)}
+      {FILTER_STATUSES.map((status) => <option key={status} value={status}>{sessionStatusView(status).label}</option>)}
     </Select>}</Field>
     <Field label="Chế độ">{(props) => <Select {...props} value={filters.mode} onChange={(event) => onChange({ mode: event.target.value })}>
       <option value="">Mọi chế độ</option>

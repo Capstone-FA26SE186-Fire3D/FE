@@ -21,6 +21,7 @@ import { emptyPipeline, isTerminalJob, revisionLabel, type RevisionPipeline } fr
 import type { ProcessingJob } from "../types";
 import { AnnotationsPanel } from "./annotations-panel";
 import { BuildingAccessPanel } from "./building-access-panel";
+import { EquipmentPanel } from "./equipment-panel";
 import { ConfirmTrainingPanel } from "./confirm-training-panel";
 import { IfcUploadPanel } from "./ifc-upload-panel";
 import { OverviewTab } from "./overview-tab";
@@ -57,6 +58,12 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "overview" }:
   const [scenarioPage, setScenarioPage] = useState(1);
   // The QR tab stays mounted once opened: a freshly issued token exists only in its memory and must survive tab switches.
   const [qrOpened, setQrOpened] = useState(false);
+  // IFC elements emphasized in the preview, bound to the revision they were chosen on.
+  const [highlight, setHighlight] = useState<{ revisionId: string; ids: string[] }>({ revisionId: "", ids: [] });
+  const showInPreview = (revisionId: string, ids: string[]) => {
+    setHighlight({ revisionId, ids });
+    document.getElementById("revision-preview")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  };
   if (tab === "qr" && !qrOpened) setQrOpened(true);
 
   const building = useAsyncData(`building:${buildingId}`, (signal) => buildingsApi.getVersioned(token, buildingId, signal), enabled);
@@ -178,8 +185,9 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "overview" }:
           {revisions.loading && !revisions.data && <Skeleton style={{ height: 160 }} />}
           {revision && accessToken && <>
             <ProcessingStatusPanel accessToken={accessToken} revision={revision} pipeline={pipeline} issues={issues.data?.items} polling={pipelineState.polling} pollError={pollError} onRefresh={pipelineState.refresh} onChanged={() => { revisions.reload(); pipelineState.refresh(); }} />
-            <PreviewPanel accessToken={accessToken} buildingId={buildingId} revisionId={revision.id} reloadKey={reloadKey} />
-            <RevisionDetailsPanel accessToken={accessToken} revisionId={revision.id} issues={{ data: issues.data?.items, error: issues.error, loading: issues.loading, reload: issues.reload }} reloadKey={reloadKey} />
+            <PreviewPanel accessToken={accessToken} buildingId={buildingId} revisionId={revision.id} reloadKey={reloadKey} highlight={highlight.revisionId === revision.id ? highlight.ids : undefined} onClearHighlight={() => setHighlight({ revisionId: "", ids: [] })} />
+            <EquipmentPanel key={revision.id} accessToken={accessToken} revisionId={revision.id} onChanged={() => { revisions.reload(); pipelineState.refresh(); }} onHighlight={(ids) => showInPreview(revision.id, ids)} />
+            <RevisionDetailsPanel accessToken={accessToken} revisionId={revision.id} issues={{ data: issues.data?.items, error: issues.error, loading: issues.loading, reload: issues.reload }} reloadKey={reloadKey} onHighlight={(ids) => showInPreview(revision.id, ids)} />
             <AnnotationsPanel accessToken={accessToken} revisionId={revision.id} />
             <ConfirmTrainingPanel accessToken={accessToken} buildingId={buildingId} revision={revision} pipeline={pipeline} jobs={jobs} onConfirmed={revisions.reload} />
           </>}

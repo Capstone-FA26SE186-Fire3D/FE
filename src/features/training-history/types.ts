@@ -8,6 +8,11 @@
 /** Values `status` takes in the history list (AwaitingSync is derived: Running with a pinned completion). */
 export const SESSION_STATUSES = ["Launching", "Running", "AwaitingSync", "Completed", "CompletedWithSupersededRelease", "ScenarioUnsurvivable", "Aborted", "Abandoned", "Crashed"] as const;
 export type SessionStatus = (typeof SESSION_STATUSES)[number];
+/**
+ * States a v7 session takes and the only values `GET /api/training/sessions?status=` accepts (others answer 400).
+ * The longer list above is kept for labels of legacy rows.
+ */
+export const FILTER_STATUSES = ["Launching", "Running", "AwaitingSync", "Completed"] as const;
 
 export const TRAINING_MODES = ["Learn", "Guided", "Assessment"] as const;
 export type TrainingMode = (typeof TRAINING_MODES)[number];
@@ -50,8 +55,14 @@ export type HistoryFilters = {
 
 export type HistoryQuery = HistoryFilters & { page: number; pageSize: number };
 
+/** `GET /api/training/buildings` item: a Building of the caller's own started sessions (kept after access is lost). */
+export type HistoryBuilding = { id: string; name: string; sessionCount: number; lastSessionAt: string | null };
+
 export type CriterionResult = {
   id: string;
+  /** Author's label and description from the pinned rubric (null when left out). */
+  label: string | null;
+  description: string | null;
   metric: string;
   /** Measured value: number for the supported metrics, anything the server sends otherwise; null when unavailable. */
   value: unknown;
@@ -71,6 +82,8 @@ export type TrainingResult = {
   /** Machine code of the outcome (for example MANDATORY_CRITERION_FAILED), not prose. */
   reason: string;
   scorePercent: number | null;
+  /** Rubric pass threshold on the same 0–100 scale as `scorePercent`; Assessment only. */
+  passThresholdPercent: number | null;
   rubricHash: string | null;
   /** null: the server returned no criteria (the policy of the mode decides, the web does not infer it). */
   criteria: CriterionResult[] | null;

@@ -20,8 +20,8 @@ import { accountsApi } from "@/features/accounts/api";
 import { formatDateTime, formatQuota } from "@/features/billing/format";
 
 import { adminAiApi } from "../api";
-import { aiErrorText, failureText, operationLabel, statusLabel, statusTone } from "../labels";
-import { AI_STATUSES, urlFilter, urlId, type AiRequest } from "../types";
+import { aiErrorText, audienceLabel, failureText, operationLabel, statusLabel, statusTone } from "../labels";
+import { ADMIN_AI_OPERATIONS, AI_AUDIENCES, AI_STATUSES, urlFilter, urlId, type AiRequest } from "../types";
 import styles from "../org-ai.module.css";
 import { RequestPanel } from "./request-panel";
 
@@ -95,30 +95,38 @@ function AdminDetail({ accessToken, request, refresh, orgName }: { accessToken: 
 export function AdminRequestsTab({ accessToken }: { accessToken: string }) {
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const status = urlFilter(get("status"), AI_STATUSES);
+  const operation = urlFilter(get("operation"), ADMIN_AI_OPERATIONS);
+  const audience = urlFilter(get("audience"), AI_AUDIENCES);
   const organizationId = get("organizationId");
   const requestId = urlId(get("request"));
 
   const list = useAsyncData(
-    `admin-ai:requests:${page}:${status}:${organizationId}`,
-    (signal) => adminAiApi.listRequests(accessToken, { page, pageSize: PAGE_SIZE, status: status || undefined, organizationId: organizationId || undefined }, signal),
+    `admin-ai:requests:${page}:${status}:${operation}:${audience}:${organizationId}`,
+    (signal) => adminAiApi.listRequests(accessToken, { page, pageSize: PAGE_SIZE, status: status || undefined, operation: operation || undefined, audience: audience || undefined, organizationId: organizationId || undefined }, signal),
   );
   const organizations = useAsyncData("admin-ai:orgs", () => accountsApi.organizations(accessToken));
   const orgNames = useMemo(() => Object.fromEntries((organizations.data?.items ?? []).map((item) => [item.id, item.name])), [organizations.data]);
   const orgName = (id: string | undefined) => (id ? orgNames[id] ?? `${id.slice(0, 8)}…` : "—");
   const items = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
-  const filtering = Boolean(status || organizationId);
+  const filtering = Boolean(status || operation || audience || organizationId);
 
   return <>
     <div className="ops-toolbar">
       <Select aria-label="Trạng thái" style={{ width: 220 }} value={status} onChange={(event) => setParams({ status: event.target.value })}>
         <option value="">Mọi trạng thái</option>{AI_STATUSES.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}
       </Select>
+      <Select aria-label="Loại yêu cầu" style={{ width: 200 }} value={operation} onChange={(event) => setParams({ operation: event.target.value })}>
+        <option value="">Mọi loại</option>{ADMIN_AI_OPERATIONS.map((value) => <option key={value} value={value}>{operationLabel(value)}</option>)}
+      </Select>
+      <Select aria-label="Đối tượng" style={{ width: 170 }} value={audience} onChange={(event) => setParams({ audience: event.target.value })}>
+        <option value="">Mọi đối tượng</option>{AI_AUDIENCES.map((value) => <option key={value} value={value}>{audienceLabel(value)}</option>)}
+      </Select>
       <Select aria-label="Tổ chức" style={{ width: 240 }} value={organizationId} onChange={(event) => setParams({ organizationId: event.target.value })}>
         <option value="">Mọi tổ chức</option>
         {(organizations.data?.items ?? []).map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
       </Select>
-      {filtering && <Button variant="quiet" onClick={() => setParams({ status: null, organizationId: null })}>Xóa bộ lọc</Button>}
+      {filtering && <Button variant="quiet" onClick={() => setParams({ status: null, operation: null, audience: null, organizationId: null })}>Xóa bộ lọc</Button>}
       <Button variant="quiet" onClick={list.reload} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
     </div>
     {list.error !== undefined && <Alert tone="danger" title="Không tải được yêu cầu AI" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{aiErrorText(list.error)}</Alert>}
@@ -131,7 +139,7 @@ export function AdminRequestsTab({ accessToken }: { accessToken: string }) {
             <button type="button" className={styles.rowButton} onClick={() => setParams({ request: item.requestId })} aria-label={`Mở yêu cầu ${operationLabel(item.operation)} ${item.requestId.slice(0, 8)}`}>{operationLabel(item.operation)}</button>
             <span className="ops-cell-sub"><span className={styles.mono}>{item.requestId.slice(0, 8)}…</span></span>
           </td>
-          <td>{orgName(item.organizationId)}</td>
+          <td>{item.audience === "trainee" ? <>Trainee<span className="ops-cell-sub">không thuộc quota tổ chức</span></> : orgName(item.organizationId)}</td>
           <td><StatusBadge tone={statusTone(item.status, item.resultType)}>{statusLabel(item.status, item.resultType)}</StatusBadge>{item.reconcileRequestedAt && <span className="ops-cell-sub">Đã yêu cầu đối soát</span>}</td>
           <td>{item.consumedUnits !== undefined ? formatQuota(item.consumedUnits, item.quotaUnit) : item.reservedUnits !== undefined ? `Giữ chỗ ${formatQuota(item.reservedUnits, item.quotaUnit)}` : "—"}</td>
           <td>{formatDateTime(item.createdAt)}</td>
@@ -140,7 +148,6 @@ export function AdminRequestsTab({ accessToken }: { accessToken: string }) {
       </tbody>
     </Table>
     {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
-    <p className={styles.dim}>Bộ lọc loại thao tác chưa có trong API quản trị (chỉ trạng thái và tổ chức).</p>
 
     <Drawer open={requestId !== ""} onOpenChange={(open) => { if (!open) { setParams({ request: null }); list.reload(); } }} title="Chi tiết yêu cầu AI" description="Số liệu và nội dung do máy chủ trả; tự cập nhật khi còn đang xử lý hoặc đã lên lịch đối soát." className={styles.wideDrawer}>
       {requestId && <RequestPanel key={requestId} admin accessToken={accessToken} requestId={requestId}
