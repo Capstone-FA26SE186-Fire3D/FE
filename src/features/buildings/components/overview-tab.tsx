@@ -8,7 +8,7 @@ import { Drawer } from "@/components/ui/dialog";
 import { Panel, Stat } from "@/components/ui/panel";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
-import { buildingConflict, buildingsApi } from "../api";
+import { buildingConflict, buildingsApi, sameBuildingVersion } from "../api";
 import { describeBuildingWriteError, formatDateTime } from "../format";
 import { deriveQaVerdict, jobLabel, revisionLabel, type RevisionPipeline } from "../pipeline";
 import type { Building, BuildingRevision, RevisionIssue } from "../types";
@@ -50,7 +50,14 @@ export function OverviewTab({ accessToken, building, etag, revision, pipeline, i
     setSaving(true);
     setFormError("");
     try {
-      const ifMatch = (stale ? stale.etag : etag) ?? (await buildingsApi.getVersioned(accessToken, building.id)).etag;
+      let ifMatch = stale ? stale.etag : etag;
+      if (!ifMatch) {
+        // No ETag for the version on screen: read data and ETag together, and only use that ETag if the data is the same
+        // version the form was built from; otherwise show the newer version instead of overwriting it with old fields.
+        const fresh = await buildingsApi.getVersioned(accessToken, building.id);
+        if (!sameBuildingVersion(fresh.data, base)) { setStale({ current: fresh.data, etag: fresh.etag }); return; }
+        ifMatch = fresh.etag;
+      }
       if (!ifMatch) { setFormError("Không đọc được phiên bản công trình (ETag). Hãy tải lại trang rồi thử lại."); return; }
       // PlatformAdmin edits on behalf of the building's organization; an OrganizationUser never sends the parameter.
       await buildingsApi.update(accessToken, building.id, buildingFormToInput(form, base), ifMatch, isAdmin ? building.organizationId : undefined);

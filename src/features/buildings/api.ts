@@ -255,6 +255,16 @@ export const buildingsApi = {
   },
 };
 
+/**
+ * True when two reads describe the same version of a Building: same `updatedAt` and same fields a save sends back.
+ * Used when the first read had no readable ETag: the ETag fetched at save time only applies to the data fetched with it.
+ */
+export function sameBuildingVersion(a: Building, b: Building): boolean {
+  const pick = (x: Building) => JSON.stringify([x.name, x.buildingType ?? null, x.totalFloors, x.location ?? null, x.contact ?? null]);
+  const at = (x: Building) => Date.parse(x.updatedAt);
+  return a.id === b.id && at(a) === at(b) && pick(a) === pick(b);
+}
+
 /** A 412 on PUT/DELETE /api/buildings/{id}: the Building as it is now (`current`) and its new ETag, to compare and retry. */
 export function buildingConflict(error: unknown): { current: Building | null; etag: string | null } | null {
   if (!(error instanceof ApiError) || error.status !== 412) return null;
