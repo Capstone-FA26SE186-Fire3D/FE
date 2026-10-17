@@ -25,7 +25,7 @@ import type { MarkerInput, MarkerRef, Point3, TransformResult } from "../../scen
 import type { ModelRequest, ModelStatus, ViewportHandle } from "../../scene/editor-viewport";
 import { useEditorPreview } from "../../use-editor-preview";
 import { kindAvailability, type GeometryState } from "../../v1/availability";
-import { parseRubricCatalog, parseRuntimeCatalog } from "../../v1/catalog";
+import { findRuntime, parseRubricCatalog, parseRuntimeCatalog } from "../../v1/catalog";
 import type { ObjectKind } from "../../v1/contract";
 import { parseGeometry } from "../../v1/geometry";
 import { targetOf } from "../../v1/issues";
@@ -40,6 +40,7 @@ import { useLeaveGuard, useMediaQuery } from "../hooks";
 import { KindAvailability } from "../kind-availability";
 import { createV1Actions } from "./actions";
 import { V1GeometryPanel } from "./v1-geometry-panel";
+import { V1EquipmentImport } from "./v1-equipment-import";
 import { V1IssuesPanel } from "./v1-issues";
 import { V1LibraryPanel, initialLibraryUi, type AppliedSample, type LibraryUi } from "./v1-library-panel";
 import { V1ObjectForm } from "./v1-object-form";
@@ -67,6 +68,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const [mobileTab, setMobileTab] = useState<MobileTab>("model");
   const [treeOpen, setTreeOpen] = useState(false);
   const [conflictOpen, setConflictOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [floorChoice, setFloorChoice] = useState<string | null | undefined>(undefined);
   const [modelVisible, setModelVisible] = useState(true);
   const [layerVisibility, setLayerVisibility] = useState<Record<string, boolean>>({});
@@ -252,7 +254,8 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
     onSelect={(index) => { selectObject(index); setTreeOpen(false); if (isMobile) setMobileTab("props"); }}
     onAdd={(kind) => { addAtCentre(kind); setTreeOpen(false); }} kindStatus={kindStatus} addDisabledReason={placeDisabledReason}
     modelLayers={modelLayers} layerVisibility={layerVisibility} onLayer={(key, visible) => setLayerVisibility((current) => ({ ...current, [key]: visible }))}
-    modelVisible={modelVisible} onModelVisible={setModelVisible} hasModel={modelStatus.phase === "loaded"} />;
+    modelVisible={modelVisible} onModelVisible={setModelVisible} hasModel={modelStatus.phase === "loaded"}
+    onImportEquipment={() => { setImportOpen(true); setTreeOpen(false); }} />;
 
   const previewBanner = preview.phase === "reprocess"
     ? <ReprocessGuide buildingId={buildingId} revisionId={revisionId} />
@@ -341,6 +344,9 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
       onLoad={() => void editor.loadConflict()}
       onApply={(choices) => { editor.applyMerge(choices); setConflictOpen(false); toast.notify({ tone: "info", title: "Đã đối chiếu", description: "Kết quả chưa được lưu. Kiểm tra rồi bấm Lưu." }); }}
       onClose={() => { setConflictOpen(false); editor.closeConflict(); }} />
+
+    {importOpen && <V1EquipmentImport accessToken={accessToken} buildingId={buildingId} revisionId={revisionId} draft={state.draft} runtime={findRuntime(runtimes ?? [], runtimeVersion)}
+      runtimeVersion={runtimeVersion} geometry={geometry} onApply={edit} onClose={() => setImportOpen(false)} />}
 
     {aiRequestId && !aiDismissed && <AiProposalApply key={aiRequestId} accessToken={accessToken} requestId={aiRequestId} draft={state.draft} floorIds={aiFloorIds} onApply={edit} onClose={closeAiProposal} />}
 

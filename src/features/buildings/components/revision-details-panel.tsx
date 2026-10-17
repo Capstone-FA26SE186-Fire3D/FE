@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableMessage } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { buildingsApi } from "../api";
+import { entityLabel, propertyLabel, qualityFlagCodes, qualityFlagLabel, sortFacts } from "../bim-facts";
 import { describeApiError, formatDateTime, shortHash } from "../format";
 import { countBySeverity, severityLabel, severityOrder, severityRank } from "../pipeline";
 import { issueGlobalIds, qaGuide } from "../qa-codes";
@@ -116,14 +117,25 @@ function FactsTab({ accessToken, revisionId, reloadKey }: { accessToken: string;
   const [page, setPage] = useState(1);
   const facts = useAsyncData(`facts:${revisionId}:${reloadKey}:${page}`, (signal) => buildingsApi.listBimFacts(accessToken, revisionId, page, 20, signal));
   const total = facts.data?.totalCount ?? 0;
+  const rows = useMemo(() => sortFacts(facts.data?.items ?? []), [facts.data]);
+  const unnamed = rows.filter((fact) => qualityFlagCodes(fact.qualityFlags).includes("SPACE_UNNAMED")).length;
+  const hasSpaces = rows.some((fact) => fact.entityType === "IfcSpace");
   return <div className="ops-stack">
     {facts.error !== undefined && <Alert tone="danger" title="Không tải được BIM facts" action={<Button size="sm" variant="secondary" className="mt-3" onClick={facts.reload}>Thử lại</Button>}>{describeApiError(facts.error, "Hãy thử lại sau.")}</Alert>}
-    <Table caption="BIM facts">
-      <thead><tr><th>IFC GlobalId</th><th>Thực thể</th><th>Thuộc tính</th><th>Giá trị</th></tr></thead>
+    {unnamed > 0 && <div data-testid="facts-unnamed"><Alert tone="warning" title={`${unnamed} phòng chưa có tên trên trang này`}>{qaGuide("IFC_SPACE_UNNAMED")?.guidance}</Alert></div>}
+    {hasSpaces && <p className="ops-muted" data-testid="facts-space-note">Mỗi phòng có ba dòng: tên, tên đầy đủ và loại phòng. Máy chủ phân trang theo dòng nên các dòng của một phòng có thể nằm ở trang khác.</p>}
+    <Table caption="BIM facts" data-testid="facts-table">
+      <thead><tr><th>IFC GlobalId</th><th>Thực thể</th><th>Thuộc tính</th><th>Giá trị</th><th>Cảnh báo</th></tr></thead>
       <tbody>
-        {facts.loading && !facts.data && <TableMessage colSpan={4}><SkeletonRows rows={3} label="Đang tải BIM facts…" /></TableMessage>}
-        {facts.data?.items.map((fact) => <tr key={fact.id}><td className="ops-mono">{fact.ifcGlobalId}</td><td>{fact.entityType}</td><td>{fact.propertyPath}</td><td>{valueText(fact.value)}</td></tr>)}
-        {facts.data && facts.data.items.length === 0 && <TableMessage colSpan={4}><EmptyState icon={FileSearch} title="Chưa có BIM facts" description="Dữ liệu thuộc tính được worker trích xuất từ IFC sau khi xử lý." /></TableMessage>}
+        {facts.loading && !facts.data && <TableMessage colSpan={5}><SkeletonRows rows={3} label="Đang tải BIM facts…" /></TableMessage>}
+        {rows.map((fact) => {
+          const flags = qualityFlagCodes(fact.qualityFlags);
+          return <tr key={fact.id} data-testid="fact-row">
+            <td className="ops-mono">{fact.ifcGlobalId}</td><td>{entityLabel(fact.entityType)}</td><td>{propertyLabel(fact)}</td><td>{valueText(fact.value)}</td>
+            <td>{flags.length === 0 ? "—" : <span className="ops-actions">{flags.map((code) => <StatusBadge key={code} tone="warning" data-testid="fact-flag">{qualityFlagLabel(code)}</StatusBadge>)}</span>}</td>
+          </tr>;
+        })}
+        {facts.data && facts.data.items.length === 0 && <TableMessage colSpan={5}><EmptyState icon={FileSearch} title="Chưa có BIM facts" description="Tên, tên đầy đủ và loại của từng phòng (IfcSpace) có sau khi xử lý IFC xong và QA đạt." /></TableMessage>}
       </tbody>
     </Table>
     {total > 20 && <div className="ops-actions" style={{ justifyContent: "space-between" }}>

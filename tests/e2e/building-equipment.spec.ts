@@ -147,3 +147,53 @@ for (const width of [375, 1440]) {
     await page.getByTestId("equipment-panel").screenshot({ path: testInfo.outputPath(`equipment-${width}.png`) });
   });
 }
+
+test.describe("BIM facts of spaces", () => {
+  test("shows Name/LongName/Category of each IfcSpace side by side with the SPACE_UNNAMED flag in Vietnamese", async ({ page }) => {
+    const state: State = { version: 0, status: "ReadyForScenario", exitRequired: false, items: [], patches: [] };
+    await setup(page, state);
+    const fact = (id: string, ifcGlobalId: string, propertyPath: string, value: unknown, qualityFlags: unknown = []) =>
+      ({ id, revisionId: "rev-1", ifcGlobalId, entityType: "IfcSpace", propertyPath, value, sourceHash: "c".repeat(64), qualityFlags, createdAt: "2026-10-17T00:00:00Z" });
+    // The server pages by row in id order, so one space's rows arrive interleaved with another's.
+    const items = [
+      fact("f-6", DOOR_A, "Category", "stair"),
+      fact("f-1", EXT, "LongName", "Corridor"),
+      fact("f-4", DOOR_A, "Name", null, ["SPACE_UNNAMED"]),
+      fact("f-2", EXT, "Name", "101"),
+      fact("f-5", DOOR_A, "LongName", null),
+      fact("f-3", EXT, "Category", null),
+    ];
+    await page.route("**/api/revisions/rev-1/bim-facts?*", (route) => route.fulfill({ json: { items, totalCount: items.length, page: 1, pageSize: 20 } }));
+    await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-1");
+    await page.getByRole("tab", { name: "BIM facts", exact: true }).click();
+    const rows = page.getByTestId("fact-row");
+    await expect(rows).toHaveCount(6);
+    // Grouped by GlobalId, then Name, LongName, Category.
+    await expect(rows.nth(0)).toContainText(DOOR_A);
+    await expect(rows.nth(0)).toContainText("Tên phòng (Name)");
+    await expect(rows.nth(0)).toContainText("Phòng (IfcSpace)");
+    await expect(rows.nth(0).getByTestId("fact-flag")).toHaveText("Phòng chưa có tên (SPACE_UNNAMED)");
+    await expect(rows.nth(1)).toContainText("Tên đầy đủ (LongName)");
+    await expect(rows.nth(2)).toContainText("Loại phòng (Category)");
+    await expect(rows.nth(2)).toContainText("stair");
+    await expect(rows.nth(3)).toContainText(EXT);
+    await expect(rows.nth(3)).toContainText("101");
+    await expect(rows.nth(4)).toContainText("Corridor");
+    await expect(page.getByTestId("fact-flag")).toHaveCount(1);
+    await expect(page.getByTestId("facts-unnamed")).toContainText("1 phòng chưa có tên trên trang này");
+    await expect(page.getByTestId("facts-space-note")).toBeVisible();
+  });
+
+  test("unknown flag codes and { code } objects are shown as sent, not hidden", async ({ page }) => {
+    const state: State = { version: 0, status: "ReadyForScenario", exitRequired: false, items: [], patches: [] };
+    await setup(page, state);
+    const items = [{ id: "f-1", revisionId: "rev-1", ifcGlobalId: DOOR_B, entityType: "IfcDoor", propertyPath: "Dimensions.Height", value: null, sourceHash: "c".repeat(64), qualityFlags: [{ code: "NEW_FLAG", severity: "Info" }, "MissingValue"], createdAt: "2026-10-17T00:00:00Z" }];
+    await page.route("**/api/revisions/rev-1/bim-facts?*", (route) => route.fulfill({ json: { items, totalCount: 1, page: 1, pageSize: 20 } }));
+    await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-1");
+    await page.getByRole("tab", { name: "BIM facts", exact: true }).click();
+    await expect(page.getByTestId("fact-flag")).toHaveText(["NEW_FLAG", "Thiếu giá trị (MissingValue)"]);
+    await expect(page.getByTestId("fact-row")).toContainText("IfcDoor");
+    await expect(page.getByTestId("facts-unnamed")).toHaveCount(0);
+    await expect(page.getByTestId("facts-space-note")).toHaveCount(0);
+  });
+});
