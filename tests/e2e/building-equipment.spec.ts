@@ -134,3 +134,16 @@ test("IFC_UNSUPPORTED_FORMAT at initiate (400) or upload-complete (422) says the
   const atInitiate = classifyUploadError("initiate", new ApiError("not ifc", 400, undefined, undefined, "IFC_UNSUPPORTED_FORMAT"));
   expect(atInitiate.message).toContain("IFC2X3");
 });
+
+for (const width of [375, 1440]) {
+  test(`equipment step fits ${width}px without page overflow`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    const state: State = { version: 0, status: "NeedsFix", exitRequired: true, items: [candidate("ifc:A", DOOR_A, "door.standard", "IfcDoor"), candidate("ifc:E", EXT, "extinguisher.portable", "IfcFlowTerminal", 0.6)], patches: [] };
+    await setup(page, state);
+    await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-1");
+    await expect(page.getByTestId("exit-step")).toBeVisible();
+    await page.getByTestId("equipment-panel").scrollIntoViewIfNeeded();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    await page.getByTestId("equipment-panel").screenshot({ path: testInfo.outputPath(`equipment-${width}.png`) });
+  });
+}

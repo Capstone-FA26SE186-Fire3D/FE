@@ -151,7 +151,7 @@ export function EquipmentPanel({ accessToken, revisionId, onChanged, onHighlight
                 {!candidate.decision && !draft && candidate.suggestedDecision && <span className="ops-cell-sub" data-testid="equipment-suggestion">Gợi ý từ revision trước: {DECISION[candidate.suggestedDecision.decision]?.label ?? candidate.suggestedDecision.decision}{candidate.suggestedDecision.catalogKey ? ` (${candidate.suggestedDecision.catalogKey})` : ""} <Button type="button" size="sm" variant="quiet" onClick={() => set(candidate, { decision: candidate.suggestedDecision!.decision as EquipmentDecisionKind, catalogKey: candidate.suggestedDecision!.catalogKey ?? "" })}>Dùng gợi ý</Button></span>}
               </td>
               <td>
-                <div className="ops-actions">
+                <div className="ops-actions" style={{ flexWrap: "wrap", whiteSpace: "nowrap" }}>
                   <Button type="button" size="sm" variant="secondary" onClick={() => set(candidate, { decision: "Confirmed", catalogKey: "" })} disabled={busy} aria-label={`Xác nhận ${candidate.ifcGlobalId}`}>Xác nhận</Button>
                   <Select aria-label={`Đổi loại ${candidate.ifcGlobalId}`} style={{ width: 190 }} value={draft?.decision === "Retyped" ? draft.catalogKey : ""} disabled={busy || equipmentKeys.length === 0}
                     onChange={(event) => set(candidate, event.target.value ? { decision: "Retyped", catalogKey: event.target.value } : null)}>

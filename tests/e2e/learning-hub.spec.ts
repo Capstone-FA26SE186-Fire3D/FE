@@ -341,3 +341,16 @@ test("mobile menu Escape returns focus and profile scrolls without overflow", as
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(375);
   await page.screenshot({ path: testInfo.outputPath("profile-mobile.png"), fullPage: true });
 });
+
+for (const width of [375, 1440]) {
+  test(`Trainee Q&A fits ${width}px without page overflow`, async ({ page }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    const ai = new TraineeAiBackend();
+    ai.seed();
+    await restore(page, "trainee", () => undefined, ai);
+    await page.goto(`/learning-hub?view=questions&article=${slug}&request=${ai.requests[0].requestId}`);
+    await expect(page.getByTestId("ai-answer")).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    await page.screenshot({ path: testInfo.outputPath(`trainee-ai-${width}.png`), fullPage: true });
+  });
+}

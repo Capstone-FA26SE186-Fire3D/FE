@@ -145,7 +145,7 @@ export function RequestView({ request, admin, trainee, onApply, extra }: { reque
 
   return <article className={styles.stack} data-testid="ai-request" data-status={request.status} data-operation={request.operation}>
     <div className={styles.row}>
-      <div className="ops-actions"><strong>{operationLabel(request.operation)}</strong><StatusBadge tone={statusTone(request.status, request.resultType)} data-testid="ai-status">{statusLabel(request.status, request.resultType)}</StatusBadge>
+      <div className="ops-actions"><strong>{trainee ? "Câu hỏi của bạn" : operationLabel(request.operation)}</strong><StatusBadge tone={statusTone(request.status, request.resultType)} data-testid="ai-status">{statusLabel(request.status, request.resultType)}</StatusBadge>
         {isSuccessfulDraft(request) && <StatusBadge tone="info">Cần bạn chỉnh sửa trước khi dùng</StatusBadge>}</div>
       <span className={styles.dim}>{formatDateTime(request.createdAt)}</span>
     </div>

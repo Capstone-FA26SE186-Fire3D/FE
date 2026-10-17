@@ -141,8 +141,9 @@ test.describe("list: session state and result are shown apart", () => {
     const last = backend.lists().at(-1)!;
     expect(last.params.get("mode")).toBe("Assessment");
     expect(last.params.get("pageSize")).toBe("10");
-    // The Building filter is built from the learner's own latest sessions (one extra read of up to 100).
-    expect(backend.lists().some((call) => call.params.get("pageSize") === "100")).toBe(true);
+    // The Building filter comes from GET /api/training/buildings, not from an extra read of the history list.
+    expect(backend.callsTo("GET", /^\/api\/training\/buildings$/).length).toBeGreaterThan(0);
+    expect(backend.lists().some((call) => call.params.get("pageSize") === "100")).toBe(false);
     expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => /history|session-list|training/i.test(key)))).toEqual([]);
   });
 
@@ -359,12 +360,14 @@ test.describe("detail drawer: result", () => {
     await expect(drawer).toContainText("Học (Learn)");
   });
 
-  test("the detail offers no AI, lesson or certificate link: the server returns nothing to link to", async ({ page }) => {
+  test("the detail's only link is the real Trainee AI question about this result; no lesson or certificate link", async ({ page }) => {
     const backend = new TrainingBackend();
     seedMix(backend);
     await start(page, backend);
     await openDetail(page, ids.passed);
-    await expect(page.getByRole("dialog").getByRole("link")).toHaveCount(0);
+    const links = page.getByRole("dialog").getByRole("link");
+    await expect(links).toHaveCount(1);
+    await expect(links).toHaveText("Hỏi AI về kết quả này");
     await expect(page.getByRole("dialog")).not.toContainText(/chứng nhận\b(?! hay)|chứng chỉ/i);
   });
 

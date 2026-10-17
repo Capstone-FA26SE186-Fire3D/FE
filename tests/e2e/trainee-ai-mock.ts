@@ -7,6 +7,9 @@ import type { Page } from "@playwright/test";
 type Rec = Record<string, unknown>;
 export type TraineeCall = { method: string; path: string; search: string; headers: Record<string, string>; body: unknown };
 
+/** The Learn citation the mock answers carry (title, version and link resolved by the BE). */
+export const learnCitation = () => [{ kind: "LearnPost", id: "p", versionId: "v", title: "Đọc không gian trước khi hành động", versionLabel: "1", chunkId: null, locator: null, relevance: null, link: { learnSlug: "doc-khong-gian", learnPostId: "p", libraryItemId: null, sourceUri: null } }];
+
 export class TraineeAiBackend {
   calls: TraineeCall[] = [];
   requests: Rec[] = [];
@@ -25,7 +28,7 @@ export class TraineeAiBackend {
     const request: Rec = {
       requestId: this.id(this.counter), audience: "trainee", operation: "TraineeAnswer", status: "Succeeded", resultType: "KnowledgeAnswer", quotaUnit: "tokens", reservedUnits: 50, consumedUnits: 30,
       input: { text: "Câu hỏi cũ", inputHash: "e".repeat(64), buildingId: null, buildingName: null, revisionId: null, requestedSources: [], context: null },
-      sources: [], citations: [{ kind: "LearnPost", id: "p", versionId: "v", title: "Đọc không gian trước khi hành động", versionLabel: "1", chunkId: null, locator: null, relevance: null, link: { learnSlug: "doc-khong-gian", learnPostId: "p", libraryItemId: null, sourceUri: null } }],
+      sources: [], citations: learnCitation(),
       result: { status: "Answered", answer: "Không dùng thang máy vì có thể mất điện và khói vào giếng thang." }, failureCode: null, resultWithheld: false,
       createdAt: new Date(Date.now() - 60_000 * this.counter).toISOString(), completedAt: new Date().toISOString(), revision: 3, polls: 0, ...partial,
     };
@@ -88,7 +91,7 @@ export async function installTraineeAi(page: Page, backend: TraineeAiBackend) {
       if (!found) return problem(404, "NOT_FOUND");
       if (found.status === "Accepted") {
         found.polls = Number(found.polls) + 1;
-        if (Number(found.polls) > backend.pendingPolls) Object.assign(found, { status: "Succeeded", resultType: "KnowledgeAnswer", consumedUnits: 30, completedAt: new Date().toISOString(), result: { status: "Answered", answer: "Không dùng thang máy khi có cháy." }, citations: backend.requests.at(-1)?.citations ?? [] });
+        if (Number(found.polls) > backend.pendingPolls) Object.assign(found, { status: "Succeeded", resultType: "KnowledgeAnswer", consumedUnits: 30, completedAt: new Date().toISOString(), result: { status: "Answered", answer: "Không dùng thang máy khi có cháy." }, citations: learnCitation() });
       }
       return route.fulfill({ json: view(found) });
     }
