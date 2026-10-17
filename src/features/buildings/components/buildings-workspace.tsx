@@ -4,6 +4,8 @@ import { Archive, Building2, LayoutGrid, List, Pencil, Plus, RefreshCw, Search }
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
+import { useIdempotencyKey } from "@/api/idempotency";
+import { ApiError } from "@/api/types/common";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams, useUrlSearch } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
@@ -18,11 +20,11 @@ import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
-import { buildingsApi } from "../api";
-import { describeApiError } from "../format";
+import { buildingConflict, buildingsApi } from "../api";
+import { describeApiError, describeBuildingWriteError, formatDateTime } from "../format";
 import { organizationsApi } from "@/features/organizations/api";
 import type { Building, BuildingSummary } from "../types";
-import { BuildingForm, buildingFormToInput, emptyForm, formFromBuilding, validateBuildingForm, type FormState } from "./building-form";
+import { BuildingConflictAlert, BuildingForm, buildingFormToInput, emptyForm, formFromBuilding, validateBuildingForm, type FormState } from "./building-form";
 import { RetryButton } from "@/components/ui/retry-button";
 
 const PAGE_SIZE = 20;
@@ -58,12 +60,18 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
   const [drawer, setDrawer] = useState<{ mode: "create" } | { mode: "edit"; id: string } | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editing, setEditing] = useState<Building | null>(null);
+  /** ETag of `editing`; a 412 replaces both with the server's newer version so the next save applies on top of it. */
+  const [editEtag, setEditEtag] = useState<string | null>(null);
+  const [conflict, setConflict] = useState<Building | null>(null);
+  const createKey = useIdempotencyKey();
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<ReturnType<typeof validateBuildingForm>>({});
   const submitting = useRef(false);
   const [archiving, setArchiving] = useState<BuildingSummary | null>(null);
   const [archiveBusy, setArchiveBusy] = useState(false);
+  const [archiveEtag, setArchiveEtag] = useState<string | null>(null);
+  const [archiveNotice, setArchiveNotice] = useState("");
 
   const isAdmin = user?.role === 0;
   // OrganizationUser: tenant comes from the account, so the parameter is never sent. PlatformAdmin: must choose.
@@ -94,15 +102,17 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
   const totalCount = data?.totalCount ?? 0;
   const filtering = Boolean(urlSearch) || status !== "active";
 
-  const openCreate = () => { setForm(emptyForm); setEditing(null); setFieldErrors({}); setFormError(""); setDrawer({ mode: "create" }); };
+  const openCreate = () => { setForm(emptyForm); setEditing(null); setEditEtag(null); setConflict(null); setFieldErrors({}); setFormError(""); setDrawer({ mode: "create" }); };
 
   const openEdit = async (id: string) => {
     if (!accessToken) return;
     setFieldErrors({});
     setFormError("");
+    setConflict(null);
     try {
-      const building = await buildingsApi.get(accessToken, id);
+      const { data: building, etag } = await buildingsApi.getVersioned(accessToken, id);
       setEditing(building);
+      setEditEtag(etag);
       setForm(formFromBuilding(building));
       setDrawer({ mode: "edit", id });
     } catch {
@@ -122,32 +132,72 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
     setFormError("");
     try {
       if (drawer.mode === "create") {
-        const created = await buildingsApi.create(accessToken, buildingFormToInput(form), scopedOrgId);
-        router.push(`${routes.workspaceBuildings}/${created.id}`);
+        const input = buildingFormToInput(form);
+        // Same key while the payload is unchanged, so a retry after a lost response replays the first create instead of a duplicate.
+        const created = await buildingsApi.create(accessToken, input, createKey.keyFor({ input, organizationId: scopedOrgId }), scopedOrgId);
+        createKey.done();
+        router.push(`${routes.workspaceBuildings}/${created.data.id}`);
       } else {
-        await buildingsApi.update(accessToken, drawer.id, buildingFormToInput(form, editing ?? undefined), scopedOrgId);
+        // No ETag yet (header not readable on the first read): read it now rather than send a PUT the server rejects with 428.
+        const etag = editEtag ?? (await buildingsApi.getVersioned(accessToken, drawer.id)).etag;
+        if (!etag) { setFormError("Không đọc được phiên bản công trình (ETag). Hãy tải lại trang rồi thử lại."); return; }
+        await buildingsApi.update(accessToken, drawer.id, buildingFormToInput(form, editing ?? undefined), etag, scopedOrgId);
         setDrawer(null);
+        setConflict(null);
         toast.notify({ tone: "success", title: "Đã lưu công trình" });
         reload();
       }
-    } catch {
-      setFormError("Không thể lưu công trình. Nội dung bạn nhập vẫn được giữ lại; hãy thử lại sau.");
+    } catch (cause) {
+      const stale = buildingConflict(cause);
+      if (stale) {
+        if (stale.current) setEditing(stale.current);
+        setEditEtag(stale.etag);
+        setConflict(stale.current ?? editing);
+      } else {
+        if (cause instanceof ApiError && cause.code === "IDEMPOTENCY_KEY_CONFLICT") createKey.done();
+        setFormError(`${describeBuildingWriteError(cause, "Không thể lưu công trình.")} Nội dung bạn nhập vẫn được giữ lại.`);
+      }
     } finally {
       submitting.current = false;
       setSaving(false);
     }
   };
 
+  const openArchive = (building: BuildingSummary) => { setArchiving(building); setArchiveEtag(null); setArchiveNotice(""); };
+
+  const changedNotice = (building: BuildingSummary) => `Công trình vừa được thay đổi ở nơi khác (cập nhật ${formatDateTime(building.updatedAt)}). Thông tin trên là bản mới nhất; bấm “Lưu trữ” lần nữa nếu vẫn muốn lưu trữ.`;
+
   const confirmArchive = async () => {
     if (!accessToken || !archiving) return;
     setArchiveBusy(true);
     try {
-      await buildingsApi.archive(accessToken, archiving.id, scopedOrgId);
+      let etag = archiveEtag;
+      if (!etag) {
+        // The list carries no ETag: read the detail first, and stop if it moved on since the list was loaded.
+        const fresh = await buildingsApi.getVersioned(accessToken, archiving.id);
+        etag = fresh.etag;
+        if (Date.parse(fresh.data.updatedAt) !== Date.parse(archiving.updatedAt)) {
+          setArchiving(fresh.data);
+          setArchiveEtag(etag);
+          setArchiveNotice(changedNotice(fresh.data));
+          return;
+        }
+      }
+      if (!etag) { setArchiveNotice("Không đọc được phiên bản công trình (ETag). Hãy tải lại trang rồi thử lại."); return; }
+      await buildingsApi.archive(accessToken, archiving.id, etag, scopedOrgId);
       toast.notify({ tone: "success", title: "Đã lưu trữ công trình", description: archiving.name });
       setArchiving(null);
       reload();
-    } catch {
-      toast.notify({ tone: "danger", title: "Không thể lưu trữ công trình", description: "Hãy thử lại sau." });
+    } catch (cause) {
+      const stale = buildingConflict(cause);
+      if (stale) {
+        const current = stale.current ?? archiving;
+        setArchiving(current);
+        setArchiveEtag(stale.etag);
+        setArchiveNotice(changedNotice(current));
+      } else {
+        toast.notify({ tone: "danger", title: "Không thể lưu trữ công trình", description: describeBuildingWriteError(cause, "Hãy thử lại sau.") });
+      }
     } finally {
       setArchiveBusy(false);
     }
@@ -191,7 +241,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
 
   const rowActions = (building: BuildingSummary) => <span className="ops-actions" style={{ justifyContent: "flex-end" }}>
     <Button size="sm" variant="quiet" onClick={() => void openEdit(building.id)} aria-label={`Chỉnh sửa ${building.name}`}><Pencil size={14} aria-hidden="true" />Sửa</Button>
-    {building.isActive && <Button size="sm" variant="quiet" onClick={() => setArchiving(building)} aria-label={`Lưu trữ ${building.name}`}><Archive size={14} aria-hidden="true" />Lưu trữ</Button>}
+    {building.isActive && <Button size="sm" variant="quiet" onClick={() => openArchive(building)} aria-label={`Lưu trữ ${building.name}`}><Archive size={14} aria-hidden="true" />Lưu trữ</Button>}
   </span>;
 
   const statusBadge = (building: BuildingSummary) => <StatusBadge tone={building.isActive ? "success" : "neutral"}>{building.isActive ? "Hoạt động" : "Đã lưu trữ"}</StatusBadge>;
@@ -264,6 +314,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
       description={drawer?.mode === "edit" ? "Các thông tin không hiển thị ở đây (tọa độ, liên hệ) được giữ nguyên." : "Sau khi tạo, bạn sẽ chuyển tới trang công trình để tải lên mô hình IFC."}
     >
       <form onSubmit={submit} noValidate className="ops-stack">
+        {conflict && <BuildingConflictAlert current={conflict} onUseLatest={() => { setForm(formFromBuilding(conflict)); setConflict(null); }} />}
         <BuildingForm form={form} errors={fieldErrors} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} />
         {formError && <Alert tone="danger">{formError}</Alert>}
         <div className="ops-actions" style={{ justifyContent: "flex-end" }}>
@@ -280,6 +331,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
       description={archiving ? `“${archiving.name}” sẽ chuyển sang trạng thái đã lưu trữ. Dữ liệu IFC và kịch bản không bị xóa.` : undefined}
       footer={<><Button variant="quiet" onClick={() => setArchiving(null)} disabled={archiveBusy}>Hủy</Button><Button variant="danger" onClick={() => void confirmArchive()} disabled={archiveBusy}>{archiveBusy ? "Đang lưu trữ…" : "Lưu trữ"}</Button></>}
     >
+      {archiveNotice && <Alert tone="warning" title="Công trình đã thay đổi">{archiveNotice}</Alert>}
       <p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>Công trình đã lưu trữ không xuất hiện trong danh sách mặc định; bạn có thể xem lại bằng bộ lọc “Đã lưu trữ”.</p>
     </Modal>
   </>;

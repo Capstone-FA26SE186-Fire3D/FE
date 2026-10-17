@@ -24,7 +24,7 @@ type TabKey = (typeof TABS)[number];
 const isTab = (value: string): value is TabKey => (TABS as readonly string[]).includes(value);
 
 /** Every URL parameter owned by a tab; switching tabs clears them so filters and the open request never leak across tabs. */
-const TAB_PARAMS = ["page", "request", "status", "operation", "mine"];
+const TAB_PARAMS = ["page", "request", "status", "resultType", "operation", "mine"];
 
 /** `/workspace/ai`: Organization AI through the .NET API (never the FastAPI service). OrganizationUser only. */
 export function OrganizationAi() {

@@ -1,15 +1,25 @@
 /**
- * Organization AI through the .NET API (BE `docs/organization-ai.md`, OpenAPI @ 1eaf988). The OpenAPI only declares
- * `JsonElement` for the bodies below, so these shapes follow the BE source (`ai_request_representation`, the gates in
- * `OrganizationAi.sql`, `OrganizationAiContracts.cs`). The FE never talks to the FastAPI adapter.
+ * Organization AI through the .NET API (BE `docs/organization-ai.md`, OpenAPI schemas `AiRequestView`/`AiRequestPage`,
+ * Docs v7 vocabulary since BE#89). The FE never talks to the FastAPI adapter.
  */
 
 export type AiOperation = "ScenarioDraft" | "Answer";
 export const AI_OPERATIONS: readonly AiOperation[] = ["Answer", "ScenarioDraft"];
 
-/** Request lifecycle. `Succeeded | InsufficientEvidence | SafetyRejected` are the adapter outcomes; the rest are service states. */
-export type AiRequestStatus = "Queued" | "Running" | "Succeeded" | "InsufficientEvidence" | "SafetyRejected" | "Failed" | "NeedsReconcile";
-export const AI_STATUSES: readonly AiRequestStatus[] = ["Queued", "Running", "Succeeded", "InsufficientEvidence", "SafetyRejected", "Failed", "NeedsReconcile"];
+/**
+ * Request lifecycle (service state only). What the AI produced is `resultType`, set once `Succeeded`.
+ * `Rejected` is reserved by v7 and not produced yet. The pre-v7 names (Queued, Running, SafetyRejected,
+ * InsufficientEvidence as a status) are gone: list filters with them answer 400.
+ */
+export type AiRequestStatus = "Accepted" | "Processing" | "Succeeded" | "Failed" | "NeedsReconcile" | "Rejected";
+export const AI_STATUSES: readonly AiRequestStatus[] = ["Accepted", "Processing", "Succeeded", "Failed", "NeedsReconcile"];
+
+/** Outcome of a `Succeeded` request. InsufficientEvidence and RejectedBySafetyGate succeed as a request but carry no answer/draft. */
+export type AiResultType = "KnowledgeAnswer" | "ScenarioDraft" | "InsufficientEvidence" | "RejectedBySafetyGate";
+export const AI_RESULT_TYPES: readonly AiResultType[] = ["KnowledgeAnswer", "ScenarioDraft", "InsufficientEvidence", "RejectedBySafetyGate"];
+
+/** `result.status`: Answered (KnowledgeAnswer), NeedsUserEdit (ScenarioDraft only), InsufficientEvidence, RejectedBySafetyGate. */
+export type AiResultStatus = "Answered" | "NeedsUserEdit" | "InsufficientEvidence" | "RejectedBySafetyGate";
 
 export type AiSourceKind = "KnowledgeSource" | "LibraryVersion" | "LearnPost";
 export const AI_SOURCE_KINDS: readonly AiSourceKind[] = ["KnowledgeSource", "LibraryVersion", "LearnPost"];
@@ -29,12 +39,13 @@ export type AiCitation = { kind: string; id: string; locator?: string };
 export type AiDraftProposal = { state: Record<string, unknown>; notes?: string | null };
 
 export type AiResult = {
-  outcome?: string;
+  status?: AiResultStatus | (string & {});
+  /** Pre-v7 location of the citations; v7 returns them on the request (`AiRequest.citations`). */
   citations?: AiCitation[];
   /** Plain text (Answer). */
   answer?: string;
   draft?: AiDraftProposal;
-  /** Plain text for InsufficientEvidence / SafetyRejected. */
+  /** Plain text for InsufficientEvidence / RejectedBySafetyGate. */
   message?: string | null;
 };
 
@@ -45,12 +56,15 @@ export type AiRequest = {
   requestId: string;
   operation: AiOperation | (string & {});
   status: AiRequestStatus | (string & {});
+  /** Set when `status` is Succeeded, null before. */
+  resultType?: AiResultType | (string & {}) | null;
   quotaUnit?: string;
   reservedUnits?: number;
   consumedUnits?: number;
   sources?: AiPinnedSource[];
-  result?: AiResult;
-  failureCode?: string;
+  result?: AiResult | null;
+  citations?: AiCitation[];
+  failureCode?: string | null;
   createdAt: string;
   completedAt?: string;
   revision?: number;
@@ -67,7 +81,7 @@ export type AiRequest = {
 
 export type AiRequestPage = { items: AiRequest[]; total: number; page: number; pageSize: number };
 
-export type AiRequestFilters = { status?: string; operation?: string; mine?: boolean; page?: number; pageSize?: number };
+export type AiRequestFilters = { status?: string; resultType?: string; operation?: string; mine?: boolean; page?: number; pageSize?: number };
 export type AdminAiRequestFilters = { status?: string; organizationId?: string; page?: number; pageSize?: number };
 
 export type AnswerInput = { question: string; sources?: AiSourceRef[] };

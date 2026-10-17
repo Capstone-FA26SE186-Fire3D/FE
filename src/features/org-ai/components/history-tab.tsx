@@ -15,8 +15,8 @@ import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { formatDateTime, formatQuota } from "@/features/billing/format";
 
 import { orgAiApi } from "../api";
-import { aiErrorText, operationLabel, statusLabel, statusTone } from "../labels";
-import { AI_OPERATIONS, AI_STATUSES, type AiRequest } from "../types";
+import { aiErrorText, operationLabel, resultTypeLabel, statusLabel, statusTone } from "../labels";
+import { AI_OPERATIONS, AI_RESULT_TYPES, AI_STATUSES, type AiRequest } from "../types";
 import styles from "../org-ai.module.css";
 import { RequestPanel } from "./request-panel";
 
@@ -26,17 +26,18 @@ const PAGE_SIZE = 20;
 export function HistoryTab({ accessToken, onApply }: { accessToken: string; onApply: (request: AiRequest) => void }) {
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const status = get("status");
+  const resultType = get("resultType");
   const operation = get("operation");
   const mine = get("mine") === "1";
   const requestId = get("request");
 
   const list = useAsyncData(
-    `org-ai:history:${page}:${status}:${operation}:${mine}`,
-    (signal) => orgAiApi.listRequests(accessToken, { page, pageSize: PAGE_SIZE, status: status || undefined, operation: operation || undefined, mine: mine || undefined }, signal),
+    `org-ai:history:${page}:${status}:${resultType}:${operation}:${mine}`,
+    (signal) => orgAiApi.listRequests(accessToken, { page, pageSize: PAGE_SIZE, status: status || undefined, resultType: resultType || undefined, operation: operation || undefined, mine: mine || undefined }, signal),
   );
   const items = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
-  const filtering = Boolean(status || operation || mine);
+  const filtering = Boolean(status || resultType || operation || mine);
 
   return <>
     <div className="ops-toolbar">
@@ -46,8 +47,11 @@ export function HistoryTab({ accessToken, onApply }: { accessToken: string; onAp
       <Select aria-label="Trạng thái" style={{ width: 220 }} value={status} onChange={(event) => setParams({ status: event.target.value })}>
         <option value="">Mọi trạng thái</option>{AI_STATUSES.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}
       </Select>
+      <Select aria-label="Kết quả" style={{ width: 200 }} value={resultType} onChange={(event) => setParams({ resultType: event.target.value })}>
+        <option value="">Mọi kết quả</option>{AI_RESULT_TYPES.map((value) => <option key={value} value={value}>{resultTypeLabel(value)}</option>)}
+      </Select>
       <label className={styles.radio} data-on={mine}><input type="checkbox" checked={mine} onChange={(event) => setParams({ mine: event.target.checked ? "1" : null })} />Chỉ của tôi</label>
-      {filtering && <Button variant="quiet" onClick={() => setParams({ status: null, operation: null, mine: null })}>Xóa bộ lọc</Button>}
+      {filtering && <Button variant="quiet" onClick={() => setParams({ status: null, resultType: null, operation: null, mine: null })}>Xóa bộ lọc</Button>}
     </div>
 
     {list.error !== undefined && <Alert tone="danger" title="Không tải được lịch sử yêu cầu AI" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{aiErrorText(list.error)}</Alert>}
@@ -61,7 +65,7 @@ export function HistoryTab({ accessToken, onApply }: { accessToken: string; onAp
             <button type="button" className={styles.rowButton} onClick={() => setParams({ request: item.requestId })} aria-label={`Mở yêu cầu ${operationLabel(item.operation)} ${item.requestId.slice(0, 8)}`}>{operationLabel(item.operation)}</button>
             <span className="ops-cell-sub"><span className={styles.mono}>{item.requestId.slice(0, 8)}…</span></span>
           </td>
-          <td><StatusBadge tone={statusTone(item.status)}>{statusLabel(item.status)}</StatusBadge></td>
+          <td><StatusBadge tone={statusTone(item.status, item.resultType)}>{statusLabel(item.status, item.resultType)}</StatusBadge></td>
           <td>{item.consumedUnits !== undefined ? formatQuota(item.consumedUnits, item.quotaUnit) : item.reservedUnits !== undefined ? `Giữ chỗ ${formatQuota(item.reservedUnits, item.quotaUnit)}` : "—"}</td>
           <td>{formatDateTime(item.createdAt)}</td>
         </tr>)}

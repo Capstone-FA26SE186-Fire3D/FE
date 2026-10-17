@@ -82,6 +82,7 @@ export const apiClient = {
         parseRetryAfter(response.headers.get("Retry-After")),
         parseErrorCode(payload),
         parseFieldErrors(payload),
+        response.headers,
       );
     }
 

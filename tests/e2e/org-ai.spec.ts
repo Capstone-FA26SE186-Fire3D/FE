@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { admin, calls, ids, mockAi, newAiMock, owner, requestId, seedRequest, signInAs, type AiMock } from "./org-ai-mock";
+import { admin, calls, ids, mockAi, newAiMock, outcomeFields, owner, requestId, seedRequest, signInAs, type AiMock } from "./org-ai-mock";
 
 // Every assertion runs against Playwright route mocks that follow the BE source/OpenAPI: they prove FE behavior, not the real BE.
 
@@ -15,7 +15,7 @@ const send = (page: Page) => page.getByTestId("ai-send");
 const noOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 
 test.describe("Organization AI: ask", () => {
-  test("quota is read before the POST, the request is polled from Queued to the answer with citation and usage, and a reload restores it from the server", async ({ page }) => {
+  test("quota is read before the POST, the request is polled from Accepted to the answer with citation and usage, and a reload restores it from the server", async ({ page }) => {
     const mock = newAiMock();
     await open(page, mock, "/workspace/ai");
     await expect(page.getByRole("heading", { name: "Trợ lý AI", level: 1 })).toBeVisible();
@@ -209,7 +209,7 @@ test.describe("Organization AI: ask", () => {
 
   test("a polling error keeps the last data, honors Retry-After and recovers", async ({ page }) => {
     const mock = newAiMock({ pendingPolls: 0 });
-    const seeded = seedRequest(mock, { status: "Running", result: undefined, consumedUnits: undefined, completedAt: undefined });
+    const seeded = seedRequest(mock, { status: "Processing", result: undefined, consumedUnits: undefined, completedAt: undefined });
     mock.getFaults.push({ status: 429, json: { status: 429, title: "slow down", code: "RATE_LIMITED" }, headers: { "Retry-After": "1" } });
     await open(page, mock, `/workspace/ai?request=${seeded.requestId}`);
     await expect(page.getByText("Không tải được yêu cầu")).toBeVisible();
@@ -224,10 +224,10 @@ test.describe("Organization AI: ask", () => {
 });
 
 test.describe("Organization AI: outcomes", () => {
-  test("InsufficientEvidence and SafetyRejected are shown as such, without citations or answer", async ({ page }) => {
+  test("InsufficientEvidence and RejectedBySafetyGate (Succeeded requests) are shown as such, without citations or answer", async ({ page }) => {
     const mock = newAiMock();
-    const insufficient = seedRequest(mock, { status: "InsufficientEvidence", consumedUnits: 0, result: { outcome: "InsufficientEvidence", citations: [], message: "Các nguồn đã chọn chưa nêu yêu cầu này." } });
-    const rejected = seedRequest(mock, { status: "SafetyRejected", consumedUnits: 0, result: { outcome: "SafetyRejected", citations: [], message: "Nội dung bị chặn bởi cổng an toàn." } });
+    const insufficient = seedRequest(mock, { ...outcomeFields(mock, "Answer", "InsufficientEvidence"), consumedUnits: 0 });
+    const rejected = seedRequest(mock, { ...outcomeFields(mock, "Answer", "RejectedBySafetyGate"), consumedUnits: 0 });
     await open(page, mock, `/workspace/ai?request=${insufficient.requestId}`);
     await expect(page.getByTestId("ai-insufficient")).toContainText("Chưa đủ căn cứ để trả lời");
     await expect(page.getByTestId("ai-insufficient")).toContainText("chưa nêu yêu cầu này");
@@ -280,7 +280,7 @@ test.describe("Organization AI: scenario draft and history", () => {
 
   test("a scenario draft whose content is not fet3d.editor/1 cannot be applied", async ({ page }) => {
     const mock = newAiMock();
-    const bad = seedRequest(mock, { operation: "ScenarioDraft", result: { outcome: "Succeeded", citations: [], draft: { state: { schemaVersion: "other/9" } } } });
+    const bad = seedRequest(mock, { operation: "ScenarioDraft", citations: [], result: { status: "NeedsUserEdit", draft: { state: { schemaVersion: "other/9" } } } });
     await open(page, mock, `/workspace/ai?tab=draft&request=${bad.requestId}`);
     await expect(page.getByText("Không đọc được đề xuất")).toBeVisible();
     await expect(page.getByTestId("ai-apply")).toHaveCount(0);
@@ -288,14 +288,14 @@ test.describe("Organization AI: scenario draft and history", () => {
 
   test("history: filters and page live in the URL, detail opens from the server and survives reload", async ({ page }) => {
     const mock = newAiMock();
-    for (let index = 0; index < 22; index += 1) seedRequest(mock, { status: index % 5 === 0 ? "InsufficientEvidence" : "Succeeded", operation: index % 2 === 0 ? "Answer" : "ScenarioDraft" });
+    for (let index = 0; index < 22; index += 1) { const operation = index % 2 === 0 ? "Answer" : "ScenarioDraft"; seedRequest(mock, { operation, ...(index % 5 === 0 ? outcomeFields(mock, operation, "InsufficientEvidence") : {}) }); }
     await open(page, mock, "/workspace/ai?tab=history");
     await expect(page.getByTestId("ai-history-row")).toHaveCount(20);
     await page.getByRole("button", { name: "Trang sau" }).click();
     await expect(page).toHaveURL(/page=2/);
     await expect(page.getByTestId("ai-history-row")).toHaveCount(2);
-    await page.getByLabel("Trạng thái").selectOption("InsufficientEvidence");
-    await expect(page).toHaveURL(/status=InsufficientEvidence/);
+    await page.getByLabel("Kết quả").selectOption("InsufficientEvidence");
+    await expect(page).toHaveURL(/resultType=InsufficientEvidence/);
     await expect(page).not.toHaveURL(/page=2/);
     await page.getByLabel("Loại yêu cầu").selectOption("Answer");
     await expect(page).toHaveURL(/operation=Answer/);
@@ -303,7 +303,8 @@ test.describe("Organization AI: scenario draft and history", () => {
     await expect(page).toHaveURL(/mine=1/);
     await expect.poll(() => calls(mock, "GET", "/api/ai/requests").at(-1)?.search).toContain("mine=true");
     const last = calls(mock, "GET", "/api/ai/requests").at(-1)!;
-    expect(last.search).toContain("status=InsufficientEvidence");
+    expect(last.search).toContain("resultType=InsufficientEvidence");
+    expect(last.search).not.toMatch(/(^|[?&])status=/);
     expect(last.search).toContain("operation=Answer");
     const rows = page.getByTestId("ai-history-row");
     await expect(rows.first()).toBeVisible();

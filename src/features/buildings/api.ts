@@ -1,5 +1,5 @@
 import { apiClient } from "@/api/client";
-import type { PageResponse } from "@/api/types/common";
+import { ApiError, type PageResponse } from "@/api/types/common";
 import type { ScenarioSummary } from "@/features/scenarios/types";
 
 import type {
@@ -27,6 +27,7 @@ import type {
   RevisionIssuePage,
   RevisionPage,
   ScenarioVersionPage,
+  VersionedBuilding,
 } from "./types";
 
 function headers(accessToken: string): HeadersInit {
@@ -47,30 +48,47 @@ export const buildingsApi = {
       signal,
     });
   },
-  /** PlatformAdmin passes `organizationId`; it travels in the body (the query alias is deprecated in the BE). */
-  create(accessToken: string, input: BuildingInput, organizationId?: string) {
-    return apiClient.request<Building>("/api/buildings", {
+  /**
+   * PlatformAdmin passes `organizationId`; it travels in the body (the query alias is deprecated in the BE).
+   * Idempotency-Key is mandatory (400 IDEMPOTENCY_KEY_REQUIRED): the same key + same input replays the first 201,
+   * the same key with another input is 409 IDEMPOTENCY_KEY_CONFLICT.
+   */
+  async create(accessToken: string, input: BuildingInput, idempotencyKey: string, organizationId?: string): Promise<VersionedBuilding> {
+    const response = await apiClient.requestWithMeta<Building>("/api/buildings", {
       headers: headers(accessToken),
+      idempotencyKey,
       json: organizationId ? { ...input, organizationId } : input,
     });
+    return { data: response.data, etag: response.headers.get("etag") };
   },
   get(accessToken: string, id: string, signal?: AbortSignal) {
     return apiClient.request<Building>(`/api/buildings/${id}`, { headers: headers(accessToken), signal });
   },
-  update(accessToken: string, id: string, input: BuildingInput, organizationId?: string) {
-    return apiClient.request<Building>(`/api/buildings/${id}`, {
+  /** Detail plus its ETag, for screens that will PUT or DELETE it. */
+  async getVersioned(accessToken: string, id: string, signal?: AbortSignal): Promise<VersionedBuilding> {
+    const response = await apiClient.requestWithMeta<Building>(`/api/buildings/${id}`, { headers: headers(accessToken), signal });
+    return { data: response.data, etag: response.headers.get("etag") };
+  },
+  /** If-Match is mandatory: missing → 428, changed since read → 412 with `current` + new ETag (see `buildingConflict`). */
+  async update(accessToken: string, id: string, input: BuildingInput, etag: string, organizationId?: string): Promise<VersionedBuilding> {
+    const response = await apiClient.requestWithMeta<Building>(`/api/buildings/${id}`, {
       headers: headers(accessToken),
+      ifMatch: etag,
       json: input,
       method: "PUT",
       query: orgQuery(organizationId),
     });
+    return { data: response.data, etag: response.headers.get("etag") };
   },
-  archive(accessToken: string, id: string, organizationId?: string) {
-    return apiClient.request<BuildingSummary>(`/api/buildings/${id}`, {
+  /** Archive (isActive=false), 200 with the summary. Same If-Match rules as PUT; an already archived Building answers 200 again. */
+  async archive(accessToken: string, id: string, etag: string, organizationId?: string): Promise<VersionedBuilding<BuildingSummary>> {
+    const response = await apiClient.requestWithMeta<BuildingSummary>(`/api/buildings/${id}`, {
       headers: headers(accessToken),
+      ifMatch: etag,
       method: "DELETE",
       query: orgQuery(organizationId),
     });
+    return { data: response.data, etag: response.headers.get("etag") };
   },
   listRevisions(accessToken: string, buildingId: string, page = 1, pageSize = 50, signal?: AbortSignal) {
     return apiClient.request<RevisionPage>(`/api/buildings/${buildingId}/revisions`, {
@@ -236,3 +254,13 @@ export const buildingsApi = {
     });
   },
 };
+
+/** A 412 on PUT/DELETE /api/buildings/{id}: the Building as it is now (`current`) and its new ETag, to compare and retry. */
+export function buildingConflict(error: unknown): { current: Building | null; etag: string | null } | null {
+  if (!(error instanceof ApiError) || error.status !== 412) return null;
+  const current = error.payload?.current;
+  return {
+    current: current && typeof current === "object" && typeof (current as Building).id === "string" ? (current as Building) : null,
+    etag: error.headers?.get("etag") ?? null,
+  };
+}
