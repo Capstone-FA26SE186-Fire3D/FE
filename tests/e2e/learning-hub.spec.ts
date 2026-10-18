@@ -141,15 +141,76 @@ test("a withheld answer (access lost) is explained without content; other roles 
   await expect(page.getByText("Hỏi đáp AI ở đây dành cho tài khoản học viên")).toBeVisible();
 });
 
-test("an unknown article from Learn is explained and the question is sent without it", async ({ page }) => {
+test("an unknown article from Learn blocks sending until the learner picks 'Hỏi chung' or another article", async ({ page }) => {
   const ai = new TraineeAiBackend();
   await restore(page, "trainee", () => undefined, ai);
-  await page.goto("/learning-hub?article=khong-co-bai-nay");
-  await expect(page.getByTestId("trainee-ai-article-missing")).toContainText("Không tìm thấy bài bạn mở từ Learn");
-  await page.getByLabel("Câu hỏi", { exact: true }).fill("Hỏi chung");
+  await page.goto("/learning-hub?view=questions&article=khong-co-bai-nay");
+  const missing = page.getByTestId("trainee-ai-article-missing");
+  await expect(missing).toContainText("Không tìm thấy bài bạn mở từ Learn");
+  await expect(missing).toContainText("Câu hỏi chưa được gửi");
+  await expect(missing.getByRole("link", { name: "Chọn bài khác" })).toHaveAttribute("href", "/learn");
+  await page.getByLabel("Câu hỏi", { exact: true }).fill("Thoát hiểm thế nào?");
+  await expect(page.getByTestId("ai-send")).toBeDisabled();
+  await page.getByLabel("Câu hỏi", { exact: true }).press("Enter");
+  await page.getByLabel("Câu hỏi", { exact: true }).evaluate((element) => (element as HTMLTextAreaElement).form?.requestSubmit());
+  expect(ai.posts()).toHaveLength(0);
+
+  await missing.getByRole("button", { name: "Hỏi chung" }).click();
+  await expect(page).not.toHaveURL(/article=/);
+  await expect(page.getByTestId("trainee-ai-article-missing")).toHaveCount(0);
+  await page.getByLabel("Câu hỏi", { exact: true }).fill("Thoát hiểm thế nào?");
   await page.getByTestId("ai-send").click();
   await expect.poll(() => ai.posts().length).toBe(1);
-  expect(ai.posts()[0].body).toEqual({ question: "Hỏi chung" });
+  expect(ai.posts()[0].body).toEqual({ question: "Thoát hiểm thế nào?" });
+});
+
+test("an answer already shown is dropped when a reload answers 403 or 404; only the lost-access state stays", async ({ page }) => {
+  const ai = new TraineeAiBackend();
+  const shown = ai.seed();
+  await restore(page, "trainee", () => undefined, ai);
+  for (const status of [403, 404]) {
+    ai.denied.delete(shown.requestId as string);
+    await page.goto(`/learning-hub?view=questions&request=${shown.requestId}`);
+    const panel = page.getByTestId("ai-request-panel");
+    await expect(panel.getByTestId("ai-answer")).toContainText("Không dùng thang máy");
+    ai.denied.set(shown.requestId as string, status);
+    await panel.getByRole("button", { name: "Tải lại" }).click();
+    await expect(panel).toContainText("Không mở được yêu cầu này");
+    await expect(panel.getByTestId("ai-answer")).toHaveCount(0);
+    await expect(panel.getByTestId("ai-citations")).toHaveCount(0);
+    await expect(panel).not.toContainText("đang hiển thị dữ liệu đã tải");
+    await expect(panel).not.toContainText("Không dùng thang máy");
+  }
+});
+
+test("the quota is re-read on focus, at the reset time and when a request settles, unlocking the send button", async ({ page }) => {
+  const ai = new TraineeAiBackend();
+  ai.quota = { ...ai.quota, canSubmit: false, blockedByAssessment: true };
+  await restore(page, "trainee", () => undefined, ai);
+  await page.goto("/learning-hub?view=questions");
+  await expect(page.getByTestId("trainee-ai-blocked")).toContainText("AI tạm khóa trong bài đánh giá");
+  await page.getByLabel("Câu hỏi", { exact: true }).fill("Bình CO2 dùng thế nào?");
+  await expect(page.getByTestId("ai-send")).toBeDisabled();
+
+  // The Assessment ended in Unity; coming back to the window re-reads the quota.
+  ai.quota = { ...ai.quota, canSubmit: true, blockedByAssessment: false };
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByTestId("trainee-ai-blocked")).toHaveCount(0);
+  await expect(page.getByTestId("ai-send")).toBeEnabled();
+
+  // Daily allowance used up: the page re-reads it right after the reset time without any user action.
+  ai.quota = { ...ai.quota, remainingUnits: 0, canSubmit: false, resetsAt: new Date(Date.now() + 2_000).toISOString() };
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(page.getByTestId("trainee-ai-blocked")).toContainText("Đã hết lượt hỏi hôm nay");
+  await expect(page.getByTestId("ai-send")).toBeDisabled();
+  ai.quota = { ...ai.quota, remainingUnits: 200, usedUnits: 0, canSubmit: true, resetsAt: "2026-10-19T17:00:00Z" };
+  await expect(page.getByTestId("ai-send")).toBeEnabled({ timeout: 10_000 });
+  await expect(page.getByTestId("trainee-ai-quota")).toContainText("Hôm nay còn 200 tokens");
+
+  // Sending reserves 50; when the answer settles (30 consumed) the quota is read again and shows the released reserve.
+  await page.getByTestId("ai-send").click();
+  await expect(page.getByTestId("ai-answer")).toContainText("Không dùng thang máy", { timeout: 15_000 });
+  await expect(page.getByTestId("trainee-ai-quota")).toContainText("Hôm nay còn 170 tokens");
 });
 
 test("history is a real view with no demo content", async ({ page }) => {
