@@ -114,6 +114,16 @@ test("entry screen: ReprocessRequired or NotReady Geometry locks draft creation 
   expect(mock.createDraftCalls).toHaveLength(0);
 });
 
+test("entry screen: revision status is labelled in Vietnamese and NeedsFix is explained with a link back to its IFC progress", async ({ page }) => {
+  const mock = v1Mock({ createdDraftId: NEW_DRAFT_ID });
+  await installEditorMocks(page, mock);
+  await page.route(`**/api/buildings/${BUILDING_ID}/revisions*`, (route) => route.fulfill({ json: { items: [{ id: REVISION_ID, buildingId: BUILDING_ID, versionLabel: "IFC rev. 01", status: "NeedsFix", createdAt: "2026-10-01T00:00:00Z", sourceDocument: null }], totalCount: 1, page: 1, pageSize: 50 } }));
+  await page.goto(`/workspace/buildings/${BUILDING_ID}/scenarios/${SCENARIO_ID}`);
+  await expect(page.getByLabel("Revision IFC")).toContainText("IFC rev. 01 · Cần sửa mô hình");
+  await expect(page.getByTestId("revision-needs-fix")).toContainText("IFC_EXIT_UNKNOWN");
+  await expect(page.getByTestId("revision-ifc-link")).toHaveAttribute("href", `/workspace/buildings/${BUILDING_ID}?tab=ifc&revision=${REVISION_ID}`);
+});
+
 test("places all six kinds, fills capability/parameter forms from the catalog, saves, and reopens from the server with nothing lost", async ({ page }) => {
   const mock = v1Mock({ state: emptyV1(), version: 5 });
   const log = await openV1(page, mock);
