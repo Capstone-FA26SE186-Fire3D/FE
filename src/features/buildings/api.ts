@@ -11,6 +11,7 @@ import type {
   BuildingFilters,
   BuildingInput,
   BuildingPage,
+  BuildingRevision,
   BuildingSummary,
   ConfirmTrainingInput,
   EditorPreview,
@@ -100,6 +101,10 @@ export const buildingsApi = {
     });
   },
 
+  getRevision(accessToken: string, revisionId: string, signal?: AbortSignal) {
+    return apiClient.request<BuildingRevision>(`/api/revisions/${revisionId}`, { headers: headers(accessToken), signal });
+  },
+
   /** Idempotency-Key is mandatory (400 IDEMPOTENCY_KEY_REQUIRED). Keep the key when retrying the same payload. */
   initiateUpload(accessToken: string, buildingId: string, input: InitiateIfcUploadInput, idempotencyKey: string) {
     return apiClient.request<InitiatedIfcUpload>(`/api/buildings/${buildingId}/revisions/upload-url`, {
@@ -122,7 +127,10 @@ export const buildingsApi = {
       signal,
     });
   },
-  /** 202 `{ jobId }` means queued, not processed. Needs an Idempotency-Key as well. */
+  /**
+   * 202 `{ jobId }` means queued, not processed. Needs an Idempotency-Key as well. When the revision already has a Geometry
+   * job for the same file the BE answers 202 with that job again: it never starts a second run (BE request_revision_processing).
+   */
   processRevision(accessToken: string, revisionId: string, idempotencyKey: string) {
     return apiClient.request<ProcessRevisionResult>(`/api/revisions/${revisionId}/process`, {
       headers: headers(accessToken),

@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleCheck, FileSearch, ListChecks } from "lucide-react";
+import { CircleCheck, DoorOpen, FileSearch, ListChecks, PenLine, Upload } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
@@ -16,7 +16,7 @@ import { buildingsApi } from "../api";
 import { entityLabel, propertyLabel, qualityFlagCodes, qualityFlagLabel, sortFacts } from "../bim-facts";
 import { describeApiError, formatDateTime, shortHash } from "../format";
 import { countBySeverity, severityLabel, severityOrder, severityRank } from "../pipeline";
-import { issueGlobalIds, qaGuide } from "../qa-codes";
+import { issueGlobalIds, qaGuide, type QaAction } from "../qa-codes";
 import type { RevisionIssue } from "../types";
 
 type IssueState = { data: RevisionIssue[] | undefined; error: unknown; loading: boolean; reload: () => void };
@@ -27,7 +27,18 @@ function valueText(value: unknown) {
   return text.length > 120 ? `${text.slice(0, 120)}…` : text;
 }
 
-function IssuesTab({ issues, onHighlight }: { issues: IssueState; onHighlight?: (ids: string[]) => void }) {
+const ISSUE_ACTIONS: Record<QaAction, { label: string; icon: typeof Upload }> = {
+  equipment: { label: "Mở Thiết bị phát hiện từ IFC", icon: DoorOpen },
+  reupload: { label: "Tải lên IFC mới", icon: Upload },
+  editor: { label: "Đặt trong trình soạn kịch bản", icon: PenLine },
+};
+
+function IssueAction({ action, onAction }: { action: QaAction; onAction: (action: QaAction) => void }) {
+  const { label, icon: Icon } = ISSUE_ACTIONS[action];
+  return <Button type="button" size="sm" variant="secondary" onClick={() => onAction(action)} data-testid="issue-action" data-action={action}><Icon size={14} aria-hidden="true" />{label}</Button>;
+}
+
+function IssuesTab({ issues, onHighlight, onAction }: { issues: IssueState; onHighlight?: (ids: string[]) => void; onAction?: (action: QaAction) => void }) {
   const [severity, setSeverity] = useState("all");
   const [currentOnly, setCurrentOnly] = useState(true);
   const all = useMemo(() => issues.data ?? [], [issues.data]);
@@ -69,6 +80,7 @@ function IssuesTab({ issues, onHighlight }: { issues: IssueState; onHighlight?: 
               {guide ? <strong>{guide.title}</strong> : null}
               {issue.message && <span className={guide ? "ops-cell-sub" : undefined}>{issue.message}</span>}
               {guide?.guidance && <span className="ops-cell-sub" data-testid="issue-guidance">Cách xử lý: {guide.guidance}</span>}
+              {guide?.action && onAction && <span className="ops-cell-sub"><IssueAction action={guide.action} onAction={onAction} /></span>}
               {ids.length > 0 && <span className="ops-cell-sub">Cấu kiện: <span className="ops-mono">{ids.slice(0, 3).join(", ")}{ids.length > 3 ? ` +${ids.length - 3}` : ""}</span>
                 {onHighlight && <Button type="button" size="sm" variant="quiet" onClick={() => onHighlight(ids)} data-testid="issue-highlight">Đánh dấu trong preview</Button>}</span>}
             </td>
@@ -146,16 +158,26 @@ function FactsTab({ accessToken, revisionId, reloadKey }: { accessToken: string;
 }
 
 /** Technical detail of the selected revision: issues (severity filter), processing logs, artifacts, BIM facts. */
-export function RevisionDetailsPanel({ accessToken, revisionId, issues, reloadKey, onHighlight }: { accessToken: string; revisionId: string; issues: IssueState; reloadKey: string; onHighlight?: (ids: string[]) => void }) {
-  return <Panel title="Chi tiết kỹ thuật" description="Issue của validator, nhật ký worker, artifact và dữ liệu BIM của revision đang chọn.">
-    <Tabs defaultValue="issues">
+export function RevisionDetailsPanel({ accessToken, revisionId, issues, reloadKey, onHighlight, onIssueAction, tab, onTabChange }: {
+  accessToken: string;
+  revisionId: string;
+  issues: IssueState;
+  reloadKey: string;
+  onHighlight?: (ids: string[]) => void;
+  /** Per-issue next step from the QA guide (equipment, re-upload, editor). */
+  onIssueAction?: (action: QaAction) => void;
+  tab: string;
+  onTabChange: (tab: string) => void;
+}) {
+  return <Panel id="ifc-details" tabIndex={-1} title="Chi tiết kỹ thuật" description="Issue của validator, nhật ký worker, artifact và dữ liệu BIM của revision đang chọn.">
+    <Tabs value={tab} onValueChange={onTabChange}>
       <TabsList aria-label="Chi tiết kỹ thuật">
         <TabsTrigger value="issues">Issue</TabsTrigger>
         <TabsTrigger value="logs">Nhật ký</TabsTrigger>
         <TabsTrigger value="artifacts">Artifact</TabsTrigger>
         <TabsTrigger value="facts">BIM facts</TabsTrigger>
       </TabsList>
-      <TabsContent value="issues"><IssuesTab issues={issues} onHighlight={onHighlight} /></TabsContent>
+      <TabsContent value="issues"><IssuesTab issues={issues} onHighlight={onHighlight} onAction={onIssueAction} /></TabsContent>
       <TabsContent value="logs"><LogsTab accessToken={accessToken} revisionId={revisionId} reloadKey={reloadKey} /></TabsContent>
       <TabsContent value="artifacts"><ArtifactsTab accessToken={accessToken} revisionId={revisionId} reloadKey={reloadKey} /></TabsContent>
       <TabsContent value="facts"><FactsTab accessToken={accessToken} revisionId={revisionId} reloadKey={reloadKey} /></TabsContent>
