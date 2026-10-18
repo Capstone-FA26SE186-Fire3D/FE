@@ -3,8 +3,9 @@
 import { MessageCircleQuestion, Send, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 
+import { ApiError } from "@/api/types/common";
 import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,16 @@ export function traineeBlock(quota: TraineeAiQuota): { title: string; text: stri
   if (quota.blockedByAssessment) return { title: "AI tạm khóa trong bài đánh giá", text: "Bạn đang có một bài đánh giá (Assessment) chưa kết thúc. AI không hỗ trợ trong lúc làm bài; hãy hoàn tất bài rồi hỏi lại." };
   if (!quota.canSubmit) return { title: "Đã hết lượt hỏi hôm nay", text: `Hạn mức hôm nay đã dùng hết. Lượt mới có lại lúc ${formatDateTime(quota.resetsAt)}.` };
   return null;
+}
+
+/** Longest delay `setTimeout` accepts; a later reset is re-armed when the page reloads the quota. */
+const MAX_TIMER_MS = 2_147_483_647;
+
+/** Milliseconds from `now` until the quota resets (plus a small margin so the server has rolled over), or null if not ahead. */
+export function quotaResetDelay(resetsAt: string, now: number): number | null {
+  const at = Date.parse(resetsAt);
+  if (Number.isNaN(at) || at <= now) return null;
+  return Math.min(at - now + 1000, MAX_TIMER_MS);
 }
 
 /**
@@ -74,7 +85,10 @@ function TraineeAsk({ accessToken, articleParam }: { accessToken: string; articl
     return undefined;
   }, [loaded, sessionId, trainingId]);
   const articlePending = !!slug && !loaded && article.error === undefined && !sessionId && !trainingId;
-  const articleMissing = !!articleParam && !sessionId && !trainingId && (!slug || (article.error !== undefined && !loaded));
+  const articleUnresolved = !!articleParam && !sessionId && !trainingId && (!slug || (article.error !== undefined && !loaded));
+  // Only a missing article (or an invalid slug) is "gone"; another failure may heal and offers a retry. Either way the
+  // question is never sent silently without the article: the learner must pick "Hỏi chung" or another article first.
+  const articleGone = articleUnresolved && (!slug || (article.error instanceof ApiError && article.error.status === 404));
 
   const go = useCallback((patch: Record<string, string | null>) => {
     const next = new URLSearchParams(params.toString());
@@ -88,6 +102,26 @@ function TraineeAsk({ accessToken, articleParam }: { accessToken: string; articl
 
   const reloadQuota = quota.reload;
   const reloadRecent = recent.reload;
+  // The quota changes outside this page (an Assessment ends, the daily reset, a request settles): re-read it when the learner
+  // comes back to the tab/window and at the reset time, so a send button is never left locked after the server allows it.
+  useEffect(() => {
+    const onFocus = () => { if (document.visibilityState === "visible") reloadQuota(); };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [reloadQuota]);
+  const resetsAt = quota.data?.resetsAt;
+  useEffect(() => {
+    if (!resetsAt) return;
+    const delay = quotaResetDelay(resetsAt, Date.now());
+    if (delay === null) return;
+    const timer = window.setTimeout(reloadQuota, delay);
+    return () => window.clearTimeout(timer);
+  }, [resetsAt, reloadQuota]);
+  const settled = useCallback(() => { reloadQuota(); reloadRecent(); }, [reloadQuota, reloadRecent]);
   const tracked = useCallback((id: string) => { go({ request: id }); reloadQuota(); reloadRecent(); }, [go, reloadQuota, reloadRecent]);
   const adapter: SubmitAdapter = useMemo(() => ({
     check: async (signal) => {
@@ -103,7 +137,7 @@ function TraineeAsk({ accessToken, articleParam }: { accessToken: string; articl
   const maxChars = quota.data?.maxInputChars ?? null;
   const tooLong = maxChars !== null && text.length > maxChars;
   const block = quota.data ? traineeBlock(quota.data) : null;
-  const canSend = text.length > 0 && !working && !tooLong && !articlePending && !block;
+  const canSend = text.length > 0 && !working && !tooLong && !articlePending && !articleUnresolved && !block;
 
   const doSubmit = () => {
     if (!canSend) return;
@@ -129,7 +163,16 @@ function TraineeAsk({ accessToken, articleParam }: { accessToken: string; articl
           <Button type="button" size="sm" variant="quiet" onClick={() => go({ session: null, training: null, article: null })} disabled={working}><X size={14} aria-hidden="true" />Hỏi chung</Button>
         </div>}
         {articlePending && <p role="status" className={styles.dim}>Đang mở thông tin bài…</p>}
-        {articleMissing && <p role="status" className={styles.dim} data-testid="trainee-ai-article-missing">Không tìm thấy bài bạn mở từ Learn (có thể đã bị ẩn hoặc gỡ). Câu hỏi sẽ không kèm bài.</p>}
+        {articleUnresolved && <div data-testid="trainee-ai-article-missing">
+          <Alert tone="warning" title={articleGone ? "Không tìm thấy bài bạn mở từ Learn" : "Chưa tải được bài bạn mở từ Learn"}
+            action={<div className="ops-actions mt-3">
+              <Button type="button" size="sm" variant="secondary" onClick={() => go({ article: null })} disabled={working}>Hỏi chung</Button>
+              <Link className="underline" href={routes.learn}>Chọn bài khác</Link>
+              {!articleGone && <Button type="button" size="sm" variant="quiet" onClick={article.reload}>Thử lại</Button>}
+            </div>}>
+            {articleGone ? "Bài có thể đã bị ẩn hoặc gỡ." : aiErrorText(article.error)} Câu hỏi chưa được gửi: hãy chọn &quot;Hỏi chung&quot; (không kèm bài) hoặc chọn bài khác.
+          </Alert>
+        </div>}
         <Field label="Câu hỏi" required error={questionError} hint="Văn bản thuần. Không nhập thông tin cá nhân của người khác.">
           {(props) => <Textarea {...props} rows={4} value={question} onChange={(event) => setQuestion(event.target.value)} disabled={working} placeholder="Ví dụ: Vì sao không nên dùng thang máy khi có cháy?" />}
         </Field>
@@ -143,7 +186,7 @@ function TraineeAsk({ accessToken, articleParam }: { accessToken: string; articl
     </Panel>
 
     {requestId && (phase.kind === "idle" || phase.kind === "tracking") && <Panel title="Câu trả lời" description="Lấy từ máy chủ theo mã yêu cầu; tải lại trang vẫn mở lại được.">
-      <RequestPanel accessToken={accessToken} requestId={requestId} trainee />
+      <RequestPanel accessToken={accessToken} requestId={requestId} trainee onSettled={settled} />
     </Panel>}
 
     <Panel title="Câu hỏi gần đây" description="Chỉ bạn xem được câu hỏi của mình.">

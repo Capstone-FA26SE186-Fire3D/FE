@@ -19,6 +19,8 @@ export class TraineeAiBackend {
   pendingPolls = 1;
   /** Next submits: the server stores the request but the response is lost. */
   submitFaults: Array<"lost-response" | { status: number; json: Rec }> = [];
+  /** Request ids whose GET now answers this status (the learner lost access after it was shown). */
+  denied = new Map<string, number>();
   private counter = 0;
 
   id(n: number) { return `eeeeeeee-0000-4000-8000-${String(n).padStart(12, "0")}`; }
@@ -35,6 +37,8 @@ export class TraineeAiBackend {
     this.requests.unshift(request);
     return request;
   }
+
+  quotaReads() { return this.calls.filter((call) => call.method === "GET" && call.path === "/api/ai/trainee/quota").length; }
 
   posts() { return this.calls.filter((call) => call.method === "POST" && call.path === "/api/ai/trainee/answer"); }
 }
@@ -89,9 +93,12 @@ export async function installTraineeAi(page: Page, backend: TraineeAiBackend) {
     if (method === "GET" && one) {
       const found = backend.requests.find((item) => item.requestId === one[1]);
       if (!found) return problem(404, "NOT_FOUND");
+      const denied = backend.denied.get(found.requestId as string);
+      if (denied) return problem(denied, denied === 404 ? "NOT_FOUND" : "FORBIDDEN");
       if (found.status === "Accepted") {
         found.polls = Number(found.polls) + 1;
         if (Number(found.polls) > backend.pendingPolls) Object.assign(found, { status: "Succeeded", resultType: "KnowledgeAnswer", consumedUnits: 30, completedAt: new Date().toISOString(), result: { status: "Answered", answer: "Không dùng thang máy khi có cháy." }, citations: learnCitation() });
+        if (Number(found.polls) > backend.pendingPolls) backend.quota = { ...backend.quota, reservedUnits: 0, remainingUnits: Number(backend.quota.remainingUnits) + 20 }; // reserve 50, consumed 30
       }
       return route.fulfill({ json: view(found) });
     }
