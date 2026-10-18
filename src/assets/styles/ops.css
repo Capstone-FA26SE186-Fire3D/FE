@@ -368,6 +368,18 @@ select.ops-input { appearance: none; padding-right: 34px; background-image: line
 .ops-stepper li[data-state="active"] .ops-stepper-dot { border-color: var(--ember); color: var(--ember); background: var(--ember-soft); }
 .ops-stepper li[data-state="error"] { color: var(--danger); font-weight: 600; }
 .ops-stepper li[data-state="error"] .ops-stepper-dot { border-color: var(--danger); color: var(--danger); background: var(--danger-soft); }
+.ops-pipeline { display: grid; grid-template-columns: repeat(var(--steps, 6), minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.ops-pipeline li { display: flex; align-items: flex-start; gap: 8px; min-width: 0; color: var(--dim); font-size: 13px; }
+.ops-pipeline-text { display: grid; gap: 2px; min-width: 0; }
+.ops-pipeline-label { font-weight: 600; }
+.ops-pipeline-state { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.ops-pipeline li[data-state="done"], .ops-pipeline li[data-state="active"] { color: var(--text); }
+.ops-pipeline li[data-state="done"] .ops-stepper-dot { border-color: var(--success); color: var(--success); background: var(--success-soft); }
+.ops-pipeline li[data-state="active"] .ops-stepper-dot { border-color: var(--ember); color: var(--ember); background: var(--ember-soft); }
+.ops-pipeline li[data-state="error"] { color: var(--danger); }
+.ops-pipeline li[data-state="error"] .ops-stepper-dot { border-color: var(--danger); color: var(--danger); background: var(--danger-soft); }
+.ops-pipeline li[data-state="skipped"] .ops-stepper-dot { border-style: dashed; }
+@media (max-width: 1100px) { .ops-pipeline { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .ops-progress-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; color: var(--muted); font-size: 13px; }
 .ops-progress-row > label { grid-column: 1 / -1; color: var(--text); font-weight: 600; }
 .ops-progress-row progress { width: 100%; height: 8px; border: 0; border-radius: 999px; overflow: hidden; background: var(--line); accent-color: var(--ember); }
@@ -388,6 +400,7 @@ select.ops-input { appearance: none; padding-right: 34px; background-image: line
 .ops-preview-overlay { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; padding: 20px; text-align: center; background: color-mix(in srgb, var(--bg-soft) 88%, transparent); }
 @media (max-width: 767px) {
   .ops-stepper { grid-template-columns: minmax(0, 1fr); }
+  .ops-pipeline { grid-template-columns: minmax(0, 1fr); }
   .ops-kv { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .ops-kv dd { margin-bottom: 10px; }
   .ops-annotation-row { grid-template-columns: minmax(0, 1fr); }

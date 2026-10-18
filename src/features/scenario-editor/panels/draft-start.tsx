@@ -12,11 +12,12 @@ import { Field, Select } from "@/components/ui/field";
 import { Panel } from "@/components/ui/panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buildingsApi } from "@/features/buildings/api";
+import { revisionLabel } from "@/features/buildings/pipeline";
 import { scenarioVersionsApi } from "@/features/scenarios/versions-api";
 
 import { createDraftV1 } from "../v1/create-draft";
 import { useRevisionFloors } from "../v1/use-revision-floors";
-import { FloorsStatus } from "./geometry-status";
+import { FloorsStatus, RevisionStatusNote } from "./geometry-status";
 import { describeApiError } from "@/api/describe-error";
 
 /**
@@ -34,6 +35,7 @@ export function DraftStart({ accessToken, buildingId, scenarioId, onOpen }: { ac
   const [error, setError] = useState<string | null>(null);
   const items = revisions.data?.items ?? [];
   const selected = revisionId || items[0]?.id || "";
+  const selectedStatus = items.find((revision) => revision.id === selected)?.status;
   const floors = useRevisionFloors(accessToken, selected || undefined);
   const geometry = floors.reading;
 
@@ -75,9 +77,10 @@ export function DraftStart({ accessToken, buildingId, scenarioId, onOpen }: { ac
             : <form className="ops-stack" onSubmit={create}>
               <Field label="Revision IFC" required>
                 {(props) => <Select {...props} value={selected} onChange={(event) => setRevisionId(event.target.value)}>
-                  {items.map((revision) => <option key={revision.id} value={revision.id}>{revision.versionLabel} · {revision.status}</option>)}
+                  {items.map((revision) => <option key={revision.id} value={revision.id}>{revision.versionLabel} · {revisionLabel(revision.status).label}</option>)}
                 </Select>}
               </Field>
+              {selected && selectedStatus && <RevisionStatusNote status={selectedStatus} buildingId={buildingId} revisionId={selected} />}
               {selected && <FloorsStatus reading={geometry} loading={floors.loading} error={floors.error} reload={floors.reload} buildingId={buildingId} revisionId={selected} />}
               {error && <Alert tone="danger" title="Tạo bản nháp thất bại">{error}</Alert>}
               <div><Button type="submit" disabled={creating || geometry?.kind !== "valid"} data-testid="create-draft" title={geometry?.kind === "valid" ? undefined : "Cần Geometry hợp lệ của revision này"}>{creating ? "Đang tạo…" : "Tạo bản nháp"}</Button></div>
