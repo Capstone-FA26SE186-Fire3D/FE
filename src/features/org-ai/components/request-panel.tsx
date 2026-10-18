@@ -1,7 +1,7 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
-import { useCallback, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, type ReactNode } from "react";
 
 import { ApiError } from "@/api/types/common";
 import { usePolling } from "@/api/use-polling";
@@ -19,9 +19,10 @@ import { RequestView } from "./request-view";
  * A request followed by id: the server is the only source of truth (`GET /api/ai/requests/{id}`), so a reload, another
  * tab or a recovered lost response all end up here. Polls only while the service may still change it (Accepted/Processing; for
  * the admin also a NeedsReconcile that has a reconcile scheduled), backs off on errors, honors Retry-After and pauses while
- * the tab is hidden (`usePolling`). An answer for another id than the one shown is never displayed.
+ * the tab is hidden (`usePolling`). An answer for another id than the one shown is never displayed, and a 401/403/404 drops
+ * the answer already on screen: only the lost-access state is shown, never the cached content.
  */
-export function RequestPanel({ accessToken, requestId, admin, trainee, onApply, renderExtra }: {
+export function RequestPanel({ accessToken, requestId, admin, trainee, onApply, renderExtra, onSettled }: {
   accessToken: string;
   requestId: string;
   admin?: boolean;
@@ -29,12 +30,18 @@ export function RequestPanel({ accessToken, requestId, admin, trainee, onApply, 
   trainee?: boolean;
   onApply?: (request: AiRequest) => void;
   renderExtra?: (request: AiRequest, refresh: () => void) => ReactNode;
+  /** Called once each time the request is loaded in a final state (no more polling), e.g. to refresh a quota. */
+  onSettled?: (request: AiRequest) => void;
 }) {
   const fetcher = useCallback((signal: AbortSignal) => (admin ? adminAiApi.getRequest(accessToken, requestId, signal) : trainee ? traineeAiApi.getRequest(accessToken, requestId, signal) : orgAiApi.getRequest(accessToken, requestId, signal)), [accessToken, admin, trainee, requestId]);
   const isDone = useCallback((request: AiRequest) => (admin ? !(isInFlight(request.status) || (request.status === "NeedsReconcile" && Boolean(request.reconcileRequestedAt))) : !isInFlight(request.status)), [admin]);
   const polling = usePolling<AiRequest>({ fetcher, isDone, resetKey: `${admin ? "admin" : trainee ? "trainee" : "org"}:${requestId}` });
-  const request = polling.data?.requestId === requestId ? polling.data : undefined;
   const gone = polling.error instanceof ApiError && (polling.error.status === 404 || polling.error.status === 403 || polling.error.status === 401);
+  const request = !gone && polling.data?.requestId === requestId ? polling.data : undefined;
+  const settled = polling.finished && request ? request : undefined;
+  const onSettledRef = useRef(onSettled);
+  useEffect(() => { onSettledRef.current = onSettled; });
+  useEffect(() => { if (settled) onSettledRef.current?.(settled); }, [settled]);
 
   return <div className={styles.stack} data-testid="ai-request-panel" aria-busy={polling.polling && !request}>
     {!request && !polling.error && <SkeletonRows rows={4} label="Đang tải yêu cầu AI…" />}
