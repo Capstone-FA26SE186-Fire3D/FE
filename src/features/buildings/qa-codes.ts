@@ -2,7 +2,8 @@
  * Vietnamese meaning and guidance for IFC QA codes (BE `docs/ifc-qa-codes.md`, Docs IFC ingestion 5.9). The BE returns
  * codes only; any other code is shown generically with the worker message.
  */
-export type QaGuide = { title: string; guidance: string | null; action?: "equipment" | "reupload" | "editor" };
+export type QaAction = "equipment" | "reupload" | "editor";
+export type QaGuide = { title: string; guidance: string | null; action?: QaAction };
 
 const CODES: Record<string, QaGuide> = {
   IFC_NO_BODY_GEOMETRY: { title: "Cấu kiện không có hình khối 3D", guidance: "Xuất lại IFC có biểu diễn 3D (Body) cho tường, sàn, cửa và cầu thang.", action: "reupload" },

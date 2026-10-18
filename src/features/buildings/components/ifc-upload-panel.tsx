@@ -60,7 +60,7 @@ export function IfcUploadPanel({ accessToken, buildingId, onRevisionChanged }: {
     ? error?.restart ? "Bắt đầu lại" : error?.fileStored ? "Gửi lại yêu cầu xử lý" : "Thử lại"
     : "Tải lên và xử lý";
 
-  return <Panel title="Tải lên IFC mới" description="Mỗi lần tải tạo một revision mới. Tệp được kiểm tra SHA-256 trên máy bạn rồi tải thẳng lên kho lưu trữ." bodyClassName="ops-stack">
+  return <Panel id="ifc-upload" tabIndex={-1} title="Tải lên IFC mới" description="Mỗi lần tải tạo một revision mới. Tệp được kiểm tra SHA-256 trên máy bạn rồi tải thẳng lên kho lưu trữ." bodyClassName="ops-stack">
     <Stepper completed={completed} running={running} failedStep={status === "error" && error ? error.step : null} />
 
     <form onSubmit={submit} className="ops-stack" noValidate>
@@ -69,7 +69,7 @@ export function IfcUploadPanel({ accessToken, buildingId, onRevisionChanged }: {
           {(p) => <Input {...p} maxLength={120} value={versionLabel} disabled={locked} placeholder="IFC rev. 02" onChange={(event) => flow.setVersionLabel(event.target.value)} />}
         </Field>
         <Field label="Tệp IFC" required hint={file && !fileProblem ? `${file.name} · ${formatBytes(file.size)}` : "Chỉ nhận tệp .ifc không rỗng."} error={fileProblem ?? undefined}>
-          {(p) => <Input {...p} type="file" accept=".ifc" disabled={locked} onChange={(event) => flow.setFile(event.target.files?.[0] ?? null)} />}
+          {(p) => <Input {...p} type="file" accept=".ifc" data-focus-target disabled={locked} onChange={(event) => flow.setFile(event.target.files?.[0] ?? null)} />}
         </Field>
       </div>
 

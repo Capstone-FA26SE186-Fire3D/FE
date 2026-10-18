@@ -27,6 +27,8 @@ async function mockBuilding(page: Page, mock: Mock = {}) {
   await page.route("**/api/buildings/building-1/revisions?*", (route) => route.fulfill({ json: page1(mock.revisions ?? [rev2, rev1]) }));
   await page.route("**/api/buildings/building-1/scenarios?*", (route) => route.fulfill({ json: page1(mock.scenarios ?? []) }));
   await page.route("**/api/scenarios/*/versions?*", (route) => route.fulfill({ json: page1([]) }));
+  // Fresh revision read while a Succeeded job waits for QA to settle the status.
+  await page.route("**/api/revisions/*", (route) => route.fulfill({ json: (mock.revisions ?? [rev2, rev1]).find((item) => (item as { id: string }).id === route.request().url().split("/").pop()) }));
   await page.route("**/api/revisions/*/processing-jobs?*", (route) => route.fulfill({ json: page1(mock.jobs?.() ?? []) }));
   await page.route("**/api/revisions/*/issues?*", (route) => route.fulfill({ json: page1(mock.issues ?? []) }));
   await page.route("**/api/revisions/*/processing-logs?*", (route) => route.fulfill({ json: page1([]) }));
@@ -131,7 +133,7 @@ test.describe("IFC upload stepper", () => {
     expect(log.complete).toEqual([{ objectKey: "staging/key", fileSizeBytes: 13, mimeType: "application/octet-stream", sha256Hash: log.initiates[0].body.sha256Hash, originalFilename: "school.ifc" }]);
     expect(log.process).toHaveLength(1);
     expect(log.process[0]).toBeTruthy();
-    await expect(page.getByRole("listitem").filter({ hasText: "Xử lý" }).first()).toHaveAttribute("data-state", "done");
+    await expect(page.getByRole("list", { name: "Các bước tải IFC" }).getByRole("listitem").filter({ hasText: "Xử lý" })).toHaveAttribute("data-state", "done");
   });
 
   test("IFC_UPLOAD_DISABLED with Retry-After waits, then the retry reuses the same Idempotency-Key; another file gets a new key", async ({ page, baseURL }) => {
@@ -211,6 +213,7 @@ test.describe("processing, QA and polling", () => {
     await page.route("**/api/revisions/rev-2/processing-jobs?*", (route) => { const status = states[Math.min(polls, states.length - 1)]; polls++; return route.fulfill({ json: page1([job(status)]) }); });
     await page.route("**/api/processing-jobs/job-1", (route) => route.fulfill({ json: jobDetail(states[Math.min(polls - 1, 2)]) }));
     await page.route("**/api/processing-jobs/job-1/qa?*", (route) => route.fulfill({ json: { jobId: "job-1", currentAttemptId: "att-1", validationRuns: page1([]) } }));
+    await page.route("**/api/revisions/rev-2", (route) => route.fulfill({ json: { ...rev2, status: "NeedsFix" } }));
     await page.goto("/workspace/buildings/building-1?tab=ifc");
     await expect(page.getByText("Đang chờ worker").first()).toBeVisible();
     await expect(page.getByText("Đang chờ kết quả QA")).toBeVisible();

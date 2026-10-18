@@ -18,6 +18,7 @@ import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import { AiProposalApply } from "@/features/org-ai/components/ai-proposal-apply";
 import { AI_PROPOSAL_PARAM } from "@/features/org-ai/components/apply-target-dialog";
+import { revisionLabel } from "@/features/buildings/pipeline";
 
 import { scenarioEditorApi, type LoadedDraft } from "../../api";
 import type { FloorInfo } from "../../scene/preview-model";
@@ -35,7 +36,7 @@ import { readGeometryPin, readObjects, readString, type ReferenceContext } from 
 import { useEditorV1 } from "../../v1/use-editor-v1";
 import type { Issue } from "../../store/validation";
 import { ConflictDialog } from "../conflict-dialog";
-import { ReprocessGuide } from "../geometry-status";
+import { ifcTabHref, ReprocessGuide } from "../geometry-status";
 import { useLeaveGuard, useMediaQuery } from "../hooks";
 import { KindAvailability } from "../kind-availability";
 import { createV1Actions } from "./actions";
@@ -260,7 +261,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const previewBanner = preview.phase === "reprocess"
     ? <ReprocessGuide buildingId={buildingId} revisionId={revisionId} />
     : preview.phase === "not-ready"
-      ? <Alert tone="warning" title="Mô hình 3D chưa sẵn sàng" action={<div className="se-banner-actions"><span>Trạng thái revision: {preview.preview?.revisionStatus ?? "?"}. Tự kiểm tra lại mỗi vài giây{preview.attempts >= 24 ? " (đã dừng, hãy thử lại)" : ""}.{geometry ? " Có thể đặt đối tượng theo tọa độ tầng." : ""}</span><Button type="button" size="sm" variant="secondary" onClick={preview.refresh}>Kiểm tra lại</Button></div>} />
+      ? <Alert tone="warning" title="Mô hình 3D chưa sẵn sàng" action={<div className="se-banner-actions"><span data-testid="preview-revision-status">Trạng thái revision: {revisionLabel(preview.preview?.revisionStatus).label}.{preview.preview?.revisionStatus === "NeedsFix" ? " QA chưa đạt hoặc chưa xác nhận cửa thoát; xử lý ở tab IFC." : ""} Tự kiểm tra lại mỗi vài giây{preview.attempts >= 24 ? " (đã dừng, hãy thử lại)" : ""}.{geometry ? " Có thể đặt đối tượng theo tọa độ tầng." : ""}</span><Button type="button" size="sm" variant="secondary" onClick={preview.refresh}>Kiểm tra lại</Button>{preview.preview?.revisionStatus === "NeedsFix" && <Button asChild size="sm" variant="quiet"><Link href={ifcTabHref(buildingId, revisionId)} data-testid="preview-ifc-link">Mở tab IFC</Link></Button>}</div>} />
       : preview.phase === "error"
         ? <Alert tone="danger" title="Không lấy được thông tin mô hình" action={<div className="se-banner-actions"><span>{preview.error}</span><Button type="button" size="sm" variant="secondary" onClick={preview.refresh}>Thử lại</Button></div>} />
         : reading.kind === "invalid"

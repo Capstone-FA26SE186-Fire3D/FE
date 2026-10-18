@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { routes } from "@/configs/routes";
+import { isUnsettledRevision, revisionLabel } from "@/features/buildings/pipeline";
 
 import type { FloorsReading } from "../v1/geometry";
 
@@ -16,9 +17,24 @@ export function ReprocessGuide({ buildingId, revisionId }: { buildingId: string;
   return <Alert tone="warning" title="Cần xử lý lại IFC để dùng editor fet3d.editor/1">
     <div className="ops-stack" data-testid="reprocess-guide">
       <p style={{ margin: 0 }}>Mô hình của revision được tạo bằng bản xử lý cũ, chưa có tọa độ theo contract nên máy chủ không trả tọa độ hay liên kết tải. Editor không dựng mô hình và không đoán tọa độ.</p>
-      <p style={{ margin: 0 }}>Chạy lại xử lý Geometry cho revision ở tab IFC rồi tải lại trang. Tạo bản nháp mới và đặt đối tượng bị khóa cho đến lúc đó.</p>
+      <p style={{ margin: 0 }}>Revision đã xử lý xong không chạy lại được (chỉ job thất bại mới chạy lại), nên hãy tải lên lại tệp IFC ở tab IFC để tạo revision mới rồi soạn trên revision đó. Tạo bản nháp mới và đặt đối tượng bị khóa trên revision này.</p>
       <div><Button asChild variant="secondary" size="sm"><Link href={ifcTabHref(buildingId, revisionId)} data-testid="reprocess-link">Mở tab IFC của công trình</Link></Button></div>
     </div>
+  </Alert>;
+}
+
+/** Why a revision is not ready to author, with a link back to its IFC progress. Nothing for ReadyForScenario/ConfirmedForTraining. */
+export function RevisionStatusNote({ status, buildingId, revisionId }: { status: string; buildingId: string; revisionId: string }) {
+  if (status === "ReadyForScenario" || status === "ConfirmedForTraining") return null;
+  const link = <Button asChild variant="secondary" size="sm"><Link href={ifcTabHref(buildingId, revisionId)} data-testid="revision-ifc-link">Mở tiến trình IFC của revision</Link></Button>;
+  if (status === "NeedsFix") {
+    return <div data-testid="revision-needs-fix"><Alert tone="warning" title="Revision cần sửa trước khi soạn kịch bản" action={<div className="mt-3">{link}</div>}>
+      QA chưa đạt hoặc chưa có cửa thoát được xác nhận (IFC_EXIT_UNKNOWN). Xem issue và cách xử lý ở tab IFC: chọn cửa thoát trong mục Thiết bị phát hiện từ IFC, hoặc sửa mô hình rồi tải lên IFC mới.
+    </Alert></div>;
+  }
+  const label = revisionLabel(status).label;
+  return <Alert tone={isUnsettledRevision(status) ? "info" : "warning"} title={`Revision chưa sẵn sàng soạn kịch bản: ${label}`} action={<div className="mt-3">{link}</div>}>
+    {isUnsettledRevision(status) ? "Mô hình đang được xử lý và kiểm tra QA; quay lại khi tab IFC báo sẵn sàng." : "Xem trạng thái và hướng xử lý ở tab IFC của công trình."}
   </Alert>;
 }
 

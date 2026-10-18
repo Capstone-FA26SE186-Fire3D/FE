@@ -50,11 +50,20 @@ export type BuildingFilters = {
   organizationId?: string;
 };
 
+/** Known values are typed; anything newer from the BE is still accepted and shown as-is. */
+type Tolerant<T extends string> = T | (string & {});
+
+export type RevisionStatus = "Draft" | "Uploaded" | "Processing" | "NeedsFix" | "ReadyForScenario" | "ConfirmedForTraining" | "Rejected" | "Failed" | "Superseded";
+export type QuarantineStatus = "Pending" | "Accepted" | "Rejected";
+export type JobStatus = "Queued" | "Running" | "Succeeded" | "Failed" | "Cancelled";
+export type AttemptStatus = "Running" | "Succeeded" | "Failed" | "Expired";
+export type ValidationStatus = "Passed" | "Failed";
+
 export type SourceDocument = {
   id: string;
   originalFilename: string;
   fileSizeBytes: number;
-  quarantineStatus: string;
+  quarantineStatus: Tolerant<QuarantineStatus>;
   createdAt: string;
 };
 
@@ -62,7 +71,7 @@ export type BuildingRevision = {
   id: string;
   buildingId: string;
   versionLabel: string;
-  status: string;
+  status: Tolerant<RevisionStatus>;
   createdAt: string;
   sourceDocument: SourceDocument | null;
 };
@@ -89,12 +98,13 @@ export type FinalizeIfcUploadInput = {
   originalFilename: string;
 };
 
-export type EditorPreviewStatus = "Ready" | "NotReady" | (string & {});
+/** ReprocessRequired: an artifact exists but predates the editor contract; no URL or coordinates are returned. */
+export type EditorPreviewStatus = Tolerant<"Ready" | "NotReady" | "ReprocessRequired">;
 
 export type EditorPreview = {
   buildingId: string;
   revisionId: string;
-  revisionStatus: string;
+  revisionStatus: Tolerant<RevisionStatus>;
   status: EditorPreviewStatus;
   artifactId: string | null;
   attemptId: string | null;
@@ -112,16 +122,15 @@ export type ProcessingJob = {
   sourceDocumentId: string;
   scenarioVersionId: string | null;
   kind: string;
-  /** Queued | Running | Succeeded | Failed | Cancelled. `Succeeded` is NOT a QA verdict. */
-  status: string;
+  /** `Succeeded` is NOT a QA verdict. */
+  status: Tolerant<JobStatus>;
   createdAt: string;
 };
 
 export type ProcessingAttempt = {
   id: string;
   attemptNumber: number;
-  /** Running | Succeeded | Failed | Expired */
-  status: string;
+  status: Tolerant<AttemptStatus>;
   toolchainVersion: string;
   startedAt: string;
   finishedAt: string | null;
@@ -144,8 +153,8 @@ export type ValidationRun = {
   scenarioVersionId: string | null;
   scope: string;
   validatorVersion: string;
-  /** Worker result (Passed | Failed | …). Read together with the current issues. */
-  status: string;
+  /** Worker result. Read together with the current issues. */
+  status: Tolerant<ValidationStatus>;
   summary: unknown;
   startedAt: string | null;
   finishedAt: string | null;
@@ -206,7 +215,7 @@ export type EquipmentCandidates = {
   /** Overlay version = ETag (`"0"` before the first save). */
   version: number;
   items: EquipmentCandidate[];
-  revisionStatus?: string | null;
+  revisionStatus?: Tolerant<RevisionStatus> | null;
   /** IFC_EXIT_UNKNOWN: the revision stays NeedsFix until an IfcDoor candidate is Confirmed/Retyped as `door.exit`. */
   exitConfirmationRequired?: boolean;
 };

@@ -113,7 +113,7 @@ export function EquipmentPanel({ accessToken, revisionId, onChanged, onHighlight
 
   const unavailable = view.error instanceof ApiError && view.error.code === "EQUIPMENT_CANDIDATES_UNAVAILABLE";
 
-  return <Panel title="Thiết bị phát hiện từ IFC" description="Worker đề xuất thiết bị PCCC, nguồn nước, cửa và thang máy từ IFC. Xác nhận, đổi loại hoặc loại bỏ; mô hình 3D của thiết bị luôn lấy từ thư viện dùng chung." actions={<Button size="sm" variant="quiet" onClick={() => { setSaved(null); setReload((value) => value + 1); }} disabled={view.loading || busy}><RefreshCw size={14} aria-hidden="true" />Tải lại</Button>}>
+  return <Panel id="ifc-equipment" tabIndex={-1} title="Thiết bị phát hiện từ IFC" description="Worker đề xuất thiết bị PCCC, nguồn nước, cửa và thang máy từ IFC. Xác nhận, đổi loại hoặc loại bỏ; mô hình 3D của thiết bị luôn lấy từ thư viện dùng chung." actions={<Button size="sm" variant="quiet" onClick={() => { setSaved(null); setReload((value) => value + 1); }} disabled={view.loading || busy}><RefreshCw size={14} aria-hidden="true" />Tải lại</Button>}>
     <div className="ops-stack" data-testid="equipment-panel">
       {view.loading && !view.data && <SkeletonRows rows={3} label="Đang tải thiết bị…" />}
       {unavailable && <Alert tone="info" title="Chưa có hình học được chấp nhận">Danh sách thiết bị có sau khi xử lý IFC xong và QA đạt (không còn lỗi Error/Critical).</Alert>}
@@ -158,7 +158,7 @@ export function EquipmentPanel({ accessToken, revisionId, onChanged, onHighlight
                     <option value="">Đổi loại…</option>
                     {equipmentKeys.map((value) => <option key={value} value={value}>{value}</option>)}
                   </Select>
-                  {isDoor(candidate) && exitAllowed && <Button type="button" size="sm" variant={key === EXIT_KEY ? "primary" : "quiet"} onClick={() => chooseExit(candidate)} disabled={busy} data-testid="equipment-exit" aria-label={`Chọn ${candidate.ifcGlobalId} làm cửa thoát`}><DoorOpen size={14} aria-hidden="true" />Làm cửa thoát</Button>}
+                  {isDoor(candidate) && exitAllowed && <Button type="button" size="sm" variant={key === EXIT_KEY ? "primary" : "quiet"} onClick={() => chooseExit(candidate)} disabled={busy} data-testid="equipment-exit" data-focus-target aria-label={`Chọn ${candidate.ifcGlobalId} làm cửa thoát`}><DoorOpen size={14} aria-hidden="true" />Làm cửa thoát</Button>}
                   <Button type="button" size="sm" variant="quiet" onClick={() => set(candidate, { decision: "Rejected", catalogKey: "" })} disabled={busy} aria-label={`Loại bỏ ${candidate.ifcGlobalId}`}>Loại bỏ</Button>
                   {draft && <Button type="button" size="sm" variant="quiet" onClick={() => set(candidate, null)} disabled={busy}>Bỏ chọn</Button>}
                 </div>
