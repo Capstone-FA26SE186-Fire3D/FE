@@ -1,41 +1,8 @@
 /**
- * `POST /api/scenario-drafts/{id}/validate-state` answers with `stateHash`: the SHA-256 of the checked JSON "as received".
- * The BE computes it over `JsonNode.ToJsonString()` of the parsed body (compact, UTF-8), which re-escapes strings with
- * System.Text.Json's default encoder: every non-ASCII char becomes `\uXXXX`, and `" & ' + < > ` ` plus DEL are escaped too.
- * `JSON.stringify` does NOT do that, so hashing the raw string we send would never match a body that contains Vietnamese
- * text. `serverJson` reproduces the BE serialization so the client can tell which edit a result belongs to.
- * Verified against System.Text.Json on .NET 10 (see tests/e2e/scenario-editor-v1.spec.ts for the vector).
+ * `POST /api/scenario-drafts/{id}/validate-state` answers with `stateHash`: the lowercase hex SHA-256 of the exact UTF-8 request
+ * body bytes (BE #90). The API client sends `JSON.stringify(json)`, so hashing that same string reproduces it, Vietnamese text
+ * included, and tells which edit a result belongs to.
  */
-
-const SHORT_ESCAPES: Record<string, string> = { "\b": "\\b", "\t": "\\t", "\n": "\\n", "\f": "\\f", "\r": "\\r", "\\": "\\\\" };
-const HTML_SENSITIVE = new Set(['"', "&", "'", "+", "<", ">", "`"]);
-
-function escapeString(value: string): string {
-  let out = '"';
-  for (let i = 0; i < value.length; i++) {
-    const ch = value[i];
-    const code = value.charCodeAt(i);
-    const short = SHORT_ESCAPES[ch];
-    if (short) out += short;
-    else if (code < 0x20 || code > 0x7e || HTML_SENSITIVE.has(ch)) out += `\\u${code.toString(16).toUpperCase().padStart(4, "0")}`;
-    else out += ch;
-  }
-  return `${out}"`;
-}
-
-/** Compact JSON exactly as the BE re-serializes a parsed body (key order preserved, `undefined` members skipped). */
-export function serverJson(value: unknown): string {
-  if (value === null) return "null";
-  if (typeof value === "string") return escapeString(value);
-  if (typeof value === "number") return Number.isFinite(value) ? JSON.stringify(value) : "null";
-  if (typeof value === "boolean") return value ? "true" : "false";
-  if (Array.isArray(value)) return `[${value.map((item) => (item === undefined ? "null" : serverJson(item))).join(",")}]`;
-  if (typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>).filter(([, item]) => item !== undefined);
-    return `{${entries.map(([key, item]) => `${escapeString(key)}:${serverJson(item)}`).join(",")}}`;
-  }
-  return "null";
-}
 
 // ───────── SHA-256 (synchronous, no WebCrypto needed so it also works on insecure origins) ─────────
 
@@ -81,7 +48,7 @@ export function sha256Hex(text: string): string {
   return Array.from(h, (word) => word.toString(16).padStart(8, "0")).join("");
 }
 
-/** SHA-256 the BE reports as `stateHash` for the body `value` (lowercase hex). */
+/** SHA-256 the BE reports as `stateHash` for the body `value`: the hash of the string the API client sends. */
 export function stateHash(value: unknown): string {
-  return sha256Hex(serverJson(value));
+  return sha256Hex(JSON.stringify(value));
 }

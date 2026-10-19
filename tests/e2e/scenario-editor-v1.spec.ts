@@ -11,7 +11,8 @@ import { carryOverCandidates, carryOverExtras } from "../../src/features/scenari
 import { addItemCommand, addObjectCommand, moveObjectCommand, pinGeometryCommand, removeObjectCommand, rotateObjectCommand, setCapabilityCommand, setFloorCommand, setPathCommand } from "../../src/features/scenario-editor/v1/commands";
 import { isV1Dirty, initialV1State, v1Reducer, type V1EditorState } from "../../src/features/scenario-editor/v1/editor-state";
 import { anchorsForFloor, parseFloorsResponse, parseGeometry } from "../../src/features/scenario-editor/v1/geometry";
-import { sha256Hex, serverJson, stateHash } from "../../src/features/scenario-editor/v1/hash";
+import { createHash } from "node:crypto";
+import { sha256Hex, stateHash } from "../../src/features/scenario-editor/v1/hash";
 import { combineIssues, objectIssues, targetOf, toIssues } from "../../src/features/scenario-editor/v1/issues";
 import { applyMatrix, glbToLocal, ifcToGlb, invertAffine, isUnitQuaternion, localToGlb, matrixProblem, near, quaternionToYaw, roundQuaternion, yawToQuaternion } from "../../src/features/scenario-editor/v1/matrix";
 import { completenessIssues, initialStateV1, isV1State, readObjects, shapeIssues } from "../../src/features/scenario-editor/v1/state";
@@ -378,7 +379,7 @@ test("rubric catalog: metrics come from the server, nothing is defaulted", () =>
 
 // ───────── stateHash ─────────
 
-test("stateHash reproduces the BE's SHA-256 of JsonNode.ToJsonString() (System.Text.Json default escaping), verified on .NET 10", () => {
+test("stateHash is the SHA-256 of the exact body the client sends (BE #90 hashes the received bytes), Vietnamese included", () => {
   expect(sha256Hex("")).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
   expect(sha256Hex("abc")).toBe("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
   expect(sha256Hex("a".repeat(1000))).toBe("41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3");
@@ -388,10 +389,9 @@ test("stateHash reproduces the BE's SHA-256 of JsonNode.ToJsonString() (System.T
     n: [0.7071068, 1, 1.5, -0, 1e21, 1e-7, 123456789012345680000, 5e-324, 0.1, 100, 1e300],
     o: { "ключ": "значение", "a/b": 1 }, a: [], e: {}, t: true, f: false, z: null, skipped: undefined,
   };
-  expect(serverJson(body)).toBe('{"schemaVersion":"fet3d.editor/1","name":"S\\u01A1 t\\u00E1n \\u003Ca\\u003E \\u0026 \\u0022b\\u0022 \\u002B c\\u0027 \\u0060d\\u0060 \\\\ / \\u007F \\u0001 \\n\\t \\uD83D\\uDE00 \\u00E9 ~ ! # $ % ( ) * , - . : ; = ? @ [ ] ^ { | }","n":[0.7071068,1,1.5,0,1e+21,1e-7,123456789012345680000,5e-324,0.1,100,1e+300],"o":{"\\u043A\\u043B\\u044E\\u0447":"\\u0437\\u043D\\u0430\\u0447\\u0435\\u043D\\u0438\\u0435","a/b":1},"a":[],"e":{},"t":true,"f":false,"z":null}');
-  expect(stateHash(body)).toBe("33cb0e5a0dbb3df7b13d7d70f3764268a88c3d86af4105eab7503fe6e2dd1a3b");
-  // The BE fixture contains Vietnamese text: the hash must still match what the server computes for it.
-  expect(stateHash(stateFixture())).toBe("3423434d2902b02d2f1539e5eeaa7b32e42003cf3c3319ee81c39b47e8084819");
+  const bytesHash = (value: unknown) => createHash("sha256").update(JSON.stringify(value), "utf8").digest("hex");
+  expect(stateHash(body)).toBe(bytesHash(body));
+  expect(stateHash(stateFixture())).toBe(bytesHash(stateFixture()));
   // A different edit gives a different hash (this is how a result is recognised as stale).
   const edited = applyCommand(stateFixture(), moveObjectCommand(stateFixture(), nextId(), 0, { x: 3 }, { at: 1, label: "Di chuyển" })!);
   expect(stateHash(edited)).not.toBe(stateHash(stateFixture()));

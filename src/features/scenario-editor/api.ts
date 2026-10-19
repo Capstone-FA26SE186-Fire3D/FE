@@ -30,7 +30,7 @@ export type RuntimeCatalogEntry = { runtimeVersion: string; protocolVersion: str
 
 export type ValidateResponse = { draftId: string; version: number; isValid: boolean; issues: unknown };
 
-/** `POST /api/scenario-drafts/{id}/validate-state`: dry run of an unsaved body. `stateHash` is the SHA-256 of the checked JSON as the BE re-serialized it. */
+/** `POST /api/scenario-drafts/{id}/validate-state`: dry run of an unsaved body. `stateHash` is the SHA-256 of the exact request body bytes. */
 export type ValidateStateResponse = { draftId: string; storedVersion: number; stateHash: string; isValid: boolean; issues: unknown };
 
 /** `GET /api/buildings/{id}/editor-preview` with the `fet3d.editor/1` fields (status Ready | NotReady | ReprocessRequired). */
