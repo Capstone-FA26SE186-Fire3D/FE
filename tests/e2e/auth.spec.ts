@@ -35,6 +35,29 @@ test("password login posts credentials directly to the Fire3D API", async ({ pag
   await expect.poll(() => payload).toEqual({ email: "owner@fire3d.test", password: "safe-password-123" });
 });
 
+test("login keeps the session in a cookie that a new tab and a reload restore", async ({ page, context }) => {
+  const user = { id: "org-user", email: "owner@fire3d.test", fullName: "Owner", role: 1, organizationId: "org-1" };
+  await context.route("**/api/auth/login", (route) => route.fulfill({ json: { accessToken: "access-token", refreshToken: "refresh-token", user } }));
+  await context.route("**/api/auth/me", (route) => route.fulfill({ json: user }));
+  await context.route("**/api/auth/logout", (route) => route.fulfill({ status: 204 }));
+
+  await page.goto("/login?next=/learn");
+  await page.getByLabel("Email").fill("owner@fire3d.test");
+  await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
+  await page.getByRole("button", { name: "Đăng nhập" }).click();
+
+  await expect.poll(async () => (await context.cookies()).find((cookie) => cookie.name === "fire3d_session")?.sameSite).toBe("Lax");
+  expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage }).includes("refresh-token"))).toBe(false);
+
+  const other = await context.newPage();
+  await other.goto("/learn");
+  await expect(other.getByRole("button", { name: "Mở menu tài khoản của Owner" })).toBeVisible();
+
+  await other.getByRole("button", { name: "Mở menu tài khoản của Owner" }).click();
+  await other.getByRole("menuitem", { name: /Đăng xuất/ }).click();
+  await expect.poll(async () => (await context.cookies()).some((cookie) => cookie.name === "fire3d_session")).toBe(false);
+});
+
 test("login displays the backend ProblemDetails message unchanged", async ({ page }) => {
   await page.route("**/api/auth/login", (route) => route.fulfill({
     status: 403,
