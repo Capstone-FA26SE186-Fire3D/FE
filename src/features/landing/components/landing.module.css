@@ -47,7 +47,10 @@
 .choiceButton:hover { border-color: #ee8654; }
 .actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-top: 18px; }
 .back { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; background: none; border: 0; color: #d3dbd9; font-size: 12px; padding: 0 6px; }
-.status { position: absolute; right: 32px; top: 105px; color: #c2cdca; font-size: 11px; background: #141719d9; border-radius: 8px; padding: 8px 12px; }
+.skip { position: absolute; z-index: 6; right: 48px; top: 108px; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid #3a4448; background: #101719b3; color: #f3f5f4; font-size: 12px; font-weight: 500; cursor: pointer; }
+.skip:hover { border-color: #ee8654; }
+.skip:focus-visible { outline: 2px dashed #eee0c9; outline-offset: 3px; }
+.status { position: absolute; right: 32px; top: 164px; color: #c2cdca; font-size: 11px; background: #141719d9; border-radius: 8px; padding: 8px 12px; }
 .static .journey { height: auto; }
 .static .stage { height: auto; min-height: 100svh; position: relative; overflow: visible; }
 .static .world { height: 100svh; background-image: url('/assets/landing-cutaway.webp'); opacity: .8; }
@@ -58,6 +61,7 @@
 .static .choice { max-width: 600px; }
 @keyframes arrive { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media(max-width: 767px) {
+  .skip { right: 20px; top: 96px; }
   .journey { height: 500svh; }
   .stage { min-height: 0; }
   .copy { width: calc(100% - 40px); align-items: flex-end; padding-bottom: 98px; }
@@ -76,7 +80,7 @@
   .choices { margin-top: 14px; gap: 8px; }
   .choiceButton { min-height: 52px; padding: 12px; font-size: 12px; }
   .actions { margin-top: 12px; gap: 10px; }
-  .status { top: 85px; right: 20px; font-size: 9px; }
+  .status { top: 150px; right: 20px; font-size: 9px; }
   .static .copy { padding-top: 150px; gap: 45px; }
 }
 @media(prefers-reduced-motion: reduce) { .panel { animation: none; } }
