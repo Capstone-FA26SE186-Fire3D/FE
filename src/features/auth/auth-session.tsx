@@ -9,9 +9,8 @@ import { clearPendingCheckout } from "@/features/billing/pending-payment";
 import { authApi } from "./api";
 import { accessTokenExpiry } from "./token-expiry";
 import { signInWithGoogle } from "./firebase";
+import { openSessionChannel, persistTokens, readTokens, withRefreshLock, type SessionBroadcast } from "./session-store";
 import type { AuthUser, RegisterInput, TokenResponse, GoogleLoginResult, GoogleOnboardingInput } from "./types";
-
-type StoredTokens = Pick<TokenResponse, "accessToken" | "refreshToken">;
 
 type AuthSessionContextValue = {
   accessToken: string | null;
@@ -31,32 +30,7 @@ type AuthSessionContextValue = {
   updateUser: (user: AuthUser) => void;
 };
 
-const storageKey = "fire3d-auth-tokens";
 const AuthSessionContext = createContext<AuthSessionContextValue | null>(null);
-
-function readTokens(): StoredTokens | null {
-  try {
-    const raw = window.sessionStorage.getItem(storageKey);
-    if (!raw) return null;
-    const value: unknown = JSON.parse(raw);
-    if (typeof value !== "object" || value === null) return null;
-    const tokens = value as Record<string, unknown>;
-    return typeof tokens.accessToken === "string" && typeof tokens.refreshToken === "string"
-      ? { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken }
-      : null;
-  } catch {
-    return null;
-  }
-}
-
-function persistTokens(tokens: StoredTokens | null) {
-  try {
-    if (tokens) window.sessionStorage.setItem(storageKey, JSON.stringify(tokens));
-    else window.sessionStorage.removeItem(storageKey);
-  } catch {
-    // The session continues in memory when browser storage is unavailable.
-  }
-}
 
 /**
  * Browser storage that points at one tenant's business objects (the retry keys of unfinished commands, the checkout the
@@ -87,19 +61,51 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   // The account this tab last held: a different account signing in (even without a logout in between) starts clean.
   const lastUserId = useRef<string | null>(null);
+  const channel = useRef<ReturnType<typeof openSessionChannel> | null>(null);
 
   const saveSession = useCallback((response: TokenResponse, explicitLogin = false) => {
     if (explicitLogin && lastUserId.current && lastUserId.current !== response.user.id) forgetAccountBoundData();
     lastUserId.current = response.user.id;
     setAccessToken(response.accessToken);
     setUser(response.user);
-    persistTokens({ accessToken: response.accessToken, refreshToken: response.refreshToken });
+    const tokens = { accessToken: response.accessToken, refreshToken: response.refreshToken };
+    persistTokens(tokens);
+    channel.current?.post({ type: "session", tokens });
   }, []);
 
   const clearSession = useCallback(() => {
     setAccessToken(null);
     setUser(null);
     persistTokens(null);
+    channel.current?.post({ type: "logout" });
+  }, []);
+
+  // The session cookie is shared by every tab: follow a sign-in, rotation or sign-out made in another one, so this tab
+  // never replays a refresh token that another tab already consumed.
+  useEffect(() => {
+    const adopt = async (tokens: { accessToken: string; refreshToken: string }) => {
+      try {
+        const currentUser = await authApi.me(tokens.accessToken);
+        lastUserId.current = currentUser.id;
+        setAccessToken(tokens.accessToken);
+        setUser(currentUser);
+      } catch {
+        // The owning tab keeps the session alive; this tab will pick it up on the next signal.
+      }
+    };
+    const onMessage = (message: SessionBroadcast) => {
+      if (message.type === "logout") {
+        setAccessToken(null);
+        setUser(null);
+        forgetAccountBoundData();
+        lastUserId.current = null;
+      } else {
+        void adopt(message.tokens);
+      }
+    };
+    const session = openSessionChannel(onMessage);
+    channel.current = session;
+    return () => { session.close(); channel.current = null; };
   }, []);
 
   useEffect(() => {
@@ -122,7 +128,14 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
           return;
         }
         try {
-          const refreshed = await authApi.refresh(tokens.refreshToken);
+          const refreshed = await withRefreshLock(async () => {
+            // Another tab may have rotated the token while this one waited for the lock: use its session.
+            const latest = readTokens();
+            if (latest && latest.refreshToken !== tokens.refreshToken) {
+              return { ...(await authApi.me(latest.accessToken).then((user) => ({ user }))), accessToken: latest.accessToken, refreshToken: latest.refreshToken };
+            }
+            return authApi.refresh(tokens.refreshToken);
+          });
           if (active) saveSession(refreshed);
         } catch {
           // The session is really gone (expired/revoked): whoever signs in next may be another account.
@@ -152,8 +165,13 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
       if (!tokens || tokens.accessToken !== accessToken) return;
       refreshing.current = true;
       try {
-        const refreshed = await authApi.refresh(tokens.refreshToken);
-        if (!cancelled) saveSession(refreshed);
+        const refreshed = await withRefreshLock(async () => {
+          const latest = readTokens();
+          // A sibling tab already renewed: its broadcast delivers the new session, nothing to rotate here.
+          if (!latest || latest.refreshToken !== tokens.refreshToken) return null;
+          return authApi.refresh(tokens.refreshToken);
+        });
+        if (refreshed && !cancelled) saveSession(refreshed);
       } catch (error) {
         if (cancelled) return;
         const rejected = error instanceof ApiError && (error.status === 400 || error.status === 401 || error.status === 403);
