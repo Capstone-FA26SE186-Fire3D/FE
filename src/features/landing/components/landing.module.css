@@ -20,7 +20,7 @@
 .header { position: absolute; z-index: 12; inset: 0 0 auto; background: linear-gradient(#101517d9, transparent); }
 .journey { position: relative; height: 540svh; overflow-anchor: none; }
 .stage { position: sticky; top: 0; height: 100svh; min-height: 560px; overflow: hidden; isolation: isolate; background: #141719; }
-.world { position: absolute; inset: 0; z-index: -2; background: #141719 url('/assets/landing-opening.webp') center / cover no-repeat; }
+.world { position: absolute; inset: 0; z-index: -2; background: #141719 url('/assets/landing-opening-v2.webp') center / cover no-repeat; }
 .world :global(.building-canvas) { position: absolute; inset: 0; display: block; width: 100%; height: 100%; touch-action: pan-y; pointer-events: none; }
 .scrim { position: absolute; inset: 0; z-index: -1; pointer-events: none; background: linear-gradient(90deg, #101719ee 0%, #101719cf 23%, #10171938 54%, transparent 73%), linear-gradient(0deg, #101719ed, transparent 22%, transparent 83%, #10171988); }
 .copy { width: min(1280px, calc(100% - 96px)); margin: auto; height: 100%; display: flex; align-items: center; }
@@ -53,7 +53,7 @@
 .status { position: absolute; right: 32px; top: 164px; color: #c2cdca; font-size: 11px; background: #141719d9; border-radius: 8px; padding: 8px 12px; }
 .static .journey { height: auto; }
 .static .stage { height: auto; min-height: 100svh; position: relative; overflow: visible; }
-.static .world { height: 100svh; background-image: url('/assets/landing-cutaway.webp'); opacity: .8; }
+.static .world { height: 100svh; background-image: url('/assets/landing-cutaway-v2.webp'); opacity: .8; }
 .static .copy { display: grid; gap: 80px; padding-top: 180px; padding-bottom: 80px; }
 .static .panel { width: min(680px, 100%); animation: none; padding: 20px 0; }
 .static .scrim { background: linear-gradient(#14171980, #141719 90svh); }

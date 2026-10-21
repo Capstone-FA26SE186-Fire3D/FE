@@ -4,7 +4,7 @@ import { takeSceneHandoff } from "@/features/landing/handoff";
 import styles from "./public.module.css";
 
 export function OrganizationHero({ children }: { children: ReactNode }) {
-  const [image, setImage] = useState("/assets/landing-cutaway.webp");
+  const [image, setImage] = useState("/assets/landing-cutaway-v2.webp");
   useEffect(() => {
     const timer = setTimeout(() => { const handoff = takeSceneHandoff(); if (handoff) setImage(handoff.image); }, 0);
     return () => clearTimeout(timer);
