@@ -1,207 +1,193 @@
 import * as THREE from "three";
-import { createMaterials, labelTexture } from "./materials";
-import { batchStatic } from "./batch-static";
-import { stairs } from "./building-layout";
-import { roomFireTimeline } from "./fire-timeline";
-import { createBuildingDamage } from "./building-damage";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { BAYS, BAY_SPAN, COLLAPSE, PLAN, arcPoint, bayCentre, bayFall, routeAngle, smoothstep } from "./layout";
 
-export type FireSource = { position: THREE.Vector3; intensity: number; color: THREE.Color; ignition?: number; exterior?: boolean; drift?: [number, number]; size?: [number, number]; activity?: number; softFloor?: boolean; cameraFacing?: boolean };
+/*
+ * Circular three-storey glass building.
+ *
+ * The ring is built as 8 bays x 3 tiers of shared geometry. Two representations are drawn from it:
+ *  - "whole": every bay merged into four meshes (glass, concrete, frames, walls): about a dozen draw calls, used for
+ *    the walk-through and the overview;
+ *  - "bays": one group per bay/tier that can be moved, used only once the demonstration collapse starts.
+ * Glass is alpha-blended and lit by the shared environment map (a cheap reflection, no per-pane refraction).
+ * Collapse is authored animation plus instanced debris; there is no physics engine.
+ */
+const TIER_H = PLAN.tierHeight - PLAN.slab;
+const door = (a: number) => Math.abs(Math.atan2(Math.sin(a - PLAN.doorAngle), Math.cos(a - PLAN.doorAngle)));
+const DOOR_HALF = PLAN.doorWidth / 2 / PLAN.outerRadius;
 
-export function createBuilding() {
-  const group = new THREE.Group(); group.name = "fire3d-building";
-  const mat = createMaterials();
-  const geometries = new Set<THREE.BufferGeometry>();
-  const signMaterials: THREE.Material[] = [], textures: THREE.Texture[] = [];
-  const levels: THREE.Group[] = [], roofs: THREE.Object3D[] = [];
-  const cutawayShell = new Set<THREE.Object3D>();
-  const annotations = new THREE.Group(); annotations.name = "scenario-and-spawn-markers"; group.add(annotations);
-  const exterior = new THREE.Group(); exterior.name = "exterior-plaza"; group.add(exterior);
-  function box(parent: THREE.Object3D, name: string, size: [number, number, number], at: [number, number, number], material: THREE.Material): THREE.Object3D {
-    if (size[2] > 6.5) {
-      const section = new THREE.Group(); section.name = name; section.position.set(...at); parent.add(section);
-      const count = Math.ceil(size[2] / 6.5), length = size[2] / count;
-      for (let part = 0; part < count; part++) box(section, `${name}-section`, [size[0],size[1],length], [0,0,-size[2]/2+length*(part+.5)], material);
-      if (["east-spandrel", "east-header", "front-right", "west-stair-wall"].includes(name)) cutawayShell.add(section);
-      return section;
-    }
-    const geometry = new THREE.BoxGeometry(...size); geometries.add(geometry);
-    const mesh = new THREE.Mesh(geometry, material); mesh.name = name; mesh.position.set(...at);
-    mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh);
-    if (["east-spandrel", "east-header", "facade-mullion", "facade-glazing", "front-right", "west-stair-wall"].includes(name)) cutawayShell.add(mesh);
-    return mesh;
+/** Cylinder-like geometry for a bay: three.js sweeps with x = r sin t, z = r cos t, so t = pi/2 - phi. */
+const sweep = (centre: number) => ({ thetaStart: Math.PI / 2 - centre - BAY_SPAN / 2, thetaLength: BAY_SPAN });
+
+function bayGeometries(bay: number, tier: number) {
+  const centre = bayCentre(bay), { thetaStart, thetaLength } = sweep(centre);
+  const base = tier * PLAN.tierHeight;
+  const hasDoor = tier === 0 && bay === 0;
+
+  // Outer glass (the ground-floor door leaves a gap, so build two arcs around it).
+  const glassParts: THREE.BufferGeometry[] = [];
+  const arc = (from: number, length: number) => { const g = new THREE.CylinderGeometry(PLAN.outerRadius, PLAN.outerRadius, TIER_H, Math.max(3, Math.round(length / 0.06)), 1, true, from, length); g.translate(0, base + TIER_H / 2, 0); glassParts.push(g); };
+  if (hasDoor) { arc(thetaStart, BAY_SPAN / 2 - DOOR_HALF); arc(DOOR_HALF, BAY_SPAN / 2 - DOOR_HALF); }
+  else arc(thetaStart, thetaLength);
+
+  // Floor slab (and roof on the top tier).
+  const slabParts: THREE.BufferGeometry[] = [];
+  const ring = (inner: number, outer: number, y: number) => {
+    const profile = [new THREE.Vector2(inner, 0), new THREE.Vector2(outer, 0), new THREE.Vector2(outer, -PLAN.slab), new THREE.Vector2(inner, -PLAN.slab), new THREE.Vector2(inner, 0)];
+    const g = new THREE.LatheGeometry(profile, 12, thetaStart, thetaLength); g.translate(0, y, 0); slabParts.push(g);
+  };
+  ring(PLAN.atriumRadius, PLAN.outerRadius + 0.3, base);
+  if (tier === PLAN.tiers - 1) ring(PLAN.atriumRadius + 3, PLAN.outerRadius + 0.6, PLAN.tiers * PLAN.tierHeight);
+
+  // Mullions and transoms (thin boxes along the arc).
+  const frameParts: THREE.BufferGeometry[] = [];
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), p = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
+  const place = (g: THREE.BufferGeometry, x: number, y: number, z: number, yaw: number) => { m.compose(p.set(x, y, z), q.setFromAxisAngle(up, yaw), one); g.applyMatrix4(m); frameParts.push(g); };
+  const steps = 12;
+  for (let i = 0; i <= steps; i++) {
+    const a = centre - BAY_SPAN / 2 + (i / steps) * BAY_SPAN;
+    if (i === steps && bay !== BAYS - 1) continue; // shared edge belongs to the next bay
+    if (tier === 0 && door(a) < DOOR_HALF * 1.3) continue;
+    place(new THREE.BoxGeometry(0.08, TIER_H, 0.14), Math.cos(a) * PLAN.outerRadius, base + TIER_H / 2, Math.sin(a) * PLAN.outerRadius, -a + Math.PI / 2);
   }
-  function sign(parent: THREE.Object3D, text: string, at: [number, number, number], width: number, background?: string) {
-    const texture = labelTexture(text, background); textures.push(texture);
-    const material = new THREE.MeshBasicMaterial({ map: texture }); signMaterials.push(material);
-    return box(parent, `sign-${text}`, [width, width / 4, .035], at, material);
+  for (let i = 0; i < steps; i++) {
+    const a = centre - BAY_SPAN / 2 + ((i + 0.5) / steps) * BAY_SPAN;
+    if (tier === 0 && door(a) < DOOR_HALF * 1.3) continue;
+    const chord = (BAY_SPAN / steps) * PLAN.outerRadius * 1.02;
+    place(new THREE.BoxGeometry(chord, 0.07, 0.1), Math.cos(a) * PLAN.outerRadius, base + TIER_H, Math.sin(a) * PLAN.outerRadius, -a + Math.PI / 2 + Math.PI);
   }
-  function rail(parent: THREE.Object3D, a: THREE.Vector3, b: THREE.Vector3) {
-    const geometry = new THREE.CylinderGeometry(.025, .025, a.distanceTo(b), 8); geometries.add(geometry);
-    const mesh = new THREE.Mesh(geometry, mat.metal); mesh.position.copy(a).add(b).multiplyScalar(.5);
-    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize()); parent.add(mesh);
+
+  // Inner room wall and atrium wall (opaque, double-sided so the corridor and void read from both sides).
+  const wallParts: THREE.BufferGeometry[] = [];
+  for (const r of [PLAN.roomWallRadius, PLAN.atriumRadius]) { const g = new THREE.CylinderGeometry(r, r, TIER_H, 14, 1, true, thetaStart, thetaLength); g.translate(0, base + TIER_H / 2, 0); wallParts.push(g); }
+
+  const merge = (parts: THREE.BufferGeometry[]) => { const merged = mergeGeometries(parts.map(g => g.toNonIndexed()), false); parts.forEach(g => g.dispose()); return merged; };
+  return { glass: merge(glassParts), concrete: merge(slabParts), frames: merge(frameParts), walls: merge(wallParts) };
+}
+
+export function createCircularBuilding() {
+  const group = new THREE.Group(); group.name = "circular-glass-building";
+  const disposables: { dispose(): void }[] = [];
+  const own = <T extends { dispose(): void }>(item: T) => { disposables.push(item); return item; };
+
+  const concrete = own(new THREE.MeshStandardMaterial({ color: 0x2b3236, roughness: 0.85, metalness: 0.05, side: THREE.DoubleSide }));
+  const floorMaterial = own(new THREE.MeshStandardMaterial({ color: 0x1d2528, roughness: 0.32, metalness: 0.15 }));
+  const wallMaterial = own(new THREE.MeshStandardMaterial({ color: 0x3a4348, roughness: 0.9, side: THREE.DoubleSide }));
+  const frameMaterial = own(new THREE.MeshStandardMaterial({ color: 0x9aa7ab, roughness: 0.35, metalness: 0.85 }));
+  const glassMaterial = own(new THREE.MeshStandardMaterial({ color: 0x9cc9d1, roughness: 0.04, metalness: 0, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false, envMapIntensity: 1.6 }));
+
+  const ground = new THREE.Mesh(own(new THREE.CircleGeometry(140, 72)), own(new THREE.MeshStandardMaterial({ color: 0x050708, roughness: 0.98, envMapIntensity: 0.2 })));
+  ground.rotation.x = -Math.PI / 2; ground.position.y = -0.02; group.add(ground);
+  const plaza = new THREE.Mesh(own(new THREE.RingGeometry(PLAN.outerRadius + 0.4, PLAN.outerRadius + 16, 96)), own(new THREE.MeshStandardMaterial({ color: 0x0e1316, roughness: 0.6, metalness: 0.1, envMapIntensity: 0.4 })));
+  plaza.rotation.x = -Math.PI / 2; plaza.position.y = 0.01; group.add(plaza);
+  // Ground-floor slab is polished; it is not a collapse piece (it is the foundation).
+  const foundation = new THREE.Mesh(own(new THREE.CircleGeometry(PLAN.outerRadius + 0.3, 96)), floorMaterial);
+  foundation.rotation.x = -Math.PI / 2; foundation.position.y = -0.005; group.add(foundation);
+  const skylight = new THREE.Mesh(own(new THREE.CircleGeometry(PLAN.atriumRadius + 3, 72)), own(new THREE.MeshBasicMaterial({ color: 0xcfe6ea })));
+  skylight.rotation.x = Math.PI / 2; skylight.position.y = PLAN.tiers * PLAN.tierHeight - 0.05; group.add(skylight);
+
+  // Shared geometry for all 24 bay pieces.
+  const pieces: { bay: number; tier: number; geo: ReturnType<typeof bayGeometries> }[] = [];
+  for (let tier = 0; tier < PLAN.tiers; tier++) for (let bay = 0; bay < BAYS; bay++) pieces.push({ bay, tier, geo: bayGeometries(bay, tier) });
+
+  // "Whole" representation: merge by material.
+  const whole = new THREE.Group(); whole.name = "whole"; group.add(whole);
+  const mergeAll = (key: "glass" | "concrete" | "frames" | "walls", material: THREE.Material, order = 0) => {
+    const geometry = own(mergeGeometries(pieces.map(piece => piece.geo[key].clone()), false));
+    const mesh = new THREE.Mesh(geometry, material); mesh.renderOrder = order; mesh.name = `whole-${key}`; whole.add(mesh); return mesh;
+  };
+  const wholeGlass = mergeAll("glass", glassMaterial, 20); mergeAll("concrete", concrete); mergeAll("frames", frameMaterial); mergeAll("walls", wallMaterial);
+
+  // "Bays" representation: pivoted groups, built once, hidden until collapse starts.
+  const bays = new THREE.Group(); bays.name = "bays"; bays.visible = false; group.add(bays);
+  const bayGroups = pieces.map(({ bay, tier, geo }) => {
+    const centre = bayCentre(bay), pivot = new THREE.Vector3(Math.cos(centre) * 25, tier * PLAN.tierHeight + PLAN.tierHeight / 2, Math.sin(centre) * 25);
+    const holder = new THREE.Group(); holder.position.copy(pivot); holder.name = `bay-${bay}-tier-${tier}`;
+    const add = (g: THREE.BufferGeometry, material: THREE.Material, order = 0) => { const clone = own(g.clone()); clone.translate(-pivot.x, -pivot.y, -pivot.z); const mesh = new THREE.Mesh(clone, material); mesh.renderOrder = order; holder.add(mesh); };
+    add(geo.glass, glassMaterial, 20); add(geo.concrete, concrete); add(geo.frames, frameMaterial); add(geo.walls, wallMaterial);
+    bays.add(holder);
+    return { holder, bay, tier, pivot, outward: new THREE.Vector3(Math.cos(centre), 0, Math.sin(centre)), axis: new THREE.Vector3(-Math.sin(centre), 0, Math.cos(centre)) };
+  });
+  for (const piece of pieces) Object.values(piece.geo).forEach(g => g.dispose());
+
+  // Door frame + glow at the main entrance.
+  const doorGroup = new THREE.Group(); group.add(doorGroup);
+  const doorPost = own(new THREE.BoxGeometry(0.16, 3.1, 0.3));
+  for (const side of [-1, 1]) { const post = new THREE.Mesh(doorPost, frameMaterial); post.position.set(side * (PLAN.doorWidth / 2 + 0.08), 1.55, PLAN.outerRadius); doorGroup.add(post); }
+  const lintel = new THREE.Mesh(own(new THREE.BoxGeometry(PLAN.doorWidth + 0.4, 0.18, 0.3)), frameMaterial); lintel.position.set(0, 3.1, PLAN.outerRadius); doorGroup.add(lintel);
+  const doorGlow = new THREE.Mesh(own(new THREE.PlaneGeometry(PLAN.doorWidth * 1.4, 3)), own(new THREE.MeshBasicMaterial({ color: 0xffc38a, transparent: true, opacity: 0.18, depthWrite: false })));
+  doorGlow.position.set(0, 1.5, PLAN.outerRadius + 0.6); doorGroup.add(doorGlow);
+
+  // Interior dressing (instanced): ceiling lights, floor guidance, room doors.
+  const interior = new THREE.Group(); interior.name = "interior"; group.add(interior);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(1, 1, 1), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  const instanced = (geometry: THREE.BufferGeometry, material: THREE.Material, count: number, at: (i: number) => { angle: number; radius: number; y: number; yaw?: number }, name: string) => {
+    const mesh = new THREE.InstancedMesh(own(geometry), material, count); mesh.name = name;
+    for (let i = 0; i < count; i++) { const { angle, radius, y, yaw } = at(i); const [x, , z] = arcPoint(angle, radius, y); q.setFromAxisAngle(up, yaw ?? -angle); m.compose(p.set(x, y, z), q, s); mesh.setMatrixAt(i, m); }
+    interior.add(mesh); return mesh;
+  };
+  const lightCount = 40;
+  instanced(new THREE.BoxGeometry(0.4, 0.05, 1.2), own(new THREE.MeshBasicMaterial({ color: 0xeaf6f8 })), lightCount, i => ({ angle: routeAngle(i / (lightCount - 1)) - 0.02, radius: PLAN.corridorRadius, y: TIER_H - 0.06 }), "ceiling-lights");
+  const dashCount = 200;
+  instanced(new THREE.BoxGeometry(0.18, 0.02, 0.7), own(new THREE.MeshBasicMaterial({ color: 0x5ed3a0 })), dashCount, i => ({ angle: routeAngle(i / (dashCount - 1)), radius: PLAN.corridorRadius - 0.1, y: 0.03 }), "floor-guidance");
+  instanced(new THREE.BoxGeometry(1.1, 2.3, 0.1), own(new THREE.MeshStandardMaterial({ color: 0x111719, roughness: 0.6 })), 28, i => ({ angle: routeAngle((i + 0.5) / 28), radius: PLAN.roomWallRadius - 0.04, y: 1.15, yaw: -routeAngle((i + 0.5) / 28) + Math.PI / 2 }), "room-doors");
+  const exitSign = new THREE.Mesh(own(new THREE.BoxGeometry(0.9, 0.25, 0.06)), own(new THREE.MeshBasicMaterial({ color: 0x5ed3a0 })));
+  { const a = routeAngle(0.3); const [x, , z] = arcPoint(a, PLAN.roomWallRadius - 0.1, 2.75); exitSign.position.set(x, 2.75, z); exitSign.rotation.y = -a + Math.PI / 2; interior.add(exitSign); }
+
+  // Debris: 6 pieces per bay, instanced; positions are authored parabolas, not simulated.
+  const PER_BAY = 6, debrisCount = BAYS * PLAN.tiers * PER_BAY;
+  const debris = new THREE.InstancedMesh(own(new THREE.BoxGeometry(1, 1, 1)), own(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: 0.1 })), debrisCount);
+  debris.name = "debris"; debris.visible = false; debris.frustumCulled = false; group.add(debris);
+  const hash = (n: number) => { const v = Math.sin(n * 127.1 + 311.7) * 43758.5453; return v - Math.floor(v); };
+  const color = new THREE.Color();
+  const debrisSpec = Array.from({ length: debrisCount }, (_, i) => {
+    const holder = bayGroups[Math.floor(i / PER_BAY)];
+    const a = hash(i * 3.1) * Math.PI * 2, r = 3 + hash(i * 5.7) * 9;
+    debris.setColorAt(i, color.setHex(hash(i) > 0.5 ? 0x9cc9d1 : 0x59666a));
+    return { holder, land: new THREE.Vector3(holder.pivot.x + holder.outward.x * (6 + r * 0.5) + Math.cos(a) * r * 0.6, 0.2 + hash(i * 2.3) * 0.25, holder.pivot.z + holder.outward.z * (6 + r * 0.5) + Math.sin(a) * r * 0.6), size: 0.25 + hash(i * 9.1) * 0.7, spin: (hash(i * 4.4) - 0.5) * 8 };
+  });
+  if (debris.instanceColor) debris.instanceColor.needsUpdate = true;
+
+  const qa = new THREE.Quaternion(), qb = new THREE.Quaternion(), pos = new THREE.Vector3(), scl = new THREE.Vector3(), euler = new THREE.Euler();
+  let collapsing = false;
+  function setCollapsing(on: boolean) {
+    if (on === collapsing) return; collapsing = on;
+    whole.visible = !on; bays.visible = on; interior.visible = !on; debris.visible = on;
+    if (!on) for (const g of bayGroups) { g.holder.position.copy(g.pivot); g.holder.quaternion.identity(); g.holder.scale.set(1, 1, 1); }
   }
-  for (let level = 0; level < 3; level++) {
-    const floor = new THREE.Group(); floor.name = `floor-${level}`; floor.position.y = level * 3.6; group.add(floor); levels.push(floor);
-    box(floor, "floor-slab", [10.4, .22, 19.3], [0, -.11, -.65], mat.floor);
-    // Leave the stairwell open through every upper slab.
-    box(floor, "rear-floor-east", [7.55, .22, 6.7], [1.425, -.11, -13.65], mat.floor);
-    box(floor, "rear-floor-west", [.95, .22, 6.7], [-4.725, -.11, -13.65], mat.floor);
-    box(floor, "rear-cross-landing", [1.9, .22, .65], [-3.3, -.11, stairs.landingZ], mat.floor);
-    box(floor, "stair-exit-landing", [1.9, .22, .75], [-3.3, -.11, -10.675], mat.floor);
-    if (level === 0) box(floor, "ground-stair-base", [1.9, .22, 5.65], [-3.3, -.11, -13.125], mat.floor);
-    box(floor, "rear-wall", [10.4, 3.4, .18], [0, 1.7, -17], mat.wall);
-    box(floor, "west-spandrel", [.18, .9, 26], [-5.2, .45, -4], mat.wall);
-    box(floor, "west-header", [.18, .6, 26], [-5.2, 3.1, -4], mat.wall);
-    for (const z of [5, -1, -7]) {
-      const pierRear = z + 1.3, pierFront = Math.min(9, z + 4.7);
-      box(floor, "west-window-pier", [.18, 1.9, pierFront - pierRear], [-5.2, 1.85, (pierFront + pierRear) / 2], mat.wall);
-      box(floor, "west-window-sill", [.3, .1, 2.6], [-5.2, .95, z], mat.metal);
-    }
-    box(floor, "west-stair-wall", [.18, 1.9, 8.7], [-5.2, 1.85, -12.65], mat.wall);
-    box(floor, "east-spandrel", [.18, .9, 26], [5.2, .45, -4], mat.wall);
-    box(floor, "east-header", [.18, .6, 26], [5.2, 3.1, -4], mat.wall);
-    for (let bay = 0; bay < 9; bay++) {
-      const z = 8.5 - bay * 3;
-      box(floor, "facade-mullion", [.23, 2.1, .24], [5.2, 1.85, z], mat.metal);
-      if (bay < 3 || bay > 5) {
-        const front = Math.min(8.84, z - .15), rear = Math.max(-16.84, z - 2.85);
-        if (front > rear) box(floor, "facade-glazing", [.06, 1.85, front - rear], [5.2, 1.85, (front + rear) / 2], mat.glass);
-      }
-    }
-    roofs.push(box(floor, "ceiling", [10.4, .14, 26], [0, 3.27, -4], mat.wall));
-    for (const side of [-1, 1]) {
-      for (const z of [5, -1, -7]) {
-        const wall = new THREE.Group(); wall.position.set(side * 1.5, 0, z); floor.add(wall);
-        if (side === 1) cutawayShell.add(wall);
-        if (z === 5) box(wall, "entry-room-wall", [.16, 3.4, 1], [0, 1.7, 3.5], mat.wall);
-        // Jambs and lintel surround an actual open doorway, not a door pasted on a wall.
-        box(wall, "room-wall-a", [.16, 3.4, 2.1], [0, 1.7, 1.95], mat.wall);
-        box(wall, "room-wall-b", [.16, 3.4, 2.7], [0, 1.7, -1.65], mat.wall);
-        box(wall, "door-lintel", [.16, 1.1, 1.2], [0, 2.85, .3], mat.wall);
-        box(wall, "lower-wall-a", [.19, 1.03, 2.1], [0, .52, 1.95], mat.lower);
-        box(wall, "lower-wall-b", [.19, 1.03, 2.7], [0, .52, -1.65], mat.lower);
-        for (const jamb of [-.3, .9]) box(wall, "door-jamb", [.23, 2.35, .07], [0, 1.175, jamb], mat.metal);
-        box(wall, "door-head", [.23, .07, 1.27], [0, 2.35, .3], mat.metal);
-        const door = new THREE.Group(); door.position.set(side * .1, 0, -.25); door.rotation.y = side * 1.45; wall.add(door);
-        box(door, "door-leaf", [.075, 2.25, 1.1], [0, 1.125, .55], mat.door);
-        box(door, "door-glazing", [.081, .7, .32], [0, 1.6, .55], mat.glass);
-        box(door, "door-handle", [.14, .04, .16], [-side * .08, 1.05, .94], mat.metal);
-        const number = sign(wall, `${level + 1}0${Math.abs(z) + 1}`, [-side * .12, 2.62, .3], .5, "#263635"); number.rotation.y = -side * Math.PI / 2;
-        box(floor, "room-partition", [3.6, 3.4, .15], [side * 3.35, 1.7, z - 3], mat.wall);
-        box(floor, "desk-top", [1.4, .06, .7], [side * 3.2, .76, z], mat.door);
-        for (const dx of [-.6, .6]) box(floor, "desk-leg", [.05, .75, .6], [side * 3.2 + dx, .375, z], mat.metal);
-      }
-    }
-    for (const z of [7.8, 2, -4, -10]) {
-      for (const x of [-1.32, 1.32]) {
-        box(floor, "column", [.22, 3.2, .3], [x, 1.6, z], mat.lower);
-        box(floor, "skirting", [.05, .12, 5.5], [x * 1.075, .06, z - 2.8], mat.dark);
-      }
-      box(floor, "ceiling-beam", [2.8, .17, .32], [0, 3.1, z], mat.lower);
-      box(floor, "light-housing", [.25, .08, 1.2], [0, 3.12, z - 1.7], mat.metal);
-      box(floor, "fluorescent", [.16, .025, 1.1], [0, 3.065, z - 1.7], mat.lamp);
-      if (level === 0) { const light = new THREE.PointLight(0xd0e6dd, 4, 7, 2); light.position.set(0, 2.85, z - 1.7); floor.add(light); }
-    }
-    if (level < 2) {
-    for (let i = 0; i < stairs.count; i++) box(floor, "stair-tread", [1.35, stairs.rise, stairs.run], [stairs.x, (i + 1) * stairs.rise - .09, stairs.bottomZ - i * stairs.run], mat.lower);
-    box(floor, "stair-landing", [2.1, .18, .65], [stairs.x, 3.51, stairs.landingZ], mat.floor);
-    for (const x of [-4.23, -2.87]) {
-      rail(floor, new THREE.Vector3(x, .95, stairs.bottomZ), new THREE.Vector3(x, 4.37, stairs.bottomZ - 19 * stairs.run));
-      for (let i = 0; i < stairs.count; i += 3) rail(floor, new THREE.Vector3(x, (i + 1) * stairs.rise, stairs.bottomZ - i * stairs.run), new THREE.Vector3(x, (i + 1) * stairs.rise + .9, stairs.bottomZ - i * stairs.run));
-    }
-    }
-    sign(floor, "EXIT  ←", [0, 2.68, -10.3], .92);
-    sign(floor, `LEVEL 0${level + 1}`, [-4.1, 2.6, -16.86], 1.3, "#273c3b");
-    for (const x of [-1.32, 1.32]) box(floor, "threshold-jamb", [.18, 2.7, .2], [x, 1.35, -11.2], mat.metal);
-    box(floor, "threshold-header", [2.8, .25, .2], [0, 2.77, -11.2], mat.metal);
-    box(annotations, `scenario-zone-${level}`, [2.6, .04, 3], [2.8, level * 3.6 + .1, -5], mat.ember);
-    // Continuous structure between slabs: no floating, exploded floors.
-    for (const x of [-5.2, 5.2]) for (const z of [-17, -4, 9]) box(floor, "structural-pier", [.32, 3.6, .32], [x, 1.8, z], mat.lower);
-    box(floor, "front-left", [3.8, 3.6, .18], [-3.3, 1.8, 9], mat.wall);
-    box(floor, "front-right", [3.8, 3.6, .18], [3.3, 1.8, 9], mat.wall);
-    box(floor, "front-lintel", [2.8, .8, .18], [0, 3.2, 9], mat.lower);
-  }
-  box(levels[0], "burning-storage", [.52, .7, .65], [1.08, .35, 1.3], mat.soot);
-  box(levels[0], "burning-chair", [.55, .45, .55], [-1.05, .22, -7.2], mat.soot);
-  const plazaMaterial = mat.floor.clone(), pathMaterial = mat.lower.clone();
-  signMaterials.push(plazaMaterial, pathMaterial);
-  box(exterior, "plaza", [38, .15, 52], [0, -.3, -1], plazaMaterial);
-  box(exterior, "entry-path", [3.3, .08, 15], [0, -.16, 16], pathMaterial);
-  const spreadSources: FireSource[] = [];
-  // Burning debris along stair edges, leaving the authored walking centre clear.
-  for (let floor = 0; floor < 2; floor++) {
-    for (const [index, tread] of [3, 10, 17].entries()) {
-      spreadSources.push({
-        position: new THREE.Vector3(stairs.x - .52, floor * 3.6 + (tread + 1) * stairs.rise + .02, stairs.bottomZ - tread * stairs.run),
-        intensity: .35, color: new THREE.Color(0xff802c), exterior: true,
-        ignition: 8 + floor * 4 + index * 3, size: [.5, .75], drift: [-.1, -.25],
-      });
-    }
-    spreadSources.push({
-      position: new THREE.Vector3(stairs.x - .8, (floor + 1) * 3.6 + .02, stairs.landingZ),
-      intensity: .4, color: new THREE.Color(0xff802c), exterior: true,
-      ignition: 15 + floor * 4, size: [.7, .8], drift: [-.1, -.2],
-    });
-  }
-  for (const [i, z] of [4.1, -2.8, -8.5].entries()) {
-    // Low charred debris at the floor edge, not a row of storage bins.
-    box(levels[2], "scorched-corridor-floor", [.28, .012, 1.1], [1.18, .006, z], mat.soot);
-    spreadSources.push({ position: new THREE.Vector3(1.18, 7.23, z), intensity: .7,
-      color: new THREE.Color(0xff7826), ignition: 2 + i * 4, exterior: true,
-      size: [.65, .55 + i * .12] });
-  }
-  for (let i = 0; i < 6; i++) {
-    const z = 1.3 - i * .65;
-    box(levels[0], "burning-skirting", [.23, .22, .6], [1.25, .11, z], mat.soot);
-    spreadSources.push({ position: new THREE.Vector3(1.23, .18, z), intensity: .38, color: new THREE.Color(0xff762e), ignition: 2 + i * 2 });
-  }
-  // Each storey has different ignition rooms. Spread travels from furniture toward
-  // the opening, not up an identical vertical stack of facade flame sprites.
-  for (let level = 0; level < 3; level++) for (const side of [-1, 1]) {
-    for (let roomIndex = 0; roomIndex < 3; roomIndex++) {
-      const seed = level * 11 + roomIndex * 3 + side;
-      const z = [5, -1, -7][roomIndex] + Math.sin(seed) * .55;
-      const timeline = roomFireTimeline(level, side, roomIndex);
-      box(levels[level], "charred-room-furniture", [1.1, .48, .75], [side * 3.5, .24, z], mat.soot);
-      // Exterior fire uses the wall-bound volume, not floating crossed cards.
-      spreadSources.push({
-        position: new THREE.Vector3(side * 3.35, level * 3.6 + .48, z),
-        intensity: .65, color: new THREE.Color(0xff802c),
-        ignition: timeline.ignition, exterior: level > 0,
-        drift: [side * .25, Math.sin(seed * 1.7) * .55],
-        size: [1.8 + .45 * Math.sin(seed * 2.4), .9 + .2 * Math.cos(seed)],
-      });
-    }
-  }
-  const routePoints = [new THREE.Vector3(-3.5, .15, -12), new THREE.Vector3(0, .15, -12), new THREE.Vector3(0, .15, -5), new THREE.Vector3(2.8, .15, -5), new THREE.Vector3(2.8, 3.75, -5), new THREE.Vector3(2.8, 7.35, -5)];
-  const routeGeometry = new THREE.BufferGeometry().setFromPoints(routePoints); geometries.add(routeGeometry);
-  const routeMaterial = new THREE.LineBasicMaterial({ color: 0xee8654 }); signMaterials.push(routeMaterial);
-  annotations.add(new THREE.Line(routeGeometry, routeMaterial));
-  sign(annotations, "START", [-2.8, .8, -11], 1.1).rotation.y = .45;
-  annotations.visible = false;
-  const excluded = new Set([...roofs, ...cutawayShell]);
-  [...roofs, ...cutawayShell].forEach(root => root.traverse(child => excluded.add(child)));
-  levels.forEach(floor => batchStatic(floor, excluded).forEach(geometry => geometries.add(geometry)));
-  const damage = createBuildingDamage(levels, group, new Set([...roofs, ...cutawayShell]));
+
   return {
-    group,
-    updateDamage(time: number) {
-      annotations.visible = annotations.visible && time < 110;
-      return damage.update(time);
+    group, glass: glassMaterial,
+    /** Glass + mullions toggle for the lab (the whole-building meshes are named whole-*). */
+    setGlassVisible(visible: boolean) { wholeGlass.visible = visible; },
+    /**
+     * Apply the Organization demonstration at `time` seconds (0 resets the building completely). Returns the
+     * collapsed fraction (0 standing .. 1 down).
+     */
+    setDamage(time: number) {
+      setCollapsing(time >= COLLAPSE.start);
+      if (!collapsing) return 0;
+      let total = 0;
+      for (const g of bayGroups) {
+        const u = bayFall(time, g.tier, g.bay); total += u;
+        const drop = u * u * (g.pivot.y - 0.35);
+        const lean = (0.28 + 0.1 * (g.bay % 3)) * u * (1 + g.tier * 0.2);
+        g.holder.position.set(g.pivot.x + g.outward.x * 4.5 * Math.pow(u, 1.5), g.pivot.y - drop, g.pivot.z + g.outward.z * 4.5 * Math.pow(u, 1.5));
+        g.holder.quaternion.setFromAxisAngle(g.axis, lean);
+        const squash = 1 - 0.78 * smoothstep(0.72, 1, u);
+        g.holder.scale.set(1 + 0.08 * u, squash, 1 + 0.08 * u);
+        if (u > 0.999) g.holder.position.y = Math.min(g.holder.position.y, g.pivot.y - (g.pivot.y - 0.35 * squash) + 0.1);
+      }
+      debrisSpec.forEach((d, i) => {
+        const u = bayFall(time, d.holder.tier, d.holder.bay), fly = smoothstep(0, 0.9, u);
+        if (u <= 0.001) { debris.setMatrixAt(i, m.makeScale(0.0001, 0.0001, 0.0001)); return; }
+        pos.set(THREE.MathUtils.lerp(d.holder.pivot.x, d.land.x, fly), THREE.MathUtils.lerp(d.holder.pivot.y, d.land.y, fly * fly) + Math.sin(fly * Math.PI) * 2.2, THREE.MathUtils.lerp(d.holder.pivot.z, d.land.z, fly));
+        qa.setFromEuler(euler.set(u * d.spin, u * d.spin * 0.7, 0)); qb.identity(); qa.multiply(qb);
+        m.compose(pos, qa, scl.set(d.size, d.size * 0.6, d.size)); debris.setMatrixAt(i, m);
+      });
+      debris.instanceMatrix.needsUpdate = true;
+      return total / bayGroups.length;
     },
-    fireSources: [
-      { position: new THREE.Vector3(1.08, .45, 1.3), intensity: 1, color: new THREE.Color(0xff762e) },
-      { position: new THREE.Vector3(-1.05, .3, -7.2), intensity: .7, color: new THREE.Color(0xff984c) },
-      ...spreadSources,
-    ],
-    reveal(amount: number) {
-      levels.forEach((floor, i) => { floor.position.y = i * 3.6; floor.visible = i === 0 || amount > .01; });
-      roofs.forEach((roof, i) => { roof.visible = i === 2 || amount < .08; });
-      cutawayShell.forEach(part => { part.visible = amount < .5; });
-      exterior.visible = amount > .05;
-      annotations.visible = amount > .6;
-      routeGeometry.setDrawRange(0, Math.floor(THREE.MathUtils.clamp((amount - .6) / .4, 0, 1) * routePoints.length));
-    },
-    dispose() { damage.dispose(); geometries.forEach(g => g.dispose()); signMaterials.forEach(m => m.dispose()); textures.forEach(t => t.dispose()); mat.dispose(); group.clear(); },
+    dispose() { for (const item of disposables) item.dispose(); },
   };
 }
