@@ -1,5 +1,7 @@
 # Organization, Building, and IFC Workspace Implementation Plan
 
+> Tài liệu lịch sử: mô tả kế hoạch/thiết kế tại ngày trong tên file, không phải trạng thái source hiện hành. Trước khi dùng, đối chiếu [context FE](../../../.codex/context.md) và [tracker vận hành](../../fet3d-operations-ui-tracker.md), nhất là auth/session store, Google, AI và các blocker API đã thay đổi. Không chạy lại checklist chỉ vì nó còn trong kế hoạch này.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add authenticated Organization administration, Building management, and a signed IFC revision upload workspace backed by the deployed Fire3D API.

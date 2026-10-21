@@ -1,5 +1,7 @@
 # PlatformAdmin Organization console
 
+> Tài liệu lịch sử: mô tả kế hoạch/thiết kế tại ngày trong tên file, không phải trạng thái source hiện hành. Trước khi dùng, đối chiếu [context FE](../../../.codex/context.md) và [tracker vận hành](../../fet3d-operations-ui-tracker.md), nhất là auth/session store, Google, AI và các blocker API đã thay đổi. Không chạy lại checklist chỉ vì nó còn trong kế hoạch này.
+
 ## Goal
 
 Give `PlatformAdmin` a complete, API-backed console for the documented flow:
