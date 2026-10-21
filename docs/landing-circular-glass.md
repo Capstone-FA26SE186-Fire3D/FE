@@ -13,8 +13,8 @@ Scroll journey: aerial view of the three-storey circular glass building -> main 
 - **Organization**: camera backs off and rises to an orbit-able overview that fits the whole building at any yaw/pitch (`orgOverview`).
   Only this branch has the fire spread and collapse, on the authored clock fire from ~0:02, collapse 1:50 to ~2:20.
   Leaving the branch resets the clock and rebuilds the building. Continue navigates as before.
-- Static fallback (reduced motion, WebGL failure, context loss) shows posters `public/assets/landing-opening.webp` /
-  `landing-cutaway.webp` (captured from this scene) and both CTAs.
+- Static fallback (reduced motion, WebGL failure, context loss) shows posters `public/assets/landing-opening-v2.webp` /
+  `landing-cutaway-v2.webp` (captured from this scene) and both CTAs.
 
 ## Code map (`src/features/landing/`)
 

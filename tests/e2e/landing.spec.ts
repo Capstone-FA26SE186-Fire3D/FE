@@ -120,7 +120,7 @@ test('context loss gives a usable poster fallback, not a blank canvas', async ({
   await expect(page.locator('main')).toHaveAttribute('data-scene-mode', 'static');
   await expect(page.getByRole('status')).toContainText('Chế độ ảnh tĩnh');
   await expect(page.locator('canvas')).toHaveCount(0);
-  const poster = await page.request.get('/assets/landing-cutaway.webp');
+  const poster = await page.request.get('/assets/landing-cutaway-v2.webp');
   expect(poster.ok()).toBeTruthy();
   await page.getByRole('button', { name: 'Tôi muốn tập huấn', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Tiếp tục', exact: true })).toBeEnabled();
