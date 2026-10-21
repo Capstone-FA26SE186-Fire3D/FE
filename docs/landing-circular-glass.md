@@ -59,3 +59,8 @@ non-PlayerMale rigs; rigs and clips are being fixed separately. Rig/animation fi
 
 Real-device FPS (laptop iGPU, mid-range phone), contrast review, a Figma side-by-side pass, tablet visual review, Docs repository
 update, merge/release.
+
+## Release
+
+Merged to `develop` in #111 and to `main` in #112 on 2026-10-21 (`main` c310c87). Vercel did not create a Production deployment for that
+merge commit, so this note was released again to retrigger it; check the Vercel Deployments list for the commit that carries it.
