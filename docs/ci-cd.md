@@ -6,13 +6,13 @@ Repo FE độc lập: Root Directory trên Vercel là gốc repository (`.` ho�
 
 | Sự kiện | GitHub Actions | Vercel Git Integration |
 | --- | --- | --- |
-| PR vào `develop` hoặc `main` | Lint, build, typecheck, 3 smoke tests | Tạo Preview và ghi deployment check trên PR |
+| PR vào `develop` hoặc `main` | Lint, build, typecheck, kiểm thử public UI/auth/production RAG gate | Tạo Preview và ghi deployment check trên PR |
 | Push/merge vào `develop` | Chạy CI trên commit đã merge | Tạo Preview deployment |
 | Push/merge vào `main` | Chạy CI trên commit đã merge | Deploy Production |
 
 GitHub Actions chỉ kiểm tra code. Vercel đã liên kết repository nên tự tạo Preview/Production từ Git; workflow không cần gọi Vercel CLI hay dùng Vercel token. Git check Vercel trên PR có thể được bật làm required check nếu team muốn preview phải sẵn sàng trước khi merge; CI vẫn là check chất lượng code chính.
 
-CI chạy Node 22 và pnpm 10.28.2 theo frozen lockfile. Build chạy trước typecheck để Next.js tạo route types. Smoke tests gồm hai test brand/logo và một test RAG mock. Test đăng nhập demo cũ trong `smoke.spec.ts` không khớp Firebase login hiện tại nên chưa nằm trong CI gate. Đây chưa phải full E2E hoặc kiểm thử API/Firebase production.
+CI chạy Node 22 và pnpm 10.28.2 theo frozen lockfile. Build chạy trước typecheck để Next.js tạo route types. Bộ kiểm thử gồm brand/logo, auth/OTP/session-cookie với API mock và production RAG gate (demo `/demo/rag` phải trả 404). Test mở demo RAG ở development không chạy trong production gate; không dùng một test bị skip để báo đã kiểm contract RAG. Đây chưa phải full E2E hoặc kiểm thử API/Firebase production.
 
 ## Vercel
 
@@ -54,7 +54,7 @@ GitHub Environments không bắt buộc cho luồng này. Nếu muốn gắn rev
 
 Push nhánh task và mở PR vào `develop`; Actions chạy CI và Vercel tạo Preview từ commit PR. Xem status checks, đọc Preview URL trong Vercel/GitHub, kiểm tra UI và các flow cần API/Firebase thật. Sau khi PR merge vào `develop`, Vercel tạo Preview tích hợp. Chỉ mở PR `develop → main` sau khi tích hợp đạt; merge vào `main` tạo Production deployment.
 
-Trước khi phát hành, đồng bộ các commit đã có trên `main` trở lại `develop` qua PR. Lúc thiết kế workflow, `main` hơn `origin/develop` 16 commit; không reset/force-push để đưa nhánh về cùng trạng thái.
+Trước khi phát hành, đồng bộ các commit đã có trên `main` trở lại `develop` qua PR. Nhánh tích hợp CI đã đồng bộ các thay đổi mới trên `main` trước kiểm thử; không reset/force-push để đưa nhánh về cùng trạng thái.
 
 ## Tài liệu
 
