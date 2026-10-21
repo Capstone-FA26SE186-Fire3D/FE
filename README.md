@@ -1,6 +1,6 @@
 # Fire3D Web
 
-Website trải nghiệm Fire3D: landing POV dùng Three.js, thư viện Learn, các màn hình mẫu cho đăng nhập/Góc học tập và RAG demo.
+Web FET3D dùng Next.js App Router: landing/editor Three.js, khu Organization/PlatformAdmin, auth, Learn, billing, AI, lịch sử và playtest handoff. Gameplay Android chạy trong Mobile/Unity. [Tracker](docs/fet3d-operations-ui-tracker.md) phân biệt contract, FE integration và kiểm chứng API thật.
 
 ## Chạy local
 
@@ -13,16 +13,15 @@ Mở [http://localhost:5173](http://localhost:5173). RAG demo đọc `NEXT_PUBLI
 
 ## Xác thực
 
-Mặc định web chạy `NEXT_PUBLIC_AUTH_MODE=mock`, dùng tài khoản trải nghiệm cục bộ và không gọi backend. Đây là chế độ phù hợp khi database chưa có tài khoản khởi tạo.
+Web gọi .NET API qua `NEXT_PUBLIC_API_BASE_URL` (rỗng nghĩa là cùng origin); không còn adapter đăng nhập mock. Biến `NEXT_PUBLIC_AUTH_MODE` trong `.env.example` là cấu hình legacy, source auth hiện không đọc nó. Không dùng biến này để bật tài khoản mẫu.
 
-Khi backend đã seed tài khoản, tạo `.env.local` với:
+Local registration đi qua form → request/verify OTP → register → login riêng. Google dùng Firebase Web Authentication rồi exchange với .NET; source đã có onboarding, liên kết Google và đặt mật khẩu local đầu tiên. Cấu hình Firebase công khai theo `.env.example`; không đặt backend/provider secret vào `NEXT_PUBLIC_*`.
 
-```bash
-NEXT_PUBLIC_AUTH_MODE=api
-NEXT_PUBLIC_API_BASE_URL=https://fire3d-api-h3a5h2fgdvajfbcz.eastasia-01.azurewebsites.net
-```
+Token được lưu bằng cookie first-party `fire3d_session` do JavaScript quản lý, dùng chung giữa các tab; fallback `localStorage` khi cookie không ghi được hoặc payload quá lớn, và đọc `sessionStorage` cũ để tương thích. Đây không phải cookie HttpOnly hay phiên xác thực phía server. Client gửi Bearer token tới .NET; backend vẫn quyết định authorization. Xem `src/features/auth/session-store.ts` và `auth-session.tsx`.
 
-API mode gọi các endpoint Auth trong Swagger: login, refresh, logout, thông tin người dùng, quên mật khẩu và đặt lại mật khẩu. Frontend không có endpoint đăng ký và không thể tự tạo tài khoản được backend chấp nhận; PlatformAdmin đầu tiên phải do backend/database owner seed. Token chỉ được giữ trong `sessionStorage` của tab, không commit vào mã nguồn.
+Để thử API từ localhost khi deployment chỉ cho phép CORS origin cố định, chạy `next dev` với `FET3D_DEV_API_PROXY` là base URL backend đã được team cấp và `NEXT_PUBLIC_API_BASE_URL=` (rỗng). Xem `next.config.ts`. PlatformAdmin đầu tiên do backend/database owner khởi tạo.
+
+AI nghiệp vụ gọi .NET; RAG v2/FastAPI là service nội bộ được backend cấp quyền. `/demo/rag` và `NEXT_PUBLIC_RAG_API_URL` chỉ phục vụ demo legacy trong development; production trả 404 cho route này.
 
 ## Kiểm tra
 
@@ -39,7 +38,7 @@ Landing dùng một WebGL renderer, world/depth render target và scene volume r
 
 Prototype có chữ sơn chọn nhánh, điện thoại với màn hình sống, mặt cắt ba tầng và orbit bằng kéo/Arrow/Home. Nhánh tổ chức sạm dần ở 65–105 giây rồi sụp từng khu ở 110–143 giây; rời nhánh sẽ reset. Đây là hoạt cảnh minh họa, không phải mô phỏng kết cấu/cháy có kiểm định. Xem [trạng thái kiểm chứng](docs/landing-completion-plan.md) và [bài học kỹ thuật](.codex/lessons.md); chất lượng visual/hiệu năng chưa được nghiệm thu đầy đủ.
 
-Toàn bộ tài khoản, bài lưu và hội thoại trong các màn hình mẫu là dữ liệu minh họa lưu trong `sessionStorage`, không phải tài khoản production.
+Bài lưu, AI và lịch sử/kết quả trong Góc học tập dùng API backend; dữ liệu mock trong Playwright chỉ là fixture kiểm thử. Kiểm thử API/provider/thiết bị thật được ghi riêng, không suy từ UI hoặc build pass.
 
 ## Package manager
 

@@ -1,5 +1,7 @@
 # Firebase Auth and Accounts UI Implementation Plan
 
+> Tài liệu lịch sử: mô tả kế hoạch/thiết kế tại ngày trong tên file, không phải trạng thái source hiện hành. Trước khi dùng, đối chiếu [context FE](../../../.codex/context.md) và [tracker vận hành](../../fet3d-operations-ui-tracker.md), nhất là auth/session store, Google, AI và các blocker API đã thay đổi. Không chạy lại checklist chỉ vì nó còn trong kế hoạch này.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace mock authentication with Firebase ID-token exchange and add live PlatformAdmin account administration.

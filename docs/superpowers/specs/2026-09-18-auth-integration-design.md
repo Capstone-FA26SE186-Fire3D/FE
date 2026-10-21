@@ -1,5 +1,7 @@
 # Auth integration design
 
+> Tài liệu lịch sử: mô tả kế hoạch/thiết kế tại ngày trong tên file, không phải trạng thái source hiện hành. Trước khi dùng, đối chiếu [context FE](../../../.codex/context.md) và [tracker vận hành](../../fet3d-operations-ui-tracker.md), nhất là auth/session store, Google, AI và các blocker API đã thay đổi. Không chạy lại checklist chỉ vì nó còn trong kế hoạch này.
+
 ## Goal
 
 Replace the login-only demo boundary with an authentication feature that can run in either local mock mode or against Fire3D API v1. The existing Learn bookmarks and sample chat remain browser-only prototype data; this change does not claim to persist them to the backend.

@@ -1,5 +1,7 @@
 # Firebase Auth and Accounts design
 
+> Tài liệu lịch sử: mô tả kế hoạch/thiết kế tại ngày trong tên file, không phải trạng thái source hiện hành. Trước khi dùng, đối chiếu [context FE](../../../.codex/context.md) và [tracker vận hành](../../fet3d-operations-ui-tracker.md), nhất là auth/session store, Google, AI và các blocker API đã thay đổi. Không chạy lại checklist chỉ vì nó còn trong kế hoạch này.
+
 ## Goal
 
 Replace the Fire3D web's mock authentication with the live Firebase-to-Fire3D token exchange and provide a PlatformAdmin account-management screen backed by the deployed Swagger contract.
