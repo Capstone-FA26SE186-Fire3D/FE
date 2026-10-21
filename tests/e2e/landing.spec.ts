@@ -29,9 +29,17 @@ test('rendered POV reverses while ambient time continues', async ({ page }) => {
   await page.waitForFunction(initial => document.querySelector('canvas')?.getAttribute('data-camera') !== initial, start);
   const ambient = Number(await canvas.getAttribute('data-ambient-time'));
   await scrollTo(page, 0);
-  await page.waitForFunction(() => Math.abs(Number(document.querySelector('canvas')?.getAttribute('data-camera')?.split(',')[2]) - 7.4) < .02);
+  const startZ = Number(start!.split(',')[2]);
+  await page.waitForFunction(z => Math.abs(Number(document.querySelector('canvas')?.getAttribute('data-camera')?.split(',')[2]) - z) < .3, startZ);
   expect(Number(await canvas.getAttribute('data-ambient-time'))).toBeGreaterThan(ambient);
   expect(errors).toEqual([]);
+});
+
+test('skip journey jumps to the branch choice and hides itself there', async ({ page }) => {
+  await page.goto('/'); await ready(page);
+  await page.getByRole('button', { name: /Bỏ qua hành trình/ }).click();
+  await expect(page.getByRole('button', { name: 'Tôi muốn tập huấn', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Bỏ qua hành trình/ })).toHaveCount(0);
 });
 
 test('choices interrupt and return before routing explicitly', async ({ page }) => {

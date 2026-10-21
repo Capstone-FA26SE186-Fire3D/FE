@@ -10,15 +10,19 @@ type Props = {
   onStatus: (status: "ready" | "transitioning" | "settled" | "error", detail?: string) => void;
   snapshotRef: MutableRefObject<(() => string) | null>;
   choiceRefs: MutableRefObject<Partial<Record<NonNullable<LandingBranch>, HTMLButtonElement | null>>>;
+  /** Called when the adaptive quality tier changes ("low" means the scene dropped to its cheapest effects). */
+  onTier?: (tier: string) => void;
 };
 
 /** Render at most about 60 frames per second, even on 120/144/240 Hz displays. */
 const TARGET_FRAME_MS = 1000 / 60;
 
-export function BuildingScene({ input, onStatus, snapshotRef, choiceRefs }: Props) {
+export function BuildingScene({ input, onStatus, snapshotRef, choiceRefs, onTier }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef(onStatus);
   useEffect(() => { statusRef.current = onStatus; }, [onStatus]);
+  const tierRef = useRef(onTier);
+  useEffect(() => { tierRef.current = onTier; }, [onTier]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -27,9 +31,9 @@ export function BuildingScene({ input, onStatus, snapshotRef, choiceRefs }: Prop
     const canvas = document.createElement("canvas");
     canvas.className = "building-canvas";
     canvas.setAttribute("role", "img");
-    canvas.setAttribute("aria-label", "Công trình FET3D ba tầng, hành lang và cầu thang");
+    canvas.setAttribute("aria-label", "Công trình kính hình tròn ba tầng của FET3D, hành lang vòng cung và sảnh chọn hành trình");
     let disposed = false, runtime: LandingRuntime | null = null, frame = 0;
-    let visible = true, lastTime = 0, status = "", lastBranch: LandingBranch = null;
+    let visible = true, lastTime = 0, status = "", lastBranch: LandingBranch = null, lastTier = "";
     // Display refresh estimate: on fast displays render every nth tick, not every tick.
     let lastTick = 0, skip = 1, tick = 0, estimated = false;
     const tickSamples: number[] = [];
@@ -71,6 +75,7 @@ export function BuildingScene({ input, onStatus, snapshotRef, choiceRefs }: Prop
         if (lastBranch !== input.current.branch) { lastBranch = input.current.branch; report("transitioning"); }
         report(input.current.branch ? result.settled ? "settled" : "transitioning" : "ready");
         if (canvas.dataset.state !== status) canvas.dataset.state = status;
+        if (canvas.dataset.tier && canvas.dataset.tier !== lastTier) { lastTier = canvas.dataset.tier; tierRef.current?.(lastTier); }
         frame = requestAnimationFrame(render);
       } catch (error) {
         console.error("[Fire3D:render]", error); report("error", "render");
@@ -95,7 +100,8 @@ export function BuildingScene({ input, onStatus, snapshotRef, choiceRefs }: Prop
         host.appendChild(canvas);
         await document.fonts.load('600 65px "Be Vietnam Pro"');
         if (disposed) return;
-        runtime = createLandingRuntime(canvas, window.matchMedia("(max-width: 767px)").matches);
+        runtime = await createLandingRuntime(canvas, window.matchMedia("(max-width: 767px)").matches);
+        if (disposed) { runtime.dispose(); runtime = null; return; }
         snapshotRef.current = runtime.snapshot;
         resize(); resizeObserver.observe(canvas); intersection.observe(canvas);
         canvas.addEventListener("webglcontextlost", contextLost);

@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowUpRight, Building2, Smartphone } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Building2, ChevronRight, Smartphone } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { SiteHeader } from "@/layouts/site-header";
@@ -17,7 +17,7 @@ import { OrbitSurface } from "./orbit-surface";
 const BuildingScene = dynamic(() => import("./building-scene").then(m => m.BuildingScene), { ssr: false });
 type Mode = "loading" | "motion" | "static";
 type Status = "ready" | "transitioning" | "settled" | "error";
-const locations = ["Tầng trệt / hành lang phía đông", "Tầng trệt / khu phòng học", "Tầng trệt / điểm tập dượt", "Tầng trệt / sảnh cầu thang", "Sảnh kết nối / chọn hành trình"];
+const locations = ["Toàn cảnh / lối vào chính", "Tầng trệt / cửa chính và sảnh", "Tầng trệt / hành lang ¾ vòng", "Tầng trệt / sảnh phân nhánh", "Sảnh kết nối / chọn hành trình"];
 
 export function LandingExperience({ panels }: { panels: ReactNode[] }) {
   const router = useRouter();
@@ -33,6 +33,7 @@ export function LandingExperience({ panels }: { panels: ReactNode[] }) {
   const [mode, setMode] = useState<Mode>("loading");
   const [status, setStatus] = useState<Status>("ready");
   const [failure, setFailure] = useState(false);
+  const [lowQuality, setLowQuality] = useState(false);
 
   useEffect(() => {
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -51,7 +52,7 @@ export function LandingExperience({ panels }: { panels: ReactNode[] }) {
       const progress = Math.max(0, Math.min(1, -element.getBoundingClientRect().top / Math.max(1, element.offsetHeight - window.innerHeight)));
       input.current.progress = progress;
       if (progressBar.current) progressBar.current.style.transform = `scaleX(${Math.max(.015, progress)})`;
-      const next = progress < .14 ? 0 : progress < .34 ? 1 : progress < .54 ? 2 : progress < .82 ? 3 : 4;
+      const next = progress < .14 ? 0 : progress < .34 ? 1 : progress < .62 ? 2 : progress < .88 ? 3 : 4;
       if (next !== stepRef.current) {
         stepRef.current = next; setStep(next);
         if (next < 4) { input.current.branch = null; setBranch(null); }
@@ -71,6 +72,11 @@ export function LandingExperience({ panels }: { panels: ReactNode[] }) {
   function handleStatus(value: Status, detail?: string) {
     setStatus(value);
     if (value === "error") { setFailure(true); setMode("static"); console.warn("[Fire3D:fallback]", detail); }
+  }
+  /** Jump to the branch choice without scrolling through the whole journey (instant, so reduced-motion users are unaffected). */
+  function skipJourney() {
+    const element = journey.current;
+    if (element) window.scrollTo({ top: (element.offsetHeight - window.innerHeight) * .93, behavior: "instant" });
   }
   function continueJourney() {
     if (!branch || (mode !== "static" && status !== "settled")) return;
@@ -98,7 +104,8 @@ export function LandingExperience({ panels }: { panels: ReactNode[] }) {
     <div className={styles.header}><SiteHeader /></div>
     <section ref={journey} className={styles.journey} aria-label="Hành trình làm quen FET3D">
       <div className={styles.stage}>
-        <div className={styles.world}>{mode === "motion" && <BuildingScene input={input} onStatus={handleStatus} snapshotRef={snapshot} choiceRefs={choiceRefs} />}</div>
+        <div className={styles.world}>{mode === "motion" && <BuildingScene input={input} onStatus={handleStatus} snapshotRef={snapshot} choiceRefs={choiceRefs} onTier={tier => setLowQuality(tier === "low")} />}</div>
+        {!staticMode && step < 4 && <button type="button" className={styles.skip} onClick={skipJourney}>Bỏ qua hành trình <ChevronRight size={16} aria-hidden="true" /></button>}
         {!staticMode && step === 4 && !branch && <div className={styles.wallTargets}>
           <button ref={node => { choiceRefs.current.trainee = node; }} className={styles.wallTarget} onPointerDown={event => event.preventDefault()} onClick={() => choose("trainee")} aria-label="Tôi muốn tập huấn" />
           <button ref={node => { choiceRefs.current.organization = node; }} className={styles.wallTarget} onPointerDown={event => event.preventDefault()} onClick={() => choose("organization")} aria-label="Tôi muốn tổ chức tập huấn" />
@@ -112,10 +119,10 @@ export function LandingExperience({ panels }: { panels: ReactNode[] }) {
           {staticMode ? <>{panels.map((panel, i) => <section className={styles.panel} key={i}>{panel}</section>)}{choice}</> :
             <div className={styles.panel} key={step === 4 ? "choice" : step}>{step < 4 ? panels[step] : choice}</div>}
         </div>
-        {(mode === "loading" || failure) && <p className={styles.status} role="status">{failure ? "Chế độ ảnh tĩnh · trải nghiệm 3D hiện chưa khả dụng" : "Đang chuẩn bị không gian…"}</p>}
+        {(mode === "loading" || failure || (lowQuality && mode === "motion")) && <p className={styles.status} role="status">{failure ? "Chế độ ảnh tĩnh · trải nghiệm 3D hiện chưa khả dụng" : lowQuality && mode === "motion" ? "Chế độ tiết kiệm · giảm hiệu ứng để giữ độ mượt" : "Đang chuẩn bị không gian…"}</p>}
         <div className={styles.hud}>
           <span>0{Math.min(step + 1, 4)} <span className={styles.track}><i ref={progressBar} /></span> 04</span>
-          <span><Building2 size={14} />{branch === "organization" ? "Toàn cảnh / 03 tầng" : branch === "trainee" ? "Trải nghiệm trên Android" : locations[step]}</span>
+          <span><Building2 size={14} />{branch === "organization" ? "Toàn cảnh / 03 tầng" : branch === "trainee" ? "Điện thoại ngang / Android" : locations[step]}</span>
         </div>
       </div>
     </section>

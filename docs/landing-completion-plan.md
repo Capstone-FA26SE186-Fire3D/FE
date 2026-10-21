@@ -1,5 +1,7 @@
 # Landing completion — acceptance ledger
 
+> Historical (rectangular-building scene). The 3D scene was replaced by the circular glass landing on 2026-10-21; see [landing-circular-glass.md](landing-circular-glass.md). Items below describe the removed scene.
+
 Source of truth: ../../Docs/fire3d-web-ux-design.md and the approved corrective plan.
 Direction: cinematic semi-realistic architecture, physically coherent scale and convincing materials/light. No backend management or web gameplay.
 
