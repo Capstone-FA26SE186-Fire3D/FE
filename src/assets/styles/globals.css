@@ -292,9 +292,9 @@ button { cursor: pointer; }
 }
 
 /* Article reader: secondary reading beside the current article. */
-.reader-layout { display: grid; grid-template-columns: minmax(0, 780px) minmax(260px, 1fr); align-items: start; gap: 56px; }
+.reader-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; align-items: start; gap: 32px; }
 .reader-layout .article-reading { min-width: 0; }
-.reader-related { position: sticky; top: 32px; min-width: 0; }
+.reader-related { min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
 .reader-related h2 { margin: 0 0 10px; color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
 .reader-related-note { margin: 0 0 20px; color: var(--dim); font-size: 11px; }
 .reader-related ul { list-style: none; margin: 0; padding: 0; }
@@ -309,8 +309,7 @@ button { cursor: pointer; }
 .reader-related-link:hover strong, .reader-related-all:hover { color: var(--ember); }
 .reader-related-all { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; margin-top: 8px; color: var(--muted); font-size: 12px; }
 @media (max-width: 1023px) {
-  .reader-layout { grid-template-columns: minmax(0, 1fr); gap: 40px; }
-  .reader-related { position: static; padding-top: 28px; border-top: 1px solid var(--line); }
+  .reader-layout { grid-template-columns: minmax(0, 1fr); gap: 24px; }
 }
 
 /* Organization screens share the personal workspace navigation. */
