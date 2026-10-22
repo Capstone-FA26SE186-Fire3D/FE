@@ -1,7 +1,7 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { accountsApi } from "@/features/accounts/api";
 import { analyticsApi } from "../api";
-import type { AnalyticsScope } from "../types";
+import type { AnalyticsScope, OperationsReport } from "../types";
 import { OperationsReportView } from "./operations-report";
 import { PeriodMeta, RangeBar, RangeError, useAnalyticsRange } from "./range";
 import { ReportShell } from "./report-shell";
@@ -32,7 +32,7 @@ const ROLE: Record<AnalyticsVariant, 0 | 1> = { organization: 1, platform: 0, "a
  * One reporting screen for the three scopes: the caller's own organization, the whole platform and one organization seen
  * by an Admin. The tenant is chosen by the route and the session, never by a client filter; the period is the only query.
  */
-export function AnalyticsWorkspace({ variant, organizationId, title, description, breadcrumbs }: { variant: AnalyticsVariant; organizationId?: string; title: string; description: string; breadcrumbs: Crumb[] }) {
+export function AnalyticsWorkspace({ variant, organizationId, title, description, breadcrumbs, sectionHeading, onOperations }: { variant: AnalyticsVariant; organizationId?: string; title: string; description: string; breadcrumbs: Crumb[]; /** Render as a section of a larger page (an h2 plus the refresh button) instead of the page header. */ sectionHeading?: boolean; /** Receives each loaded operations report so a page around this one can show headline figures without a second request. */ onOperations?: (report: OperationsReport) => void }) {
   const { accessToken, ready, user } = useAuthSession();
   const { urlFrom, urlTo, hasRange, error: rangeError, range, get, setParams, apply } = useAnalyticsRange();
   const tabs = TABS[variant];
@@ -48,6 +48,9 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
   const revenue = useAsyncData(`revenue:${key}`, (signal) => analyticsApi.revenue(accessToken as string, range, signal), enabled && tab === "revenue" && variant === "platform", { keepWhenDenied: true });
   const names = useAsyncData("analytics:organization-names", () => accountsApi.organizations(accessToken as string).then((page) => new Map(page.items.map((item) => [item.id, item.name]))), enabled && tab === "training" && variant === "platform");
 
+  const operationsData = operations.data;
+  useEffect(() => { if (operationsData) onOperations?.(operationsData); }, [operationsData, onOperations]);
+
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
   if (user?.role !== ROLE[variant]) return <Alert tone="danger" title="Không có quyền truy cập">{variant === "organization" ? "Báo cáo này dành cho tài khoản tổ chức." : "Chỉ PlatformAdmin có thể xem báo cáo này."}</Alert>;
 
@@ -55,13 +58,12 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
   const meta = active.data;
   const identity = variant === "admin-organization" ? (training.data?.organization ?? operations.data?.organization ?? null) : null;
 
+  const refresh = <Button variant="quiet" onClick={active.reload} disabled={active.loading || Boolean(rangeError)}><RefreshCw size={16} aria-hidden="true" />{active.loading ? "Đang tải…" : "Tải lại"}</Button>;
+
   return <>
-    <PageHeader
-      title={title}
-      description={description}
-      breadcrumbs={breadcrumbs}
-      actions={<Button variant="quiet" onClick={active.reload} disabled={active.loading || Boolean(rangeError)}><RefreshCw size={16} aria-hidden="true" />{active.loading ? "Đang tải…" : "Tải lại"}</Button>}
-    />
+    {sectionHeading
+      ? <div className="ops-page-header" style={{ marginBottom: 14 }}><div><h2 className="adm-section-title" style={{ margin: 0 }}>{title}</h2><p className="ops-muted" style={{ marginTop: 6 }}>{description}</p></div><div className="ops-actions">{refresh}</div></div>
+      : <PageHeader title={title} description={description} breadcrumbs={breadcrumbs} actions={refresh} />}
 
     <RangeBar key={`${urlFrom}|${urlTo}`} urlFrom={urlFrom} urlTo={urlTo} onApply={apply} />
     <PeriodMeta data={meta} hasRange={hasRange} urlFrom={urlFrom} urlTo={urlTo} />

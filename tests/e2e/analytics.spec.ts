@@ -203,7 +203,7 @@ test.describe("organization analytics", () => {
 });
 
 test.describe("admin analytics", () => {
-  test("overview tabs: training with organization names and links, revenue per currency, nothing is requested until a tab opens", async ({ page }) => {
+  test("overview tabs: training with organization names and links, revenue per currency, revenue is requested only when its tab opens", async ({ page }) => {
     const urls: string[] = [];
     await signIn(page, admin);
     await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Trường An Toàn", slug: "an-toan", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }], totalCount: 1, page: 1, pageSize: 100 } }));
@@ -215,7 +215,8 @@ test.describe("admin analytics", () => {
     await page.goto("/admin/overview");
     await expect(page.locator(".ops-stat", { hasText: "Tài khoản (hiện tại)" }).locator("strong")).toHaveText("45");
     await expect(page.locator("#ops-main").getByText("Chờ BE")).toHaveCount(0);
-    expect(urls).toEqual(["/api/admin/analytics/operations"]);
+    // The report section asks for operations; the "Phiên 30 ngày" tile reads the default training report. Revenue waits for its tab.
+    expect([...urls].sort()).toEqual(["/api/admin/analytics/operations", "/api/admin/analytics/training"]);
 
     await page.getByRole("tab", { name: "Huấn luyện" }).click();
     await expect(page.getByRole("link", { name: "Trường An Toàn" })).toHaveAttribute("href", "/admin/organizations/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/analytics");
@@ -284,7 +285,7 @@ test.describe("admin analytics", () => {
     await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [{ id: "org-1", name: "Fire3D Lab", slug: "fire3d-lab", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }], totalCount: 1, page: 1, pageSize: 20 } }));
     await page.route("**/api/organizations/org-1", (route) => route.fulfill({ json: { id: "org-1", name: "Fire3D Lab", slug: "fire3d-lab", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }, headers: { ETag: '"1"' } }));
     await page.goto("/admin/organizations?organization=org-1");
-    await expect(page.getByRole("dialog", { name: "Thông tin tổ chức" }).getByRole("link", { name: "Xem báo cáo" })).toHaveAttribute("href", "/admin/organizations/org-1/analytics");
+    await expect(page.getByRole("region", { name: "Thông tin tổ chức" }).getByRole("link", { name: "Xem báo cáo" })).toHaveAttribute("href", "/admin/organizations/org-1/analytics");
   });
 });
 
