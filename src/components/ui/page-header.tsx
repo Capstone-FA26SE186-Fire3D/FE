@@ -16,9 +16,9 @@ export function Breadcrumbs({ items }: { items: Crumb[] }) {
   </ol></nav>;
 }
 
-export function PageHeader({ title, description, breadcrumbs, actions }: { title: string; description?: string; breadcrumbs?: Crumb[]; actions?: ReactNode }) {
+export function PageHeader({ title, description, breadcrumbs, actions, eyebrow }: { title: string; description?: string; breadcrumbs?: Crumb[]; actions?: ReactNode; eyebrow?: string }) {
   return <>
     {breadcrumbs && breadcrumbs.length > 0 && <Breadcrumbs items={breadcrumbs} />}
-    <header className="ops-page-header"><div><h1>{title}</h1>{description && <p>{description}</p>}</div>{actions && <div className="ops-actions">{actions}</div>}</header>
+    <header className="ops-page-header"><div>{eyebrow && <p className="ops-eyebrow">{eyebrow}</p>}<h1>{title}</h1>{description && <p>{description}</p>}</div>{actions && <div className="ops-actions">{actions}</div>}</header>
   </>;
 }

@@ -75,7 +75,7 @@ class ReviewServer {
 
   list(url: URL) {
     const query = url.searchParams;
-    this.listQueries.push(query);
+    if (query.get("pageSize") !== "1") this.listQueries.push(query); // pageSize=1 is the per-status total probe of the KPI tiles
     const status = query.get("status");
     if (status && !["Submitted", "Approved", "Rejected"].includes(status)) return { status: 400, body: { title: "Review validation failed.", code: "VALIDATION_ERROR" } };
     const organizationId = query.get("organizationId");
@@ -161,7 +161,8 @@ const baseSeeds = (): Seed[] => [
   { n: 4, status: "Rejected", scenarioName: "Thoát nạn tầng hầm", reason: "Thiếu tiêu chí thời gian phản ứng." },
 ];
 
-const drawer = (page: Page) => page.getByRole("dialog", { name: "Chi tiết bản duyệt" });
+const drawer = (page: Page) => page.getByRole("region", { name: "Chi tiết bản duyệt" });
+const chip = (page: Page, name: RegExp) => page.getByRole("group", { name: "Trạng thái duyệt" }).getByRole("button", { name });
 const rows = (page: Page) => page.getByTestId("review-row");
 
 test.describe("queue", () => {
@@ -175,7 +176,7 @@ test.describe("queue", () => {
     await expect(rows(page)).toHaveCount(2);
     expect(server.listQueries[0].get("status")).toBe("Submitted");
     expect(server.listQueries[0].get("pageSize")).toBe("20");
-    for (const heading of ["Tổ chức", "Công trình", "Kịch bản", "Phiên bản", "Người gửi", "Gửi lúc", "Trạng thái"]) await expect(page.getByRole("columnheader", { name: heading, exact: true })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Tổng theo trạng thái" })).toContainText("Tổng từ máy chủ");
     const first = rows(page).first();
     await expect(first).toContainText("Công ty Sao Mai"); // newest submittedAt first
     await expect(first).toContainText("Kho hàng");
@@ -190,13 +191,13 @@ test.describe("queue", () => {
     await page.goto("/admin/reviews");
     await expect(rows(page)).toHaveCount(2);
 
-    await page.getByLabel("Trạng thái duyệt").selectOption("Approved");
+    await chip(page, /^Đã duyệt/).click();
     await expect(page).toHaveURL(/status=Approved/);
     await expect(rows(page)).toHaveCount(1);
     await expect(rows(page).first()).toContainText("Mất điện và khói");
     await expect(rows(page).first()).toContainText("Đã duyệt nội dung");
 
-    await page.getByLabel("Trạng thái duyệt").selectOption("all");
+    await chip(page, /^Tất cả/).click();
     await expect(page).toHaveURL(/status=all/);
     await expect(rows(page)).toHaveCount(4);
     expect(server.listQueries.at(-1)?.has("status")).toBe(false);
@@ -207,7 +208,7 @@ test.describe("queue", () => {
     expect(server.listQueries.at(-1)?.get("organizationId")).toBe(ORG_2);
 
     await page.reload();
-    await expect(page.getByLabel("Trạng thái duyệt")).toHaveValue("all");
+    await expect(chip(page, /^Tất cả/)).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("combobox", { name: "Tổ chức" })).toHaveValue(ORG_2);
     await expect(rows(page)).toHaveCount(1);
 
@@ -240,9 +241,9 @@ test.describe("queue", () => {
     await install(page, server);
     await page.goto("/admin/reviews");
     await expect(page.getByText("Chưa có kịch bản nào chờ duyệt")).toBeVisible();
-    await page.getByLabel("Trạng thái duyệt").selectOption("Approved");
+    await chip(page, /^Đã duyệt/).click();
     await expect(rows(page)).toHaveCount(1);
-    await page.getByLabel("Trạng thái duyệt").selectOption("Rejected");
+    await chip(page, /^Từ chối/).click();
     await expect(page.getByText("Không có bản duyệt phù hợp.")).toBeVisible();
 
     server.faults.listStatus = 500;
@@ -285,7 +286,7 @@ test.describe("detail", () => {
     const dialog = drawer(page);
     await expect(dialog.getByRole("heading", { name: /Sơ tán giờ ra chơi · v2/ })).toBeVisible();
     await expect(dialog.getByText("Trường THPT Lê Quý Đôn · Nhà A")).toBeVisible();
-    await expect(dialog.getByText("Nguyễn Văn A (gửi)")).toBeVisible();
+    await expect(dialog.getByText(`${target.submittedBy.slice(0, 8)}…`).first()).toBeVisible(); // ids only: the API has no display names
     await expect(dialog.locator(".rev-hash", { hasText: target.scenarioVersionId })).toBeVisible();
 
     const contentHash = dialog.getByTestId("hash-content");
@@ -358,7 +359,7 @@ test.describe("detail", () => {
     const dialog = drawer(page);
     await expect(dialog.getByTestId("decision-result")).toContainText("đã bị từ chối");
     await expect(dialog.getByTestId("reject-reason")).toContainText("Thiếu tiêu chí thời gian phản ứng.");
-    await expect(dialog.getByText("Quản trị Duyệt")).toBeVisible();
+    await expect(dialog.getByText(`${ADMIN_ID.slice(0, 8)}…`)).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Duyệt nội dung" })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "Từ chối", exact: true })).toHaveCount(0);
   });

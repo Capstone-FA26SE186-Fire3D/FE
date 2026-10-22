@@ -1,7 +1,6 @@
 "use client";
 
 import { Landmark, Plus, RefreshCw, Search } from "lucide-react";
-import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { ApiError } from "@/api";
 import { useAsyncData } from "@/api/use-async-data";
@@ -16,6 +15,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Pagination, Table, TableMessage } from "@/components/ui/table";
+import { DetailPane, Split } from "@/features/admin-overview/components/admin-kit";
+import { formatCount } from "@/features/admin-overview/format";
 import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
@@ -31,9 +32,7 @@ function slugify(value: string) {
   return value.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-const formatDate = (value: string) => new Date(value).toLocaleString("vi-VN");
-const buildingsHref = (id: string) => `${routes.adminOrganizations}/${id}/buildings`;
-const ownersHref = (id: string) => `${routes.adminAccounts}?organizationId=${id}`;
+const formatDate = (value: string) => new Date(value).toLocaleDateString("vi-VN");
 
 type CreateErrors = { name?: string; slug?: string };
 
@@ -131,49 +130,61 @@ export function OrganizationsAdmin() {
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
   if (user?.role !== 0) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin có thể quản lý tổ chức.</Alert>;
 
+  const selected = items.find((organization) => organization.id === selectedId);
+
   return <>
     <PageHeader
+      eyebrow="Quản lý hệ thống"
       title="Tổ chức"
-      description="Tạo tổ chức, kiểm soát trạng thái và cấp OrganizationUser owner trước khi mở không gian công trình."
+      description="Hồ sơ tổ chức, công trình và tài khoản của từng tổ chức. Tạo tổ chức rồi cấp OrganizationUser owner trước khi mở không gian công trình."
       breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Tổ chức" }]}
       actions={<><Button variant="quiet" onClick={list.reload} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />{list.loading ? "Đang tải…" : "Tải lại"}</Button><Button onClick={() => { resetCreate(); setCreating(true); }}><Plus size={16} aria-hidden="true" />Tạo tổ chức</Button></>}
     />
 
-    <div className="ops-toolbar">
-      <div className="ops-field ops-toolbar-grow" style={{ position: "relative" }}>
-        <label htmlFor="organization-search" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Tìm tổ chức</label>
-        <Search size={16} aria-hidden="true" style={{ position: "absolute", left: 12, top: 13, color: "var(--dim)" }} />
-        <Input id="organization-search" style={{ paddingLeft: 36 }} placeholder="Tên hoặc slug" value={searchText} onChange={(event) => setSearchText(event.target.value)} />
+    <div className="adm-filters">
+      <div className="adm-search">
+        <label htmlFor="organization-search" className="sr-only">Tìm tổ chức</label>
+        <Search size={16} aria-hidden="true" />
+        <Input id="organization-search" placeholder="Tìm theo tên hoặc slug" value={searchText} onChange={(event) => setSearchText(event.target.value)} />
       </div>
-      <Select aria-label="Trạng thái" style={{ width: 180 }} value={active} onChange={(event) => setParams({ status: event.target.value })}>
-        <option value="">Mọi trạng thái</option><option value="true">Đang hoạt động</option><option value="false">Đã vô hiệu hóa</option>
+      <Select aria-label="Trạng thái" data-w style={{ width: 190 }} value={active} onChange={(event) => setParams({ status: event.target.value })}>
+        <option value="">Trạng thái: tất cả</option><option value="true">Đang hoạt động</option><option value="false">Đã vô hiệu hóa</option>
       </Select>
     </div>
 
     {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tổ chức" action={<RetryButton error={list.error} onRetry={list.reload} />}>{describeApiError(list.error, "Không tải được danh sách tổ chức. Hãy thử lại sau.")}</Alert>}
 
-    <Table caption="Danh sách tổ chức">
-      <thead><tr><th>Tổ chức</th><th>Trạng thái</th><th>Tạo lúc</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
-      <tbody>
-        {list.loading && !list.data && <TableMessage colSpan={4}><SkeletonRows rows={6} label="Đang tải danh sách tổ chức…" /></TableMessage>}
-        {items.map((organization) => <tr key={organization.id}>
-          <td><button type="button" className="ops-cell-primary" style={{ border: 0, background: "none", textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => openDetail(organization.id)}>{organization.name}<span className="ops-cell-sub">{organization.slug}</span></button></td>
-          <td>{statusBadge(organization)}</td>
-          <td>{formatDate(organization.createdAt)}</td>
-          <td className="ops-cell-actions">
-            <Button asChild size="sm" variant="ghost"><Link href={ownersHref(organization.id)} aria-label={`Tạo owner cho ${organization.name}`}>Tạo owner</Link></Button>
-            <Button asChild size="sm" variant="ghost"><Link href={buildingsHref(organization.id)} aria-label={`Xem công trình của ${organization.name}`}>Công trình</Link></Button>
-            <Button size="sm" variant="quiet" onClick={() => { setToggleError(""); setToggling(organization); }} aria-label={`${organization.isActive ? "Khóa" : "Mở"} ${organization.name}`}>{organization.isActive ? "Khóa" : "Mở"}</Button>
-          </td>
-        </tr>)}
-        {list.data && !items.length && <TableMessage colSpan={4}><EmptyState icon={filtering ? Search : Landmark} title={filtering ? "Không có tổ chức phù hợp." : "Chưa có tổ chức"} description={filtering ? "Thử đổi từ khóa hoặc bộ lọc." : "Tạo tổ chức đầu tiên, sau đó cấp OrganizationUser owner."} action={!filtering && <Button onClick={() => { resetCreate(); setCreating(true); }}><Plus size={16} aria-hidden="true" />Tạo tổ chức</Button>} /></TableMessage>}
-      </tbody>
-    </Table>
-    {totalCount > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} disabled={list.loading} />}
+    <Split>
+      <div>
+        <Table caption="Danh sách tổ chức">
+          <thead><tr><th>Tổ chức</th><th>Công trình</th><th>Tài khoản</th><th>Tạo lúc</th><th>Trạng thái</th></tr></thead>
+          <tbody>
+            {list.loading && !list.data && <TableMessage colSpan={5}><SkeletonRows rows={6} label="Đang tải danh sách tổ chức…" /></TableMessage>}
+            {items.map((organization) => <tr key={organization.id} data-selected={selectedId === organization.id ? "true" : undefined}>
+              <td><button type="button" className="ops-cell-primary" style={{ border: 0, background: "none", textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => openDetail(organization.id)}>{organization.name}<span className="ops-cell-sub">{organization.slug}</span></button></td>
+              <td>{formatCount(organization.buildingCount) ?? "—"}</td>
+              <td>{formatCount(organization.accountCount) ?? "—"}</td>
+              <td>{formatDate(organization.createdAt)}</td>
+              <td>{statusBadge(organization)}</td>
+            </tr>)}
+            {list.data && !items.length && <TableMessage colSpan={5}><EmptyState icon={filtering ? Search : Landmark} title={filtering ? "Không có tổ chức phù hợp." : "Chưa có tổ chức"} description={filtering ? "Thử đổi từ khóa hoặc bộ lọc." : "Tạo tổ chức đầu tiên, sau đó cấp OrganizationUser owner."} action={!filtering && <Button onClick={() => { resetCreate(); setCreating(true); }}><Plus size={16} aria-hidden="true" />Tạo tổ chức</Button>} /></TableMessage>}
+          </tbody>
+        </Table>
+        {list.data && totalCount > 0 && <p className="adm-note" role="status">Hiển thị {items.length} trên {formatCount(totalCount)} · bộ lọc áp dụng toàn bộ danh sách.</p>}
+        {totalCount > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} disabled={list.loading} />}
+      </div>
 
-    <Drawer open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) closeDetail(); }} title="Thông tin tổ chức" description="Dữ liệu lấy trực tiếp từ Fire3D API.">
-      {selectedId && accessToken && <OrganizationDetail key={`${selectedId}:${detailVersion}`} id={selectedId} accessToken={accessToken} onToggle={(organization) => { setToggleError(""); setToggling(organization); }} onSaved={list.reload} />}
-    </Drawer>
+      <DetailPane
+        open={Boolean(selectedId)}
+        label="Thông tin tổ chức"
+        title={selected?.name ?? "Thông tin tổ chức"}
+        subtitle={selected ? `slug ${selected.slug} · tạo ${formatDate(selected.createdAt)}` : undefined}
+        onClose={closeDetail}
+        placeholder={{ icon: Landmark, title: "Chọn một tổ chức", text: "Hồ sơ, quy mô và các thao tác quản trị hiện ở đây." }}
+      >
+        {selectedId && accessToken && <OrganizationDetail key={`${selectedId}:${detailVersion}`} id={selectedId} accessToken={accessToken} onToggle={(organization) => { setToggleError(""); setToggling(organization); }} onSaved={list.reload} />}
+      </DetailPane>
+    </Split>
 
     <Drawer open={creating} onOpenChange={(open) => { if (!open && !saving) setCreating(false); }} title="Tạo tổ chức" description="Slug là định danh URL, không đổi được sau khi tạo.">
       <form onSubmit={submit} noValidate className="ops-stack">

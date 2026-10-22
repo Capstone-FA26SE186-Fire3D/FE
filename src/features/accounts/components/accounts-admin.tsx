@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, RefreshCw, Search, UserCog, Users } from "lucide-react";
+import { Plus, RefreshCw, Search, ShieldAlert, UserCog, UserRound, Users } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { ApiError } from "@/api";
 import { useAsyncData } from "@/api/use-async-data";
@@ -9,12 +9,14 @@ import { describeApiError } from "@/api/describe-error";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Drawer, Modal } from "@/components/ui/dialog";
+import { DetailPane, Rows, Split } from "@/features/admin-overview/components/admin-kit";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field, Input, Select } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonRows } from "@/components/ui/skeleton";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { StatusBadge, type Tone } from "@/components/ui/status-badge";
 import { Pagination, Table, TableMessage } from "@/components/ui/table";
+import { formatCount } from "@/features/admin-overview/format";
 import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
@@ -29,7 +31,10 @@ const roles: Array<{ value: UserRole; label: string }> = [
   { value: 1, label: "Thành viên tổ chức" },
   { value: 2, label: "Học viên" },
 ];
+/** PlatformAdmin is granted outside this screen (Figma: "Không thể gán PlatformAdmin ở đây"), so the create form does not offer it. */
+const creatableRoles = roles.filter((item) => item.value !== 0);
 const roleLabel = (role: UserRole) => roles.find((item) => item.value === role)?.label ?? "Không xác định";
+const roleTone = (role: UserRole): Tone => (role === 0 ? "ember" : role === 1 ? "info" : "neutral");
 const formatDate = (value: string | null | undefined) => (value ? new Date(value).toLocaleString("vi-VN") : "Chưa có");
 
 type CreateForm = { email: string; password: string; fullName: string; role: UserRole; organizationId: string };
@@ -139,63 +144,83 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
 
   return <>
     <PageHeader
+      eyebrow="Quản lý hệ thống"
       title="Tài khoản"
-      description="Danh sách, trạng thái và tạo tài khoản mới qua Fire3D API."
+      description="Tìm và quản lý tài khoản. Mở chi tiết không làm mất bộ lọc hay trang đang xem."
       breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Tài khoản" }]}
       actions={<><Button variant="quiet" onClick={list.reload} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />{list.loading ? "Đang tải…" : "Tải lại"}</Button><Button onClick={() => { setFieldErrors({}); setFormError(""); setCreating(true); }}><Plus size={16} aria-hidden="true" />Tạo tài khoản</Button></>}
     />
 
-    <div className="ops-toolbar">
-      <div className="ops-field ops-toolbar-grow" style={{ position: "relative" }}>
-        <label htmlFor="account-search" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Tìm tài khoản</label>
-        <Search size={16} aria-hidden="true" style={{ position: "absolute", left: 12, top: 13, color: "var(--dim)" }} />
-        <Input id="account-search" style={{ paddingLeft: 36 }} placeholder="Email hoặc tên" value={searchText} onChange={(event) => setSearchText(event.target.value)} />
+    <div className="adm-filters">
+      <div className="adm-search">
+        <label htmlFor="account-search" className="sr-only">Tìm tài khoản</label>
+        <Search size={16} aria-hidden="true" />
+        <Input id="account-search" placeholder="Tìm theo email hoặc họ tên" value={searchText} onChange={(event) => setSearchText(event.target.value)} />
       </div>
-      <Select aria-label="Vai trò" style={{ width: 190 }} value={role} onChange={(event) => setParams({ role: event.target.value })}>
-        <option value="">Mọi vai trò</option>{roles.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+      <Select aria-label="Vai trò" data-w style={{ width: 180 }} value={role} onChange={(event) => setParams({ role: event.target.value })}>
+        <option value="">Vai trò: tất cả</option>{roles.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
       </Select>
-      <Select aria-label="Trạng thái" style={{ width: 170 }} value={active} onChange={(event) => setParams({ status: event.target.value })}>
-        <option value="">Mọi trạng thái</option><option value="true">Đang hoạt động</option><option value="false">Đã vô hiệu hóa</option>
+      <Select aria-label="Trạng thái" data-w style={{ width: 180 }} value={active} onChange={(event) => setParams({ status: event.target.value })}>
+        <option value="">Trạng thái: tất cả</option><option value="true">Đang hoạt động</option><option value="false">Đã vô hiệu hóa</option>
       </Select>
-      <Select aria-label="Tổ chức" style={{ width: 200 }} value={organizationId} onChange={(event) => setParams({ organizationId: event.target.value })}>
-        <option value="">Mọi tổ chức</option>{orgItems.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
+      <Select aria-label="Tổ chức" data-w style={{ width: 200 }} value={organizationId} onChange={(event) => setParams({ organizationId: event.target.value })}>
+        <option value="">Tổ chức: tất cả</option>{orgItems.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
       </Select>
     </div>
 
     {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tài khoản" action={<RetryButton error={list.error} onRetry={list.reload} />}>{describeApiError(list.error, "Không tải được danh sách tài khoản. Hãy thử lại sau.")}</Alert>}
 
-    <Table caption="Danh sách tài khoản">
-      <thead><tr><th>Tài khoản</th><th>Vai trò</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
-      <tbody>
-        {list.loading && !list.data && <TableMessage colSpan={4}><SkeletonRows rows={6} label="Đang tải danh sách tài khoản…" /></TableMessage>}
-        {items.map((account) => <tr key={account.id}>
-          <td><button type="button" className="ops-cell-primary" style={{ border: 0, background: "none", textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => void openDetail(account.id)}>{account.fullName || account.username || account.email}<span className="ops-cell-sub">{account.username ? `@${account.username} · ${account.email}` : account.email}</span></button></td>
-          <td>{roleLabel(account.role)}</td>
-          <td>{statusBadge(account)}</td>
-          <td className="ops-cell-actions"><Button size="sm" variant="quiet" onClick={() => setToggling(account)} aria-label={`${account.isActive ? "Khóa" : "Mở"} ${account.email}`}>{account.isActive ? "Khóa" : "Mở"}</Button></td>
-        </tr>)}
-        {list.data && !items.length && <TableMessage colSpan={4}><EmptyState icon={filtering ? Search : Users} title={filtering ? "Không có tài khoản phù hợp." : "Chưa có tài khoản"} description={filtering ? "Thử đổi từ khóa hoặc bộ lọc." : "Tạo tài khoản đầu tiên cho tổ chức hoặc học viên."} /></TableMessage>}
-      </tbody>
-    </Table>
-    {totalCount > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} disabled={list.loading} />}
+    <Split>
+      <div>
+        <Table caption="Danh sách tài khoản">
+          <thead><tr><th>Email</th><th>Họ tên</th><th>Vai trò</th><th>Tổ chức</th><th>Trạng thái</th></tr></thead>
+          <tbody>
+            {list.loading && !list.data && <TableMessage colSpan={5}><SkeletonRows rows={6} label="Đang tải danh sách tài khoản…" /></TableMessage>}
+            {items.map((account) => <tr key={account.id} data-selected={selected?.id === account.id ? "true" : undefined}>
+              <td><button type="button" className="ops-cell-primary" aria-label={`Mở tài khoản ${account.email}`} style={{ border: 0, background: "none", textAlign: "left", cursor: "pointer", font: "inherit", minWidth: 0 }} onClick={() => void openDetail(account.id)}>{account.email}</button></td>
+              <td>{account.fullName || account.username || "—"}</td>
+              <td><StatusBadge tone={roleTone(account.role)}>{roleLabel(account.role)}</StatusBadge></td>
+              <td>{orgName(account.organizationId) ?? (account.organizationId ? `${account.organizationId.slice(0, 8)}…` : "—")}</td>
+              <td>{statusBadge(account)}</td>
+            </tr>)}
+            {list.data && !items.length && <TableMessage colSpan={5}><EmptyState icon={filtering ? Search : Users} title={filtering ? "Không có tài khoản phù hợp." : "Chưa có tài khoản"} description={filtering ? "Thử đổi từ khóa hoặc bộ lọc." : "Tạo tài khoản đầu tiên cho tổ chức hoặc học viên."} /></TableMessage>}
+          </tbody>
+        </Table>
+        {list.data && totalCount > 0 && <p className="adm-note" role="status">Hiển thị {items.length} trên {formatCount(totalCount)} · trang {page} / {Math.max(1, Math.ceil(totalCount / PAGE_SIZE))}</p>}
+        {totalCount > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} disabled={list.loading} />}
+      </div>
 
-    <Drawer open={selected !== null} onOpenChange={(open) => { if (!open) setSelected(null); }} title={selected?.fullName || selected?.email || "Tài khoản"} description={selected?.email}
-      footer={selected && <Button variant={selected.isActive ? "secondary" : "primary"} onClick={() => setToggling(selected)}><UserCog size={16} aria-hidden="true" />{selected.isActive ? "Vô hiệu hóa" : "Kích hoạt"}</Button>}>
-      {selected && <dl className="ops-stack" style={{ margin: 0 }}>
-        <div><dt className="ops-field-hint">Vai trò</dt><dd style={{ margin: 0 }}>{roleLabel(selected.role)}</dd></div>
-        {selected.username && <div><dt className="ops-field-hint">Tên người dùng</dt><dd style={{ margin: 0 }}>{selected.username}</dd></div>}
-        <div><dt className="ops-field-hint">Trạng thái</dt><dd style={{ margin: 0 }}>{statusBadge(selected)}</dd></div>
-        {selected.organizationId && <div><dt className="ops-field-hint">Tổ chức</dt><dd style={{ margin: 0 }}>{orgName(selected.organizationId) ?? selected.organizationId}</dd></div>}
-        <div><dt className="ops-field-hint">Đăng nhập gần nhất</dt><dd style={{ margin: 0 }}>{formatDate(selected.lastLoginAt)}</dd></div>
-      </dl>}
-    </Drawer>
+      <DetailPane
+        open={selected !== null}
+        label="Chi tiết tài khoản"
+        title={selected?.fullName || selected?.username || selected?.email}
+        subtitle={selected?.email}
+        onClose={() => setSelected(null)}
+        placeholder={{ icon: UserRound, title: "Chọn một tài khoản", text: "Vai trò, tổ chức và lần đăng nhập gần nhất hiện ở đây." }}
+      >
+        {selected && <>
+          <Rows items={[
+            { label: "Vai trò", value: roleLabel(selected.role) },
+            ...(selected.username ? [{ label: "Tên người dùng", value: selected.username }] : []),
+            { label: "Tổ chức", value: selected.organizationId ? orgName(selected.organizationId) ?? selected.organizationId : "—" },
+            { label: "Trạng thái", value: statusBadge(selected) },
+            { label: "Đăng nhập gần nhất", value: formatDate(selected.lastLoginAt) },
+            { label: "Ngày tạo", value: formatDate(selected.createdAt) },
+          ]} />
+          <Alert tone="info" title="Không thể gán PlatformAdmin ở đây">Quyền PlatformAdmin cấp ngoài giao diện này theo quy trình riêng. Vai trò và tổ chức của tài khoản không đổi được sau khi tạo.</Alert>
+          <div className="adm-pane-actions">
+            <Button className="adm-btn-danger-outline" variant="secondary" onClick={() => setToggling(selected)}>{selected.isActive ? <ShieldAlert size={16} aria-hidden="true" /> : <UserCog size={16} aria-hidden="true" />}{selected.isActive ? "Khóa tài khoản…" : "Kích hoạt tài khoản…"}</Button>
+          </div>
+        </>}
+      </DetailPane>
+    </Split>
 
     <Drawer open={creating} onOpenChange={(open) => { if (!open && !saving) setCreating(false); }} title="Tạo tài khoản" description="Vai trò và tổ chức không đổi được sau khi tạo.">
       <form onSubmit={submit} noValidate className="ops-stack">
         <Field label="Email" required error={fieldErrors.email}>{(p) => <Input {...p} type="email" autoComplete="off" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />}</Field>
         <Field label="Mật khẩu" required hint="Từ 12 đến 128 ký tự." error={fieldErrors.password}>{(p) => <Input {...p} type="password" autoComplete="new-password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />}</Field>
         <Field label="Họ và tên">{(p) => <Input {...p} maxLength={200} autoComplete="off" value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} />}</Field>
-        <Field label="Vai trò">{(p) => <Select {...p} value={form.role} onChange={(event) => setForm({ ...form, role: Number(event.target.value) as UserRole })}>{roles.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</Select>}</Field>
+        <Field label="Vai trò">{(p) => <Select {...p} value={form.role} onChange={(event) => setForm({ ...form, role: Number(event.target.value) as UserRole })}>{creatableRoles.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</Select>}</Field>
         {form.role === 1 && <Field label="Tổ chức" required error={fieldErrors.organizationId}>{(p) => <Select {...p} value={form.organizationId} onChange={(event) => setForm({ ...form, organizationId: event.target.value })}><option value="">Chọn tổ chức</option>{orgItems.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}</Select>}</Field>}
         {formError && <Alert tone="danger">{formError}</Alert>}
         <div className="ops-actions" style={{ justifyContent: "flex-end" }}>
