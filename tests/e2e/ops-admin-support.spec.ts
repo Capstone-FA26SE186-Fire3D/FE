@@ -149,10 +149,10 @@ test.describe("admin support inbox", () => {
 
     await page.getByRole("button", { name: /Mở ticket SUP-0001/ }).click();
     await expect(page).toHaveURL(/ticket=ticket-1/);
-    await expect(page.getByRole("dialog", { name: "Chi tiết ticket" }).getByText("Em cần hỗ trợ gấp")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Chi tiết ticket" }).getByText("Em cần hỗ trợ gấp")).toBeVisible();
 
     await page.goto("/admin/support?ticket=ticket-1");
-    await expect(page.getByRole("dialog", { name: "Chi tiết ticket" }).getByRole("heading", { name: "Không tải được mô hình IFC" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Chi tiết ticket" }).getByRole("heading", { name: "Không tải được mô hình IFC" })).toBeVisible();
   });
 
   test("assign/transition sends PATCH with If-Match; 412 keeps the choices and lets the admin load the newer version", async ({ page }) => {
@@ -174,7 +174,7 @@ test.describe("admin support inbox", () => {
     });
 
     await page.goto("/admin/support?ticket=ticket-1");
-    const drawer = page.getByRole("dialog", { name: "Chi tiết ticket" });
+    const drawer = page.getByRole("region", { name: "Chi tiết ticket" });
     await expect(drawer.getByRole("heading", { name: "Không tải được mô hình IFC" })).toBeVisible();
     await drawer.getByLabel("Trạng thái", { exact: true }).selectOption("InProgress");
     await drawer.getByLabel("Ưu tiên").selectOption("High");
@@ -211,7 +211,7 @@ test.describe("admin support inbox", () => {
     });
 
     await page.goto("/admin/support?ticket=ticket-1");
-    const drawer = page.getByRole("dialog", { name: "Chi tiết ticket" });
+    const drawer = page.getByRole("region", { name: "Chi tiết ticket" });
     await drawer.getByLabel("Tin nhắn mới").fill("  Chúng tôi đang kiểm tra  ");
     await drawer.getByRole("button", { name: "Gửi tin nhắn" }).dblclick();
     await expect.poll(() => sends.length).toBe(1);
@@ -236,7 +236,7 @@ test.describe("admin support inbox", () => {
     await page.route("**/api/admin/support/tickets?*", (route) => route.fulfill({ json: page1([ticket({ status: "Closed" })]) }));
     await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ETag: '"support-2"' }, json: { ...ticket({ status: "Closed" }), messages: messagesPage([]) } }));
     await page.goto("/admin/support?ticket=ticket-1");
-    const drawer = page.getByRole("dialog", { name: "Chi tiết ticket" });
+    const drawer = page.getByRole("region", { name: "Chi tiết ticket" });
     await expect(drawer.getByText(/Ticket đã đóng/)).toBeVisible();
     await expect(drawer.getByRole("button", { name: "Gửi tin nhắn" })).toBeDisabled();
   });

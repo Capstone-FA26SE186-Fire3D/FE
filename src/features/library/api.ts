@@ -82,8 +82,9 @@ async function versionWithEtag(promise: Promise<{ data: unknown; headers: Header
   return { data: version, etag: etagOf(response.headers, version.revision) };
 }
 
-type ListQuery = { kind?: LibraryKind | ""; page: number; pageSize: number };
-const listQuery = (query: ListQuery) => ({ kind: query.kind || undefined, page: query.page, pageSize: query.pageSize });
+/** `search` is part of the item code (BE: wildcards literal, max 80), applied before paging. */
+type ListQuery = { kind?: LibraryKind | ""; search?: string; page: number; pageSize: number };
+const listQuery = (query: ListQuery) => ({ kind: query.kind || undefined, search: query.search?.trim() || undefined, page: query.page, pageSize: query.pageSize });
 
 /** Read side for OrganizationUser and PlatformAdmin. */
 export const libraryApi = {

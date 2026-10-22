@@ -53,7 +53,7 @@ test.describe("admin organization profile", () => {
     await signIn(page, admin);
     await mockOrganizations(page, org);
     await page.goto("/admin/organizations?organization=org-1");
-    const drawer = page.getByRole("dialog", { name: "Thông tin tổ chức" });
+    const drawer = page.getByRole("region", { name: "Thông tin tổ chức" });
     await expect(drawer.getByText("1 Lê Lợi, Đà Nẵng")).toBeVisible();
     await expect(drawer.getByText("+842361234567")).toBeVisible();
     await expect(drawer.getByText("2 công trình · 5 tài khoản")).toBeVisible();
@@ -66,7 +66,7 @@ test.describe("admin organization profile", () => {
     expect(org.patches).toEqual([{ ifMatch: '"3"', body: { name: "Fire3D Lab Việt Nam" } }]);
 
     await page.reload();
-    await expect(page.getByRole("dialog", { name: "Thông tin tổ chức" }).getByText("Fire3D Lab Việt Nam").first()).toBeVisible();
+    await expect(page.getByRole("region", { name: "Thông tin tổ chức" }).getByText("Fire3D Lab Việt Nam").first()).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.getByRole("button", { name: "Fire3D Lab Việt Nam fire3d-lab" })).toBeVisible();
   });
@@ -76,7 +76,7 @@ test.describe("admin organization profile", () => {
     await signIn(page, admin);
     await mockOrganizations(page, org);
     await page.goto("/admin/organizations?organization=org-1");
-    const drawer = page.getByRole("dialog", { name: "Thông tin tổ chức" });
+    const drawer = page.getByRole("region", { name: "Thông tin tổ chức" });
     await drawer.getByRole("button", { name: "Sửa hồ sơ" }).click();
     await drawer.getByLabel("Địa chỉ").fill("99 Nguyễn Văn Linh");
     // Someone else edits the phone number first.
@@ -100,7 +100,7 @@ test.describe("admin organization profile", () => {
     await signIn(page, admin);
     await mockOrganizations(page, org);
     await page.goto("/admin/organizations?organization=org-1");
-    const drawer = page.getByRole("dialog", { name: "Thông tin tổ chức" });
+    const drawer = page.getByRole("region", { name: "Thông tin tổ chức" });
     await drawer.getByRole("button", { name: "Sửa hồ sơ" }).click();
     await drawer.getByLabel("Số điện thoại").fill("+84999999999");
     await drawer.getByRole("button", { name: "Lưu hồ sơ" }).click();
@@ -114,7 +114,7 @@ test.describe("admin organization profile", () => {
     await signIn(page, admin);
     await mockOrganizations(page, org);
     await page.goto("/admin/organizations?organization=org-1");
-    const drawer = page.getByRole("dialog", { name: "Thông tin tổ chức" });
+    const drawer = page.getByRole("region", { name: "Thông tin tổ chức" });
     await drawer.getByRole("button", { name: "Sửa hồ sơ" }).click();
     await drawer.getByLabel("Địa chỉ").fill("");
     await drawer.getByRole("button", { name: "Lưu hồ sơ" }).click();
@@ -128,7 +128,7 @@ test.describe("admin organization profile", () => {
     await signIn(page, admin);
     await mockOrganizations(page, org);
     await page.goto("/admin/organizations?organization=org-1");
-    const drawer = page.getByRole("dialog", { name: "Thông tin tổ chức" });
+    const drawer = page.getByRole("region", { name: "Thông tin tổ chức" });
     await drawer.getByRole("button", { name: "Sửa hồ sơ" }).click();
     await drawer.getByRole("button", { name: "Tải lại tổ chức" }).click();
     await drawer.getByLabel("Tên tổ chức").fill("Tên đang gõ");
@@ -149,7 +149,7 @@ test.describe("admin organization profile", () => {
     status = 200;
     await page.route("**/api/organizations/org-1", (route) => route.fulfill({ json: { id: "org-1", name: "Phục hồi", slug: "phuc-hoi", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" } }));
     await page.getByRole("button", { name: "Thử lại" }).click();
-    await expect(page.getByRole("dialog", { name: "Thông tin tổ chức" }).getByText("Phục hồi").first()).toBeVisible();
+    await expect(page.getByRole("region", { name: "Thông tin tổ chức" }).getByText("Phục hồi").first()).toBeVisible();
     // No counts and no revision from an older deployment: still readable, edit stays safe (no ETag, no save).
     await expect(page.getByText("công trình ·")).toHaveCount(0);
   });
@@ -189,7 +189,7 @@ test.describe("who sent it", () => {
     await expect(page.getByText("b@school.test")).toHaveCount(0);
 
     await page.getByRole("button", { name: /Mở ticket SUP-0001/ }).click();
-    const drawer = page.getByRole("dialog", { name: "Chi tiết ticket" });
+    const drawer = page.getByRole("region", { name: "Chi tiết ticket" });
     await expect(drawer.getByText("b@school.test")).toBeVisible();
     await expect(drawer.getByText("Trường An Toàn")).toBeVisible();
     await expect(drawer.getByRole("listitem").filter({ hasText: "Em cần hỗ trợ gấp" }).getByText("Trần Thị B")).toBeVisible();
@@ -437,7 +437,7 @@ test.describe("layout", () => {
         await expect(page.getByRole("row").filter({ hasText: "SUP-0001" }).getByText("Trần Thị B")).toBeVisible();
         expect(await overflow(page)).toBeLessThanOrEqual(0);
         await page.getByRole("button", { name: /Mở ticket SUP-0001/ }).click();
-        await expect(page.getByRole("dialog", { name: "Chi tiết ticket" }).getByText("b@school.test")).toBeVisible();
+        await expect(page.getByRole("region", { name: "Chi tiết ticket" }).getByText("b@school.test")).toBeVisible();
         await page.waitForTimeout(400);
         expect(await overflow(page)).toBeLessThanOrEqual(0);
         await page.screenshot({ path: testInfo.outputPath(`ticket-${scheme}-${width}.png`) });
@@ -449,7 +449,7 @@ test.describe("layout", () => {
         await page.screenshot({ path: testInfo.outputPath(`audit-${scheme}-${width}.png`) });
 
         await page.goto("/admin/organizations?organization=org-1");
-        const drawer = page.getByRole("dialog", { name: "Thông tin tổ chức" });
+        const drawer = page.getByRole("region", { name: "Thông tin tổ chức" });
         await drawer.getByRole("button", { name: "Sửa hồ sơ" }).click();
         await expect(drawer.getByLabel("Số điện thoại")).toBeVisible();
         await page.waitForTimeout(400);

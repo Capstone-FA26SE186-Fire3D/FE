@@ -34,15 +34,12 @@ test("PlatformAdmin creates, reviews and locks an Organization through the Fire3
   await page.goto("/admin/organizations");
   await expect(page.getByRole("heading", { name: "Tổ chức", exact: true })).toBeVisible();
 
-  // Row links: owner handoff and building list (page owned by another task, link only).
-  await expect(page.getByRole("link", { name: "Tạo owner cho Fire3D Lab" })).toHaveAttribute("href", "/admin/accounts?organizationId=org-1");
-  await expect(page.getByRole("link", { name: "Xem công trình của Fire3D Lab" })).toHaveAttribute("href", "/admin/organizations/org-1/buildings");
-
   // Detail drawer is deep-linkable and only shows fields the API returns.
   await page.getByRole("button", { name: "Fire3D Lab fire3d-lab" }).click();
   await expect(page).toHaveURL(/organization=org-1/);
-  const detail = page.getByRole("dialog", { name: "Thông tin tổ chức" });
+  const detail = page.getByRole("region", { name: "Thông tin tổ chức" });
   await expect(detail.getByRole("link", { name: "Tạo OrganizationUser" })).toHaveAttribute("href", "/admin/accounts?organizationId=org-1");
+  await expect(detail.getByRole("link", { name: "Xem công trình" })).toHaveAttribute("href", "/admin/organizations/org-1/buildings");
   await expect(detail.getByText("Chờ BE: địa chỉ và số điện thoại")).toHaveCount(0);
   await expect(detail.getByRole("button", { name: "Sửa hồ sơ" })).toBeVisible();
 

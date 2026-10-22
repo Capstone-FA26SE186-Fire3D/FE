@@ -1,0 +1,138 @@
+/*
+ * PlatformAdmin visual layer (Figma "05 Admin"). Uses only the operations tokens from ops.css (--surface, --line,
+ * --ember, --success ...), so dark, light and system themes all work. Everything is scoped under `.adm`.
+ */
+
+.adm { display: block; }
+.adm .ops-eyebrow { margin: 0 0 6px; color: var(--ember); font-size: 11px; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; }
+.adm .ops-page-header { margin-bottom: 20px; }
+.adm .ops-page-header h1 { font-size: clamp(24px, 2.4vw, 30px); }
+.adm .ops-page-header p:not(.ops-eyebrow) { max-width: 640px; font-size: 13.5px; }
+.adm .ops-breadcrumb { margin-bottom: 14px; }
+.adm .ops-breadcrumb ol { font-size: 12px; }
+.adm .ops-panel { border-radius: 14px; }
+.adm .ops-panel-head { padding: 14px 18px; }
+.adm .ops-panel-body { padding: 18px; }
+.adm .ops-table-wrap { border-radius: 14px; }
+.adm .ops-table th { background: transparent; font-size: 11px; letter-spacing: .08em; }
+.adm .ops-table tbody tr[data-selected="true"] td { background: var(--ember-soft); }
+.adm .ops-table tbody tr[data-selected="true"] td:first-child { box-shadow: inset 3px 0 0 var(--ember); }
+.adm .ops-stat { border-radius: 14px; }
+.adm .ops-badge { min-height: 22px; font-size: 11.5px; }
+.adm .adm-flush { padding: 0; }
+.adm .adm-flush .ops-table-wrap { border: 0; border-radius: 0 0 14px 14px; }
+
+/* ───────── KPI tiles ───────── */
+.adm-kpis { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+.adm-kpi { display: grid; align-content: start; gap: 4px; min-width: 0; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--text); }
+.adm-kpi-label { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--muted); font-size: 13px; font-weight: 500; }
+.adm-kpi-label svg { color: var(--dim); }
+.adm-kpi-value { margin: 2px 0 0; font-size: 30px; font-weight: 600; letter-spacing: -.03em; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.adm-kpi-hint { margin: 0; color: var(--dim); font-size: 12.5px; line-height: 1.45; }
+.adm-kpi-link { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; margin-top: 2px; color: var(--ember); font-size: 13px; font-weight: 600; }
+.adm-kpi-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.adm-kpi[data-tone="warning"] .adm-kpi-value { color: var(--warning); }
+.adm-kpi[data-tone="danger"] .adm-kpi-value { color: var(--danger); }
+.adm-kpi-skeleton { display: block; width: 64px; height: 30px; margin: 2px 0; }
+.adm-kpi-unavailable { margin: 2px 0 0; color: var(--dim); font-size: 22px; font-weight: 600; }
+@media (max-width: 1100px) { .adm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .adm-kpis { grid-template-columns: minmax(0, 1fr); } .adm-kpi-value { font-size: 26px; } }
+
+/* ───────── Filter chips (segmented tabs of a list) ───────── */
+.adm-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; padding: 0; list-style: none; }
+.adm-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease; }
+.adm-chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .7; }
+.adm-chip:hover { border-color: var(--line-strong); color: var(--text); }
+.adm-chip[aria-pressed="true"], .adm-chip[aria-checked="true"], .adm-chip[aria-selected="true"] { border-color: transparent; background: var(--ember-soft); color: var(--ember-hover); }
+.adm-chip:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.ops-theme[data-theme="light"] .adm-chip[aria-pressed="true"], .ops-theme[data-theme="light"] .adm-chip[aria-checked="true"] { color: var(--ember); }
+
+/* ───────── Filter bar ───────── */
+.adm-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+.adm-search { position: relative; flex: 1 1 260px; min-width: 0; }
+.adm-search > svg { position: absolute; left: 12px; top: 14px; color: var(--dim); pointer-events: none; }
+.adm-search .ops-input { padding-left: 36px; }
+.adm-filters .ops-input[data-w] { width: auto; min-width: 150px; }
+
+/* ───────── Master / detail ───────── */
+.adm-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 440px); gap: 18px; align-items: start; }
+.adm-split--queue { grid-template-columns: minmax(300px, 440px) minmax(0, 1fr); }
+.adm-split > * { min-width: 0; }
+.adm-pane { position: sticky; top: calc(var(--ops-topbar, 60px) + 16px); max-height: calc(100dvh - var(--ops-topbar, 60px) - 32px); overflow-y: auto; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.adm-pane-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 4px; }
+.adm-pane-head h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.adm-pane-sub { margin: 4px 0 14px; color: var(--dim); font-size: 12.5px; overflow-wrap: anywhere; }
+.adm-pane-placeholder { display: grid; justify-items: center; gap: 8px; padding: 36px 16px; border: 1px dashed var(--line-strong); border-radius: 14px; background: var(--bg-soft); color: var(--muted); text-align: center; font-size: 13.5px; }
+.adm-pane-placeholder strong { color: var(--text); font-size: 15px; }
+.adm-pane-placeholder > svg { color: var(--ember); }
+.adm-pane h3 { margin: 18px 0 8px; font-size: 14px; font-weight: 650; }
+.adm-pane .ops-alert { margin-top: 14px; }
+.adm-pane-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+@media (max-width: 1100px) {
+  .adm-split, .adm-split--queue { grid-template-columns: minmax(0, 1fr); }
+  .adm-pane { position: static; max-height: none; overflow: visible; }
+}
+
+/* Panels nested in a detail pane read as sections of the pane, not boxes inside a box */
+.adm-pane .ops-panel { border: 0; border-radius: 0; background: transparent; }
+.adm-pane .ops-panel-head { padding: 0 0 8px; border-bottom: 0; }
+.adm-pane .ops-panel-head h2 { font-size: 14px; font-weight: 650; }
+.adm-pane .ops-panel-body { padding: 0; }
+.adm-pane .ops-table-wrap { border-radius: 10px; }
+.adm-pane .ops-stack > .ops-stack { gap: 14px; }
+.adm-pane .rev-detail-head h3 { margin: 0; font-size: 18px; }
+.adm-pane .rev-gates li { background: var(--bg-soft); }
+
+/* Key / value rows with hairlines (detail panes) */
+.adm-rows { display: grid; margin: 0; }
+.adm-rows > div { display: grid; grid-template-columns: minmax(96px, 40%) minmax(0, 1fr); align-items: baseline; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.adm-rows > div:last-child { border-bottom: 0; }
+.adm-rows dt { color: var(--dim); }
+.adm-rows dd { margin: 0; min-width: 0; color: var(--text); text-align: right; overflow-wrap: anywhere; }
+.adm-rows dd.adm-left { text-align: left; }
+@media (max-width: 520px) { .adm-rows > div { grid-template-columns: minmax(0, 1fr); gap: 2px; } .adm-rows dd { text-align: left; } }
+
+/* ───────── Queue (review) cards ───────── */
+.adm-queue { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.adm-queue-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 6px 12px; width: 100%; min-height: 72px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-soft); color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: border-color 150ms ease, background-color 150ms ease; }
+.adm-queue-item:hover { border-color: var(--line-strong); }
+.adm-queue-item[aria-current="true"] { border-color: var(--ember); background: var(--ember-soft); }
+.adm-queue-item:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.adm-queue-title { display: block; font-size: 14.5px; font-weight: 600; overflow-wrap: anywhere; }
+.adm-queue-sub { display: block; margin-top: 2px; color: var(--dim); font-size: 12px; overflow-wrap: anywhere; }
+.adm-queue-meta { display: grid; justify-items: end; gap: 6px; color: var(--dim); font-size: 12px; white-space: nowrap; }
+
+/* ───────── Code / hash, gate rows ───────── */
+.adm-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; word-break: break-all; }
+.adm-checks { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.adm-checks li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-soft); }
+.adm-checks strong { display: block; font-size: 13.5px; font-weight: 600; }
+.adm-checks span.adm-check-note { display: block; margin-top: 2px; color: var(--dim); font-size: 12.5px; line-height: 1.5; }
+.adm-decision { margin-top: 18px; padding: 16px; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--bg-soft); }
+.adm-decision h3 { margin: 0 0 8px; }
+
+/* Outlined destructive action (Figma "Khóa tài khoản…", "Tạm khóa tổ chức…") */
+.adm .adm-btn-danger-outline.adm-btn-danger-outline { border-color: var(--danger); background: transparent; color: var(--danger); }
+.adm .adm-btn-danger-outline.adm-btn-danger-outline:hover { background: var(--danger-soft); border-color: var(--danger); }
+
+/* ───────── Info rules table ───────── */
+.adm-rules { width: 100%; border-collapse: collapse; font-size: 13px; }
+.adm-rules th, .adm-rules td { padding: 9px 0; border-bottom: 1px solid var(--line); text-align: left; font-weight: 500; }
+.adm-rules th { width: 38%; color: var(--dim); }
+.adm-rules td { color: var(--text); text-align: right; }
+.adm-rules tr:last-child th, .adm-rules tr:last-child td { border-bottom: 0; }
+
+/* ───────── Overview ───────── */
+.adm-action-tile { position: relative; }
+.adm-action-tile .adm-kpi-label strong { color: var(--text); font-size: 14px; font-weight: 600; }
+.adm-list { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+.adm-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.adm-list li:last-child { border-bottom: 0; }
+.adm-list time { flex: none; color: var(--dim); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+.adm-list .adm-list-main { display: flex; min-width: 0; flex: 1; align-items: baseline; gap: 12px; overflow-wrap: anywhere; }
+
+.adm-note { margin: 12px 0 0; color: var(--dim); font-size: 12.5px; line-height: 1.55; }
+.adm-section-title { margin: 28px 0 12px; font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+.adm-banner { margin-bottom: 18px; }
+
+@media (prefers-reduced-motion: reduce) { .adm-chip, .adm-queue-item { transition: none; } }
