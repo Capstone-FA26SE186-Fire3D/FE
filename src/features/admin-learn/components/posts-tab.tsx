@@ -18,6 +18,8 @@ import { learnAdminApi } from "../api";
 import { describeLearnError } from "../errors";
 import { postStatusView } from "../status";
 import { LifecycleRules } from "./lifecycle-rules";
+import { QuickEditPane } from "./quick-edit-pane";
+import "./learn-quick.css";
 
 const PAGE_SIZE = 20;
 
@@ -35,6 +37,9 @@ export function PostsTab({ accessToken, onOpen, onCreate }: { accessToken: strin
   const loaded = list.data?.items ?? [];
   const items = kind ? loaded.filter((post) => post.publishedVersion?.kind === kind) : loaded;
   const total = list.data?.total ?? 0;
+  // The row whose side pane is open (`?quick=<id>`); the row itself still opens the full editor.
+  const quick = get("quick");
+  const quickPost = quick ? (loaded.find((post) => post.id === quick) ?? null) : null;
 
   return <>
     <Chips label="Loại bài (chỉ lọc trong trang đang xem)">
@@ -56,13 +61,13 @@ export function PostsTab({ accessToken, onOpen, onCreate }: { accessToken: strin
     <Split>
       <div>
     <Table caption="Danh sách bài Learn">
-      <thead><tr><th>Bài</th><th>Loại</th><th>Trạng thái</th><th>Bản công khai</th><th>Cập nhật</th></tr></thead>
+      <thead><tr><th>Bài</th><th>Loại</th><th>Trạng thái</th><th>Bản công khai</th><th>Cập nhật</th><th><span className="sr-only">Sửa nhanh</span></th></tr></thead>
       <tbody>
-        {list.loading && !list.data && <TableMessage colSpan={5}><SkeletonRows rows={6} label="Đang tải danh sách bài…" /></TableMessage>}
+        {list.loading && !list.data && <TableMessage colSpan={6}><SkeletonRows rows={6} label="Đang tải danh sách bài…" /></TableMessage>}
         {items.map((post) => {
           const view = postStatusView[post.publicationStatus];
           const published = post.publishedVersion;
-          return <tr key={post.id}>
+          return <tr key={post.id} className="learn-quick-row" data-selected={quick === post.id ? "true" : undefined}>
             <td>
               <button type="button" className="ops-cell-primary" style={{ background: "none", border: 0, padding: 0, textAlign: "left", cursor: "pointer", font: "inherit", color: "inherit", minHeight: 44 }} onClick={() => onOpen(post.id)} aria-label={`Mở bài ${published?.title ?? post.slug}`}>
                 <span style={{ display: "block", overflowWrap: "anywhere" }}>{published?.title ?? "Chưa có bản xuất bản"}</span>
@@ -73,14 +78,18 @@ export function PostsTab({ accessToken, onOpen, onCreate }: { accessToken: strin
             <td><StatusBadge tone={view.tone}>{view.label}</StatusBadge></td>
             <td>{published ? `v${published.versionNumber}` : "—"}</td>
             <td>{formatDateTime(post.updatedAt)}</td>
+            <td className="ops-cell-actions"><Button size="sm" variant="quiet" aria-pressed={quick === post.id} aria-label={`Sửa nhanh bài ${published?.title ?? post.slug}`} onClick={() => setParams({ quick: quick === post.id ? null : post.id, page }, "replace")}>Sửa nhanh</Button></td>
           </tr>;
         })}
-        {list.data && !items.length && <TableMessage colSpan={5}><EmptyState icon={status ? Search : BookOpen} title={status ? "Không có bài ở trạng thái này." : "Chưa có bài nào"} description={status ? "Thử đổi hoặc xóa bộ lọc." : "Tạo bài đầu tiên: lưu bản nháp rồi xuất bản khi nội dung và nguồn đã sẵn sàng."} action={!status && <Button size="sm" onClick={onCreate}>Tạo bài</Button>} /></TableMessage>}
+        {list.data && !items.length && <TableMessage colSpan={6}><EmptyState icon={status ? Search : BookOpen} title={status ? "Không có bài ở trạng thái này." : "Chưa có bài nào"} description={status ? "Thử đổi hoặc xóa bộ lọc." : "Tạo bài đầu tiên: lưu bản nháp rồi xuất bản khi nội dung và nguồn đã sẵn sàng."} action={!status && <Button size="sm" onClick={onCreate}>Tạo bài</Button>} /></TableMessage>}
       </tbody>
     </Table>
     {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
       </div>
-      <LifecycleRules />
+      <div className="learn-quick-col">
+        <QuickEditPane accessToken={accessToken} postId={quick || null} fallbackName={quickPost ? (quickPost.publishedVersion?.title ?? quickPost.slug) : "Sửa nhanh"} onClose={() => setParams({ quick: null, page }, "replace")} onOpenEditor={onOpen} onChanged={list.reload} />
+        <LifecycleRules />
+      </div>
     </Split>
   </>;
 }
