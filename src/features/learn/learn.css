@@ -1,4 +1,19 @@
-/* Public Learn (API-driven list, reader, saved posts). Uses the global dark tokens from globals.css; it is not themed. */
+/* Public Learn (API-driven list, reader, saved posts). Public pages use the global dark tokens from globals.css; inside the
+   Trainee workspace (.ops-theme) the same tokens are redefined for light/dark, so these rules follow the chosen theme. */
+
+/* Cards: kind art fallback (3:2 art in a fixed 16:10 box), kind badge, note and read link */
+.learn-cover { background: var(--art-bg, #3b322d); }
+.learn-cover > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.learn-cover > img.learn-cover-art { object-fit: contain; object-position: center bottom; }
+.learn-card-meta > span[data-kind] { border: 0; border-radius: 999px; padding: 3px 10px; background: var(--hover, rgba(243,245,244,.06)); font-weight: 600; }
+.learn-card-meta > span[data-kind="Article"] { background: var(--info-soft, rgba(127,183,255,.13)); color: var(--info, #7fb7ff); }
+.learn-card-meta > span[data-kind="Tip"] { background: var(--success-soft, rgba(95,208,138,.13)); color: var(--success, #5fd08a); }
+.learn-card-meta > span[data-kind="Video"] { background: var(--warning-soft, rgba(242,193,78,.13)); color: var(--warning, #f2c14e); }
+.learn-card-note { margin: 0; color: var(--dim); font-size: 12px; }
+.learn-card-read { display: inline-flex; align-items: center; gap: 2px; min-height: 44px; margin-top: 4px; color: var(--ember); font-size: 13px; font-weight: 600; }
+.learn-card-read:hover { color: var(--ember-hover, var(--ember)); }
+.learn-card-read:focus-visible, .learn-cover:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+
 
 /* Search and filters (public, dark global tokens). Every control is at least 44px tall. */
 .learn-search { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin: 0 0 20px; }
@@ -15,7 +30,7 @@
 .learn-search-clear:focus-visible, .learn-search-submit:focus-visible, .learn-active-chip:focus-visible, .learn-filters-toggle:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
 .learn-search-submit { min-height: 44px; min-width: 76px; padding: 0 20px; border: 0; border-radius: 10px; background: var(--ember); color: var(--ember-foreground); font-weight: 600; }
 .learn-search-hint { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
-.learn-search-hint[data-invalid] { color: #ffb4a8; }
+.learn-search-hint[data-invalid] { color: var(--danger, #ffb4a8); }
 
 .learn-filters { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 0 0 16px; }
 .learn-filters-toggle { display: none; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: transparent; color: var(--text); font-size: 14px; }
