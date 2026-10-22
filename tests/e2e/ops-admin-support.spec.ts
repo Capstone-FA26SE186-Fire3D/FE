@@ -149,10 +149,10 @@ test.describe("admin support inbox", () => {
 
     await page.getByRole("button", { name: /Mở ticket SUP-0001/ }).click();
     await expect(page).toHaveURL(/ticket=ticket-1/);
-    await expect(page.getByRole("dialog", { name: "Chi tiết ticket" }).getByText("Em cần hỗ trợ gấp")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Chi tiết ticket" }).getByText("Em cần hỗ trợ gấp")).toBeVisible();
 
     await page.goto("/admin/support?ticket=ticket-1");
-    await expect(page.getByRole("dialog", { name: "Chi tiết ticket" }).getByRole("heading", { name: "Không tải được mô hình IFC" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Chi tiết ticket" }).getByRole("heading", { name: "Không tải được mô hình IFC" })).toBeVisible();
   });
 
   test("assign/transition sends PATCH with If-Match; 412 keeps the choices and lets the admin load the newer version", async ({ page }) => {
@@ -174,7 +174,7 @@ test.describe("admin support inbox", () => {
     });
 
     await page.goto("/admin/support?ticket=ticket-1");
-    const drawer = page.getByRole("dialog", { name: "Chi tiết ticket" });
+    const drawer = page.getByRole("region", { name: "Chi tiết ticket" });
     await expect(drawer.getByRole("heading", { name: "Không tải được mô hình IFC" })).toBeVisible();
     await drawer.getByLabel("Trạng thái", { exact: true }).selectOption("InProgress");
     await drawer.getByLabel("Ưu tiên").selectOption("High");
@@ -211,7 +211,7 @@ test.describe("admin support inbox", () => {
     });
 
     await page.goto("/admin/support?ticket=ticket-1");
-    const drawer = page.getByRole("dialog", { name: "Chi tiết ticket" });
+    const drawer = page.getByRole("region", { name: "Chi tiết ticket" });
     await drawer.getByLabel("Tin nhắn mới").fill("  Chúng tôi đang kiểm tra  ");
     await drawer.getByRole("button", { name: "Gửi tin nhắn" }).dblclick();
     await expect.poll(() => sends.length).toBe(1);
@@ -236,7 +236,7 @@ test.describe("admin support inbox", () => {
     await page.route("**/api/admin/support/tickets?*", (route) => route.fulfill({ json: page1([ticket({ status: "Closed" })]) }));
     await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ETag: '"support-2"' }, json: { ...ticket({ status: "Closed" }), messages: messagesPage([]) } }));
     await page.goto("/admin/support?ticket=ticket-1");
-    const drawer = page.getByRole("dialog", { name: "Chi tiết ticket" });
+    const drawer = page.getByRole("region", { name: "Chi tiết ticket" });
     await expect(drawer.getByText(/Ticket đã đóng/)).toBeVisible();
     await expect(drawer.getByRole("button", { name: "Gửi tin nhắn" })).toBeDisabled();
   });
@@ -407,7 +407,7 @@ test.describe("organization support", () => {
     expect(creates[0].body).toEqual({ subject: "Không tải được mô hình IFC", description: "Tệp tải lên báo lỗi quét." });
 
     await expect(page).toHaveURL(/ticket=ticket-1/);
-    const drawer = page.getByRole("dialog", { name: "Chi tiết yêu cầu" });
+    const drawer = page.getByRole("region", { name: "Chi tiết yêu cầu" });
     await expect(drawer.getByText("Chúng tôi đã nhận yêu cầu")).toBeVisible();
     await expect(drawer.getByText("Đội hỗ trợ Fire3D")).toBeVisible();
     await expect(drawer.getByText("Bạn", { exact: true })).toBeVisible();
@@ -425,16 +425,15 @@ test.describe("organization support", () => {
     await page.route("**/api/feedback", async (route) => { feedbackPosts.push({ key: await route.request().headerValue("idempotency-key"), body: route.request().postDataJSON() }); await route.fulfill({ status: 201, json: { id: "f", category: "UI", message: "ok", rating: 5, status: "Submitted", reviewedBy: null, reviewedAt: null, revision: 1, createdAt: "2026-10-10T00:00:00Z", updatedAt: "2026-10-10T00:00:00Z" } }); });
 
     await page.goto("/workspace/support?status=Open");
-    await expect(page.getByLabel("Trạng thái yêu cầu")).toHaveValue("Open");
+    await expect(page.getByRole("group", { name: "Trạng thái yêu cầu" }).getByRole("button", { name: "Mới" })).toHaveAttribute("aria-pressed", "true");
     expect(queries[0].get("status")).toBe("Open");
     await page.getByRole("button", { name: /Mở yêu cầu SUP-0001/ }).click();
-    const drawer = page.getByRole("dialog", { name: "Chi tiết yêu cầu" });
+    const drawer = page.getByRole("region", { name: "Chi tiết yêu cầu" });
     await expect(drawer.getByText(/Chưa có phản hồi/)).toBeVisible();
     await drawer.getByLabel("Tin nhắn mới").fill("Bổ sung: lỗi xảy ra với tệp 80MB");
     await drawer.getByRole("button", { name: "Gửi tin nhắn" }).click();
     await expect.poll(() => sends.length).toBe(1);
     expect(sends[0].key).toBeTruthy();
-    await page.keyboard.press("Escape");
 
     await page.getByRole("tab", { name: "Phản hồi" }).click();
     await expect(page.getByText("Bạn chưa gửi phản hồi nào")).toBeVisible();
@@ -495,18 +494,15 @@ test.describe("organization profile (new style)", () => {
 
     await page.goto("/workspace/profile");
     await page.getByLabel("Tên tổ chức", { exact: true }).fill("Fire3D Safety");
-    await page.getByRole("button", { name: "Lưu hồ sơ tổ chức" }).click();
-    await expect(page.getByText("Hồ sơ vừa được thay đổi ở nơi khác")).toBeVisible();
-    await expect(page.getByLabel("Tên tổ chức", { exact: true })).toHaveValue("Fire3D Safety");
-    await page.getByRole("button", { name: "Tải bản mới nhất" }).click();
-    await expect(page.getByText("Hồ sơ vừa được thay đổi ở nơi khác")).toHaveCount(0);
+    await page.getByRole("button", { name: "Lưu thay đổi" }).click();
+    await expect(page.getByText("Dữ liệu đã thay đổi trên máy chủ (412)")).toBeVisible();
     await expect(page.getByLabel("Tên tổ chức", { exact: true })).toHaveValue("Fire3D Safety");
 
-    await page.getByRole("button", { name: "Lưu hồ sơ tổ chức" }).click();
+    await page.getByRole("button", { name: "Ghi đè bằng giá trị của tôi" }).click();
     await expect(page.getByText("Số điện thoại đã được tổ chức khác sử dụng.")).toBeVisible();
     expect(updates[1].ifMatch).toBe('"5"');
 
-    await page.getByRole("button", { name: "Lưu hồ sơ tổ chức" }).click();
+    await page.getByRole("button", { name: "Ghi đè bằng giá trị của tôi" }).click();
     await expect(page.getByText("Đã lưu hồ sơ tổ chức")).toBeVisible();
     expect(updates[2].ifMatch).toBe('"5"');
   });

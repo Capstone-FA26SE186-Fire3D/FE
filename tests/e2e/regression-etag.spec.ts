@@ -38,7 +38,7 @@ async function openProfile(page: Page) {
   await tokenSession(page, "tok-profile");
   await page.route("**/api/auth/me", (route) => me.handle(route));
   await page.route("**/api/organizations/me", (route) => org.handle(route));
-  await page.goto("/workspace/profile");
+  await page.goto("/account");
   await expect(page.getByLabel("Họ và tên")).toHaveValue("Nguyễn Văn A");
   await expect(page.getByLabel("Tên tổ chức")).toHaveValue("Fire3D Studio");
   return { me, org };
@@ -100,7 +100,7 @@ test.describe("412 on commerce catalog edits (PATCH replaces every field)", () =
     const mock = newMock();
     await billingSignIn(page, billingAdmin);
     await mockBilling(page, mock);
-    await page.goto("/admin/commerce");
+    await page.goto("/admin/commerce?tab=packages");
     await page.getByRole("button", { name: "Sửa gói BLD-12", exact: true }).click();
     await page.getByLabel("Tên gói").fill("Tên gói tôi gõ");
     // Somebody else raises the price and saves first.
@@ -178,7 +178,7 @@ test.describe("412 on the PlatformAdmin organization editor", () => {
     await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [server.state.record], totalCount: 1, page: 1, pageSize: 20 } }));
     await page.route("**/api/organizations/org-1", (route) => server.handle(route));
     await page.goto("/admin/organizations?organization=org-1");
-    const drawer = page.getByRole("dialog", { name: "Thông tin tổ chức" });
+    const drawer = page.getByRole("region", { name: "Thông tin tổ chức" });
     await drawer.getByRole("button", { name: "Sửa hồ sơ" }).click();
     await drawer.getByLabel("Tên tổ chức").fill("Tên do admin gõ");
     server.otherEditor({ phoneNumber: "+842369999999" });

@@ -169,7 +169,7 @@ test.describe("layout and accessibility", () => {
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
         await page.screenshot({ path: testInfo.outputPath(`buildings-${scheme}-${width}.png`), fullPage: true });
 
-        await page.getByRole("button", { name: "Tạo công trình", exact: true }).click();
+        await page.getByRole("button", { name: "Thêm công trình", exact: true }).click();
         const dialog = page.getByRole("dialog", { name: "Tạo công trình" });
         await expect(dialog).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
@@ -188,7 +188,7 @@ test.describe("layout and accessibility", () => {
     await page.keyboard.press("Tab");
     await expect(page.getByRole("link", { name: "Bỏ qua điều hướng" })).toBeFocused();
 
-    const opener = page.getByRole("button", { name: "Tạo công trình", exact: true });
+    const opener = page.getByRole("button", { name: "Thêm công trình", exact: true });
     await opener.focus();
     await page.keyboard.press("Enter");
     const dialog = page.getByRole("dialog", { name: "Tạo công trình" });

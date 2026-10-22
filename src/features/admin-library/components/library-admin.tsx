@@ -29,7 +29,7 @@ export function LibraryAdmin() {
   const version = get("version");
   const kind = get("kind");
 
-  const header = (actions?: ReactNode) => <PageHeader title="Thư viện tổ chức" description="Template kịch bản, rubric mẫu và metadata thiết bị do PlatformAdmin quản lý theo phiên bản. Tổ chức chọn mẫu đã xuất bản và sao chép vào bản nháp của mình; cập nhật mẫu không đổi kịch bản đã soạn." breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Thư viện tổ chức" }]} actions={actions} />;
+  const header = (actions?: ReactNode) => <PageHeader eyebrow="Quản lý nội dung" title="Thư viện tổ chức" description="Template kịch bản, rubric mẫu và metadata thiết bị hỗ trợ. Không tự chia sẻ IFC hay kịch bản riêng của tổ chức." breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Thư viện tổ chức" }]} actions={actions} />;
 
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
   if (user?.role !== 0 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin có thể quản lý thư viện tổ chức.</Alert>;

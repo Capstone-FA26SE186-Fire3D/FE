@@ -13,9 +13,8 @@ export function GateStepper({ gates }: { gates: Gate[] }) {
     <ol className="ver-gates" aria-label="Ba cổng độc lập: kết quả kỹ thuật, duyệt nội dung, release">
       {gates.map((gate, index) => <li key={gate.id} className="ver-gate" data-known={gate.state.known} data-gate={gate.id}>
         <span className="ver-gate-index" aria-hidden="true">{index + 1}</span>
-        <div>
-          <p className="ver-gate-title">{gate.title}</p>
-          <StatusBadge tone={gate.state.tone}>{gate.state.label}</StatusBadge>
+        <div className="ver-gate-body">
+          <div className="ver-gate-head"><p className="ver-gate-title">{gate.title}</p><StatusBadge tone={gate.state.tone}>{gate.state.label}</StatusBadge></div>
           <p className="ver-gate-detail">{gate.state.detail}</p>
         </div>
       </li>)}

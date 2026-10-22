@@ -3,7 +3,7 @@
 import { RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/dialog";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -27,54 +27,62 @@ function metaOf(known: HistoryItem | null, detail: SessionDetail | undefined): M
 
 const metricOrder = ["reached_exit", "completion_time_seconds", "wrong_exits", "hazard_exposure", "distance_meters"];
 
-function Criterion({ criterion }: { criterion: CriterionResult }) {
-  const threshold = criterion.threshold === null ? "" : ` ${formatMetricValue(criterion.metric, criterion.threshold)}`;
-  return <li className="th-criterion" data-testid="criterion">
-    <header>
-      <strong>{metricName(criterion.metric)}</strong>
-      <StatusBadge tone={criterion.passed ? "success" : "danger"}>{criterion.passed ? "Đạt" : "Chưa đạt"}</StatusBadge>
-    </header>
-    {criterion.label && <p className="th-criterion-label" data-testid="criterion-label">{criterion.label}</p>}
-    {criterion.description && <p className="ops-muted">{criterion.description}</p>}
-    <p>Yêu cầu: {operatorSymbol(criterion.operator)}{threshold} · {criterion.mandatory ? "Bắt buộc" : "Không bắt buộc"}{criterion.weight === null ? "" : ` · Trọng số ${criterion.weight.toLocaleString("vi-VN")}`}</p>
-    <p>Đo được: {formatMetricValue(criterion.metric, criterion.value)}</p>
-    {criterion.reason && <p>{criterionReasonText(criterion.reason)}</p>}
-    {criterion.id && <span className="th-code">Mã tiêu chí: {criterion.id}</span>}
-  </li>;
+function CriteriaTable({ criteria }: { criteria: CriterionResult[] }) {
+  return <table className="th-table">
+    <thead><tr><th scope="col">Tiêu chí</th><th scope="col">Số đo</th><th scope="col">Yêu cầu</th><th scope="col">Bắt buộc</th><th scope="col">Kết quả</th></tr></thead>
+    <tbody>{criteria.map((criterion, index) => {
+      const threshold = criterion.threshold === null ? "—" : `${operatorSymbol(criterion.operator)} ${formatMetricValue(criterion.metric, criterion.threshold)}`;
+      const unavailable = criterion.reason === "METRIC_UNAVAILABLE";
+      return <tr key={`${criterion.id}-${index}`} data-testid="criterion">
+        <td data-label="Tiêu chí" className="th-table-name">
+          <strong data-testid={criterion.label ? "criterion-label" : undefined}>{criterion.label || metricName(criterion.metric)}</strong>
+          {criterion.label && <span className="th-table-metric">{metricName(criterion.metric)}</span>}
+          {criterion.description && <span className="ops-muted th-table-desc">{criterion.description}</span>}
+          {criterion.id && <span className="th-code">Mã tiêu chí: {criterion.id}</span>}
+        </td>
+        <td data-label="Số đo">{formatMetricValue(criterion.metric, criterion.value)}</td>
+        <td data-label="Yêu cầu">{threshold}{criterion.weight === null ? null : <small>Trọng số {criterion.weight.toLocaleString("vi-VN")}</small>}</td>
+        <td data-label="Bắt buộc">{criterion.mandatory ? "Bắt buộc" : "Không"}</td>
+        <td data-label="Kết quả">
+          <StatusBadge tone={unavailable ? "warning" : criterion.passed ? "success" : "danger"}>{unavailable ? "Chưa chấm" : criterion.passed ? "Đạt" : "Chưa đạt"}</StatusBadge>
+          {criterion.reason && <small>{criterionReasonText(criterion.reason)}</small>}
+          {criterion.reason && <span className="th-code">{criterion.reason}</span>}
+        </td>
+      </tr>;
+    })}</tbody>
+  </table>;
+}
+
+/** Reason and score of the stored result, inside the assessment card. The pass threshold exists only in Assessment. */
+function ResultFacts({ result }: { result: TrainingResult }) {
+  const assessment = result.mode === "Assessment" && result.passThresholdPercent !== null;
+  return <>
+    <div data-testid="result-outcome">
+      <p>{reasonText(result.reason)}</p>
+      {result.reason && <p className="th-code">Mã lý do: {result.reason}</p>}
+    </div>
+    <div data-testid="result-score" className="th-scoreline">
+      <span>Điểm</span>
+      <strong className="th-score" data-empty={result.scorePercent === null}>{formatScore(result.scorePercent)}</strong>
+      {assessment && <p data-testid="result-threshold">Ngưỡng đạt: {formatScore(result.passThresholdPercent)} (chỉ có ở chế độ Đánh giá)</p>}
+    </div>
+  </>;
 }
 
 function ResultBody({ result }: { result: TrainingResult }) {
-  const outcome = outcomeView(result.outcome);
   const metricKeys = [...metricOrder.filter((key) => key in result.metrics), ...Object.keys(result.metrics).filter((key) => !metricOrder.includes(key))];
   return <>
-    <section aria-labelledby="th-result-heading">
-      <h3 id="th-result-heading">Kết quả đã lưu</h3>
-      <div className="th-pair">
-        <div data-testid="result-outcome">
-          <span>Kết quả</span>
-          <StatusBadge tone={outcome.tone}>{outcome.label}</StatusBadge>
-          <p>{reasonText(result.reason)}</p>
-          {result.reason && <p className="th-code">Mã lý do: {result.reason}</p>}
-        </div>
-        <div data-testid="result-score">
-          <span>Điểm</span>
-          <strong className="th-score" data-empty={result.scorePercent === null}>{formatScore(result.scorePercent)}</strong>
-          {result.passThresholdPercent !== null && <p data-testid="result-threshold">Ngưỡng đạt: {formatScore(result.passThresholdPercent)}</p>}
-        </div>
-      </div>
-    </section>
-
     <section aria-labelledby="th-criteria-heading">
       <h3 id="th-criteria-heading">Tiêu chí</h3>
       {result.criteria && result.criteria.length > 0
-        ? <ul className="th-criteria">{result.criteria.map((criterion, index) => <Criterion key={`${criterion.id}-${index}`} criterion={criterion} />)}</ul>
+        ? <CriteriaTable criteria={result.criteria} />
         : <p className="ops-muted" data-testid="no-criteria">Máy chủ không trả tiêu chí chi tiết cho lượt này.</p>}
     </section>
 
     <section aria-labelledby="th-metrics-heading">
       <h3 id="th-metrics-heading">Số đo chính</h3>
       {metricKeys.length > 0
-        ? <dl className="th-metrics" data-testid="metrics">{metricKeys.map((key) => <div key={key} style={{ display: "contents" }}><dt>{metricName(key)}</dt><dd>{formatMetricValue(key, result.metrics[key])}</dd></div>)}</dl>
+        ? <dl className="th-tiles" data-testid="metrics">{metricKeys.map((key) => <div key={key}><dt>{metricName(key)}</dt><dd>{formatMetricValue(key, result.metrics[key])}</dd></div>)}</dl>
         : <p className="ops-muted">Máy chủ không trả số đo nào cho lượt này.</p>}
     </section>
 
@@ -127,12 +135,14 @@ function Body({ sessionId, known, onRefresh, onClose, accessToken }: { sessionId
     </dl>}
 
     {sessionView && resultView && <div className="th-pair" data-testid="detail-status">
-      <div data-testid="detail-session-status"><span>Trạng thái phiên</span><StatusBadge tone={sessionView.tone}>{sessionView.label}</StatusBadge><p>{sessionView.hint}</p></div>
-      <div data-testid="detail-result-status"><span>Kết quả</span><StatusBadge tone={resultView.tone}>{resultView.label}</StatusBadge><p>{resultView.hint}</p></div>
+      <section className="th-card" data-testid="detail-session-status" aria-label="Hoàn thành phiên"><span>Hoàn thành phiên</span><StatusBadge tone={sessionView.tone}>{sessionView.label}</StatusBadge><p>{sessionView.hint}</p></section>
+      <section className="th-card" data-testid="detail-result-status" aria-label="Kết quả đánh giá"><span>Kết quả đánh giá</span><StatusBadge tone={resultView.tone}>{resultView.label}</StatusBadge><p>{resultView.hint}</p>
+        {data.load?.kind === "result" && <ResultFacts result={data.load.result} />}
+      </section>
     </div>}
 
     {data.load?.kind === "result" && <ResultBody result={data.load.result} />}
-    {data.load?.kind === "result" && <p><Link className="underline" href={`/learning-hub?view=questions&session=${encodeURIComponent(sessionId)}`} data-testid="ask-about-result">Hỏi AI về kết quả này</Link> <span className="ops-muted">(AI chỉ đọc kết quả của riêng bạn; không đổi điểm.)</span></p>}
+    {data.load?.kind === "result" && <p className="th-ask"><Link className={buttonVariants({ variant: "secondary", size: "md" })} href={`/learning-hub?view=questions&session=${encodeURIComponent(sessionId)}`} data-testid="ask-about-result">Hỏi AI về kết quả này</Link><span className="ops-muted">AI chỉ giải thích kết quả cá nhân đã lưu, không đổi điểm.</span></p>}
 
     {data.load?.kind === "not-ready" && <Alert tone="info" title="Kết quả chưa sẵn sàng" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reload} disabled={detail.loading}><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>}>
       Máy chủ chưa lưu kết quả cho lượt tập này (mã RESULT_NOT_READY). Thường là lượt tập đang chờ thiết bị đồng bộ nốt dữ liệu. Đây không phải lỗi: hãy mở ứng dụng để đồng bộ rồi tải lại.

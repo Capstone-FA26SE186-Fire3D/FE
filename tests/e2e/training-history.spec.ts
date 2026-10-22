@@ -50,7 +50,7 @@ test.describe("list: session state and result are shown apart", () => {
     const backend = new TrainingBackend();
     seedMix(backend);
     await start(page, backend);
-    await expect(page.getByRole("heading", { level: 1, name: "Lịch sử", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Lịch sử luyện tập", exact: true })).toBeVisible();
     await expect(rows(page)).toHaveCount(10);
     await expect(page.getByText("BÀI CỦA NGƯỜI KHÁC")).toHaveCount(0);
 
@@ -94,17 +94,17 @@ test.describe("list: session state and result are shown apart", () => {
     const labels: Record<string, [string, number]> = {
       Launching: ["Đang khởi động", 1], Running: ["Đang chơi", 1], AwaitingSync: ["Chờ đồng bộ", 1], Completed: ["Đã hoàn thành", 4],
     };
-    await expect(page.getByLabel("Trạng thái phiên").locator("option")).toHaveCount(5);
+    await expect(page.getByLabel("Trạng thái", { exact: true }).locator("option")).toHaveCount(5);
     // An old link with a legacy status shows the unfiltered list instead of a 400.
     await page.goto("/learning-hub?view=history&status=Crashed");
     await expect(rows(page)).toHaveCount(10);
-    await expect(page.getByLabel("Trạng thái phiên")).toHaveValue("");
+    await expect(page.getByLabel("Trạng thái", { exact: true })).toHaveValue("");
     expect(backend.lists().every((call) => !["Crashed", "Aborted", "Abandoned"].includes(call.params.get("status") ?? ""))).toBe(true);
     for (const [status, [label, count]] of Object.entries(labels)) {
       await page.goto(`/learning-hub?view=history&status=${status}`);
       await expect(rows(page), status).toHaveCount(count);
       await expect(page.getByTestId("row-session-status").first()).toContainText(label);
-      await expect(page.getByLabel("Trạng thái phiên")).toHaveValue(status);
+      await expect(page.getByLabel("Trạng thái", { exact: true })).toHaveValue(status);
     }
     // AwaitingSync (a Running session with a pinned completion) is not mixed into Running.
     expect(backend.lists().some((call) => call.params.get("status") === "AwaitingSync")).toBe(true);
@@ -308,13 +308,15 @@ test.describe("detail drawer: result", () => {
     const criteria = drawer.getByTestId("criterion");
     await expect(criteria).toHaveCount(4);
     await expect(criteria.nth(0)).toContainText("Đã tới lối ra");
-    await expect(criteria.nth(0)).toContainText("Yêu cầu: = Có · Bắt buộc · Trọng số 50");
+    await expect(criteria.nth(0)).toContainText("= Có");
+    await expect(criteria.nth(0)).toContainText("Bắt buộc");
+    await expect(criteria.nth(0)).toContainText("Trọng số 50");
     await expect(criteria.nth(0)).toContainText("Đạt");
-    await expect(criteria.nth(1)).toContainText("Yêu cầu: ≤ 2 phút · Không bắt buộc");
-    await expect(criteria.nth(1)).toContainText("Đo được: 1 phút 36 giây");
+    await expect(criteria.nth(1)).toContainText("≤ 2 phút");
+    await expect(criteria.nth(1)).toContainText("1 phút 36 giây");
     await expect(criteria.nth(2)).toContainText("Chưa đạt");
-    await expect(criteria.nth(2)).toContainText("Đo được: 3");
-    await expect(criteria.nth(3)).toContainText("Đo được: Không có");
+    await expect(criteria.nth(2)).toContainText("3");
+    await expect(criteria.nth(3)).toContainText("Không có");
     await expect(criteria.nth(3)).toContainText("Không có số đo để so sánh");
     const metrics = drawer.getByTestId("metrics");
     await expect(metrics).toContainText("Thời gian hoàn thành");

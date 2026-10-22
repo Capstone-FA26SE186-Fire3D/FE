@@ -18,7 +18,7 @@ export function HistoryFilterBar({ filters, buildings, knownBuildingNames, onCha
   const problem = rangeError(filters);
   const selectedMissing = filters.buildingId && !buildings.some((building) => building.id === filters.buildingId);
   return <form className="th-filters" aria-label="Bộ lọc lịch sử" onSubmit={(event) => event.preventDefault()}>
-    <Field label="Trạng thái phiên">{(props) => <Select {...props} value={filters.status} onChange={(event) => onChange({ status: event.target.value })}>
+    <Field label="Trạng thái">{(props) => <Select {...props} value={filters.status} onChange={(event) => onChange({ status: event.target.value })}>
       <option value="">Mọi trạng thái</option>
       {FILTER_STATUSES.map((status) => <option key={status} value={status}>{sessionStatusView(status).label}</option>)}
     </Select>}</Field>

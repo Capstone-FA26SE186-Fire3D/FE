@@ -82,7 +82,7 @@ test("account profile uses the latest ETags to update a user and its organizatio
     });
   });
 
-  await page.goto("/workspace/profile");
+  await page.goto("/account");
   await expect(page.getByRole("heading", { name: "Tài khoản của bạn" })).toBeVisible();
 
   await page.getByLabel("Họ và tên").fill("Nguyen Van B");
@@ -129,7 +129,7 @@ test("account profile maps the gender enum name returned by the API to its selec
     },
   }));
 
-  await page.goto("/workspace/profile");
+  await page.goto("/account");
   await expect(page.getByLabel("Giới tính")).toHaveValue("3");
   await page.getByRole("button", { name: "Lưu hồ sơ cá nhân" }).click();
 
@@ -184,7 +184,7 @@ test("avatar upload creates an intent, sends the image to storage, then complete
     });
   });
 
-  await page.goto("/workspace/profile");
+  await page.goto("/account");
   await page.locator('input[type="file"]').setInputFiles({ name: "avatar.png", mimeType: "image/png", buffer: Buffer.from([137, 80, 78, 71]) });
 
   await expect.poll(() => requests).toEqual([

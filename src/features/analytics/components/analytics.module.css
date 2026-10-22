@@ -65,3 +65,9 @@
   .dates > div { width: 100%; }
   .dates { width: 100%; }
 }
+
+.filters { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; margin: 0 0 14px; }
+.filters > div { width: 220px; }
+@media (max-width: 560px) {
+  .filters > div { width: 100%; }
+}

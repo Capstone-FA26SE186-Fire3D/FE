@@ -81,7 +81,7 @@ test.describe("/workspace/library (read only)", () => {
     await expect(page.getByRole("navigation", { name: "Quản lý tổ chức" }).getByRole("link", { name: "Thư viện mẫu" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Thêm mục|Xuất bản|Tạo phiên bản/ })).toHaveCount(0);
 
-    await page.getByTestId("filter-kind").selectOption("Equipment");
+    await page.getByTestId("filter-kind-Equipment").click();
     await expect(page).toHaveURL(/kind=Equipment/);
     await expect(page.getByTestId("org-item-TEMPLATE-SO-TAN")).toHaveCount(0);
     await page.getByRole("button", { name: "Xem mẫu BINH-CO2" }).click();
@@ -91,6 +91,39 @@ test.describe("/workspace/library (read only)", () => {
     await expect(drawer.getByTestId("version-preview")).toContainText("Không thêm năng lực cho runtime");
     await expect(drawer).toContainText("Áp dụng là sao chép");
     expect(backend.calls.filter((call) => call.path.startsWith("/api/admin"))).toEqual([]);
+  });
+
+  test("search and required-capability filters live in the page and the URL, narrow only the loaded page and say so", async ({ page }) => {
+    const backend = await openBrowse(page);
+    await page.goto("/workspace/library");
+    await expect(page.getByTestId("org-item-MAT-NA")).toBeVisible();
+    expect(backend.callsTo("GET", /^\/api\/library\/items$/).every((call) => !call.search.includes("search="))).toBe(true);
+
+    await page.getByLabel("Tìm mẫu").fill("co2");
+    await expect(page).toHaveURL(/q=co2/);
+    await expect(page.getByTestId("org-item-BINH-CO2")).toBeVisible();
+    await expect(page.getByTestId("org-item-MAT-NA")).toHaveCount(0);
+    await expect(page.getByRole("status").filter({ hasText: "Máy chủ chưa lọc theo tên hoặc năng lực" })).toContainText("Có 1 mẫu khớp");
+
+    await page.getByLabel("Tìm mẫu").fill("khói"); // matches the name of MAT-NA, not its code
+    await expect(page.getByTestId("org-item-MAT-NA")).toBeVisible();
+    await expect(page.getByTestId("org-item-BINH-CO2")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Xóa bộ lọc" }).click();
+    await expect(page).not.toHaveURL(/q=/);
+    await page.getByLabel("Năng lực runtime yêu cầu").selectOption("equipment.extinguisher");
+    await expect(page).toHaveURL(/cap=equipment\.extinguisher/);
+    await expect(page.getByTestId("org-item-BINH-CO2")).toBeVisible();
+    await expect(page.getByTestId("org-item-MAT-NA")).toHaveCount(0);
+    await page.getByLabel("Năng lực runtime yêu cầu").selectOption("none");
+    await expect(page.getByTestId("org-item-TEMPLATE-SO-TAN")).toBeVisible();
+    await expect(page.getByTestId("org-item-BINH-CO2")).toHaveCount(0);
+
+    await page.getByLabel("Tìm mẫu").fill("không-có-gì");
+    await expect(page.getByRole("heading", { name: "Không có mẫu khớp bộ lọc" })).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel("Tìm mẫu")).toHaveValue("không-có-gì");
+    await expect(page.getByLabel("Năng lực runtime yêu cầu")).toHaveValue("none");
   });
 
   test("deep link to an item that is not published (or was deactivated) says it is unavailable; the Draft is not leaked", async ({ page }) => {
@@ -108,7 +141,7 @@ test.describe("/workspace/library (read only)", () => {
     await page.goto("/workspace/library");
     await expect(page.getByRole("heading", { name: "Thư viện chưa có mẫu nào" })).toBeVisible();
     await expect(page.getByText("Bạn vẫn soạn kịch bản đầy đủ bằng tay")).toBeVisible();
-    await expect(page.locator("main tbody tr")).toHaveCount(1);
+    await expect(page.locator(".org-lib-card")).toHaveCount(0);
   });
 
   test("a Trainee is turned away; an API 403 and a failed load are explained with a retry", async ({ page }) => {

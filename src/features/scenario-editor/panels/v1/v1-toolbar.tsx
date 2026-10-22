@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, Flag, Flame, History, MapPinPlus, Move3d, MousePointer2, PanelLeft, Play, Redo2, Rotate3d, Save, ShieldCheck, Undo2, UserRound, Wrench } from "lucide-react";
+import { Ban, Flag, Flame, History, MapPinPlus, Move3d, MousePointer2, PanelLeft, Play, Rotate3d, Save, ShieldCheck, UserRound, Wrench } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -29,17 +29,11 @@ const TOOLS: Array<{ tool: V1Tool; label: string; icon: typeof MousePointer2; gi
   { tool: "rotate", label: "Xoay", icon: Rotate3d, gizmo: true },
 ];
 
-export function V1Toolbar({ tool, placeKind, onTool, gizmoEnabled, canUndo, canRedo, onUndo, onRedo, undoLabel, redoLabel, status, saveBlockedReason, onSave, onValidate, validating, versionsHref, onOpenTree, hasTree, kindStatus, placeDisabledReason }: {
+export function V1Toolbar({ tool, placeKind, onTool, gizmoEnabled, status, saveBlockedReason, onSave, onValidate, validating, versionsHref, onOpenTree, hasTree, kindStatus, placeDisabledReason }: {
   tool: V1Tool;
   placeKind: ObjectKind;
   onTool: (tool: V1Tool, placeKind?: ObjectKind) => void;
   gizmoEnabled: boolean;
-  canUndo: boolean;
-  canRedo: boolean;
-  onUndo: () => void;
-  onRedo: () => void;
-  undoLabel?: string;
-  redoLabel?: string;
   status: V1Status;
   saveBlockedReason: string | null;
   onSave: () => void;
@@ -74,10 +68,6 @@ export function V1Toolbar({ tool, placeKind, onTool, gizmoEnabled, canUndo, canR
           <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
         </Button>;
       })}
-    </div>
-    <div className="se-tool-group" role="group" aria-label="Lịch sử">
-      <Button type="button" variant="secondary" size="icon" disabled={!canUndo} aria-label={undoLabel ? `Hoàn tác: ${undoLabel}` : "Hoàn tác"} title="Hoàn tác (Ctrl/Cmd+Z)" data-testid="undo" onClick={onUndo}><Undo2 size={18} strokeWidth={1.75} aria-hidden="true" /></Button>
-      <Button type="button" variant="secondary" size="icon" disabled={!canRedo} aria-label={redoLabel ? `Làm lại: ${redoLabel}` : "Làm lại"} title="Làm lại (Ctrl/Cmd+Shift+Z)" data-testid="redo" onClick={onRedo}><Redo2 size={18} strokeWidth={1.75} aria-hidden="true" /></Button>
     </div>
     <span className="se-toolbar-spacer" />
     <StatusBadge tone={st.tone} data-testid="save-status" role="status" aria-live="polite">{st.label}</StatusBadge>

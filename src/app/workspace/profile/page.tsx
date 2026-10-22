@@ -1,7 +1,7 @@
-import { AccountProfile } from "@/features/account/components/account-profile";
+import { OrganizationProfile } from "@/features/organizations/components/organization-profile";
 
 export const metadata = { title: "Hồ sơ tổ chức" };
 
 export default function WorkspaceProfilePage() {
-  return <AccountProfile />;
+  return <OrganizationProfile />;
 }

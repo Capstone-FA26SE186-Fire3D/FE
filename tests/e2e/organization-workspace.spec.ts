@@ -25,7 +25,7 @@ test("list-first workspace searches, opens create form and creates a building", 
   await page.getByLabel("Tìm công trình").fill("không có");
   await expect(page.getByText("Chưa có công trình phù hợp.")).toBeVisible();
   await page.getByLabel("Tìm công trình").clear();
-  await page.getByRole("button", { name: "Tạo công trình", exact: true }).click();
+  await page.getByRole("button", { name: "Thêm công trình", exact: true }).click();
   await page.getByLabel("Tên công trình", { exact: true }).fill("Công trình mới");
   await page.getByLabel("Loại công trình").fill("Trường học");
   await page.getByLabel("Số tầng").fill("3");
@@ -64,7 +64,6 @@ for (const width of [1440, 820, 375]) {
     if (width < 768) await page.getByRole("button", { name: "Mở điều hướng" }).click();
     await page.getByRole("link", { name: "Hồ sơ tổ chức", exact: true }).click();
     await expect(page.getByLabel("Tên tổ chức", { exact: true })).toHaveValue("FET3D Lab");
-    await page.getByRole("button", { name: "Đổi mật khẩu", exact: true }).scrollIntoViewIfNeeded();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await page.screenshot({ path: testInfo.outputPath(`profile-${width}.png`), fullPage: true });
   });

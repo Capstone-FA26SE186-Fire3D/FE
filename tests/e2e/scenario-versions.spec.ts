@@ -215,8 +215,8 @@ test.describe("snapshot", () => {
     const mock = newMock({ snapshotResponses: [0, 201] });
     await setup(page, mock);
     await page.goto(`${base}?draft=${IDS.draft}`);
-    await expect(page.getByRole("heading", { name: "Phiên bản và readiness" })).toBeVisible();
-    await page.getByRole("button", { name: "Tạo snapshot từ draft" }).first().click();
+    await expect(page.getByRole("heading", { name: "Phiên bản và phát hành" })).toBeVisible();
+    await page.getByRole("button", { name: "Tạo phiên bản mới từ draft" }).first().click();
     await expect(page.getByLabel("Bản nháp")).toHaveValue(IDS.draft);
     await page.getByRole("button", { name: "Tải draft" }).click();
     await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"12"');
@@ -242,7 +242,7 @@ test.describe("snapshot", () => {
     });
     await setup(page, mock);
     await page.goto(base);
-    await page.getByRole("button", { name: "Tạo snapshot từ draft" }).first().click();
+    await page.getByRole("button", { name: "Tạo phiên bản mới từ draft" }).first().click();
     await expect(page.getByLabel("Bản nháp")).toHaveValue(IDS.draft2);
     await expect(page.getByLabel("Bản nháp").getByRole("option")).toHaveCount(2);
     await expect(page.getByLabel("Bản nháp").getByRole("option").first()).toContainText("hiện tại");
@@ -258,7 +258,7 @@ test.describe("snapshot", () => {
     const mock = newMock({ drafts: [], currentDraftId: null });
     await setup(page, mock);
     await page.goto(base);
-    await page.getByRole("button", { name: "Tạo snapshot từ draft" }).first().click();
+    await page.getByRole("button", { name: "Tạo phiên bản mới từ draft" }).first().click();
     await expect(page.getByText("Kịch bản này chưa có draft")).toBeVisible();
     await expect(page.getByRole("link", { name: "Mở trình soạn để tạo draft" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Tải draft" })).toBeDisabled();
@@ -268,7 +268,7 @@ test.describe("snapshot", () => {
     const mock = newMock({ snapshotResponses: [412], draftEtags: ['"12"', '"13"'] });
     await setup(page, mock);
     await page.goto(`${base}?draft=${IDS.draft}`);
-    await page.getByRole("button", { name: "Tạo snapshot từ draft" }).first().click();
+    await page.getByRole("button", { name: "Tạo phiên bản mới từ draft" }).first().click();
     await page.getByRole("button", { name: "Tải draft" }).click();
     await page.getByRole("button", { name: "Tạo snapshot", exact: true }).click();
     await expect(page.getByText("Draft đã thay đổi từ lần bạn tải")).toBeVisible();

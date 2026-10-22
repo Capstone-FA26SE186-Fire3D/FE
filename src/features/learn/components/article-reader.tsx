@@ -7,7 +7,7 @@ import { useAsyncData } from "@/api/use-async-data";
 import { Button } from "@/components/ui/button";
 import { routes } from "@/configs/routes";
 import { describeReadError, learnApi } from "../api";
-import { ArticleActions } from "./article-actions";
+import { ArticleActions, AskAboutArticle } from "./article-actions";
 import { BlockRenderer } from "./block-renderer";
 import { LearnBookmarksProvider } from "./bookmarks-context";
 import { formatPostDate } from "./post-card";
@@ -64,18 +64,26 @@ export function ArticleReader({ slug }: { slug: string }) {
   return <LearnBookmarksProvider>
     <div className="reader-layout">
       <article className="article-reading">
-        <div className="article-meta"><span>{kindLabel[version.kind]}</span>{date && <><span>•</span><span>{date}</span></>}</div>
+        <nav className="reader-breadcrumb" aria-label="Đường dẫn">
+          <Link href={routes.learn}>Khám phá Learn</Link><span aria-hidden="true">›</span><span aria-current="page">{kindLabel[version.kind]}</span>
+        </nav>
+        <ul className="learn-tags reader-chips" aria-label="Loại bài và tình huống">
+          <li><span className="reader-kind-chip" data-kind={version.kind}>{kindLabel[version.kind]}</span></li>
+          {version.situations.map((item) => <li key={item.id}><Link href={`${routes.learn}?situation=${encodeURIComponent(item.slug)}`}>{item.name}</Link></li>)}
+        </ul>
         <h1>{version.title}</h1>
-        <p className="lede">{version.summary}</p>
-        {version.situations.length > 0 && <ul className="learn-tags" aria-label="Tình huống">{version.situations.map((item) => <li key={item.id}><Link href={`${routes.learn}?situation=${encodeURIComponent(item.slug)}`}>{item.name}</Link></li>)}</ul>}
-        <ArticleActions postId={post.data.id} slug={post.data.slug} />
-        <BlockRenderer blocks={version.blocks} fallbackSummary={version.summary} />
-        {version.sources.length > 0 && <section className="learn-sources" aria-labelledby="learn-sources-heading">
-          <h2 id="learn-sources-heading">Nguồn tham khảo</h2>
-          <ul>{version.sources.map((source) => <li key={`${source.sourceId}-${source.role}`}><strong>{source.title}</strong>{source.versionLabel && <span> · bản {source.versionLabel}</span>}<small>{roleLabel[source.role] ?? source.role}</small></li>)}</ul>
-        </section>}
+        <p className="lede">{version.summary}{" "}<span className="reader-published">{date ? `Xuất bản ${date} · ` : ""}phiên bản {version.versionNumber}</span></p>
+        <div className="reader-content-card"><BlockRenderer blocks={version.blocks} fallbackSummary={version.summary} /></div>
       </article>
-      <RelatedPosts currentId={post.data.id} situation={firstSituation} />
+      <aside className="reader-rail" aria-label="Công cụ của bài viết">
+        <ArticleActions postId={post.data.id} slug={post.data.slug} />
+        {version.sources.length > 0 && <section className="reader-card learn-sources" aria-labelledby="learn-sources-heading">
+          <h2 id="learn-sources-heading">Nguồn tham khảo</h2>
+          <ul>{version.sources.map((source) => <li key={`${source.sourceId}-${source.role}`}><strong>{source.title}{source.versionLabel && <span> · {source.versionLabel}</span>}</strong><small>{roleLabel[source.role] ?? source.role}</small></li>)}</ul>
+        </section>}
+        <AskAboutArticle slug={post.data.slug} />
+        <RelatedPosts currentId={post.data.id} situation={firstSituation} />
+      </aside>
     </div>
   </LearnBookmarksProvider>;
 }
