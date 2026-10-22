@@ -279,7 +279,7 @@ export function OrganizationSupport() {
     <PageHeader
       title="Hỗ trợ & phản hồi"
       description="Gửi yêu cầu hỗ trợ, theo dõi trao đổi với đội Fire3D và gửi phản hồi về sản phẩm. Chỉ bạn xem được các mục do bạn tạo."
-      breadcrumbs={[{ label: "Không gian tổ chức", href: routes.workspaceBuildings }, { label: "Hỗ trợ & phản hồi" }]}
+      eyebrow="Quản lý" breadcrumbs={[{ label: "Hỗ trợ & phản hồi" }]}
     />
     <SupportTabs accessToken={accessToken} myId={user.id} audience="organization" />
   </>;

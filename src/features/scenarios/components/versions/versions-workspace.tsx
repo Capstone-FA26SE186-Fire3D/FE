@@ -162,6 +162,7 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
 
   return <>
     <PageHeader
+      eyebrow="Bước 4–5 · Phiên bản và phát hành"
       title="Phiên bản và readiness"
       description={scenario.data ? `Kịch bản “${scenario.data.name}”: tạo snapshot, dựng package, kiểm tra kỹ thuật, gửi duyệt và tạo release.` : "Tạo snapshot, dựng package, kiểm tra kỹ thuật, gửi duyệt và tạo release."}
       breadcrumbs={crumbs}

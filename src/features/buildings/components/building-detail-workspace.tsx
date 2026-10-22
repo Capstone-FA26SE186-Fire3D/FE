@@ -40,6 +40,7 @@ import { ScenariosPanel } from "./scenarios-panel";
 export const buildingTabs = ["overview", "ifc", "scenarios", "access", "qr", "services"] as const;
 export type BuildingTab = (typeof buildingTabs)[number];
 const tabLabels: Record<BuildingTab, string> = { overview: "Hành trình", ifc: "IFC & xử lý", scenarios: "Kịch bản", access: "Quyền tham gia", qr: "QR", services: "Dịch vụ" };
+const tabEyebrow: Record<BuildingTab, string> = { overview: "Công trình", ifc: "Bước 2 · IFC và xử lý", scenarios: "Bước 3 · Soạn kịch bản", access: "Công trình · Quyền tham gia", qr: "Công trình · Mã QR", services: "Công trình · Dịch vụ" };
 const SCENARIO_PAGE_SIZE = 20;
 // After a Succeeded job the revision is re-read until QA moved it out of Uploaded/Processing; ~1 minute at most.
 const MAX_SETTLE_POLLS = 20;
@@ -233,7 +234,7 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "overview" }:
   return <>
     <PageHeader
       title={data?.name ?? "Đang tải công trình…"}
-      eyebrow="Công trình"
+      eyebrow={tabEyebrow[tab]}
       description={data ? `${data.buildingType || "Công trình"} · ${data.totalFloors} tầng` : undefined}
       breadcrumbs={crumbs}
       actions={<>

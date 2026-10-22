@@ -21,7 +21,7 @@ import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { buildingConflict, buildingsApi, sameBuildingVersion } from "../api";
-import { describeApiError, describeBuildingWriteError, formatDateTime } from "../format";
+import { describeApiError, describeBuildingWriteError, formatDate, formatDateTime } from "../format";
 import { organizationsApi } from "@/features/organizations/api";
 import type { Building, BuildingSummary } from "../types";
 import { BuildingConflictAlert, BuildingForm, buildingFormToInput, emptyForm, formFromBuilding, validateBuildingForm, type FormState } from "./building-form";
@@ -230,7 +230,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
 
   const pageDescription = isAdmin
     ? "Xem và quản lý công trình thay mặt tổ chức. Mọi thao tác đều áp dụng cho tổ chức đã chọn."
-    : "Quản lý công trình và các phiên bản mô hình IFC của tổ chức.";
+    : "Chọn một công trình để tiếp tục hành trình: IFC, kịch bản, phiên bản, phát hành.";
 
   const organizationSelect = orgPicker && <div className="ops-toolbar">
     <div className="ops-field ops-toolbar-grow">
@@ -252,6 +252,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
   }
 
   const rowActions = (building: BuildingSummary) => <span className="ops-actions" style={{ justifyContent: "flex-end" }}>
+    <Button asChild size="sm" variant="secondary"><Link href={`${routes.workspaceBuildings}/${building.id}`} aria-label={`Mở hành trình ${building.name}`}>Mở</Link></Button>
     <Button size="sm" variant="quiet" onClick={() => void openEdit(building.id)} aria-label={`Chỉnh sửa ${building.name}`}><Pencil size={14} aria-hidden="true" />Sửa</Button>
     {building.isActive && <Button size="sm" variant="quiet" onClick={() => openArchive(building)} aria-label={`Lưu trữ ${building.name}`}><Archive size={14} aria-hidden="true" />Lưu trữ</Button>}
   </span>;
@@ -260,6 +261,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
 
   return <>
     <PageHeader
+      eyebrow={isAdmin ? undefined : "Huấn luyện"}
       title={isAdmin && organizationName ? `Công trình · ${organizationName}` : "Công trình"}
       description={pageDescription}
       breadcrumbs={crumbs}
@@ -288,17 +290,18 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
 
     {view === "table"
       ? <Table caption="Danh sách công trình">
-        <thead><tr><th>Công trình</th><th>Loại</th><th>Số tầng</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
+        <thead><tr><th>Công trình</th><th>Loại</th><th>Số tầng</th><th>Trạng thái</th><th>Cập nhật</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
         <tbody>
-          {loading && !data && <TableMessage colSpan={5}><SkeletonRows rows={5} label="Đang tải danh sách công trình…" /></TableMessage>}
+          {loading && !data && <TableMessage colSpan={6}><SkeletonRows rows={5} label="Đang tải danh sách công trình…" /></TableMessage>}
           {items.map((building) => <tr key={building.id}>
             <td><Link className="ops-cell-primary" href={`${routes.workspaceBuildings}/${building.id}`}>{building.name}</Link></td>
             <td>{building.buildingType || "Chưa phân loại"}</td>
             <td>{building.totalFloors}</td>
             <td>{statusBadge(building)}</td>
+            <td>{formatDate(building.updatedAt)}</td>
             <td className="ops-cell-actions">{rowActions(building)}</td>
           </tr>)}
-          {data && !items.length && <TableMessage colSpan={5}>{filtering
+          {data && !items.length && <TableMessage colSpan={6}>{filtering
             ? <EmptyState icon={Search} title="Chưa có công trình phù hợp." description="Thử đổi từ khóa hoặc bộ lọc trạng thái." />
             : <EmptyState icon={Building2} title="Tạo công trình đầu tiên" description="Thêm công trình, tải lên mô hình IFC rồi xây dựng kịch bản sơ tán cho đúng không gian thật." action={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo công trình</Button>} />}</TableMessage>}
         </tbody>

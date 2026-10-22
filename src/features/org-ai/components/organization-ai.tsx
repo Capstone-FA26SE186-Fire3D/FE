@@ -9,7 +9,6 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
 
 import type { AiRequest } from "../types";
@@ -54,7 +53,7 @@ export function OrganizationAi() {
     <PageHeader
       title="Trợ lý AI"
       description="Hỏi đáp có trích dẫn và đề xuất kịch bản trên nguồn đã được duyệt. AI chỉ đề xuất; không tự sửa kịch bản, không phát hành, không phải chứng nhận an toàn."
-      breadcrumbs={[{ label: "Không gian tổ chức", href: routes.workspaceBuildings }, { label: "Trợ lý AI" }]}
+      eyebrow="Huấn luyện" breadcrumbs={[{ label: "Trợ lý AI" }]}
       actions={<Button asChild variant="quiet"><Link href={BILLING_AI_HREF}><Gauge size={16} aria-hidden="true" />Quota AI & top-up</Link></Button>}
     />
     <Tabs value={tab} onValueChange={changeTab}>

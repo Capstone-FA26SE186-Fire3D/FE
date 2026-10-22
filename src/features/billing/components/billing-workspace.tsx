@@ -14,7 +14,6 @@ import { SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { buildingsApi } from "@/features/buildings/api";
 import { billingApi } from "../api";
@@ -113,7 +112,7 @@ export function BillingWorkspace() {
     <PageHeader
       title="Dịch vụ & thanh toán"
       description="Mua, gia hạn hoặc nâng cấp dịch vụ theo công trình, mua thêm quota AI trả trước, thanh toán qua PayOS và theo dõi kích hoạt."
-      breadcrumbs={[{ label: "Không gian tổ chức", href: routes.workspaceBuildings }, { label: "Dịch vụ & thanh toán" }]}
+      eyebrow="Quản lý" breadcrumbs={[{ label: "Dịch vụ & thanh toán" }]}
       actions={<><Button variant="quiet" onClick={reloadAll} disabled={quotations.loading}><RefreshCw size={16} aria-hidden="true" />{quotations.loading ? "Đang tải…" : "Tải lại"}</Button>{canPurchase && <Button onClick={() => openCreate("service")}><Plus size={16} aria-hidden="true" />Tạo báo giá</Button>}</>}
     />
 
