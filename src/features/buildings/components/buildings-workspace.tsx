@@ -252,7 +252,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
   }
 
   const rowActions = (building: BuildingSummary) => <span className="ops-actions" style={{ justifyContent: "flex-end" }}>
-    <Button asChild size="sm" variant="secondary"><Link href={`${routes.workspaceBuildings}/${building.id}`} aria-label={`Mở hành trình ${building.name}`}>Mở</Link></Button>
+    <Button asChild size="sm" variant="secondary"><Link href={`${routes.workspaceBuildings}/${building.id}`} aria-describedby={`building-name-${building.id}`}>Mở</Link></Button>
     <Button size="sm" variant="quiet" onClick={() => void openEdit(building.id)} aria-label={`Chỉnh sửa ${building.name}`}><Pencil size={14} aria-hidden="true" />Sửa</Button>
     {building.isActive && <Button size="sm" variant="quiet" onClick={() => openArchive(building)} aria-label={`Lưu trữ ${building.name}`}><Archive size={14} aria-hidden="true" />Lưu trữ</Button>}
   </span>;
@@ -294,7 +294,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
         <tbody>
           {loading && !data && <TableMessage colSpan={6}><SkeletonRows rows={5} label="Đang tải danh sách công trình…" /></TableMessage>}
           {items.map((building) => <tr key={building.id}>
-            <td><Link className="ops-cell-primary" href={`${routes.workspaceBuildings}/${building.id}`}>{building.name}</Link></td>
+            <td><Link id={`building-name-${building.id}`} className="ops-cell-primary" href={`${routes.workspaceBuildings}/${building.id}`}>{building.name}</Link></td>
             <td>{building.buildingType || "Chưa phân loại"}</td>
             <td>{building.totalFloors}</td>
             <td>{statusBadge(building)}</td>
@@ -313,7 +313,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
           : <EmptyState icon={Building2} title="Tạo công trình đầu tiên" description="Thêm công trình, tải lên mô hình IFC rồi xây dựng kịch bản sơ tán cho đúng không gian thật." action={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo công trình</Button>} />)}
         <div className="ops-card-grid">
           {items.map((building) => <article key={building.id} className="ops-item-card">
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><h3><Link href={`${routes.workspaceBuildings}/${building.id}`}>{building.name}</Link></h3>{statusBadge(building)}</div>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><h3><Link id={`building-name-${building.id}`} href={`${routes.workspaceBuildings}/${building.id}`}>{building.name}</Link></h3>{statusBadge(building)}</div>
             <dl><dt>Loại</dt><dd>{building.buildingType || "Chưa phân loại"}</dd><dt>Số tầng</dt><dd>{building.totalFloors}</dd></dl>
             {rowActions(building)}
           </article>)}
