@@ -170,7 +170,7 @@ export function OrganizationsAdmin() {
             {list.data && !items.length && <TableMessage colSpan={5}><EmptyState icon={filtering ? Search : Landmark} title={filtering ? "Không có tổ chức phù hợp." : "Chưa có tổ chức"} description={filtering ? "Thử đổi từ khóa hoặc bộ lọc." : "Tạo tổ chức đầu tiên, sau đó cấp OrganizationUser owner."} action={!filtering && <Button onClick={() => { resetCreate(); setCreating(true); }}><Plus size={16} aria-hidden="true" />Tạo tổ chức</Button>} /></TableMessage>}
           </tbody>
         </Table>
-        {list.data && totalCount > 0 && <p className="adm-note" role="status">Hiển thị {items.length} trên {formatCount(totalCount)} · bộ lọc áp dụng toàn bộ danh sách.</p>}
+        {list.data && totalCount > 0 && totalCount <= PAGE_SIZE && <p className="adm-note" role="status">Hiển thị {items.length} trên {formatCount(totalCount)} · bộ lọc áp dụng toàn bộ danh sách.</p>}
         {totalCount > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} disabled={list.loading} />}
       </div>
 

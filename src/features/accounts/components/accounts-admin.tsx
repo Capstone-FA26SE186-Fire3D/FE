@@ -177,7 +177,7 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
           <tbody>
             {list.loading && !list.data && <TableMessage colSpan={5}><SkeletonRows rows={6} label="Đang tải danh sách tài khoản…" /></TableMessage>}
             {items.map((account) => <tr key={account.id} data-selected={selected?.id === account.id ? "true" : undefined}>
-              <td><button type="button" className="ops-cell-primary" aria-label={`Mở tài khoản ${account.email}`} style={{ border: 0, background: "none", textAlign: "left", cursor: "pointer", font: "inherit", minWidth: 0 }} onClick={() => void openDetail(account.id)}>{account.email}</button></td>
+              <td><button type="button" className="ops-cell-primary" aria-label={`Mở tài khoản ${account.email}`} style={{ border: 0, background: "none", textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => void openDetail(account.id)}>{account.email}</button></td>
               <td>{account.fullName || account.username || "—"}</td>
               <td><StatusBadge tone={roleTone(account.role)}>{roleLabel(account.role)}</StatusBadge></td>
               <td>{orgName(account.organizationId) ?? (account.organizationId ? `${account.organizationId.slice(0, 8)}…` : "—")}</td>
@@ -186,7 +186,7 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
             {list.data && !items.length && <TableMessage colSpan={5}><EmptyState icon={filtering ? Search : Users} title={filtering ? "Không có tài khoản phù hợp." : "Chưa có tài khoản"} description={filtering ? "Thử đổi từ khóa hoặc bộ lọc." : "Tạo tài khoản đầu tiên cho tổ chức hoặc học viên."} /></TableMessage>}
           </tbody>
         </Table>
-        {list.data && totalCount > 0 && <p className="adm-note" role="status">Hiển thị {items.length} trên {formatCount(totalCount)} · trang {page} / {Math.max(1, Math.ceil(totalCount / PAGE_SIZE))}</p>}
+        {list.data && totalCount > 0 && totalCount <= PAGE_SIZE && <p className="adm-note" role="status">Hiển thị {items.length} trên {formatCount(totalCount)} · trang {page} / {Math.max(1, Math.ceil(totalCount / PAGE_SIZE))}</p>}
         {totalCount > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} disabled={list.loading} />}
       </div>
 

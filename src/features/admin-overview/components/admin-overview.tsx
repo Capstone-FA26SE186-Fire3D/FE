@@ -1,7 +1,7 @@
 "use client";
 
 import { BookOpen, ClipboardCheck, CreditCard, LifeBuoy } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { Panel } from "@/components/ui/panel";
 import { StatusBadge, type Tone } from "@/components/ui/status-badge";
@@ -18,6 +18,7 @@ import { supportApi } from "@/features/support/api";
 import { formatCount } from "../format";
 import { KpiRow, KpiTile } from "./admin-kit";
 
+const since30 = () => new Date(Date.now() - 30 * 86_400_000).toISOString();
 const sum = (items: Array<{ count: number }>) => items.reduce((total, item) => total + item.count, 0);
 
 /** One server total read with page size 1 (only `total`/`totalCount` is used). Null while unknown or when the read failed. */
@@ -61,8 +62,7 @@ export function AdminOverview() {
   const [waited, setWaited] = useState(false);
   useEffect(() => { const timer = window.setTimeout(() => setWaited(true), 4000); return () => window.clearTimeout(timer); }, []);
   const training = useAsyncData("overview:training", (signal) => analyticsApi.training(token, { kind: "platform" }, {}, signal), enabled);
-  const since = useMemo(() => new Date(Date.now() - 30 * 86_400_000).toISOString(), []);
-  const paid = useTotal("overview:paid30", (signal) => billingApi.listLedger(token, "requests", { status: "Paid", from: since, page: 1, pageSize: 1 }, signal).then((page) => page.totalCount), enabled);
+    const paid = useTotal("overview:paid30", (signal) => billingApi.listLedger(token, "requests", { status: "Paid", from: since30(), page: 1, pageSize: 1 }, signal).then((page) => page.totalCount), enabled);
   const audit = useAsyncData("overview:audit", (signal) => supportApi.listAuditLogs(token, { page: 1, pageSize: 4 }, signal), enabled);
 
   const accounts = operations?.accounts ?? null;

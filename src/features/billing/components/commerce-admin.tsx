@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useAsyncData } from "@/api/use-async-data";
@@ -19,6 +18,8 @@ import { PoliciesSection } from "./admin-policies";
 import { AdminQuotaSection } from "./admin-quota";
 import { QuotationsSection } from "./admin-sales";
 
+/** Start of the 30-day window, read when a request runs (not during render). */
+const since30 = () => new Date(Date.now() - 30 * 86_400_000).toISOString();
 const TABS = ["payments", "packages", "policies", "discounts", "quotes", "enterprise", "quota"] as const;
 type TabId = (typeof TABS)[number];
 
@@ -35,9 +36,8 @@ export function CommerceAdmin() {
 
   const enabled = ready && user?.role === 0 && Boolean(accessToken);
   const token = accessToken as string;
-  const since = useMemo(() => new Date(Date.now() - 30 * 86_400_000).toISOString(), []);
-  const orders = useAsyncData("commerce:total:orders30", (signal) => billingApi.listLedger(token, "checkouts", { from: since, page: 1, pageSize: 1 }, signal), enabled);
-  const paid = useAsyncData("commerce:total:paid30", (signal) => billingApi.listLedger(token, "requests", { status: "Paid", from: since, page: 1, pageSize: 1 }, signal), enabled);
+    const orders = useAsyncData("commerce:total:orders30", (signal) => billingApi.listLedger(token, "checkouts", { from: since30(), page: 1, pageSize: 1 }, signal), enabled);
+  const paid = useAsyncData("commerce:total:paid30", (signal) => billingApi.listLedger(token, "requests", { status: "Paid", from: since30(), page: 1, pageSize: 1 }, signal), enabled);
   const stuck = useAsyncData("commerce:total:reconcile", (signal) => billingApi.listLedger(token, "checkouts", { status: "NeedsReconcile", page: 1, pageSize: 1 }, signal), enabled);
   const stuckCount = stuck.data?.totalCount ?? 0;
 
