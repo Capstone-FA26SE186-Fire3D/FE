@@ -1,6 +1,6 @@
 "use client";
 
-import { Crosshair, Home, RotateCcw, TriangleAlert } from "lucide-react";
+import { RotateCcw, TriangleAlert } from "lucide-react";
 import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,8 @@ export type ViewportHandle = {
   resetCamera: () => void;
   focusSelection: () => void;
   viewCentre: () => { x: number; y: number; z: number };
+  zoomBy: (factor: number) => void;
+  setCameraLocked: (locked: boolean) => void;
 };
 
 export type ViewportProps = {
@@ -56,26 +58,29 @@ export type ViewportProps = {
   onModelStatus: (status: ModelStatus) => void;
   /** Called when the signed URL was rejected or had expired: the owner fetches a new one (changes `model.key`). */
   onUrlExpired: () => void;
+  /** Screen position of the selected marker after each frame (null when none/off screen); drives the contextual toolbar. */
+  onSelectionScreen?: (position: { x: number; y: number } | null) => void;
 };
 
 const EXPIRED_STATUSES = new Set([400, 401, 403, 404, 410]);
 
 /** The only React component that owns a WebGL context. Loaded with next/dynamic (ssr: false). */
-export default function EditorViewport({ ref, markers, selection, tool, placeKind, gizmoEnabled, model, activeFloor, floors, showModel, layerVisibility, onSelect, onPlace, onTransform, onModelPick, onModelStatus, onUrlExpired }: ViewportProps) {
+export default function EditorViewport({ ref, markers, selection, tool, placeKind, gizmoEnabled, model, activeFloor, floors, showModel, layerVisibility, onSelect, onPlace, onTransform, onModelPick, onModelStatus, onUrlExpired, onSelectionScreen }: ViewportProps) {
   const { resolved } = useTheme();
   const hostRef = useRef<HTMLDivElement>(null);
   const controllerRef = useRef<EditorSceneController | null>(null);
-  const latest = useRef<Omit<ViewportProps, "ref">>({ markers, selection, tool, placeKind, gizmoEnabled, model, activeFloor, floors, showModel, layerVisibility, onSelect, onPlace, onTransform, onModelPick, onModelStatus, onUrlExpired });
+  const latest = useRef<Omit<ViewportProps, "ref">>({ markers, selection, tool, placeKind, gizmoEnabled, model, activeFloor, floors, showModel, layerVisibility, onSelect, onPlace, onTransform, onModelPick, onModelStatus, onUrlExpired, onSelectionScreen });
   const themeRef = useRef(resolved);
   const [remount, setRemount] = useState(0);
   const [lost, setLost] = useState(false);
   const [unsupported, setUnsupported] = useState(false);
   const [status, setStatus] = useState<ModelStatus>({ phase: "none" });
   const autoRefreshes = useRef(0);
+  const lastScreen = useRef<{ x: number; y: number } | null>(null);
   const MAX_AUTO_REFRESH = 2;
 
   useEffect(() => {
-    latest.current = { markers, selection, tool, placeKind, gizmoEnabled, model, activeFloor, floors, showModel, layerVisibility, onSelect, onPlace, onTransform, onModelPick, onModelStatus, onUrlExpired };
+    latest.current = { markers, selection, tool, placeKind, gizmoEnabled, model, activeFloor, floors, showModel, layerVisibility, onSelect, onPlace, onTransform, onModelPick, onModelStatus, onUrlExpired, onSelectionScreen };
     themeRef.current = resolved;
   });
 
@@ -83,6 +88,8 @@ export default function EditorViewport({ ref, markers, selection, tool, placeKin
     resetCamera: () => controllerRef.current?.resetCamera(),
     focusSelection: () => controllerRef.current?.focusSelection(),
     viewCentre: () => controllerRef.current?.viewCentre() ?? { x: 0, y: 0, z: 0 },
+    zoomBy: (factor) => controllerRef.current?.zoomBy(factor),
+    setCameraLocked: (locked) => controllerRef.current?.setCameraLocked(locked),
   }), []);
 
   const publishStatus = (next: ModelStatus) => {
@@ -108,6 +115,15 @@ export default function EditorViewport({ ref, markers, selection, tool, placeKin
       onModelPick: (pick) => latest.current.onModelPick(pick),
       onContextLost: () => setLost(true),
       onContextRestored: () => setLost(false),
+      onFrame: () => {
+        const report = latest.current.onSelectionScreen;
+        if (!report) return;
+        const next = controllerRef.current?.selectionScreen() ?? null;
+        const before = lastScreen.current;
+        if (before?.x === next?.x && before?.y === next?.y) return;
+        lastScreen.current = next;
+        report(next);
+      },
     }, themeRef.current);
     controllerRef.current = controller;
     const p = latest.current;
@@ -174,10 +190,6 @@ export default function EditorViewport({ ref, markers, selection, tool, placeKin
 
   return <div className="se-viewport" data-model-state={status.phase}>
     <div ref={hostRef} className="se-canvas-host" role="application" aria-label="Khung nhìn 3D. Dùng chuột hoặc cảm ứng để xoay, kéo để di chuyển, cuộn để thu phóng; danh sách đối tượng bên cạnh là cách chọn bằng bàn phím." />
-    {!unsupported && <div className="se-viewport-tools">
-      <Button type="button" variant="secondary" size="icon" aria-label="Đặt lại camera" title="Đặt lại camera" onClick={() => controllerRef.current?.resetCamera()}><Home size={18} strokeWidth={1.75} aria-hidden="true" /></Button>
-      <Button type="button" variant="secondary" size="icon" aria-label="Căn camera vào đối tượng đang chọn" title="Căn camera vào đối tượng đang chọn" disabled={!selection} onClick={() => controllerRef.current?.focusSelection()}><Crosshair size={18} strokeWidth={1.75} aria-hidden="true" /></Button>
-    </div>}
     {status.phase === "loading" && <div className="se-overlay-chip" role="status"><Skeleton style={{ width: 14, height: 14, borderRadius: 999 }} /> Đang tải mô hình{status.progress !== null ? ` ${Math.round(status.progress * 100)}%` : "…"}</div>}
     {status.phase === "error" && !lost && <div className="se-overlay-card" role="alert">
       <TriangleAlert size={20} aria-hidden="true" />

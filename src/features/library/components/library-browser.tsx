@@ -13,7 +13,6 @@ import { Select } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { Pagination, Table, TableMessage } from "@/components/ui/table";
-import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { libraryApi } from "../api";
 import { describeLibraryError } from "../errors";
@@ -48,7 +47,7 @@ export function LibraryBrowser() {
   const list = useAsyncData(`library-org:${kind}:${page}`, (signal) => libraryApi.listItems(accessToken ?? "", { kind, page, pageSize: PAGE_SIZE }, signal), ready && Boolean(accessToken) && (user?.role === 0 || user?.role === 1));
   const items = list.data?.items ?? [];
 
-  const header = <PageHeader title="Thư viện mẫu" description="Template kịch bản, rubric mẫu và thiết bị do quản trị hệ thống xuất bản. Bạn có thể dùng hoặc tự soạn hoàn toàn; chọn mẫu và xem trước trong trình soạn kịch bản." breadcrumbs={[{ label: "Không gian tổ chức", href: routes.workspaceBuildings }, { label: "Thư viện mẫu" }]} />;
+  const header = <PageHeader title="Thư viện mẫu" description="Template kịch bản, rubric mẫu và thiết bị do quản trị hệ thống xuất bản. Bạn có thể dùng hoặc tự soạn hoàn toàn; chọn mẫu và xem trước trong trình soạn kịch bản." eyebrow="Huấn luyện" breadcrumbs={[{ label: "Thư viện mẫu" }]} />;
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
 
   return <>

@@ -199,3 +199,21 @@
   .se-chip { min-height: 44px; }
   .se-object, .se-layer, .se-tree .se-add { min-height: 44px; }
 }
+
+/* Floating viewport controls (UIArc Floating Button Group style) */
+.se-stage { position: relative; display: flex; flex: 1; min-height: 240px; min-width: 0; }
+.se-stage > .se-viewport { flex: 1; min-width: 0; }
+.se-float { position: absolute; z-index: 5; display: flex; align-items: center; gap: 2px; padding: 4px; border: 1px solid var(--line-strong); background: color-mix(in srgb, var(--surface) 94%, transparent); box-shadow: var(--shadow-pop); backdrop-filter: blur(8px); }
+.se-float-pill { top: 12px; right: 12px; border-radius: 999px; padding: 4px 6px; }
+.se-float-rail { top: 68px; right: 12px; flex-direction: column; border-radius: 999px; padding: 6px 4px; }
+.se-float-context { transform: translate(-50%, calc(-100% - 22px)); border-radius: 999px; padding: 4px 6px; white-space: nowrap; }
+.se-float-btn { display: inline-grid; flex: none; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 50%; background: transparent; color: var(--text); cursor: pointer; transition: background-color 150ms ease, color 150ms ease; }
+.se-float-btn:hover:not(:disabled) { background: var(--hover); }
+.se-float-btn[aria-pressed="true"] { background: var(--ember-soft); color: var(--ember); }
+.se-float-btn[data-tone="danger"]:hover:not(:disabled) { background: var(--danger-soft); color: var(--danger); }
+.se-float-btn:disabled { color: var(--dim); opacity: .55; cursor: not-allowed; }
+.se-float-btn:focus-visible { outline: 2px solid var(--ember); outline-offset: 1px; }
+.se-float-sep { width: 1px; height: 22px; margin: 0 4px; background: var(--line-strong); }
+.se-float-sep-h { width: 22px; height: 1px; margin: 4px 0; }
+@media (max-width: 767px), (pointer: coarse) { .se-float-btn { width: 44px; height: 44px; } .se-float-rail { top: 74px; } }
+@media (max-width: 767px) { .se-stage { flex: none; } }

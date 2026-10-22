@@ -32,7 +32,7 @@ const ROLE: Record<AnalyticsVariant, 0 | 1> = { organization: 1, platform: 0, "a
  * One reporting screen for the three scopes: the caller's own organization, the whole platform and one organization seen
  * by an Admin. The tenant is chosen by the route and the session, never by a client filter; the period is the only query.
  */
-export function AnalyticsWorkspace({ variant, organizationId, title, description, breadcrumbs }: { variant: AnalyticsVariant; organizationId?: string; title: string; description: string; breadcrumbs: Crumb[] }) {
+export function AnalyticsWorkspace({ variant, organizationId, title, description, breadcrumbs, eyebrow }: { variant: AnalyticsVariant; organizationId?: string; title: string; description: string; breadcrumbs: Crumb[]; eyebrow?: string }) {
   const { accessToken, ready, user } = useAuthSession();
   const { urlFrom, urlTo, hasRange, error: rangeError, range, get, setParams, apply } = useAnalyticsRange();
   const tabs = TABS[variant];
@@ -60,6 +60,7 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
       title={title}
       description={description}
       breadcrumbs={breadcrumbs}
+      eyebrow={eyebrow}
       actions={<Button variant="quiet" onClick={active.reload} disabled={active.loading || Boolean(rangeError)}><RefreshCw size={16} aria-hidden="true" />{active.loading ? "Đang tải…" : "Tải lại"}</Button>}
     />
 
