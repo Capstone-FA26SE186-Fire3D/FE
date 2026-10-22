@@ -7,6 +7,7 @@ import { Table } from "@/components/ui/table";
 import { routes } from "@/configs/routes";
 import { fmt, formatRate, formatSeconds, shortId } from "../format";
 import type { AiUsage, TrainingReport } from "../types";
+import { GROUP_LABELS } from "./filters";
 import { DataTable, EmptyReport, outcomeLabels, OutcomeBar, PairBars } from "./charts";
 import styles from "./analytics.module.css";
 
@@ -82,16 +83,38 @@ export function TrainingReportView({ data, organizationNames, showOrganizationLi
         </DataTable>
       </Panel>
 
-      <Panel title="Theo bài huấn luyện" description="Tối đa 100 bài có nhiều lượt chơi nhất. API chỉ trả mã bài, chưa có tên.">
+      <Panel title="Theo bài huấn luyện" description="Tối đa 100 bài có nhiều lượt chơi nhất.">
         {data.byTraining.length ? <>
-          <PairBars label="Lượt chơi theo bài huấn luyện" rows={data.byTraining.slice(0, 8).map((row) => ({ key: row.trainingId, label: `Bài ${shortId(row.trainingId)}`, plays: row.plays, completed: row.completed }))} />
+          <PairBars label="Lượt chơi theo bài huấn luyện" rows={data.byTraining.slice(0, 8).map((row) => ({ key: row.trainingId, label: row.trainingName ?? `Bài ${shortId(row.trainingId)}`, plays: row.plays, completed: row.completed }))} />
           <DataTable caption="Lượt chơi theo bài huấn luyện" summary={`Xem bảng đầy đủ (${data.byTraining.length} bài)`}>
-            <thead><tr><th>Mã bài</th><th className={styles.num}>Lượt chơi</th><th className={styles.num}>Có kết quả</th><th className={styles.num}>Đạt</th></tr></thead>
-            <tbody>{data.byTraining.map((row) => <tr key={row.trainingId}><td><span className={styles.mono}>{row.trainingId}</span></td><td className={styles.num}>{fmt(row.plays)}</td><td className={styles.num}>{fmt(row.completed)}</td><td className={styles.num}>{fmt(row.passed)}</td></tr>)}</tbody>
+            <thead><tr><th>Bài</th><th className={styles.num}>Lượt chơi</th><th className={styles.num}>Có kết quả</th><th className={styles.num}>Đạt</th></tr></thead>
+            <tbody>{data.byTraining.map((row) => <tr key={row.trainingId}><td>{row.trainingName && <div>{row.trainingName}</div>}<span className={styles.mono}>{row.trainingId}</span></td><td className={styles.num}>{fmt(row.plays)}</td><td className={styles.num}>{fmt(row.completed)}</td><td className={styles.num}>{fmt(row.passed)}</td></tr>)}</tbody>
           </DataTable>
         </> : <p className={styles.muted}>Chưa có bài huấn luyện nào có lượt chơi trong kỳ.</p>}
       </Panel>
     </div>}
+
+    {!empty && (data.byBuilding.length > 0 || data.byScenario.length > 0) && <div className="ops-grid ops-grid-2" style={{ marginTop: 16 }}>
+      {data.byScenario.length > 0 && <Panel title="Theo kịch bản" description="Tối đa 100 kịch bản có nhiều lượt chơi nhất.">
+        <Table caption="Lượt chơi theo kịch bản">
+          <thead><tr><th>Kịch bản</th><th className={styles.num}>Lượt chơi</th><th className={styles.num}>Có kết quả</th><th className={styles.num}>Đạt</th></tr></thead>
+          <tbody>{data.byScenario.map((row) => <tr key={row.scenarioId}><td>{row.scenarioName ?? `Kịch bản ${shortId(row.scenarioId)}`}</td><td className={styles.num}>{fmt(row.plays)}</td><td className={styles.num}>{fmt(row.completed)}</td><td className={styles.num}>{fmt(row.passed)}</td></tr>)}</tbody>
+        </Table>
+      </Panel>}
+      {data.byBuilding.length > 0 && <Panel title="Theo công trình" description="Tối đa 100 công trình có nhiều lượt chơi nhất.">
+        <Table caption="Lượt chơi theo công trình">
+          <thead><tr><th>Công trình</th><th className={styles.num}>Lượt chơi</th><th className={styles.num}>Học viên</th><th className={styles.num}>Có kết quả</th></tr></thead>
+          <tbody>{data.byBuilding.map((row) => <tr key={row.buildingId}><td>{row.buildingName ?? `Công trình ${shortId(row.buildingId)}`}</td><td className={styles.num}>{fmt(row.plays)}</td><td className={styles.num}>{fmt(row.uniqueTrainees)}</td><td className={styles.num}>{fmt(row.completed)}</td></tr>)}</tbody>
+        </Table>
+      </Panel>}
+    </div>}
+
+    {data.cohorts && <Panel title={`Nhóm số liệu${data.groupBy ? ` · ${GROUP_LABELS[data.groupBy]}` : ""}`} description="Mỗi nhóm đếm học viên khác nhau riêng, không cộng dồn giữa các nhóm." style={{ marginTop: 16 }}>
+      {data.cohorts.length ? <Table caption="Số liệu theo nhóm">
+        <thead><tr><th>Nhóm</th><th className={styles.num}>Lượt chơi</th><th className={styles.num}>Học viên</th><th className={styles.num}>Có kết quả</th><th className={styles.num}>Bỏ dở</th><th className={styles.num}>Chờ đồng bộ</th><th className={styles.num}>Đạt / chấm</th><th className={styles.num}>Tỷ lệ đạt</th><th className={styles.num}>Thời lượng TB</th></tr></thead>
+        <tbody>{data.cohorts.map((row) => <tr key={row.key}><td>{row.label}</td><td className={styles.num}>{fmt(row.plays)}</td><td className={styles.num}>{fmt(row.uniqueTrainees)}</td><td className={styles.num}>{fmt(row.completed)}</td><td className={styles.num}>{fmt(row.abandoned)}</td><td className={styles.num}>{fmt(row.awaitingSync)}</td><td className={styles.num}>{fmt(row.passed)} / {fmt(row.assessed)}</td><td className={styles.num}>{formatRate(row.passRate, "—")}</td><td className={styles.num}>{formatSeconds(row.averageDurationSeconds)}</td></tr>)}</tbody>
+      </Table> : <p className={styles.muted}>Chưa có nhóm nào trong kỳ.</p>}
+    </Panel>}
 
     {data.byOrganization && <Panel title="Theo tổ chức" description="Tối đa 100 tổ chức có nhiều lượt chơi nhất trong kỳ." style={{ marginTop: 16 }}>
       {data.byOrganization.length ? <Table caption="Lượt chơi theo tổ chức">
