@@ -42,7 +42,7 @@ export function AiSideRail({ accessToken, onOpenRequest }: { accessToken: string
     <section className="org-card" aria-labelledby="org-ai-recent-title">
       <h2 id="org-ai-recent-title" className="org-card-title">Yêu cầu gần đây</h2>
       {recent.error !== undefined && !recent.data && <p className="org-card-sub" role="alert">Chưa đọc được lịch sử. <Button size="sm" variant="quiet" onClick={recent.reload}>Thử lại</Button></p>}
-      {recent.data && items.length === 0 && <p className="org-card-sub">Chưa có yêu cầu AI nào.</p>}
+      {recent.data && items.length === 0 && <p className="org-card-sub">Chưa có yêu cầu gần đây.</p>}
       <ul className="org-stack-sm" style={{ margin: 0, padding: 0, listStyle: "none" }}>
         {items.map((item) => <li key={item.requestId}>
           <button type="button" className="org-pick" onClick={() => onOpenRequest(item.requestId)} aria-label={`Gần đây: ${operationLabel(item.operation)} ${item.requestId.slice(0, 8)}`}>

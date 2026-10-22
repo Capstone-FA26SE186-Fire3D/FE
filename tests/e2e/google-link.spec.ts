@@ -309,7 +309,7 @@ test.describe("layout on the real profile page", () => {
           await page.route("**/api/organizations/me", (route) => route.fulfill({ json: { id: "org-1", name: "Fire3D Lab", slug: "f", address: "Đà Nẵng", phoneNumber: "+842361234567", isActive: true, profileRevision: 1, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }, headers: { ETag: '"1"' } }));
           await page.emulateMedia({ colorScheme: scheme });
           await page.setViewportSize({ width, height: width < 768 ? 800 : 900 });
-          await page.goto("/workspace/profile");
+          await page.goto("/account");
           const section = page.getByTestId("google-link-panel");
           await expect(section).toBeVisible();
           await expect(section.getByText(label === "google-only" ? "Chỉ đăng nhập bằng Google" : label === "linked" ? "Đã liên kết Google" : "Chưa liên kết Google", { exact: true })).toBeVisible();
