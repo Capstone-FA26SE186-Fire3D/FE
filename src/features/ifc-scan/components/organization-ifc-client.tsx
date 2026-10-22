@@ -29,5 +29,5 @@ export function OrganizationIfcClient() {
     return <Card className="admin-card"><h1>Không có quyền truy cập</h1><p>Tài khoản học viên không có quyền chuẩn bị mô hình IFC.</p></Card>;
   }
 
-  return <IfcScanWorkspace embedded eyebrow="Mô hình IFC" title="Quét mô hình IFC" description="Chọn tệp IFC để xem mô hình, kiểm tra cấu trúc và các điểm neo." />;
+  return <IfcScanWorkspace embedded eyebrow="Công cụ" title="Quét mô hình IFC" description="Chọn tệp IFC để xem mô hình, kiểm tra cấu trúc và các điểm neo." />;
 }

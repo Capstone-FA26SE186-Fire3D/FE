@@ -1,4 +1,5 @@
 import { Suspense, type ReactNode } from "react";
+import "@/assets/styles/ops-org.css";
 import { OperationsShell } from "@/layouts/operations-shell";
 
 export default function WorkspaceLayout({ children }: { children: ReactNode }) {

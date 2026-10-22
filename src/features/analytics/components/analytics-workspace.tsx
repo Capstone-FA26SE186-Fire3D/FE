@@ -1,7 +1,7 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { Download, RefreshCw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { PageHeader, type Crumb } from "@/components/ui/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { accountsApi } from "@/features/accounts/api";
+import { describeApiError } from "@/api/describe-error";
 import { analyticsApi } from "../api";
 import type { AnalyticsScope, OperationsReport } from "../types";
 import { OperationsReportView } from "./operations-report";
@@ -48,6 +49,27 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
   const revenue = useAsyncData(`revenue:${key}`, (signal) => analyticsApi.revenue(accessToken as string, range, signal), enabled && tab === "revenue" && variant === "platform", { keepWhenDenied: true });
   const names = useAsyncData("analytics:organization-names", () => accountsApi.organizations(accessToken as string).then((page) => new Map(page.items.map((item) => [item.id, item.name]))), enabled && tab === "training" && variant === "platform");
 
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const exportCsv = async () => {
+    if (!accessToken || exporting) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const text = await analyticsApi.exportTraining(accessToken, scope, range);
+      const url = URL.createObjectURL(new Blob(["﻿", text], { type: "text/csv;charset=utf-8" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "bao-cao-huan-luyen.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (cause) {
+      setExportError(describeApiError(cause, "Không xuất được CSV. Hãy thử lại sau."));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const operationsData = operations.data;
   useEffect(() => { if (operationsData) onOperations?.(operationsData); }, [operationsData, onOperations]);
 
@@ -60,10 +82,14 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
 
   const refresh = <Button variant="quiet" onClick={active.reload} disabled={active.loading || Boolean(rangeError)}><RefreshCw size={16} aria-hidden="true" />{active.loading ? "Đang tải…" : "Tải lại"}</Button>;
 
-  return <>
+  const org = variant === "organization" && !sectionHeading;
+  const exportButton = org && tab === "training" ? <Button variant="secondary" onClick={() => void exportCsv()} disabled={exporting || Boolean(rangeError)}><Download size={16} aria-hidden="true" />{exporting ? "Đang xuất…" : "Xuất CSV"}</Button> : null;
+
+  return <div className={org ? "org" : undefined}>
     {sectionHeading
       ? <div className="ops-page-header" style={{ marginBottom: 14 }}><div><h2 className="adm-section-title" style={{ margin: 0 }}>{title}</h2><p className="ops-muted" style={{ marginTop: 6 }}>{description}</p></div><div className="ops-actions">{refresh}</div></div>
-      : <PageHeader title={title} description={description} breadcrumbs={breadcrumbs} eyebrow={eyebrow} actions={refresh} />}
+      : <PageHeader title={title} description={description} breadcrumbs={breadcrumbs} eyebrow={eyebrow} actions={<>{exportButton}{refresh}</>} />}
+    {exportError && <Alert tone="danger" title="Không xuất được CSV">{exportError}</Alert>}
 
     <RangeBar key={`${urlFrom}|${urlTo}`} urlFrom={urlFrom} urlTo={urlTo} onApply={apply} />
     <PeriodMeta data={meta} hasRange={hasRange} urlFrom={urlFrom} urlTo={urlTo} />
@@ -76,5 +102,5 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
       <TabsContent value="operations">{!rangeError && <ReportShell query={operations} title="báo cáo vận hành">{(data) => <OperationsReportView data={data} scope={variant === "organization" ? "organization" : variant === "platform" ? "platform" : "admin-organization"} organizationId={organizationId} />}</ReportShell>}</TabsContent>
       <TabsContent value="revenue">{!rangeError && <ReportShell query={revenue} title="báo cáo doanh thu">{(data) => <RevenueReportView data={data} />}</ReportShell>}</TabsContent>
     </Tabs>}
-  </>;
+  </div>;
 }

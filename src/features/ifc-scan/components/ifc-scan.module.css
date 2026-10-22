@@ -115,7 +115,8 @@
 }
 
 .embedded { width: 100%; margin: 0; padding: 0; }
-.embedded .hero { margin-bottom: 18px; }
-.embedded .hero > :global(.kicker) { display: none; }
-.embedded .hero h1 { margin: 0 0 8px; font-size: clamp(24px, 2.4vw, 32px); font-weight: 600; line-height: 1.2; letter-spacing: -.03em; }
-.embedded .hero > p:last-child { font-size: 13px; line-height: 1.7; }
+.embedded .hero { margin-bottom: 24px; }
+.embedded .hero > :global(.kicker) { display: block; margin: 0 0 6px; color: var(--ember); font-size: 11px; font-weight: 650; letter-spacing: .12em; line-height: 1.4; text-transform: uppercase; }
+.embedded .hero > :global(.kicker) > :global(.kicker-line) { display: none; }
+.embedded .hero h1 { margin: 0 0 6px; font-size: clamp(24px, 2.2vw, 26px); font-weight: 600; line-height: 1.2; letter-spacing: -.02em; }
+.embedded .hero > p:last-child { font-size: 14px; line-height: 1.55; }

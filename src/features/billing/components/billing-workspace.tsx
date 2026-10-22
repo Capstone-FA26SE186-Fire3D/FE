@@ -31,7 +31,7 @@ import { ServiceCapacity } from "./service-capacity";
 import "../billing.css";
 
 const PAGE_SIZE = 20;
-const TABS = ["quotes", "services", "ai", "reminders", "enterprise"] as const;
+const TABS = ["services", "quotes", "ai", "reminders", "enterprise"] as const;
 type TabId = (typeof TABS)[number];
 
 function summarizeQuotation(quotation: Quotation) {
@@ -59,7 +59,7 @@ export function BillingWorkspace() {
   const search = useSearchParams();
 
   const tabParam = get("tab");
-  const tab: TabId = (TABS as readonly string[]).includes(tabParam) ? (tabParam as TabId) : "quotes";
+  const tab: TabId = (TABS as readonly string[]).includes(tabParam) ? (tabParam as TabId) : "services";
   const selectedId = get("quotation");
   const paymentId = get("payment");
   const serviceBuilding = get("service");
@@ -99,7 +99,7 @@ export function BillingWorkspace() {
 
   const openCreate = (mode: CreateMode, preselect: string[] = []) => setCreate({ open: true, mode, preselect });
   const reloadAll = () => { quotations.reload(); entitlements.reload(); setSettled((value) => value + 1); };
-  const openQuotation = (id: string) => { setOverride(null); setParams({ tab: null, quotation: id, payment: null }); };
+  const openQuotation = (id: string) => { setOverride(null); setParams({ tab: "quotes", quotation: id, payment: null }); };
 
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
   if (!enabled) return <Alert tone="danger" title="Không có quyền truy cập">Khu này dành cho tài khoản tổ chức.</Alert>;
@@ -108,20 +108,20 @@ export function BillingWorkspace() {
   const totalCount = quotations.data?.totalCount ?? 0;
   const noAccess = (error: unknown) => (error as { status?: number } | undefined)?.status === 403;
 
-  return <>
+  return <div className="org">
     <PageHeader
-      title="Dịch vụ & thanh toán"
-      description="Mua, gia hạn hoặc nâng cấp dịch vụ theo công trình, mua thêm quota AI trả trước, thanh toán qua PayOS và theo dõi kích hoạt."
+      title="Dịch vụ và thanh toán"
+      description="Gói công trình, trạng thái kích hoạt, quota AI trả trước và lịch sử thanh toán. Mua, gia hạn hoặc nâng cấp theo công trình; thanh toán qua PayOS."
       eyebrow="Quản lý" breadcrumbs={[{ label: "Dịch vụ & thanh toán" }]}
-      actions={<><Button variant="quiet" onClick={reloadAll} disabled={quotations.loading}><RefreshCw size={16} aria-hidden="true" />{quotations.loading ? "Đang tải…" : "Tải lại"}</Button>{canPurchase && <Button onClick={() => openCreate("service")}><Plus size={16} aria-hidden="true" />Tạo báo giá</Button>}</>}
+      actions={<><Button variant="quiet" size="icon" onClick={reloadAll} disabled={quotations.loading} aria-label="Tải lại" title="Tải lại"><RefreshCw size={16} aria-hidden="true" /></Button>{canPurchase && <><Button variant="secondary" onClick={() => openCreate("topup")}>Nạp quota AI</Button><Button onClick={() => openCreate("service")}><Plus size={16} aria-hidden="true" />Mua gói công trình</Button></>}</>}
     />
 
     {canPurchase && <ReminderBanner accessToken={token} refreshKey={settled} onOpen={() => setParams({ tab: "reminders", quotation: null, payment: null })} />}
 
-    <Tabs value={tab} onValueChange={(value) => setParams({ tab: value === "quotes" ? null : value, quotation: null, payment: null, service: null, request: null })}>
+    <Tabs value={tab} onValueChange={(value) => setParams({ tab: value === "services" ? null : value, quotation: null, payment: null, service: null, request: null })}>
       <TabsList aria-label="Dịch vụ và thanh toán">
-        <TabsTrigger value="quotes">Báo giá</TabsTrigger>
         <TabsTrigger value="services">Dịch vụ theo công trình</TabsTrigger>
+        <TabsTrigger value="quotes">Báo giá và thanh toán</TabsTrigger>
         <TabsTrigger value="ai">Quota AI</TabsTrigger>
         <TabsTrigger value="reminders">Nhắc gia hạn</TabsTrigger>
         <TabsTrigger value="enterprise">Số lượng lớn</TabsTrigger>
@@ -141,7 +141,7 @@ export function BillingWorkspace() {
               <td className="bill-money">{formatVnd(item.totalAmount)}{item.taxAmount === null && <span className="ops-cell-sub">ước tính, chưa thuế</span>}</td>
               <td className="ops-cell-actions"><Button size="sm" variant="quiet" onClick={() => openQuotation(item.id)} aria-label={`Xem báo giá ${item.quotationNumber}`}>Xem</Button></td>
             </tr>)}
-            {quotations.data && !items.length && <TableMessage colSpan={6}><EmptyState icon={FileText} title="Chưa có báo giá" description="Chọn một hoặc nhiều công trình và gói 6/12 tháng để tạo báo giá đầu tiên." action={canPurchase ? <Button onClick={() => openCreate("service")}><Plus size={16} aria-hidden="true" />Tạo báo giá</Button> : undefined} /></TableMessage>}
+            {quotations.data && !items.length && <TableMessage colSpan={6}><EmptyState icon={FileText} title="Chưa có báo giá" description="Chọn một hoặc nhiều công trình và gói 6/12 tháng để tạo báo giá đầu tiên." action={canPurchase ? <Button onClick={() => openCreate("service")}><Plus size={16} aria-hidden="true" />Mua gói công trình</Button> : undefined} /></TableMessage>}
           </tbody>
         </Table>
         {totalCount > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} disabled={quotations.loading} />}
@@ -149,27 +149,29 @@ export function BillingWorkspace() {
 
       <TabsContent value="services" style={{ marginTop: 16 }}>
         {entitlements.error !== undefined && <Alert tone="danger" title="Không tải được dịch vụ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={entitlements.reload}>Thử lại</Button>}>{billingErrorText(entitlements.error)}</Alert>}
-        <Table className="bill-table" caption="Kỳ dịch vụ của các công trình">
-          <thead><tr><th>Công trình</th><th>Kỳ dịch vụ</th><th className="bill-money">Học viên (gói gốc)</th><th>Trạng thái</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
-          <tbody>
-            {(entitlements.loading && !entitlements.data) || (buildings.loading && !buildings.data) ? <TableMessage colSpan={5}><SkeletonRows rows={5} label="Đang tải dịch vụ…" /></TableMessage> : null}
-            {serviceRows.map(({ buildingId, summary }) => {
-              const period = summary.current ?? summary.latest;
-              const name = nameOf[buildingId] ?? `Công trình ${buildingId.slice(0, 8)}`;
-              return <tr key={buildingId} data-testid="service-row">
-                <td><span className="ops-cell-primary bill-wrap">{name}</span></td>
-                <td>{period ? `${formatDate(period.startsAt)} – ${formatDate(period.endsAt)}` : "—"}{summary.state === "expiring" && <span className="ops-cell-sub">Còn {Math.max(summary.daysLeft ?? 0, 0)} ngày</span>}</td>
-                <td className="bill-money">{period?.learnerLimit != null ? formatNumber(period.learnerLimit) : "—"}</td>
-                <td>{stateBadge[summary.state]}</td>
-                <td className="ops-cell-actions">
-                  <Button size="sm" variant="quiet" onClick={() => setParams({ service: buildingId })} aria-label={`Chi tiết dịch vụ ${name}`}>Chi tiết</Button>
-                  {canPurchase && (summary.state === "none" ? <Button size="sm" variant="secondary" onClick={() => openCreate("service", [buildingId])} aria-label={`Mua dịch vụ ${name}`}>Mua</Button> : summary.state === "expiring" || summary.state === "expired" ? <Button size="sm" variant="secondary" onClick={() => openCreate("service", [buildingId])} aria-label={`Gia hạn ${name}`}>Gia hạn</Button> : null)}
-                </td>
-              </tr>;
-            })}
-            {entitlements.data && buildings.data && serviceRows.length === 0 && <TableMessage colSpan={5}><EmptyState icon={ShieldAlert} title="Chưa có công trình" description="Tạo công trình (tên và địa chỉ) rồi mua gói dịch vụ để kích hoạt." /></TableMessage>}
-          </tbody>
-        </Table>
+        {((entitlements.loading && !entitlements.data) || (buildings.loading && !buildings.data)) && <SkeletonRows rows={3} label="Đang tải dịch vụ…" />}
+        <div className="org-cols org-cols-3 org-service-cards">
+          {serviceRows.map(({ buildingId, summary }) => {
+            const period = summary.current ?? summary.latest;
+            const name = nameOf[buildingId] ?? `Công trình ${buildingId.slice(0, 8)}`;
+            return <article key={buildingId} className="org-card org-service-card" data-testid="service-row">
+              <div className="org-row" style={{ alignItems: "flex-start" }}><h3 className="org-service-name">{name}</h3>{stateBadge[summary.state]}</div>
+              <div className="org-stack-sm">
+                <p className="org-service-line">{period ? `${formatDate(period.startsAt)} – ${formatDate(period.endsAt)}` : "Chưa có kỳ dịch vụ"}</p>
+                {summary.state === "expiring" && <p className="org-service-line">Còn {Math.max(summary.daysLeft ?? 0, 0)} ngày</p>}
+                <p className="org-service-line">{period?.learnerLimit != null ? `Trainee: ${formatNumber(period.learnerLimit)} khác nhau/kỳ` : "Trainee: chưa đặt giới hạn"}</p>
+                <p className="org-service-line">Quota AI: tính gộp ở cấp tổ chức</p>
+              </div>
+              <div className="ops-actions">
+                <Button size="sm" variant="quiet" onClick={() => setParams({ service: buildingId })} aria-label={`Chi tiết dịch vụ ${name}`}>Chi tiết</Button>
+                {canPurchase && summary.state === "none" && <Button size="sm" variant="secondary" onClick={() => openCreate("service", [buildingId])} aria-label={`Mua dịch vụ ${name}`}>Mua</Button>}
+                {canPurchase && (summary.state === "effective" || summary.state === "expiring") && <Button size="sm" variant="secondary" onClick={() => openCreate("upgrade", [buildingId])} aria-label={`Nâng cấp ${name}`}>Nâng cấp</Button>}
+                {canPurchase && (summary.state === "expiring" || summary.state === "expired") && <Button size="sm" variant="quiet" onClick={() => openCreate("service", [buildingId])} aria-label={`Gia hạn ${name}`}>Gia hạn</Button>}
+              </div>
+            </article>;
+          })}
+        </div>
+        {entitlements.data && buildings.data && serviceRows.length === 0 && <EmptyState icon={ShieldAlert} title="Chưa có công trình" description="Tạo công trình (tên và địa chỉ) rồi mua gói dịch vụ để kích hoạt." />}
         <p className="bill-dim" style={{ marginTop: 10 }}>“Chi tiết” hiện học viên tối đa hiệu lực, suất đã dùng và lịch sử nâng cấp. Báo giá và thanh toán của từng công trình nằm ở tab “Dịch vụ” trong trang công trình.</p>
       </TabsContent>
 
@@ -218,7 +220,7 @@ export function BillingWorkspace() {
       mode={create.mode}
       onModeChange={(mode) => setCreate((state) => ({ ...state, mode }))}
       preselect={create.preselect}
-      onCreated={(result) => { setOverride(result); setParams({ tab: null, quotation: result.data.id, payment: null }, "replace"); quotations.reload(); }}
+      onCreated={(result) => { setOverride(result); setParams({ tab: "quotes", quotation: result.data.id, payment: null }, "replace"); quotations.reload(); }}
     />}
-  </>;
+  </div>;
 }

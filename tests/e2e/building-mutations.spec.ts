@@ -33,7 +33,7 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
     });
     await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ETag: '"1"' } }));
     await page.goto("/workspace/buildings");
-    await page.getByRole("button", { name: "Tạo công trình", exact: true }).click();
+    await page.getByRole("button", { name: "Thêm công trình", exact: true }).click();
     await page.getByLabel("Tên công trình", { exact: true }).fill("Công trình mới");
     await page.getByRole("button", { name: "Tạo và thêm IFC" }).click();
     await expect(page.getByText(/Nội dung bạn nhập vẫn được giữ lại/)).toBeVisible();
@@ -55,7 +55,7 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
     });
     await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ETag: '"1"' } }));
     await page.goto("/workspace/buildings");
-    await page.getByRole("button", { name: "Tạo công trình", exact: true }).click();
+    await page.getByRole("button", { name: "Thêm công trình", exact: true }).click();
     await page.getByLabel("Tên công trình", { exact: true }).fill("Công trình A");
     await page.getByRole("button", { name: "Tạo và thêm IFC" }).click();
     await expect(page.getByText(/Nội dung bạn nhập vẫn được giữ lại/)).toBeVisible();
