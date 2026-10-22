@@ -139,3 +139,6 @@
 .org .ops-pipeline li[data-state="todo"] .ops-pipeline-label, .org .ops-pipeline li[data-state="skipped"] .ops-pipeline-label { color: var(--dim); }
 .org .ops-pipeline-state { font-size: 13px; color: var(--dim); }
 
+.org-list td .ops-actions > button { border-color: transparent; }
+.org-lib-card { grid-template-rows: auto auto 1fr auto; }
+.org-lib-card .ops-actions { align-self: end; }

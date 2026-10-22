@@ -37,7 +37,7 @@ function problemOf(error: unknown): Problem {
  * Name, address and phone are editable; the slug is read only. Nothing else belongs to the organization profile.
  */
 export function OrganizationProfile() {
-  const { accessToken, ready, user } = useAuthSession();
+  const { accessToken, logout, ready, user } = useAuthSession();
   const toast = useToast();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [etag, setEtag] = useState<string | null>(null);
@@ -76,7 +76,7 @@ export function OrganizationProfile() {
 
   const save = async (event?: FormEvent, overrideEtag?: string | null) => {
     event?.preventDefault();
-    const sendEtag = overrideEtag ?? etag;
+    const sendEtag = overrideEtag ?? conflict?.etag ?? etag;
     if (!accessToken || !sendEtag || saving) return;
     setSaving(true);
     setProblem(null);
@@ -134,6 +134,7 @@ export function OrganizationProfile() {
         </form>}
       </section>
       <p className="org-card-sub" style={{ margin: 0 }}>Đổi mật khẩu, ảnh đại diện hoặc liên kết Google nằm ở <Link href={routes.account}>Tài khoản của bạn</Link>.</p>
+      <div><Button variant="secondary" onClick={() => void logout()}>Đăng xuất</Button></div>
     </div>
   </div>;
 }

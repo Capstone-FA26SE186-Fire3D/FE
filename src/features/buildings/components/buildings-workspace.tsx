@@ -292,7 +292,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
       <Select aria-label="Trạng thái" style={isAdmin ? { width: 180 } : undefined} value={status} onChange={(event) => setParams({ status: event.target.value === "active" ? "" : event.target.value })}>
         {statusOptions.map((option) => <option key={option.value} value={option.value}>{isAdmin ? option.label : orgStatusLabels[option.value]}</option>)}
       </Select>
-      {!isAdmin && <Button variant="quiet" size="icon" onClick={reload} disabled={loading} aria-label="Tải lại" title="Tải lại"><RefreshCw size={16} aria-hidden="true" /></Button>}
+      {!isAdmin && <Button variant="quiet" onClick={reload} disabled={loading}><RefreshCw size={16} aria-hidden="true" />{loading ? "Đang tải…" : "Tải lại"}</Button>}
       <div className="ops-segmented" role="group" aria-label="Kiểu hiển thị">
         <button type="button" aria-pressed={view === "table"} aria-label="Dạng bảng" title="Dạng bảng" onClick={() => setParams({ view: "" })}><List size={16} aria-hidden="true" /></button>
         <button type="button" aria-pressed={view === "cards"} aria-label="Dạng thẻ" title="Dạng thẻ" onClick={() => setParams({ view: "cards" })}><LayoutGrid size={16} aria-hidden="true" /></button>
