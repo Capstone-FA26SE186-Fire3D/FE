@@ -200,3 +200,12 @@
 @media (prefers-reduced-motion: reduce) {
   .learning-workspace *, .learning-workspace *::before, .learning-workspace *::after { transition-duration: .01ms !important; animation: none !important; scroll-behavior: auto !important; }
 }
+
+/* First-time tour dialog (opened from the intro card). Motion comes from the shared dialog animations, which the ops reduced-motion rule neutralises. */
+.ov-tour-step { display: grid; gap: 12px; padding-top: 4px; }
+.ov-tour-step h3 { margin: 0; font-size: 20px; font-weight: 650; line-height: 1.3; }
+.ov-tour-step p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
+.ov-tour-step .self-start { align-self: start; }
+.ov-tour-dots { display: flex; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ov-tour-dots li { flex: 1; height: 4px; border-radius: 4px; background: var(--line-strong); }
+.ov-tour-dots li[data-active="true"] { background: var(--ember); }

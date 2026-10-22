@@ -17,6 +17,7 @@ import { kindLabel } from "@/features/learn/types";
 import { trainingHistoryApi } from "@/features/training-history/api";
 import { formatWhen, modeLabel, resultCellView, sessionStatusView, trainingTitle } from "@/features/training-history/labels";
 import { useLocalPreference } from "@/utils/local-preference";
+import { IntroTour } from "./intro-tour";
 import { StateCard } from "./state-card";
 
 const INTRO_KEY = "fire3d-trainee-intro";
@@ -62,6 +63,7 @@ function Hero() {
 /** Skippable first-visit intro: nothing in it is a prerequisite, and a dismissal is remembered only in this browser. */
 function Intro() {
   const [state, setState] = useLocalPreference<"shown" | "dismissed">(INTRO_KEY, "shown", isIntroState);
+  const [tourOpen, setTourOpen] = useState(false);
   if (state === "dismissed") return null;
   return <section className="ov-intro" aria-labelledby="ov-intro-title" data-testid="trainee-intro">
     <div className="ov-intro-head">
@@ -75,9 +77,10 @@ function Intro() {
       <li><span className="ov-step-no" aria-hidden="true">3</span><div><strong>Xem kết quả</strong><span>Kết quả đánh giá tách khỏi hoàn thành phiên.</span></div></li>
     </ol>
     <div className="ov-intro-actions">
-      <Link className={buttonVariants({ variant: "primary" })} href={routes.download}>Xem hướng dẫn</Link>
+      <Button type="button" onClick={() => setTourOpen(true)} aria-haspopup="dialog">Xem hướng dẫn</Button>
       <Button type="button" variant="ghost" onClick={() => setState("dismissed")}>Bỏ qua</Button>
     </div>
+    <IntroTour open={tourOpen} onOpenChange={setTourOpen} />
   </section>;
 }
 
