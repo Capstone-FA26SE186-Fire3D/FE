@@ -189,7 +189,7 @@ test.describe("who sent it", () => {
     await expect(page.getByText("b@school.test")).toHaveCount(0);
 
     await page.getByRole("button", { name: /Mở ticket SUP-0001/ }).click();
-    const drawer = page.getByRole("dialog", { name: "Chi tiết ticket" });
+    const drawer = page.getByRole("region", { name: "Chi tiết ticket" });
     await expect(drawer.getByText("b@school.test")).toBeVisible();
     await expect(drawer.getByText("Trường An Toàn")).toBeVisible();
     await expect(drawer.getByRole("listitem").filter({ hasText: "Em cần hỗ trợ gấp" }).getByText("Trần Thị B")).toBeVisible();
@@ -437,7 +437,7 @@ test.describe("layout", () => {
         await expect(page.getByRole("row").filter({ hasText: "SUP-0001" }).getByText("Trần Thị B")).toBeVisible();
         expect(await overflow(page)).toBeLessThanOrEqual(0);
         await page.getByRole("button", { name: /Mở ticket SUP-0001/ }).click();
-        await expect(page.getByRole("dialog", { name: "Chi tiết ticket" }).getByText("b@school.test")).toBeVisible();
+        await expect(page.getByRole("region", { name: "Chi tiết ticket" }).getByText("b@school.test")).toBeVisible();
         await page.waitForTimeout(400);
         expect(await overflow(page)).toBeLessThanOrEqual(0);
         await page.screenshot({ path: testInfo.outputPath(`ticket-${scheme}-${width}.png`) });

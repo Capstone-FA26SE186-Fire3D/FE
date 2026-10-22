@@ -9,6 +9,7 @@ import { useAuthSession } from "@/features/auth/auth-session";
 import { AdminFeedbackTab } from "./admin-feedback-tab";
 import { AdminTicketsTab } from "./admin-tickets-tab";
 import { AuditLogTab } from "./audit-log-tab";
+import { RecentAudit } from "./recent-audit";
 
 const TABS = ["tickets", "feedback", "audit"] as const;
 type TabKey = (typeof TABS)[number];
@@ -33,8 +34,9 @@ export function AdminSupport() {
 
   return <>
     <PageHeader
+      eyebrow="Xử lý công việc"
       title="Hỗ trợ & audit"
-      description="Xử lý ticket và phản hồi của người dùng, đối soát hành động qua nhật ký audit."
+      description="Hàng đợi hỗ trợ và nhật ký thao tác quan trọng. Số lượng lấy từ máy chủ."
       breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Hỗ trợ & audit" }]}
     />
     <Tabs value={tab} onValueChange={changeTab}>
@@ -43,7 +45,10 @@ export function AdminSupport() {
         <TabsTrigger value="feedback">Phản hồi</TabsTrigger>
         <TabsTrigger value="audit">Nhật ký audit</TabsTrigger>
       </TabsList>
-      <TabsContent value="tickets"><AdminTicketsTab accessToken={accessToken} myId={user.id} /></TabsContent>
+      <TabsContent value="tickets">
+        <AdminTicketsTab accessToken={accessToken} myId={user.id} />
+        <RecentAudit accessToken={accessToken} onOpenAll={() => changeTab("audit")} />
+      </TabsContent>
       <TabsContent value="feedback"><AdminFeedbackTab accessToken={accessToken} /></TabsContent>
       <TabsContent value="audit"><AuditLogTab accessToken={accessToken} /></TabsContent>
     </Tabs>

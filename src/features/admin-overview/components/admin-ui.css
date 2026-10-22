@@ -19,6 +19,8 @@
 .adm .ops-table tbody tr[data-selected="true"] td:first-child { box-shadow: inset 3px 0 0 var(--ember); }
 .adm .ops-stat { border-radius: 14px; }
 .adm .ops-badge { min-height: 22px; font-size: 11.5px; }
+.adm .adm-flush { padding: 0; }
+.adm .adm-flush .ops-table-wrap { border: 0; border-radius: 0 0 14px 14px; }
 
 /* ───────── KPI tiles ───────── */
 .adm-kpis { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
