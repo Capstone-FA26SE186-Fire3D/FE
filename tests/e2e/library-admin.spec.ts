@@ -87,7 +87,7 @@ test.describe("list: filters and paging live in the URL", () => {
     });
     await page.goto("/admin/library");
     await expect(page.getByRole("button", { name: "Mở mục EQ-01" })).toBeVisible();
-    await page.getByTestId("filter-kind").selectOption("Equipment");
+    await page.getByTestId("chip-Equipment").click();
     await expect(page).toHaveURL(/kind=Equipment/);
     await expect(page.getByRole("button", { name: "Mở mục RB-ONE" })).toHaveCount(0);
     expect(backend.callsTo("GET", /items$/).some((call) => call.search.includes("kind=Equipment"))).toBe(true);
@@ -97,7 +97,7 @@ test.describe("list: filters and paging live in the URL", () => {
     await expect(page.getByRole("button", { name: "Mở mục EQ-01" })).toHaveCount(0);
     await page.reload();
     await expect(page.getByRole("button", { name: "Mở mục EQ-21" })).toBeVisible();
-    await expect(page.getByTestId("filter-kind")).toHaveValue("Equipment");
+    await expect(page.getByTestId("chip-Equipment")).toHaveAttribute("aria-pressed", "true");
 
     // The server has no status filter: this one narrows the loaded page only and says so.
     await page.getByTestId("filter-state").selectOption("inactive");

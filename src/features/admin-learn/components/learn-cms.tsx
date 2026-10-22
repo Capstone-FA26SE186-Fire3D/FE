@@ -32,7 +32,7 @@ export function LearnCms() {
   const sectionParam = get("section");
   const section: Section = isSection(sectionParam) ? sectionParam : "posts";
 
-  const header = (title: string, description: string, actions?: ReactNode) => <PageHeader title={title} description={description} breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Learn CMS" }]} actions={actions} />;
+  const header = (title: string, description: string, actions?: ReactNode) => <PageHeader eyebrow="Quản lý nội dung" title={title} description={description} breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Learn CMS" }]} actions={actions} />;
 
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
   if (user?.role !== 0 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin có thể quản lý nội dung Learn.</Alert>;
@@ -55,7 +55,7 @@ export function LearnCms() {
   }
 
   return <>
-    {header("Learn CMS", "Soạn và quản lý bài viết, mẹo, video công khai theo tình huống. Learn không có bước duyệt riêng; bài xuất bản là công khai.", <Button onClick={() => setParams({ post: "new", tab: null })}><Plus size={16} aria-hidden="true" />Tạo bài</Button>)}
+    {header("Learn CMS", "Bài viết, mẹo và video. Thao tác hợp lệ thay đổi theo trạng thái; Learn không có quy trình duyệt riêng.", <Button onClick={() => setParams({ post: "new", tab: null })}><Plus size={16} aria-hidden="true" />Tạo bài</Button>)}
     <Tabs value={section} onValueChange={(value) => { if (isSection(value) && value !== section) setParams({ ...Object.fromEntries(SECTION_PARAMS.map((key) => [key, null])), section: value === "posts" ? null : value }); }}>
       <TabsList aria-label="Learn CMS">
         <TabsTrigger value="posts">Bài viết</TabsTrigger>
