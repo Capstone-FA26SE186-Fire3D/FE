@@ -50,7 +50,7 @@ test.describe("list: session state and result are shown apart", () => {
     const backend = new TrainingBackend();
     seedMix(backend);
     await start(page, backend);
-    await expect(page.getByRole("heading", { level: 1, name: "Lịch sử", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Lịch sử luyện tập", exact: true })).toBeVisible();
     await expect(rows(page)).toHaveCount(10);
     await expect(page.getByText("BÀI CỦA NGƯỜI KHÁC")).toHaveCount(0);
 
@@ -94,17 +94,17 @@ test.describe("list: session state and result are shown apart", () => {
     const labels: Record<string, [string, number]> = {
       Launching: ["Đang khởi động", 1], Running: ["Đang chơi", 1], AwaitingSync: ["Chờ đồng bộ", 1], Completed: ["Đã hoàn thành", 4],
     };
-    await expect(page.getByLabel("Trạng thái phiên").locator("option")).toHaveCount(5);
+    await expect(page.getByLabel("Trạng thái", { exact: true }).locator("option")).toHaveCount(5);
     // An old link with a legacy status shows the unfiltered list instead of a 400.
     await page.goto("/learning-hub?view=history&status=Crashed");
     await expect(rows(page)).toHaveCount(10);
-    await expect(page.getByLabel("Trạng thái phiên")).toHaveValue("");
+    await expect(page.getByLabel("Trạng thái", { exact: true })).toHaveValue("");
     expect(backend.lists().every((call) => !["Crashed", "Aborted", "Abandoned"].includes(call.params.get("status") ?? ""))).toBe(true);
     for (const [status, [label, count]] of Object.entries(labels)) {
       await page.goto(`/learning-hub?view=history&status=${status}`);
       await expect(rows(page), status).toHaveCount(count);
       await expect(page.getByTestId("row-session-status").first()).toContainText(label);
-      await expect(page.getByLabel("Trạng thái phiên")).toHaveValue(status);
+      await expect(page.getByLabel("Trạng thái", { exact: true })).toHaveValue(status);
     }
     // AwaitingSync (a Running session with a pinned completion) is not mixed into Running.
     expect(backend.lists().some((call) => call.params.get("status") === "AwaitingSync")).toBe(true);

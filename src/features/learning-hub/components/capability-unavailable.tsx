@@ -5,7 +5,6 @@ import { Alert } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { PublicOpsScope } from "@/features/account/components/public-ops-scope";
 
 export type NextStep = { label: string; href: string };
 
@@ -24,8 +23,7 @@ export function CapabilityUnavailable({ icon: Icon, title, reason, context, step
   /** Useful things to do instead, first one is the primary action. */
   steps: NextStep[];
 }) {
-  return <PublicOpsScope>
-    <Panel
+  return <Panel
       className="hub-unavailable"
       title={title}
       actions={<StatusBadge tone="info">Chưa khả dụng</StatusBadge>}
@@ -41,6 +39,5 @@ export function CapabilityUnavailable({ icon: Icon, title, reason, context, step
           {steps.map((step, index) => <li key={step.href}><Link className={buttonVariants({ variant: index === 0 ? "primary" : "secondary" })} href={step.href}>{step.label}</Link></li>)}
         </ul>
       </div>
-    </Panel>
-  </PublicOpsScope>;
+    </Panel>;
 }

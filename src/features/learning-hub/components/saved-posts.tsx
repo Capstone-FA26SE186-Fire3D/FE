@@ -1,18 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { RefreshCw } from "lucide-react";
+import { Bookmark, BookmarkMinus, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { ApiError } from "@/api/types/common";
-import { Button } from "@/components/ui/button";
-import { Iconsax } from "@/components/ui/iconsax";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { learnApi } from "@/features/learn/api";
 import { LearnPagination } from "@/features/learn/components/learn-pagination";
 import { PostCard, formatPostDate } from "@/features/learn/components/post-card";
 import "@/features/learn/learn.css";
+import { StateCard } from "./state-card";
+import { savedAgo } from "./overview";
 
 const PAGE_SIZE = 12;
 
@@ -51,14 +52,14 @@ export function SavedPosts() {
 
   if (list.error !== undefined) {
     const failure = failureText(list.error);
-    return <div className="learn-state" role="alert"><h2>{failure.title}</h2><p>{failure.message}</p><Button variant="secondary" onClick={list.reload}><RefreshCw size={16} aria-hidden="true" />Thử lại</Button></div>;
+    return <StateCard icon={Bookmark} tone="danger" role="alert" kicker="Bài đã lưu · lỗi tải" title={failure.title} actions={<Button variant="secondary" onClick={list.reload}><RefreshCw size={16} aria-hidden="true" />Thử lại</Button>}>{failure.message}</StateCard>;
   }
   if (!list.data) {
     return <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 learn-grid" role="status" aria-live="polite" aria-label="Đang tải bài đã lưu">{Array.from({ length: 3 }, (_, index) => <div key={index} className="learn-card learn-skeleton" aria-hidden="true"><span /><span /><span /></div>)}</div>;
   }
   const { items, total } = list.data;
   if (items.length === 0 && total === 0) {
-    return <div className="learning-empty"><Iconsax name="archive-book" size={38} /><h2>Giữ lại những bài bạn muốn đọc tiếp.</h2><p>Bạn chưa lưu bài nào.</p><Button asChild><Link href="/learn">Khám phá Learn</Link></Button></div>;
+    return <StateCard icon={Bookmark} kicker="Bài đã lưu · chưa có bài" title="Bạn chưa lưu bài nào" actions={<Link className={buttonVariants({ variant: "primary" })} href="/learn">Khám phá Learn</Link>}>Mở Khám phá Learn, bấm Lưu trên bài bạn muốn đọc lại.</StateCard>;
   }
   if (items.length === 0) {
     return <div className="learn-state" role="status"><h2>Trang này không có bài</h2><Button variant="secondary" onClick={() => setPage(1)}>Về trang đầu</Button></div>;
@@ -69,8 +70,8 @@ export function SavedPosts() {
     {removeError && <p role="alert" className="saved-posts-note">{removeError}</p>}
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 learn-grid" aria-busy={list.loading}>
       {items.map((item) => item.available
-        ? <PostCard key={item.postId} slug={item.slug} title={item.title} summary={item.summary} kind={item.kind} action={
-          <Button variant="secondary" size="md" className="ml-auto" disabled={removing.has(item.postId)} aria-label={`Bỏ lưu bài viết: ${item.title}`} onClick={() => void remove(item.postId)}><Iconsax name="archive-book" size={16} /></Button>} />
+        ? <PostCard key={item.postId} slug={item.slug} title={item.title} summary={item.summary} kind={item.kind} note={savedAgo(item.bookmarkedAt)} readLink action={
+          <Button variant="secondary" size="md" className="ml-auto" disabled={removing.has(item.postId)} aria-label={`Bỏ lưu bài viết: ${item.title}`} onClick={() => void remove(item.postId)}><BookmarkMinus size={16} aria-hidden="true" /></Button>} />
         : <article key={item.postId} className="learn-card-unavailable" data-testid="saved-unavailable">
           <h2>Bài này không còn hiển thị</h2>
           <p>Bài đã bị ẩn hoặc gỡ khỏi trang công khai nên chưa thể đọc. Bạn đã lưu lúc {formatPostDate(item.bookmarkedAt) || "—"}. Nếu bài hiện lại, nó sẽ trở về đúng chỗ này.</p>

@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircleQuestion, Send, X } from "lucide-react";
+import { Hourglass, Lock, MessageCircleQuestion, Send, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
@@ -8,13 +8,13 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react
 import { ApiError } from "@/api/types/common";
 import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Field, Textarea } from "@/components/ui/field";
 import { Panel } from "@/components/ui/panel";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { routes } from "@/configs/routes";
-import { PublicOpsScope } from "@/features/account/components/public-ops-scope";
 import { useAuthSession } from "@/features/auth/auth-session";
+import { StateCard } from "./state-card";
 import { formatDateTime, formatQuota } from "@/features/billing/format";
 import { learnApi } from "@/features/learn/api";
 import { isPostSlug } from "@/features/learn/slug";
@@ -58,9 +58,9 @@ export function AskPanel({ articleParam }: { articleParam: string | null }) {
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
   if (user?.role !== 2 || !accessToken) {
     const other = user?.role === 1 ? { href: routes.workspaceAi, label: "Mở Trợ lý AI của tổ chức" } : user?.role === 0 ? { href: routes.adminAi, label: "Mở khu quản trị AI" } : null;
-    return <PublicOpsScope><Alert tone="info" title="Hỏi đáp AI ở đây dành cho tài khoản học viên" action={other ? <Link className="mt-3 inline-block underline" href={other.href}>{other.label}</Link> : undefined}>Tài khoản tổ chức và quản trị dùng trợ lý AI trong khu vực của mình.</Alert></PublicOpsScope>;
+    return <Alert tone="info" title="Hỏi đáp AI ở đây dành cho tài khoản học viên" action={other ? <Link className="mt-3 inline-block underline" href={other.href}>{other.label}</Link> : undefined}>Tài khoản tổ chức và quản trị dùng trợ lý AI trong khu vực của mình.</Alert>;
   }
-  return <PublicOpsScope><TraineeAsk accessToken={accessToken} articleParam={articleParam} /></PublicOpsScope>;
+  return <TraineeAsk accessToken={accessToken} articleParam={articleParam} />;
 }
 
 function TraineeAsk({ accessToken, articleParam }: { accessToken: string; articleParam: string | null }) {
@@ -70,7 +70,8 @@ function TraineeAsk({ accessToken, articleParam }: { accessToken: string; articl
   const trainingId = urlId(params.get("training") ?? "");
   const requestId = urlId(params.get("request") ?? "");
   const slug = articleParam && isPostSlug(articleParam) ? articleParam : null;
-  const [question, setQuestion] = useState("");
+  // `q` is a draft handed over by the overview shortcut: it only fills the box, nothing is sent until the learner presses send.
+  const [question, setQuestion] = useState(() => (params.get("q") ?? "").slice(0, 2000));
 
   const quota = useAsyncData("trainee-ai:quota", (signal) => traineeAiApi.quota(accessToken, signal));
   const article = useAsyncData(`trainee-ai:article:${slug}`, (signal) => learnApi.post(slug ?? "", signal), !!slug, { keepPrevious: false });
@@ -96,6 +97,7 @@ function TraineeAsk({ accessToken, articleParam }: { accessToken: string; articl
       if (value === null) next.delete(key);
       else next.set(key, value);
     }
+    next.delete("q");
     next.set("view", "questions");
     router.push(`/learning-hub?${next.toString()}`);
   }, [params, router]);
@@ -157,7 +159,16 @@ function TraineeAsk({ accessToken, articleParam }: { accessToken: string; articl
     <Panel title="Hỏi đáp AI" description="AI trả lời dựa trên bài Learn và tài liệu chuẩn đã duyệt, luôn kèm nguồn. Đây là thông tin tham khảo để học, không phải hướng dẫn khẩn cấp hay chứng nhận an toàn." actions={<MessageCircleQuestion size={18} aria-hidden="true" />}>
       <form className={styles.stack} onSubmit={send} aria-label="Hỏi đáp AI cho học viên">
         <QuotaLine quota={quota.data} error={quota.error} onRetry={quota.reload} />
-        {block && <div data-testid="trainee-ai-blocked"><Alert tone="warning" title={block.title}>{block.text}</Alert></div>}
+        {block && <div data-testid="trainee-ai-blocked"><StateCard
+          icon={quota.data?.blockedByAssessment ? Lock : Hourglass}
+          tone="warning"
+          role="status"
+          kicker={quota.data?.blockedByAssessment ? "Hỏi đáp · đang ở chế độ Đánh giá" : !quota.data?.policyActive ? "Hỏi đáp · chưa bật" : "Hỏi đáp · hết lượt hôm nay"}
+          title={block.title}
+          actions={<>
+            <Link className={buttonVariants({ variant: "primary" })} href={routes.learn}>{quota.data?.blockedByAssessment ? "Mở Learn" : "Quay lại Learn"}</Link>
+            {quota.data?.blockedByAssessment && <Link className={buttonVariants({ variant: "secondary" })} href="/learning-hub?view=history">Xem lịch sử</Link>}
+          </>}>{block.text}</StateCard></div>}
         {contextLine && <div className={styles.row} data-testid="trainee-ai-context">
           <p className={styles.muted}>{contextLine}</p>
           <Button type="button" size="sm" variant="quiet" onClick={() => go({ session: null, training: null, article: null })} disabled={working}><X size={14} aria-hidden="true" />Hỏi chung</Button>

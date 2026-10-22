@@ -286,49 +286,8 @@ button { cursor: pointer; }
 .learn-card-date { margin-left: auto; color: var(--muted); font-size: 11px; }
 .learn-card-source { margin: 12px 0 0; color: var(--dim); font-size: 10px; line-height: 1.6; }
 .learn-no-results { color: var(--muted); padding-block: 24px; }
-.learning-workspace { display: grid; grid-template-columns: 240px minmax(0, 1fr); min-height: 100dvh; }
-.learning-sidebar { position: sticky; top: 0; height: 100dvh; border-right: 1px solid var(--line); padding: 28px 18px 20px; background: var(--surface); }
-.learning-brand { display: flex; min-height: 44px; align-items: center; gap: 12px; padding: 0 10px 32px; font-size: 18px; font-weight: 650; }
-.learning-brand small { display: block; margin-top: 4px; font-size: 11px; font-weight: 400; color: var(--muted); }
-.learning-navigation { display: flex; flex-direction: column; height: calc(100% - 82px); }
-.learning-nav-items { display: grid; gap: 6px; }
-.learning-navigation a, .learning-navigation button { display: flex; align-items: center; gap: 12px; min-height: 46px; width: 100%; padding: 10px 14px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 13px; cursor: pointer; }
-.learning-navigation a:hover, .learning-navigation button:hover { background: var(--bg-soft); color: var(--text); }
-.learning-navigation [aria-current="page"] { background: rgba(238,134,84,.1); color: var(--ember); }
-.learning-nav-bottom { margin-top: auto; padding-top: 20px; border-top: 1px solid var(--line); }
-.learning-nav-label { display: grid; min-width: 0; line-height: 1.3; }
-.learning-nav-note { color: var(--muted); font-size: 11px; }
-.learning-menu-toggle { display: none; }
-.learning-content { min-width: 0; }
-.learning-topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 100px; padding: 20px 36px; border-bottom: 1px solid var(--line); }
-.learning-topbar p { margin: 0 0 6px; color: var(--muted); font-size: 11px; }
-.learning-topbar h1 { font-size: 24px; line-height: 1.3; margin: 0; letter-spacing: -.025em; }
-.learning-account { display: flex; min-height: 44px; gap: 8px; align-items: center; min-width: 0; font-size: 12px; color: var(--muted); }
-.learning-account span { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.learning-main { padding: 28px 36px; max-width: 1400px; margin: 0 auto; }
-.learning-empty { padding: 80px 0; color: var(--muted); }
-.learning-empty > .iconsax { color: var(--ember); }
-.learning-empty h2 { color: var(--text); font-size: 24px; margin: 22px 0 10px; }
-.learning-empty p { margin-bottom: 24px; font-size: 14px; }
-.learning-workspace .account-page { max-width: 900px; }
-.learning-workspace .account-heading h1 { font-size: 28px; }
-@media (max-width: 767px) {
-  .learning-workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
-  .learning-sidebar { position: relative; height: auto; padding: 12px 16px; border-right: 0; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; }
-  .learning-brand { padding: 0; font-size: 15px; gap: 8px; }
-  .learning-brand small { font-size: 10px; }
-  .learning-menu-toggle { display: block; min-height: 44px; border: 1px solid var(--line); background: var(--bg-soft); padding: 8px 12px; border-radius: 8px; color: var(--text); font-size: 12px; }
-  .learning-navigation { display: none; height: auto; width: 100%; padding-top: 16px; }
-  .learning-navigation.is-open { display: flex; }
-  .learning-nav-bottom { margin-top: 12px; padding-top: 12px; }
-  .learning-topbar { min-height: 80px; padding: 16px; gap: 12px; }
-  .learning-topbar h1 { font-size: 22px; }
-  .learning-account span { max-width: 115px; font-size: 11px; }
-  .learning-main { padding: 20px 16px; }
-  .learning-empty { padding: 48px 0; }
-}
 @media (prefers-reduced-motion: reduce) {
-  .learn-card, .learning-workspace * { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+  .learn-card { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
   .learn-card:hover { transform: none; }
 }
 
