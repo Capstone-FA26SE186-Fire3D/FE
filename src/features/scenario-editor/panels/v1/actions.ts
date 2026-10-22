@@ -1,7 +1,7 @@
 import type { Json, JsonObject, Path } from "../../store/json";
 import type { CapabilityOption } from "../../v1/catalog";
 import {
-  addItemCommand, addObjectCommand, moveObjectCommand, pinGeometryCommand, removeItemCommand, removeObjectCommand, rotateObjectCommand, setCapabilityCommand, setFloorCommand, setPathCommand,
+  addItemCommand, addObjectCommand, duplicateObjectCommand, moveObjectCommand, pinGeometryCommand, removeItemCommand, removeObjectCommand, rotateObjectCommand, setCapabilityCommand, setFloorCommand, setPathCommand,
   type NewObject, type V1Command, type V1Selection,
 } from "../../v1/commands";
 import type { GeometryInfo } from "../../v1/geometry";
@@ -25,6 +25,9 @@ export function createV1Actions(edit: Edit, select: (selection: V1Selection) => 
     },
     addObject(object: NewObject) {
       edit((draft, id, selection, now) => addObjectCommand(draft, id, object, now, selection));
+    },
+    duplicateObject(index: number) {
+      edit((draft, id, _selection, now) => duplicateObjectCommand(draft, id, index, now));
     },
     removeObject(index: number) {
       edit((draft, id, _selection, now) => removeObjectCommand(draft, id, index, now));

@@ -3,13 +3,13 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAsyncData } from "@/api/use-async-data";
 import type { Change } from "@/features/library/apply";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Breadcrumbs } from "@/components/ui/page-header";
 import { Drawer, Modal } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -46,6 +46,7 @@ import { V1IssuesPanel } from "./v1-issues";
 import { V1LibraryPanel, initialLibraryUi, type AppliedSample, type LibraryUi } from "./v1-library-panel";
 import { V1ObjectForm } from "./v1-object-form";
 import { V1ScenarioForm } from "./v1-scenario-form";
+import { SelectionBar, ViewportPill, ViewportRail } from "../../scene/viewport-controls";
 import { V1Toolbar } from "./v1-toolbar";
 import { V1Tree } from "./v1-tree";
 
@@ -72,6 +73,8 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const [importOpen, setImportOpen] = useState(false);
   const [floorChoice, setFloorChoice] = useState<string | null | undefined>(undefined);
   const [modelVisible, setModelVisible] = useState(true);
+  const [viewLocked, setViewLocked] = useState(false);
+  const [selectionScreen, setSelectionScreen] = useState<{ x: number; y: number } | null>(null);
   const [layerVisibility, setLayerVisibility] = useState<Record<string, boolean>>({});
   const [modelStatus, setModelStatus] = useState<ModelStatus>({ phase: "none" });
   const [pick, setPick] = useState<{ name: string; point: Point3 } | null>(null);
@@ -283,18 +286,12 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
 
   return <div className="se-root" data-mobile-tab={mobileTab} data-testid="scenario-editor" data-draft-mode="v1">
     <header className="se-header">
-      <nav aria-label="Đường dẫn" className="se-crumbs">
-        <Link href={routes.workspaceBuildings}>Công trình</Link><ChevronRight size={14} aria-hidden="true" />
-        <Link href={`${routes.workspaceBuildings}/${buildingId}`}>Chi tiết</Link><ChevronRight size={14} aria-hidden="true" />
-        <Link href={listHref}>Kịch bản</Link><ChevronRight size={14} aria-hidden="true" />
-        <span aria-current="page">Bản nháp #{meta.draftNumber}</span>
-      </nav>
+      <Breadcrumbs items={[{ label: "Công trình", href: routes.workspaceBuildings }, { label: "Chi tiết", href: `${routes.workspaceBuildings}/${buildingId}` }, { label: "Kịch bản", href: listHref }, { label: `Bản nháp #${meta.draftNumber}` }]} />
       <h1>{readString(state.draft, "name") || scenario.data?.name || "Soạn kịch bản"} <StatusBadge tone="info" data-testid="schema-badge">fet3d.editor/1</StatusBadge></h1>
     </header>
 
     <V1Toolbar tool={state.tool} placeKind={state.placeKind} onTool={(tool, kind) => dispatch({ type: "tool", tool, placeKind: kind })} gizmoEnabled={gizmoEnabled}
-      canUndo={state.history.past.length > 0} canRedo={state.history.future.length > 0} onUndo={() => dispatch({ type: "undo" })} onRedo={() => dispatch({ type: "redo" })}
-      undoLabel={lastPast?.label} redoLabel={nextFuture?.label} status={status} saveBlockedReason={saveBlockedReason} onSave={() => void onSave()} onValidate={() => void onValidate()} validating={editor.validating}
+      status={status} saveBlockedReason={saveBlockedReason} onSave={() => void onSave()} onValidate={() => void onValidate()} validating={editor.validating}
       versionsHref={versionsHref} onOpenTree={() => setTreeOpen(true)} hasTree={!isDesktop && !isMobile} kindStatus={kindStatus} placeDisabledReason={placeDisabledReason} />
 
     {(previewBanner || saveBanner || pinBanner) && <div className="se-banners">{saveBanner}{pinBanner}{previewBanner}</div>}
@@ -308,10 +305,19 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
     <div className="se-body">
       <aside className="se-panel se-left" aria-label="Tầng và đối tượng">{isDesktop || isMobile ? tree : null}</aside>
       <section className="se-center" aria-label="Khung nhìn 3D">
+        <div className="se-stage">
         <EditorViewport ref={viewportRef} markers={markers} selection={state.selection} tool={viewportTool} placeKind={state.placeKind} gizmoEnabled={gizmoEnabled}
           model={model} floors={sceneFloors} activeFloor={activeFloor} showModel={modelVisible} layerVisibility={layerVisibility}
           onSelect={(ref) => selectObject(ref && ref.kind === "object" ? ref.index : null)} onPlace={(kind, point) => placeAt(kind as ObjectKind, point)}
-          onTransform={onTransform} onModelPick={setPick} onModelStatus={setModelStatus} onUrlExpired={preview.refresh} />
+          onTransform={onTransform} onModelPick={setPick} onModelStatus={setModelStatus} onUrlExpired={preview.refresh} onSelectionScreen={setSelectionScreen} />
+        <ViewportPill canUndo={state.history.past.length > 0} canRedo={state.history.future.length > 0} undoLabel={lastPast?.label} redoLabel={nextFuture?.label}
+          onUndo={() => dispatch({ type: "undo" })} onRedo={() => dispatch({ type: "redo" })} onValidate={() => void onValidate()} validating={editor.validating} />
+        <ViewportRail canFit={modelStatus.phase === "loaded"} hasModel={modelStatus.phase === "loaded"} locked={viewLocked} modelVisible={modelVisible}
+          onZoomIn={() => viewportRef.current?.zoomBy(0.8)} onZoomOut={() => viewportRef.current?.zoomBy(1.25)} onFit={() => viewportRef.current?.resetCamera()}
+          onToggleLock={() => { const next = !viewLocked; setViewLocked(next); viewportRef.current?.setCameraLocked(next); }} onToggleModel={() => setModelVisible((value) => !value)} />
+        {selectedIndex !== null && selectedObject && selectionScreen && <SelectionBar position={selectionScreen}
+          onCopy={() => actions.duplicateObject(selectedIndex)} onFocus={() => viewportRef.current?.focusSelection()} onDelete={() => actions.removeObject(selectedIndex)} />}
+        </div>
         <div className="se-viewport-foot">
           {modelSummary && <span data-testid="model-info">{modelSummary}</span>}
           {pick && <span className="se-pick">Phần tử: {pick.name}</span>}
