@@ -221,12 +221,13 @@ test("history is a real view with no demo content", async ({ page }) => {
   expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.includes("prototype")))).toEqual([]);
 });
 
-test("an article page offers saving but no fake ask button", async ({ page }) => {
+test("an article page offers saving and an ask-AI link into the Q&A with the article", async ({ page }) => {
   await restore(page, "trainee");
   await page.goto(`/learn/${slug}`);
   await expect(page.getByRole("heading", { level: 1, name: "Đọc không gian trước khi hành động" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Lưu bài viết" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Hỏi về bài này" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Hỏi AI về bài này" })).toHaveAttribute("href", `/learning-hub?view=questions&article=${slug}`);
 });
 
 test("logout returns home even on backend failure and the Q&A view respects reduced motion", async ({ page }) => {
@@ -443,7 +444,32 @@ test.describe("overview (Tổng quan)", () => {
     await expect(page.getByTestId("trainee-intro")).toHaveCount(0);
   });
 
-  test("an empty account sees explained empty states, and the Ask AI shortcut only prefills the question", async ({ page }) => {
+  test("the intro opens a skippable three-step tour with a clear next action, keyboard support and a remembered end", async ({ page }) => {
+  await restore(page);
+  await page.goto("/learning-hub");
+  const opener = page.getByTestId("trainee-intro").getByRole("button", { name: "Xem hướng dẫn" });
+  await opener.focus();
+  await page.keyboard.press("Enter");
+  const tour = page.getByRole("dialog", { name: "Hướng dẫn nhanh" });
+  await expect(tour).toBeVisible();
+  await expect(tour.getByTestId("tour-step")).toContainText("Đọc trong Learn");
+  await expect(tour.getByRole("link", { name: "Mở Learn" })).toHaveAttribute("href", "/learn");
+  await tour.getByRole("button", { name: "Tiếp" }).click();
+  await expect(tour.getByRole("link", { name: "Tải ứng dụng" })).toHaveAttribute("href", "/download");
+  await tour.getByRole("button", { name: "Tiếp" }).click();
+  await expect(tour.getByRole("link", { name: "Mở lịch sử luyện tập" })).toHaveAttribute("href", "/learning-hub?view=history");
+  expect(await page.evaluate(() => localStorage.getItem("fire3d-trainee-tour"))).toBeNull();
+  for (let i = 0; i < 8; i += 1) await page.keyboard.press("Tab");
+  expect(await page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'))).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(tour).toHaveCount(0);
+  await expect(opener).toBeFocused();
+  expect(await page.evaluate(() => localStorage.getItem("fire3d-trainee-tour"))).toBe("done");
+  await expect(page.getByTestId("trainee-intro")).toBeVisible();
+  await expect(page.getByText(/XP|huy hiệu|cấp độ/i)).toHaveCount(0);
+});
+
+test("an empty account sees explained empty states, and the Ask AI shortcut only prefills the question", async ({ page }) => {
     const ai = new TraineeAiBackend();
     await restore(page, "trainee", () => undefined, ai);
     await page.goto("/learning-hub");
