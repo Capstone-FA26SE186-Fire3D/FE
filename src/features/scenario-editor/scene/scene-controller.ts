@@ -44,6 +44,8 @@ export type SceneCallbacks = {
   onModelPick: (pick: { name: string; point: Point3 } | null) => void;
   onContextLost: () => void;
   onContextRestored: () => void;
+  /** After every rendered frame (camera moved, selection moved…). Used to keep DOM overlays attached to the selected marker. */
+  onFrame?: () => void;
 };
 
 export type SceneInputs = { markers: MarkerInput[]; selection: MarkerRef | null; tool: SceneTool; placeKind: string };
@@ -247,6 +249,7 @@ export class EditorSceneController {
     if (!clientWidth || !clientHeight) return;
     this.renders += 1;
     this.renderer.render(this.scene, this.camera);
+    this.callbacks.onFrame?.();
   }
 
   private resize() {
@@ -425,6 +428,29 @@ export class EditorSceneController {
     this.orbit.update();
     this.rebuildGrid();
     this.requestRender();
+  }
+
+  /** Moves the camera towards (factor < 1) or away from (> 1) the orbit target. Client-only view control. */
+  zoomBy(factor: number) {
+    const offset = this.camera.position.clone().sub(this.orbit.target);
+    const distance = THREE.MathUtils.clamp(offset.length() * factor, 1.5, Math.max(this.camera.far * 0.5, 50));
+    this.camera.position.copy(this.orbit.target).add(offset.setLength(distance));
+    this.orbit.update();
+    this.requestRender();
+  }
+
+  /** Locking freezes orbit/pan/zoom so the view cannot move by accident while editing objects. */
+  setCameraLocked(locked: boolean) {
+    this.orbit.enabled = !locked;
+  }
+
+  /** Pixel position (inside the viewport) of the selected marker, or null when nothing is selected or it is off screen. */
+  selectionScreen(): { x: number; y: number } | null {
+    const marker = this.inputs.selection ? this.markers.get(markerKey(this.inputs.selection)) : undefined;
+    if (!marker) return null;
+    const point = marker.getWorldPosition(new THREE.Vector3()).project(this.camera);
+    if (point.z > 1 || Math.abs(point.x) > 1.05 || Math.abs(point.y) > 1.05) return null;
+    return { x: Math.round((point.x * 0.5 + 0.5) * this.host.clientWidth), y: Math.round((-point.y * 0.5 + 0.5) * this.host.clientHeight) };
   }
 
   focusSelection() {

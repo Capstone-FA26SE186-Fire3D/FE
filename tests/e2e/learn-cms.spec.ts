@@ -549,6 +549,68 @@ test.describe("statuses in the list", () => {
     b.seedPost("d-xoa", { title: "Đã xóa", status: "Deleted" });
   };
 
+  test("quick-edit pane: loads the draft of a never-published post, saves with If-Match + Idempotency-Key, publishes, and the row still opens the editor", async ({ page }) => {
+    const backend = await setup(page, (b) => { b.seedPost("nhap-nhanh", { title: "Tiêu đề nháp", summary: "Tóm tắt nháp." }); });
+    await page.goto("/admin/learn");
+    const row = page.getByRole("row").filter({ hasText: "nhap-nhanh" });
+    await expect(row.getByText("Chưa có bản xuất bản")).toBeVisible(); // the list carries no title for it (BE#154)
+    await page.getByRole("button", { name: "Sửa nhanh bài nhap-nhanh" }).click();
+    await expect(page).toHaveURL(/quick=/);
+    const pane = page.getByRole("region", { name: "Sửa nhanh bài" });
+    await expect(pane.getByLabel("Tiêu đề")).toHaveValue("Tiêu đề nháp");
+    await expect(pane.getByRole("button", { name: "Lưu nháp" })).toBeDisabled();
+
+    await pane.getByLabel("Tiêu đề").fill("Tiêu đề đã sửa nhanh");
+    await expect(pane.getByRole("button", { name: "Xuất bản" })).toBeDisabled(); // save first
+    await pane.getByRole("button", { name: "Lưu nháp" }).click();
+    await expect(pane.getByText("Chưa lưu")).toHaveCount(0);
+    const puts = backend.callsTo("PUT", /\/api\/admin\/learn\/versions\/[^/]+$/);
+    expect(puts).toHaveLength(1);
+    expect(puts[0].headers["if-match"]).toMatch(/^"\d+"$/);
+    expect(puts[0].headers["idempotency-key"]).toBeTruthy();
+    expect((puts[0].body as { title: string; summary: string; blocks: unknown[] }).title).toBe("Tiêu đề đã sửa nhanh");
+    expect((puts[0].body as { blocks: unknown[] }).blocks).toHaveLength(1); // the rest of the version is sent unchanged
+
+    await pane.getByRole("button", { name: "Xuất bản", exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Xuất bản", exact: true }).click();
+    await expect.poll(() => publishedCalls(backend).length).toBe(1);
+    expect(publishedCalls(backend)[0].headers["if-match"]).toMatch(/^"\d+"$/);
+    expect(publishedCalls(backend)[0].headers["idempotency-key"]).toBeTruthy();
+    await expect(row.getByText("Tiêu đề đã sửa nhanh")).toBeVisible();
+    await expect(pane.getByRole("button", { name: "Ẩn bài" })).toBeVisible();
+    await expect(pane.getByLabel("Tiêu đề")).toHaveJSProperty("readOnly", true);
+
+    await page.getByRole("button", { name: /^Mở bài/ }).click();
+    await expect(page).toHaveURL(/post=[0-9a-f-]{36}/);
+    await expect(page.getByLabel("Tiêu đề", { exact: true })).toBeVisible();
+  });
+
+  test("quick-edit pane: lifecycle commands follow the status and hide sends If-Match; Deleted offers only restore", async ({ page }) => {
+    const backend = await setup(page, (b) => {
+      b.seedPost("dang-cong-khai", { title: "Đang công khai", status: "Published" });
+      b.seedPost("da-xoa-roi", { title: "Đã xóa rồi", status: "Deleted" });
+    });
+    await page.goto("/admin/learn");
+    await page.getByRole("button", { name: "Sửa nhanh bài Đang công khai" }).click();
+    const pane = page.getByRole("region", { name: "Sửa nhanh bài" });
+    await expect(pane.getByText("Bản đã xuất bản là bất biến")).toBeVisible();
+    await expect(pane.getByRole("button", { name: "Lưu nháp" })).toHaveCount(0);
+    await expect(pane.getByRole("button", { name: "Hiện lại" })).toHaveCount(0);
+    await pane.getByRole("button", { name: "Ẩn bài" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Ẩn bài" }).click();
+    await expect.poll(() => backend.callsTo("POST", /\/posts\/[^/]+\/hide$/).length).toBe(1);
+    const hide = backend.callsTo("POST", /\/posts\/[^/]+\/hide$/)[0];
+    expect(hide.headers["if-match"]).toMatch(/^"\d+"$/);
+    expect(hide.headers["idempotency-key"]).toBeTruthy();
+    await expect(pane.getByRole("button", { name: "Hiện lại" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Sửa nhanh bài Đã xóa rồi" }).click();
+    await expect(pane.getByRole("button", { name: "Khôi phục" })).toBeVisible();
+    await expect(pane.getByRole("button", { name: /Xuất bản|Ẩn bài|Xóa bài/ })).toHaveCount(0);
+    await pane.getByRole("button", { name: "Đóng sửa nhanh" }).click();
+    await expect(page).not.toHaveURL(/quick=/);
+  });
+
   test("every state is labelled, the filter lives in the URL, and drafts without a published version say so", async ({ page }) => {
     await setup(page, seed);
     await page.goto("/admin/learn");

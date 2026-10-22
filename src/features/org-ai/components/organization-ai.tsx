@@ -9,10 +9,10 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
 
 import type { AiRequest } from "../types";
+import { AiSideRail } from "./ai-side-rail";
 import { ApplyTargetDialog } from "./apply-target-dialog";
 import { AskTab } from "./ask-tab";
 import { DraftTab } from "./draft-tab";
@@ -50,14 +50,15 @@ export function OrganizationAi() {
     setParams({ ...Object.fromEntries(TAB_PARAMS.map((key) => [key, null])), tab: value === "ask" ? null : value });
   };
 
-  return <>
+  return <div className="org">
     <PageHeader
-      title="Trợ lý AI"
-      description="Hỏi đáp có trích dẫn và đề xuất kịch bản trên nguồn đã được duyệt. AI chỉ đề xuất; không tự sửa kịch bản, không phát hành, không phải chứng nhận an toàn."
-      breadcrumbs={[{ label: "Không gian tổ chức", href: routes.workspaceBuildings }, { label: "Trợ lý AI" }]}
+      title="Trợ lý AI cho tổ chức"
+      description="Hỏi đáp từ nguồn Learn, thư viện và tri thức đã duyệt, hoặc nhờ AI soạn nháp kịch bản cho một công trình. Chỉ dùng nội dung bạn có quyền xem. AI chỉ đề xuất; không tự sửa kịch bản, không phát hành, không phải chứng nhận an toàn."
+      eyebrow="Huấn luyện" breadcrumbs={[{ label: "Trợ lý AI" }]}
       actions={<Button asChild variant="quiet"><Link href={BILLING_AI_HREF}><Gauge size={16} aria-hidden="true" />Quota AI & top-up</Link></Button>}
     />
-    <Tabs value={tab} onValueChange={changeTab}>
+    <div className="org-cols org-ai-cols">
+    <div style={{ minWidth: 0 }}><Tabs value={tab} onValueChange={changeTab}>
       <TabsList aria-label="Trợ lý AI">
         <TabsTrigger value="ask">Hỏi đáp</TabsTrigger>
         <TabsTrigger value="draft">Đề xuất kịch bản</TabsTrigger>
@@ -66,7 +67,9 @@ export function OrganizationAi() {
       <TabsContent value="ask" style={{ marginTop: 16 }}>{tab === "ask" && <AskTab accessToken={accessToken} requestId={requestId} onRequest={onRequest} />}</TabsContent>
       <TabsContent value="draft" style={{ marginTop: 16 }}>{tab === "draft" && <DraftTab accessToken={accessToken} requestId={requestId} onRequest={onRequest} onApply={setApplying} />}</TabsContent>
       <TabsContent value="history" style={{ marginTop: 16 }}>{tab === "history" && <HistoryTab accessToken={accessToken} onApply={setApplying} />}</TabsContent>
-    </Tabs>
+    </Tabs></div>
+    <AiSideRail accessToken={accessToken} onOpenRequest={(id) => onRequest(id)} />
+    </div>
     <ApplyTargetDialog accessToken={accessToken} request={applying} onClose={() => setApplying(null)} />
-  </>;
+  </div>;
 }

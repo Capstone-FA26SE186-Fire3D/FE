@@ -3,7 +3,7 @@
  * Evidence level: Playwright route mocks shaped like LearnerAnalytics.sql / OperationsQueries (OpenAPI types the training and
  * revenue bodies only as JsonElement, so the shape comes from BE source and docs/learner-analytics.md). Not an integration test.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 import { parseOperations, parseRevenue, parseTraining } from "../../src/features/analytics/parse";
 
 const admin = { id: "admin-1", email: "admin@fire3d.test", fullName: "Platform Admin", role: 0, organizationId: null, profileRevision: 1 };
@@ -13,6 +13,8 @@ const trainee = { id: "t-1", email: "t@fire3d.test", fullName: "Học Viên", ro
 async function signIn(page: Page, user: object) {
   await page.addInitScript((stored) => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify(stored)), { accessToken: "an-access", refreshToken: "an-refresh" });
   await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
+  // The organization report's building/scenario selects read the tenant lists; tests that care override these.
+  await page.route("**/api/buildings*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 100 } }));
 }
 
 const head = { asOf: "2026-10-12T03:00:00Z", from: "2026-09-12T03:00:00Z", to: "2026-10-12T03:00:00Z", activeWindowSeconds: 120, definitions: { plays: "Contract-7 learner sessions started in UTC [from,to); prepare and playtest are not counted." } };
@@ -73,7 +75,7 @@ test.describe("organization analytics", () => {
       return route.fulfill({ json: url.pathname.endsWith("/training") ? training() : operations() });
     });
     await page.goto("/workspace/analytics?from=2026-09-01&to=2026-09-30");
-    await expect(page.getByRole("heading", { name: "Báo cáo", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Báo cáo huấn luyện", exact: true })).toBeVisible();
     await expect(page.locator(".ops-stat", { hasText: "Lượt chơi (trong kỳ)" }).locator("strong")).toHaveText("40");
     await expect(page.locator(".ops-stat", { hasText: "Học viên khác nhau" }).locator("strong")).toHaveText("18");
     await expect(page.locator(".ops-stat", { hasText: "Đã có kết quả" })).toContainText("75%");
@@ -100,6 +102,62 @@ test.describe("organization analytics", () => {
     await expect(page.getByRole("tab", { name: "Vận hành" })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByLabel("Từ ngày")).toHaveValue("2026-09-01");
     await expect(page.locator(".ops-stat", { hasText: "Công trình (hiện tại)" }).locator("strong")).toHaveText("5");
+  });
+
+  test("building and scenario filters narrow the report and the CSV, the scenario depends on the building, groupBy adds the cohort table", async ({ page }) => {
+    const reports: URLSearchParams[] = [];
+    const exports: URLSearchParams[] = [];
+    await signIn(page, owner);
+    const buildingsRoute = (route: Route) => {
+      const { pathname } = new URL(route.request().url());
+      if (pathname.endsWith("/scenarios")) return route.fulfill({ json: { items: [{ id: "sc-1", buildingId: "b-1", name: "Thoát hiểm tầng 3", createdAt: "2026-10-01T00:00:00Z" }, { id: "sc-2", buildingId: "b-1", name: "Hành lang có khói", createdAt: "2026-10-02T00:00:00Z" }], totalCount: 2, page: 1, pageSize: 100 } });
+      return route.fulfill({ json: { items: [{ id: "b-1", name: "Tòa nhà A", buildingType: null, totalFloors: 5, isActive: true, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" }, { id: "b-2", name: "Tòa nhà B", buildingType: null, totalFloors: 3, isActive: true, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" }], totalCount: 2, page: 1, pageSize: 100 } });
+    };
+    await page.route("**/api/buildings*", buildingsRoute);
+    await page.route("**/api/buildings/**", buildingsRoute);
+    await page.route("**/api/organizations/me/analytics/training/export*", (route) => { exports.push(new URL(route.request().url()).searchParams); return route.fulfill({ body: "groupBy,key\nday,2026-10-01\n", contentType: "text/csv" }); });
+    await page.route("**/api/organizations/me/analytics/training?*", (route) => {
+      const params = new URL(route.request().url()).searchParams;
+      reports.push(params);
+      const grouped = params.get("groupBy") === "week";
+      return route.fulfill({ json: training({
+        byScenario: [{ scenarioId: "sc-1", scenarioName: "Thoát hiểm tầng 3", plays: 25, uniqueTrainees: 9, completed: 20, passed: 9 }],
+        byBuilding: [{ buildingId: "b-1", buildingName: "Tòa nhà A", plays: 25, uniqueTrainees: 9, completed: 20 }],
+        ...(grouped ? { filters: { groupBy: "week" }, cohorts: [{ key: "2026-09-28", label: "2026-09-28", plays: 12, uniqueTrainees: 5, completed: 9, abandoned: 1, awaitingSync: 0, assessed: 6, passed: 4, passRate: 0.6667, averageDurationSeconds: 200 }] } : {}),
+      }) });
+    });
+    await page.goto("/workspace/analytics?from=2026-09-01&to=2026-09-30");
+    const filters = page.getByRole("group", { name: "Bộ lọc báo cáo huấn luyện" });
+    const building = filters.getByLabel("Công trình");
+    const scenario = filters.getByLabel("Kịch bản");
+    await expect(scenario).toBeDisabled();
+    await expect(page.getByRole("table", { name: "Lượt chơi theo kịch bản" })).toContainText("Thoát hiểm tầng 3");
+    await expect.poll(() => reports.length).toBe(1);
+    expect(reports[0].has("buildingId")).toBe(false);
+
+    await building.selectOption("b-1");
+    await expect(page).toHaveURL(/building=b-1/);
+    await expect(scenario).toBeEnabled();
+    await expect(scenario.locator("option")).toHaveText(["Tất cả kịch bản", "Thoát hiểm tầng 3", "Hành lang có khói"]);
+    await scenario.selectOption("sc-1");
+    await filters.getByLabel("Nhóm theo").selectOption("week");
+    await expect(page.getByRole("table", { name: "Số liệu theo nhóm" })).toContainText("2026-09-28");
+    const last = reports.at(-1) as URLSearchParams;
+    expect(last.get("buildingId")).toBe("b-1");
+    expect(last.get("scenarioId")).toBe("sc-1");
+    expect(last.get("groupBy")).toBe("week");
+
+    await page.getByRole("button", { name: "Xuất CSV" }).click();
+    await expect.poll(() => exports.length).toBe(1);
+    expect(Object.fromEntries(exports[0])).toMatchObject({ buildingId: "b-1", scenarioId: "sc-1", groupBy: "week" });
+
+    // Changing the building drops the scenario of the old one; reload restores the rest from the URL.
+    await building.selectOption("b-2");
+    await expect(page).not.toHaveURL(/scenario=/);
+    await expect((reports.at(-1) as URLSearchParams).has("scenarioId")).toBe(false);
+    await page.reload();
+    await expect(building).toHaveValue("b-2");
+    await expect(filters.getByLabel("Nhóm theo")).toHaveValue("week");
   });
 
   test("every chart has a table with the same numbers", async ({ page }) => {
@@ -203,7 +261,7 @@ test.describe("organization analytics", () => {
 });
 
 test.describe("admin analytics", () => {
-  test("overview tabs: training with organization names and links, revenue per currency, nothing is requested until a tab opens", async ({ page }) => {
+  test("overview tabs: training with organization names and links, revenue per currency, revenue is requested only when its tab opens", async ({ page }) => {
     const urls: string[] = [];
     await signIn(page, admin);
     await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Trường An Toàn", slug: "an-toan", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }], totalCount: 1, page: 1, pageSize: 100 } }));
@@ -215,7 +273,8 @@ test.describe("admin analytics", () => {
     await page.goto("/admin/overview");
     await expect(page.locator(".ops-stat", { hasText: "Tài khoản (hiện tại)" }).locator("strong")).toHaveText("45");
     await expect(page.locator("#ops-main").getByText("Chờ BE")).toHaveCount(0);
-    expect(urls).toEqual(["/api/admin/analytics/operations"]);
+    // The report section asks for operations; the "Phiên 30 ngày" tile reads the default training report. Revenue waits for its tab.
+    expect([...urls].sort()).toEqual(["/api/admin/analytics/operations", "/api/admin/analytics/training"]);
 
     await page.getByRole("tab", { name: "Huấn luyện" }).click();
     await expect(page.getByRole("link", { name: "Trường An Toàn" })).toHaveAttribute("href", "/admin/organizations/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/analytics");
@@ -284,7 +343,7 @@ test.describe("admin analytics", () => {
     await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [{ id: "org-1", name: "Fire3D Lab", slug: "fire3d-lab", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }], totalCount: 1, page: 1, pageSize: 20 } }));
     await page.route("**/api/organizations/org-1", (route) => route.fulfill({ json: { id: "org-1", name: "Fire3D Lab", slug: "fire3d-lab", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }, headers: { ETag: '"1"' } }));
     await page.goto("/admin/organizations?organization=org-1");
-    await expect(page.getByRole("dialog", { name: "Thông tin tổ chức" }).getByRole("link", { name: "Xem báo cáo" })).toHaveAttribute("href", "/admin/organizations/org-1/analytics");
+    await expect(page.getByRole("region", { name: "Thông tin tổ chức" }).getByRole("link", { name: "Xem báo cáo" })).toHaveAttribute("href", "/admin/organizations/org-1/analytics");
   });
 });
 

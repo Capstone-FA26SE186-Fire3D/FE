@@ -9,6 +9,9 @@ export type Organization = {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Active buildings / non-deleted accounts (BE `OrganizationResponse`, also in the list). Optional on older deployments. */
+  buildingCount?: number;
+  accountCount?: number;
 };
 
 export type OrganizationProfile = Organization & {

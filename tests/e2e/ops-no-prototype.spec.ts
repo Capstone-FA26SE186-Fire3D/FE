@@ -24,7 +24,7 @@ test("production /admin/library is the real screen: no banner, no sample rows, n
   await expect(page.getByRole("heading", { name: "Chưa thể mở tính năng này" })).toHaveCount(0);
   const body = await page.locator("body").innerText();
   for (const marker of SAMPLE_MARKERS) expect(body).not.toContain(marker);
-  await expect(page.getByRole("navigation", { name: "Quản trị hệ thống" }).getByRole("link", { name: /Thư viện tổ chức/ })).not.toContainText("Chờ BE");
+  await expect(page.getByRole("navigation", { name: "Quản trị hệ thống" }).getByRole("link", { name: /Thư viện mẫu/ })).not.toContainText("Chờ BE");
   expect(backend.items).toHaveLength(0);
   expect(backend.calls.some((call) => call.path.startsWith("/api/admin/library"))).toBe(true); // it asked the server, it did not invent rows
 });

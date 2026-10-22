@@ -55,6 +55,23 @@ export function addObjectCommand(draft: JsonObject, id: number, object: NewObjec
   return { ...command, selectBefore, selectAfter: at(objects.length) };
 }
 
+/** Copy of an object (all its fields, new id) placed 0.5 m to the side on the same floor; selects the copy. One undoable step. */
+export function duplicateObjectCommand(draft: JsonObject, id: number, index: number, now: number): V1Command | null {
+  const objects = readObjects(draft);
+  const target = objects[index];
+  const source = Array.isArray(draft.objects) ? draft.objects[index] : undefined;
+  if (!target?.kind || !source || typeof source !== "object" || Array.isArray(source)) return null;
+  const copy = JSON.parse(JSON.stringify(source)) as JsonObject;
+  copy.id = nextObjectId(draft, target.kind, ID_PREFIXES);
+  const placement = copy.placement;
+  if (placement && typeof placement === "object" && !Array.isArray(placement)) {
+    const position = (placement as JsonObject).position;
+    if (position && typeof position === "object" && !Array.isArray(position) && typeof (position as JsonObject).x === "number") (position as JsonObject).x = Math.round(((position as JsonObject).x as number + 0.5) * 1000) / 1000;
+  }
+  const command = arrayItemCommand(draft, id, ["objects"], { type: "add", value: copy }, now, `Nhân bản ${KIND_META[target.kind].lower}`);
+  return command ? { ...command, selectBefore: at(index), selectAfter: at(objects.length) } : null;
+}
+
 export function removeObjectCommand(draft: JsonObject, id: number, index: number, now: number): V1Command | null {
   const objects = readObjects(draft);
   const target = objects[index];

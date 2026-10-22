@@ -6,13 +6,13 @@ import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Drawer } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Select } from "@/components/ui/field";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { accountsApi } from "@/features/accounts/api";
+import { DetailPane, Split } from "@/features/admin-overview/components/admin-kit";
 import { formatDateTime } from "@/utils/date-range";
 import { supportApi } from "../api";
 import { organizationName, personName, priorityLabel, priorityOptions, priorityTone, ticketStatusLabel, ticketStatusOptions, ticketStatusTone } from "../labels";
@@ -49,12 +49,12 @@ export function AdminTicketsTab({ accessToken, myId }: { accessToken: string; my
   const close = () => setParams({ ticket: null, page });
 
   return <>
-    <div className="ops-toolbar">
+    <div className="adm-filters">
       <Select aria-label="Trạng thái ticket" style={{ width: 170 }} value={status} onChange={(event) => setParams({ status: event.target.value })}>
-        <option value="">Mọi trạng thái</option>{ticketStatusOptions.map((value) => <option key={value} value={value}>{ticketStatusLabel(value)}</option>)}
+        <option value="">Trạng thái: tất cả</option>{ticketStatusOptions.map((value) => <option key={value} value={value}>{ticketStatusLabel(value)}</option>)}
       </Select>
       <Select aria-label="Mức ưu tiên" style={{ width: 170 }} value={priority} onChange={(event) => setParams({ priority: event.target.value })}>
-        <option value="">Mọi mức ưu tiên</option>{priorityOptions.map((value) => <option key={value} value={value}>{priorityLabel(value)}</option>)}
+        <option value="">Mức: tất cả</option>{priorityOptions.map((value) => <option key={value} value={value}>{priorityLabel(value)}</option>)}
       </Select>
       <Select aria-label="Người phụ trách" style={{ width: 210 }} value={assignedTo} onChange={(event) => setParams({ assignedTo: event.target.value })}>
         <option value="">Mọi người phụ trách</option>
@@ -70,27 +70,39 @@ export function AdminTicketsTab({ accessToken, myId }: { accessToken: string; my
 
     {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách ticket" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{errorText(list.error, "Hãy kiểm tra kết nối rồi thử lại.")}</Alert>}
 
-    <Table caption="Danh sách ticket hỗ trợ">
-      <thead><tr><th>Ticket</th><th>Người gửi</th><th>Trạng thái</th><th>Ưu tiên</th><th>Phụ trách</th><th>Cập nhật</th></tr></thead>
-      <tbody>
-        {list.loading && !list.data && <TableMessage colSpan={6}><SkeletonRows rows={6} label="Đang tải danh sách ticket…" /></TableMessage>}
-        {items.map((ticket) => <tr key={ticket.id}>
-          <td>
-            <button type="button" className={styles.rowButton} onClick={() => open(ticket.id)} aria-label={`Mở ticket ${ticket.ticketNumber}: ${ticket.subject}`}>
-              <span className={styles.clip}>{ticket.subject}</span>
-              <span className="ops-cell-sub">{ticket.ticketNumber}</span>
-            </button>
-          </td>
-          <td><span className={styles.clipSmall}>{personName(ticket.createdBy)}</span><span className="ops-cell-sub">{organizationName(ticket.organization)}</span></td>
-          <td><StatusBadge tone={ticketStatusTone(ticket.status)}>{ticketStatusLabel(ticket.status)}</StatusBadge></td>
-          <td><StatusBadge tone={priorityTone(ticket.priority)}>{priorityLabel(ticket.priority)}</StatusBadge></td>
-          <td>{nameOf(ticket.assignedTo)}</td>
-          <td>{formatDateTime(ticket.updatedAt)}</td>
-        </tr>)}
-        {list.data && !items.length && <TableMessage colSpan={6}><EmptyState icon={filtering ? Search : Inbox} title={filtering ? "Không có ticket phù hợp." : "Chưa có ticket nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Ticket do học viên và tổ chức gửi sẽ xuất hiện ở đây."} /></TableMessage>}
-      </tbody>
-    </Table>
-    {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
+    <Split>
+      <div>
+        <Table caption="Danh sách ticket hỗ trợ">
+          <thead><tr><th>Yêu cầu</th><th>Từ</th><th>Mức</th><th>Trạng thái</th></tr></thead>
+          <tbody>
+            {list.loading && !list.data && <TableMessage colSpan={4}><SkeletonRows rows={6} label="Đang tải danh sách ticket…" /></TableMessage>}
+            {items.map((ticket) => <tr key={ticket.id} data-selected={ticketId === ticket.id ? "true" : undefined}>
+              <td>
+                <button type="button" className={styles.rowButton} onClick={() => open(ticket.id)} aria-label={`Mở ticket ${ticket.ticketNumber}: ${ticket.subject}`}>
+                  <span className={styles.clip}>{ticket.subject}</span>
+                  <span className="ops-cell-sub">{ticket.ticketNumber} · {formatDateTime(ticket.updatedAt)}</span>
+                </button>
+              </td>
+              <td><span className={styles.clipSmall}>{personName(ticket.createdBy)}</span><span className="ops-cell-sub">{organizationName(ticket.organization)} · {nameOf(ticket.assignedTo)}</span></td>
+              <td><StatusBadge tone={priorityTone(ticket.priority)}>{priorityLabel(ticket.priority)}</StatusBadge></td>
+              <td><StatusBadge tone={ticketStatusTone(ticket.status)}>{ticketStatusLabel(ticket.status)}</StatusBadge></td>
+            </tr>)}
+            {list.data && !items.length && <TableMessage colSpan={4}><EmptyState icon={filtering ? Search : Inbox} title={filtering ? "Không có ticket phù hợp." : "Chưa có ticket nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Ticket do học viên và tổ chức gửi sẽ xuất hiện ở đây."} /></TableMessage>}
+          </tbody>
+        </Table>
+        {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
+      </div>
+
+      <DetailPane
+        open={Boolean(ticketId)}
+        label="Chi tiết ticket"
+        onClose={close}
+        closeLabel="Đóng chi tiết ticket"
+        placeholder={{ icon: Inbox, title: "Chọn một ticket", text: "Phân công, đổi trạng thái và trao đổi với người gửi hiện ở đây." }}
+      >
+        {ticketId && <AdminTicketPanel key={ticketId} ticketId={ticketId} accessToken={accessToken} myId={myId} admins={adminOptions} onChanged={list.reload} />}
+      </DetailPane>
+    </Split>
 
     <PendingBox
       title="Chưa có từ backend"
@@ -99,9 +111,5 @@ export function AdminTicketsTab({ accessToken, myId }: { accessToken: string; my
         "Thông báo email/push khi có phản hồi: API hỗ trợ chưa gửi thông báo.",
       ]}
     />
-
-    <Drawer open={Boolean(ticketId)} onOpenChange={(value) => { if (!value) close(); }} title="Chi tiết ticket" description="Phân công, đổi trạng thái và trao đổi với người gửi." className={styles.wideDrawer}>
-      {ticketId && <AdminTicketPanel key={ticketId} ticketId={ticketId} accessToken={accessToken} myId={myId} admins={adminOptions} onChanged={list.reload} />}
-    </Drawer>
   </>;
 }

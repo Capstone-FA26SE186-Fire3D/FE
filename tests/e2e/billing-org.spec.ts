@@ -47,8 +47,8 @@ test.describe("organization billing workspace (mock)", () => {
     await mockBilling(page, mock);
     queue(mock, "POST /api/billing/quotations", { status: 503, json: { code: "SERVICE_UNAVAILABLE", title: "down" }, delayMs: 300 });
     await page.goto("/workspace/billing");
-    await page.getByRole("button", { name: "Tạo báo giá", exact: true }).first().click();
-    await page.getByLabel("Công trình 1", { exact: false }).first().check();
+    await page.getByRole("button", { name: "Mua gói công trình", exact: true }).first().click();
+    await page.getByRole("dialog").getByLabel("Công trình 1", { exact: false }).first().check();
     await expect(page.getByText("Đang kiểm tra địa chỉ…")).toBeHidden();
     await pick(page, ids.pkg);
     const submit = page.getByRole("button", { name: /^Tạo báo giá \(1\)$/ });
@@ -76,8 +76,8 @@ test.describe("organization billing workspace (mock)", () => {
     await mockBilling(page, mock);
     queue(mock, "POST /api/billing/quotations", { status: 503, json: { title: "down" } });
     await page.goto("/workspace/billing");
-    await page.getByRole("button", { name: "Tạo báo giá", exact: true }).first().click();
-    await page.getByLabel("Công trình 1", { exact: false }).first().check();
+    await page.getByRole("button", { name: "Mua gói công trình", exact: true }).first().click();
+    await page.getByRole("dialog").getByLabel("Công trình 1", { exact: false }).first().check();
     await pick(page, ids.pkg);
     await page.getByRole("button", { name: /^Tạo báo giá \(1\)$/ }).click();
     await expect(page.getByText("Chưa tạo được báo giá")).toBeVisible();

@@ -14,6 +14,7 @@ import { Table } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { formatDateTime } from "@/components/ops/detail-parts";
 import { learnAdminApi } from "../api";
+import { loadPostWithVersion } from "../load-post";
 import { commandDone, commandKey } from "../command-keys";
 import { checkContent, contentFromVersion, describeDifferences, emptyContent, fingerprint, toVersionInput, type ContentIssue, type EditorContent } from "../content";
 import { describeLearnError, translateIssue, type LearnErrorView } from "../errors";
@@ -43,12 +44,7 @@ export function PostEditor({ accessToken, postId, versionId, tab, onTab, onBack,
   accessToken: string; postId: string; versionId: string; tab: string; onTab: (tab: string) => void; onBack: () => void; onOpenVersion: (versionId: string) => void;
 }) {
   const [rev, setRev] = useState(0);
-  const loaded = useAsyncData<Loaded>(`learn-post:${postId}:${versionId}:${rev}`, async (signal) => {
-    const post = await learnAdminApi.getPost(accessToken, postId, signal);
-    const versions = [...(post.data.versions ?? [])].sort((a, b) => b.versionNumber - a.versionNumber);
-    const pick = (versionId ? versions.find((item) => item.id === versionId) : undefined) ?? versions.find((item) => item.status === "Draft") ?? versions[0] ?? null;
-    return { post, version: pick ? await learnAdminApi.getVersion(accessToken, pick.id, signal) : null };
-  });
+  const loaded = useAsyncData<Loaded>(`learn-post:${postId}:${versionId}:${rev}`, (signal) => loadPostWithVersion(accessToken, postId, versionId, signal));
   const back = <div><Button variant="quiet" size="sm" onClick={onBack}><ArrowLeft size={16} aria-hidden="true" />Về danh sách</Button></div>;
 
   if (loaded.error !== undefined) {

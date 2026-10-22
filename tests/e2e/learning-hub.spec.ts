@@ -44,8 +44,8 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 980, height: 650 
     await expect(page.getByTestId("trainee-ai-quota")).toContainText("160 tokens");
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
     await page.screenshot({ path: testInfo.outputPath(`hub-${viewport.width}.png`), fullPage: true });
-    if (viewport.width < 768) await page.getByRole("button", { name: "Mở menu học tập" }).click();
-    await page.getByRole("link", { name: /^Lịch sử/ }).click();
+    if (viewport.width < 1024) await page.getByRole("button", { name: "Mở menu học tập" }).click();
+    await page.getByRole("navigation", { name: "Quản lý học tập" }).getByRole("link", { name: /^Lịch sử/ }).click();
     await expect(page.getByTestId("history-empty")).toContainText("Bạn chưa có lượt tập nào");
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
   });
@@ -56,7 +56,7 @@ test("Q&A shows today's allowance, asks with the article as context and polls th
   let ids = { post: "", version: "" };
   await restore(page, "trainee", (backend) => { const seeded = backend.seedPost("hoi-dap", { title: "Thang máy khi có cháy", summary: "x", status: "Published" }); ids = { post: seeded.post.id, version: seeded.version.id }; }, ai);
   await page.goto("/learning-hub?view=questions&article=hoi-dap");
-  await expect(page.getByRole("link", { name: /^Hỏi đáp/ })).not.toContainText(/chưa khả dụng/i);
+  await expect(page.getByRole("navigation", { name: "Quản lý học tập" }).getByRole("link", { name: /^Hỏi đáp/ })).not.toContainText(/chưa khả dụng/i);
   await expect(page.getByTestId("trainee-ai-quota")).toContainText("Hôm nay còn 160 tokens / 200 tokens");
   await expect(page.getByTestId("trainee-ai-context")).toContainText("Thang máy khi có cháy");
   await page.getByLabel("Câu hỏi", { exact: true }).fill("  Vì sao không nên dùng thang máy?  ");
@@ -221,12 +221,13 @@ test("history is a real view with no demo content", async ({ page }) => {
   expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.includes("prototype")))).toEqual([]);
 });
 
-test("an article page offers saving but no fake ask button", async ({ page }) => {
+test("an article page offers saving and an ask-AI link into the Q&A with the article", async ({ page }) => {
   await restore(page, "trainee");
   await page.goto(`/learn/${slug}`);
   await expect(page.getByRole("heading", { level: 1, name: "Đọc không gian trước khi hành động" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Lưu bài viết" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Hỏi về bài này" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Hỏi AI về bài này" })).toHaveAttribute("href", `/learning-hub?view=questions&article=${slug}`);
 });
 
 test("logout returns home even on backend failure and the Q&A view respects reduced motion", async ({ page }) => {
@@ -264,7 +265,7 @@ test("mobile organization form and OTP step scroll without overflow", async ({ p
 test.describe("saved posts (real bookmark API)", () => {
   test("default view lists the bookmarks from the server; the other views do not touch them", async ({ page }) => {
     const backend = await restore(page, "trainee", (b) => b.addBookmark(slug));
-    await page.goto("/learning-hub");
+    await page.goto("/learning-hub?view=saved");
     await expect(page.getByRole("heading", { name: "Bài đã lưu", exact: true })).toBeVisible();
     await expect(page.locator(".learn-card")).toHaveCount(1);
     await expect(page.locator(".learn-card")).toContainText("Đọc không gian trước khi hành động");
@@ -272,7 +273,7 @@ test.describe("saved posts (real bookmark API)", () => {
     await page.getByRole("link", { name: /^Lịch sử/ }).click();
     await expect(page).toHaveURL(/view=history/);
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Lịch sử", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Lịch sử luyện tập", exact: true })).toBeVisible();
     await page.goBack();
     await expect(page.getByRole("heading", { name: "Bài đã lưu", exact: true })).toBeVisible();
     await page.goForward();
@@ -284,9 +285,9 @@ test.describe("saved posts (real bookmark API)", () => {
   test("empty, loading and error states", async ({ page }) => {
     const backend = await restore(page);
     backend.failNext("GET", /bookmarks$/, { status: 200, delayMs: 700, json: { items: [], total: 0, page: 1, pageSize: 12 } });
-    await page.goto("/learning-hub");
+    await page.goto("/learning-hub?view=saved");
     await expect(page.getByRole("status", { name: "Đang tải bài đã lưu" })).toBeVisible();
-    await expect(page.getByText("Bạn chưa lưu bài nào.")).toBeVisible();
+    await expect(page.getByText("Bạn chưa lưu bài nào", { exact: true })).toBeVisible();
     backend.failNext("GET", /bookmarks$/, { status: 500, json: { code: "BOOM", title: "boom" } });
     await page.reload();
     await expect(page.getByRole("alert").filter({ hasText: "Không tải được bài đã lưu" })).toBeVisible();
@@ -298,7 +299,7 @@ test.describe("saved posts (real bookmark API)", () => {
   test("removing a saved post calls DELETE and the list stays correct after reload", async ({ page }) => {
     const backend = await restore(page, "trainee", (b) => { b.addBookmark(slug); b.addBookmark("mot-luot-hoc"); });
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto("/learning-hub");
+    await page.goto("/learning-hub?view=saved");
     await expect(page.locator(".learn-card")).toHaveCount(2);
     await page.locator(".learn-card").first().hover();
     expect(await page.locator(".learn-card").first().evaluate((node) => getComputedStyle(node).transform)).toBe("none");
@@ -314,7 +315,7 @@ test.describe("saved posts (real bookmark API)", () => {
     const backend = await restore(page, "trainee", (b) => { b.addBookmark(slug); b.addBookmark("mot-luot-hoc"); b.addBookmark("tu-bai-doc"); });
     backend.externalLifecycle(backend.bySlug("mot-luot-hoc")!.id, "Hidden");
     backend.externalLifecycle(backend.bySlug("tu-bai-doc")!.id, "Deleted");
-    await page.goto("/learning-hub");
+    await page.goto("/learning-hub?view=saved");
     await expect(page.locator(".learn-card")).toHaveCount(1);
     const unavailable = page.getByTestId("saved-unavailable");
     await expect(unavailable).toHaveCount(2);
@@ -332,7 +333,7 @@ test.describe("saved posts (real bookmark API)", () => {
 
   test("bookmarks are paged and removing the last row of a later page steps back", async ({ page }) => {
     const backend = await restore(page, "trainee", (b) => { for (let i = 1; i <= 13; i += 1) { b.seedPost(`luu-${i}`, { title: `Bài lưu ${i}`, status: "Published" }); b.addBookmark(`luu-${i}`); } });
-    await page.goto("/learning-hub");
+    await page.goto("/learning-hub?view=saved");
     await expect(page.locator(".learn-card")).toHaveCount(12);
     await page.getByRole("button", { name: "Trang sau" }).click();
     await expect(page).toHaveURL(/page=2/);
@@ -346,7 +347,7 @@ test.describe("saved posts (real bookmark API)", () => {
 
   test("an organization account gets an explanation, a guest is asked to sign in", async ({ page }) => {
     await restore(page, "org");
-    await page.goto("/learning-hub");
+    await page.goto("/learning-hub?view=saved");
     await expect(page.getByRole("heading", { name: "Bài đã lưu dành cho tài khoản học viên" })).toBeVisible();
     const guest = await page.context().newPage();
     await restore(guest, "guest");
@@ -375,7 +376,7 @@ for (const width of [1440, 820, 375]) {
   test(`saved library and profile visual review at ${width}px`, async ({ page }, testInfo) => {
     await restore(page, "trainee", (b) => { b.addBookmark(slug); });
     await page.setViewportSize({ width, height: width === 1440 ? 900 : 667 });
-    await page.goto("/learning-hub");
+    await page.goto("/learning-hub?view=saved");
     await expect(page.locator(".learn-card")).toHaveCount(1);
     await page.screenshot({ path: testInfo.outputPath(`saved-${width}.png`), fullPage: true });
     await page.goto("/learning-hub?view=profile");
@@ -391,12 +392,13 @@ test("mobile menu Escape returns focus and profile scrolls without overflow", as
   await page.goto("/learning-hub");
   const toggle = page.getByRole("button", { name: "Mở menu học tập" });
   await toggle.click();
-  await expect(page.getByRole("link", { name: "Bài đã lưu", exact: true })).toBeFocused();
+  const sidebarNav = page.getByRole("navigation", { name: "Quản lý học tập" });
+  await expect(sidebarNav.getByRole("link", { name: "Tổng quan", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(toggle).toBeFocused();
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await toggle.click();
-  await page.getByRole("link", { name: "Hồ sơ", exact: true }).click();
+  await sidebarNav.getByRole("link", { name: "Hồ sơ", exact: true }).click();
   await expect(page.getByLabel("Họ và tên")).toBeVisible();
   await page.getByRole("button", { name: "Đổi mật khẩu", exact: true }).scrollIntoViewIfNeeded();
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(375);
@@ -413,5 +415,91 @@ for (const width of [375, 1440]) {
     await expect(page.getByTestId("ai-answer")).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await page.screenshot({ path: testInfo.outputPath(`trainee-ai-${width}.png`), fullPage: true });
+  });
+}
+
+test.describe("overview (Tổng quan)", () => {
+  test("is the default view with the hero actions, the optional intro and the latest bookmarks and sessions", async ({ page }) => {
+    await restore(page, "trainee", (b) => { b.seedPost("moi-nhat", { title: "Bài mới nhất", summary: "x", status: "Published" }); b.addBookmark(slug); b.addBookmark("mot-luot-hoc"); b.addBookmark("tu-bai-doc"); b.addBookmark("moi-nhat"); });
+    await page.goto("/learning-hub");
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Xin chào");
+    const hero = page.getByRole("region", { name: "Sẵn sàng cho buổi luyện tập tiếp theo" });
+    await expect(hero.getByRole("link", { name: "Luyện tập trên ứng dụng" })).toHaveAttribute("href", "/download");
+    await expect(hero.getByRole("link", { name: "Đọc bài Học" })).toHaveAttribute("href", "/learn");
+    await expect(page.getByTestId("overview-saved")).toHaveCount(3);
+    await expect(page.getByRole("link", { name: /^Đọc bài: / }).first()).toBeVisible();
+    await expect(page.getByText("Tiếp tục đọc")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Bài đã lưu", exact: true }).first()).toHaveAttribute("href", "/learning-hub?view=saved");
+  });
+
+  test("the first-visit intro can be skipped and the choice is remembered without blocking practice", async ({ page }) => {
+    await restore(page);
+    await page.goto("/learning-hub");
+    const intro = page.getByTestId("trainee-intro");
+    await expect(intro).toContainText("Không cần đọc trước mới được luyện tập");
+    await intro.getByRole("button", { name: "Bỏ qua" }).click();
+    await expect(intro).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("Xin chào");
+    await expect(page.getByTestId("trainee-intro")).toHaveCount(0);
+  });
+
+  test("the intro opens a skippable three-step tour with a clear next action, keyboard support and a remembered end", async ({ page }) => {
+  await restore(page);
+  await page.goto("/learning-hub");
+  const opener = page.getByTestId("trainee-intro").getByRole("button", { name: "Xem hướng dẫn" });
+  await opener.focus();
+  await page.keyboard.press("Enter");
+  const tour = page.getByRole("dialog", { name: "Hướng dẫn nhanh" });
+  await expect(tour).toBeVisible();
+  await expect(tour.getByTestId("tour-step")).toContainText("Đọc trong Learn");
+  await expect(tour.getByRole("link", { name: "Mở Learn" })).toHaveAttribute("href", "/learn");
+  await tour.getByRole("button", { name: "Tiếp" }).click();
+  await expect(tour.getByRole("link", { name: "Tải ứng dụng" })).toHaveAttribute("href", "/download");
+  await tour.getByRole("button", { name: "Tiếp" }).click();
+  await expect(tour.getByRole("link", { name: "Mở lịch sử luyện tập" })).toHaveAttribute("href", "/learning-hub?view=history");
+  expect(await page.evaluate(() => localStorage.getItem("fire3d-trainee-tour"))).toBeNull();
+  for (let i = 0; i < 8; i += 1) await page.keyboard.press("Tab");
+  expect(await page.evaluate(() => !!document.activeElement?.closest('[role="dialog"]'))).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(tour).toHaveCount(0);
+  await expect(opener).toBeFocused();
+  expect(await page.evaluate(() => localStorage.getItem("fire3d-trainee-tour"))).toBe("done");
+  await expect(page.getByTestId("trainee-intro")).toBeVisible();
+  await expect(page.getByText(/XP|huy hiệu|cấp độ/i)).toHaveCount(0);
+});
+
+test("an empty account sees explained empty states, and the Ask AI shortcut only prefills the question", async ({ page }) => {
+    const ai = new TraineeAiBackend();
+    await restore(page, "trainee", () => undefined, ai);
+    await page.goto("/learning-hub");
+    await expect(page.getByText("Bạn chưa lưu bài nào", { exact: true })).toBeVisible();
+    await expect(page.getByText("Chưa có phiên luyện tập", { exact: true })).toBeVisible();
+    await page.getByLabel("Câu hỏi cho AI").fill("Thang máy khi có cháy?");
+    await page.getByRole("button", { name: "Mở Hỏi đáp AI" }).click();
+    await expect(page).toHaveURL(/view=questions/);
+    await expect(page.getByLabel("Câu hỏi", { exact: true })).toHaveValue("Thang máy khi có cháy?");
+    expect(ai.posts()).toHaveLength(0);
+  });
+
+  test("an organization account is pointed to its own area", async ({ page }) => {
+    await restore(page, "org");
+    await page.goto("/learning-hub");
+    await expect(page.getByText("Tổng quan này dành cho tài khoản học viên")).toBeVisible();
+  });
+});
+
+for (const theme of ["light", "dark"]) {
+  test(`overview keeps the stored ${theme} theme and fits the phone, tablet and desktop widths`, async ({ page }) => {
+    await page.addInitScript((value) => localStorage.setItem("fire3d-ops-theme", value), theme);
+    await restore(page);
+    for (const width of [390, 768, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/learning-hub");
+      await expect(page.getByTestId("trainee-overview")).toBeVisible();
+      await expect(page.locator(".ops-theme").first()).toHaveAttribute("data-resolved-theme", theme);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+      expect(await page.locator(".learning-tabbar").isVisible()).toBe(width < 768);
+    }
   });
 }

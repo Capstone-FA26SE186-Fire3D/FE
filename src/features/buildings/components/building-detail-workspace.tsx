@@ -1,6 +1,6 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
+import { QrCode, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePolling } from "@/api/use-polling";
 import { useAsyncData } from "@/api/use-async-data";
@@ -14,7 +14,10 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
+import { billingApi } from "@/features/billing/api";
 import { BuildingServicesTab } from "@/features/billing/components/building-services-tab";
+import { summarizeEntitlements } from "@/features/billing/entitlements";
+import { formatDate } from "@/features/billing/format";
 import { buildingsApi } from "../api";
 import { describeApiError, isStatus } from "../format";
 import { derivePipelineProgress, emptyPipeline, isTerminalJob, isUnsettledRevision, revisionLabel, type PipelineAction, type RevisionPipeline } from "../pipeline";
@@ -36,7 +39,8 @@ import { ScenariosPanel } from "./scenarios-panel";
 
 export const buildingTabs = ["overview", "ifc", "scenarios", "access", "qr", "services"] as const;
 export type BuildingTab = (typeof buildingTabs)[number];
-const tabLabels: Record<BuildingTab, string> = { overview: "Tổng quan", ifc: "IFC & xử lý", scenarios: "Kịch bản", access: "Quyền tham gia", qr: "QR", services: "Dịch vụ" };
+const tabLabels: Record<BuildingTab, string> = { overview: "Hành trình", ifc: "IFC & xử lý", scenarios: "Kịch bản", access: "Quyền tham gia", qr: "QR", services: "Dịch vụ" };
+const tabEyebrow: Record<BuildingTab, string> = { overview: "Công trình", ifc: "Bước 2 · IFC và xử lý", scenarios: "Bước 3 · Soạn kịch bản", access: "Công trình · Quyền tham gia", qr: "Công trình · Mã QR", services: "Công trình · Dịch vụ" };
 const SCENARIO_PAGE_SIZE = 20;
 // After a Succeeded job the revision is re-read until QA moved it out of Uploaded/Processing; ~1 minute at most.
 const MAX_SETTLE_POLLS = 20;
@@ -87,6 +91,10 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "overview" }:
 
   const building = useAsyncData(`building:${buildingId}`, (signal) => buildingsApi.getVersioned(token, buildingId, signal), enabled);
   const revisions = useAsyncData(`revisions:${buildingId}`, (signal) => buildingsApi.listRevisions(token, buildingId, 1, 50, signal), enabled);
+  // Header chips: visibility and the service period. Both are optional context; a failed read just hides the chip.
+  const access = useAsyncData(`building-access:${buildingId}`, (signal) => buildingsApi.getAccess(token, buildingId, signal), enabled && !isAdmin);
+  const entitlements = useAsyncData(`billing:entitlements:${buildingId}`, (signal) => billingApi.listEntitlements(token, { buildingId, pageSize: 50 }, signal), enabled && !isAdmin);
+  const service = useMemo(() => (entitlements.data ? summarizeEntitlements(entitlements.data.items) : undefined), [entitlements.data]);
   const scenarios = useAsyncData(`scenarios:${buildingId}:${scenarioPage}`, (signal) => buildingsApi.listScenarios(token, buildingId, scenarioPage, SCENARIO_PAGE_SIZE, signal), enabled);
 
   const revisionItems = revisions.data?.items;
@@ -226,10 +234,20 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "overview" }:
   return <>
     <PageHeader
       title={data?.name ?? "Đang tải công trình…"}
+      eyebrow={tabEyebrow[tab]}
       description={data ? `${data.buildingType || "Công trình"} · ${data.totalFloors} tầng` : undefined}
       breadcrumbs={crumbs}
-      actions={<Button variant="quiet" onClick={refreshAll}><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>}
+      actions={<>
+        <Button variant="quiet" onClick={refreshAll}><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
+        {!isAdmin && <Button variant="secondary" onClick={() => selectTab("qr")}><QrCode size={16} aria-hidden="true" />Mã QR công trình</Button>}
+        <Button variant="secondary" onClick={() => { selectTab("overview"); window.setTimeout(() => document.getElementById("building-info")?.scrollIntoView({ block: "start" }), 60); }}>Thông tin</Button>
+      </>}
     />
+    {!isAdmin && (access.data || service?.current) && <div className="ops-chips" aria-label="Tình trạng công trình">
+      {access.data && <StatusBadge tone="neutral">{access.data.visibility === "Public" ? "Công khai" : "Riêng tư"}</StatusBadge>}
+      {service?.current && <StatusBadge tone={service.state === "expiring" ? "warning" : "success"}>Dịch vụ hiệu lực đến {formatDate(service.current.endsAt)}{service.daysLeft !== null ? ` · còn ${Math.max(service.daysLeft, 0)} ngày` : ""}</StatusBadge>}
+      {service && !service.current && <StatusBadge tone={service.state === "expired" ? "danger" : "neutral"}>{service.state === "expired" ? "Dịch vụ đã hết hạn" : service.state === "upcoming" ? "Dịch vụ chưa đến kỳ" : "Chưa có dịch vụ"}</StatusBadge>}
+    </div>}
 
     <div className="ops-revision-bar">
       <div className="ops-field">
@@ -249,11 +267,11 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "overview" }:
       </TabsList>
 
       <TabsContent value="overview">
-        {!data ? <Skeleton style={{ height: 240 }} /> : <OverviewTab accessToken={token} building={data} etag={building.data?.etag ?? null} revision={revision} pipeline={pipeline} issues={issues.data?.items} scenarioCount={scenarios.data?.totalCount} isAdmin={isAdmin} onSaved={building.reload} onGoTo={selectTab} />}
+        {!data ? <Skeleton style={{ height: 240 }} /> : <OverviewTab accessToken={token} building={data} etag={building.data?.etag ?? null} revision={revision} pipeline={pipeline} issues={issues.data?.items} scenarios={scenarios.data?.items} scenarioCount={scenarios.data?.totalCount} service={service} isAdmin={isAdmin} onSaved={building.reload} onGoTo={selectTab} />}
       </TabsContent>
 
       <TabsContent value="ifc">
-        <div className="ops-stack">
+        <div className="ops-stack org">
           {revision && progress && <PipelineProgress model={progress} versionLabel={revision.versionLabel} onAction={runAction} busy={processing.working} actionError={processing.actionError} />}
           <IfcUploadPanel accessToken={accessToken} buildingId={buildingId} onRevisionChanged={onRevisionChanged} />
           {revisions.loading && !revisions.data && <Skeleton style={{ height: 160 }} />}

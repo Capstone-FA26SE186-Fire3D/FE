@@ -10,6 +10,7 @@ import { Field, Input } from "@/components/ui/field";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
+import { Rows } from "@/features/admin-overview/components/admin-kit";
 import { routes } from "@/configs/routes";
 import { organizationsApi } from "../api";
 import type { AdminUpdateOrganizationInput, Organization, OrganizationDetail as OrganizationDetailData } from "../types";
@@ -134,15 +135,15 @@ export function OrganizationDetail({ id, accessToken, onToggle, onSaved }: { id:
       <Button size="sm" variant="quiet" onClick={reload} disabled={loading} aria-label="Tải lại tổ chức" style={{ marginLeft: "auto" }}><RefreshCw size={14} aria-hidden="true" />{loading ? "Đang tải…" : "Tải lại"}</Button>
     </div>
 
-    {!edits && <dl className="ops-stack" style={{ margin: 0, gap: 12 }}>
-      <div><dt className="ops-field-hint">Tên tổ chức</dt><dd style={{ margin: 0, fontWeight: 600 }}>{organization.name}</dd></div>
-      <div><dt className="ops-field-hint">Địa chỉ</dt><dd style={{ margin: 0, fontSize: 14, fontWeight: 400, overflowWrap: "anywhere" }}>{dash(organization.address)}</dd></div>
-      <div><dt className="ops-field-hint">Số điện thoại</dt><dd style={{ margin: 0, fontSize: 14, fontWeight: 400 }}>{dash(organization.phoneNumber)}</dd></div>
-      {hasCounts && <div><dt className="ops-field-hint">Quy mô</dt><dd style={{ margin: 0, fontSize: 14, fontWeight: 400 }}>{organization.buildingCount ?? "—"} công trình · {organization.accountCount ?? "—"} tài khoản</dd></div>}
-      <div><dt className="ops-field-hint">Mã tổ chức</dt><dd style={{ margin: 0, fontFamily: "ui-monospace, Consolas, monospace", fontSize: 12, overflowWrap: "anywhere" }}>{organization.id}</dd></div>
-      <div><dt className="ops-field-hint">Tạo lúc</dt><dd style={{ margin: 0, fontSize: 14, fontWeight: 400 }}>{formatDate(organization.createdAt)}</dd></div>
-      <div><dt className="ops-field-hint">Cập nhật</dt><dd style={{ margin: 0, fontSize: 14, fontWeight: 400 }}>{formatDate(organization.updatedAt)}</dd></div>
-    </dl>}
+    {!edits && <Rows items={[
+      { label: "Tên tổ chức", value: <strong>{organization.name}</strong> },
+      { label: "Địa chỉ", value: dash(organization.address) },
+      { label: "Số điện thoại", value: dash(organization.phoneNumber) },
+      ...(hasCounts ? [{ label: "Quy mô", value: `${organization.buildingCount ?? "—"} công trình · ${organization.accountCount ?? "—"} tài khoản` }] : []),
+      { label: "Mã tổ chức", value: <span className="adm-mono">{organization.id}</span> },
+      { label: "Tạo lúc", value: formatDate(organization.createdAt) },
+      { label: "Cập nhật", value: formatDate(organization.updatedAt) },
+    ]} />}
 
     {edits && <form onSubmit={submit} noValidate className="ops-stack" aria-label="Sửa hồ sơ tổ chức">
       {staleEtag !== null && <Alert tone="warning" title={reloaded ? "Đã tải bản mới nhất" : "Hồ sơ vừa được thay đổi ở nơi khác"} action={!reloaded && <Button type="button" size="sm" variant="secondary" className="mt-3" onClick={reload} disabled={loading}>{loading ? "Đang tải…" : "Tải bản mới để đối chiếu"}</Button>}>
@@ -160,11 +161,11 @@ export function OrganizationDetail({ id, accessToken, onToggle, onSaved }: { id:
     </form>}
 
     <div className="ops-actions">
-      {!edits && <Button variant="secondary" onClick={startEdit}><Pencil size={16} aria-hidden="true" />Sửa hồ sơ</Button>}
-      <Button asChild><Link href={ownersHref(organization.id)}><UserPlus size={16} aria-hidden="true" />Tạo OrganizationUser</Link></Button>
       <Button asChild variant="secondary"><Link href={buildingsHref(organization.id)}><Building2 size={16} aria-hidden="true" />Xem công trình</Link></Button>
+      {!edits && <Button variant="secondary" onClick={startEdit}><Pencil size={16} aria-hidden="true" />Sửa hồ sơ</Button>}
+      <Button asChild variant="secondary"><Link href={ownersHref(organization.id)}><UserPlus size={16} aria-hidden="true" />Tạo OrganizationUser</Link></Button>
       <Button asChild variant="secondary"><Link href={`${routes.adminOrganizations}/${organization.id}/analytics`}><BarChart3 size={16} aria-hidden="true" />Xem báo cáo</Link></Button>
-      <Button variant={organization.isActive ? "secondary" : "primary"} onClick={() => onToggle(organization)}>{organization.isActive ? "Vô hiệu hóa tổ chức" : "Kích hoạt tổ chức"}</Button>
+      <Button className={organization.isActive ? "adm-btn-danger-outline" : undefined} variant={organization.isActive ? "secondary" : "primary"} onClick={() => onToggle(organization)}>{organization.isActive ? "Vô hiệu hóa tổ chức…" : "Kích hoạt tổ chức…"}</Button>
     </div>
   </div>;
 }

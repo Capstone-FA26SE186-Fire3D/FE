@@ -1,4 +1,4 @@
-import { OUTCOMES, type AiUsage, type OperationsReport, type Outcome, type QuotaAmount, type RevenueReport, type TrainingReport } from "./types";
+import { GROUP_BY, OUTCOMES, type AiUsage, type GroupBy, type OperationsReport, type Outcome, type QuotaAmount, type RevenueReport, type TrainingReport } from "./types";
 
 type Raw = Record<string, unknown>;
 
@@ -55,7 +55,11 @@ export function parseTraining(payload: unknown): TrainingReport {
     assessment: { assessed: asNumber(assessment.assessed), passed: asNumber(assessment.passed), passRate: asNullable(assessment.passRate) },
     duration: { sessions: asNumber(duration.sessions), averageSeconds: asNullable(duration.averageSeconds), medianSeconds: asNullable(duration.medianSeconds) },
     byMode: asList(raw.byMode).map((item) => ({ mode: asText(item.mode, "Không rõ"), plays: asNumber(item.plays), completed: asNumber(item.completed) })),
-    byTraining: asList(raw.byTraining).map((item) => ({ trainingId: asText(item.trainingId, "—"), plays: asNumber(item.plays), completed: asNumber(item.completed), passed: asNumber(item.passed) })),
+    byTraining: asList(raw.byTraining).map((item) => ({ trainingId: asText(item.trainingId, "—"), trainingName: asText(item.trainingName) || null, plays: asNumber(item.plays), completed: asNumber(item.completed), passed: asNumber(item.passed) })),
+    byBuilding: asList(raw.byBuilding).map((item) => ({ buildingId: asText(item.buildingId, "—"), buildingName: asText(item.buildingName) || null, plays: asNumber(item.plays), uniqueTrainees: asNumber(item.uniqueTrainees), completed: asNumber(item.completed) })),
+    byScenario: asList(raw.byScenario).map((item) => ({ scenarioId: asText(item.scenarioId, "—"), scenarioName: asText(item.scenarioName) || null, plays: asNumber(item.plays), uniqueTrainees: asNumber(item.uniqueTrainees), completed: asNumber(item.completed), passed: asNumber(item.passed) })),
+    cohorts: Array.isArray(raw.cohorts) ? asList(raw.cohorts).map((item) => ({ key: asText(item.key, "—"), label: asText(item.label) || asText(item.key, "—"), plays: asNumber(item.plays), uniqueTrainees: asNumber(item.uniqueTrainees), completed: asNumber(item.completed), abandoned: asNumber(item.abandoned), awaitingSync: asNumber(item.awaitingSync), assessed: asNumber(item.assessed), passed: asNumber(item.passed), passRate: asNullable(item.passRate), averageDurationSeconds: asNullable(item.averageDurationSeconds) })) : null,
+    groupBy: isRecord(raw.filters) && typeof raw.filters.groupBy === "string" && (GROUP_BY as readonly string[]).includes(raw.filters.groupBy) ? (raw.filters.groupBy as GroupBy) : null,
     byOrganization: Array.isArray(raw.byOrganization) ? asList(raw.byOrganization).map((item) => ({ organizationId: asText(item.organizationId, "—"), plays: asNumber(item.plays), uniqueTrainees: asNumber(item.uniqueTrainees), completed: asNumber(item.completed) })) : null,
     organization: identity(raw.organization),
     aiUsage: aiUsage(raw.aiUsage),

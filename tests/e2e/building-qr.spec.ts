@@ -201,7 +201,7 @@ test.describe("Building QR management tab", () => {
     expect(page.url()).not.toContain(token);
 
     // Switching tabs keeps it (the tab stays mounted); it is just hidden.
-    await page.getByRole("tab", { name: "Tổng quan" }).click();
+    await page.getByRole("tab", { name: "Hành trình" }).click();
     await expect(page.getByTestId("qr-issued")).toBeHidden();
     await page.getByRole("tab", { name: "QR", exact: true }).click();
     await expect(page.getByTestId("qr-link")).toHaveText(link);
