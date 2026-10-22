@@ -81,7 +81,7 @@ test.describe("/workspace/library (read only)", () => {
     await expect(page.getByRole("navigation", { name: "Quản lý tổ chức" }).getByRole("link", { name: "Thư viện mẫu" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Thêm mục|Xuất bản|Tạo phiên bản/ })).toHaveCount(0);
 
-    await page.getByTestId("filter-kind").selectOption("Equipment");
+    await page.getByTestId("filter-kind-Equipment").click();
     await expect(page).toHaveURL(/kind=Equipment/);
     await expect(page.getByTestId("org-item-TEMPLATE-SO-TAN")).toHaveCount(0);
     await page.getByRole("button", { name: "Xem mẫu BINH-CO2" }).click();
@@ -108,7 +108,7 @@ test.describe("/workspace/library (read only)", () => {
     await page.goto("/workspace/library");
     await expect(page.getByRole("heading", { name: "Thư viện chưa có mẫu nào" })).toBeVisible();
     await expect(page.getByText("Bạn vẫn soạn kịch bản đầy đủ bằng tay")).toBeVisible();
-    await expect(page.locator("main tbody tr")).toHaveCount(1);
+    await expect(page.locator(".org-lib-card")).toHaveCount(0);
   });
 
   test("a Trainee is turned away; an API 403 and a failed load are explained with a retry", async ({ page }) => {

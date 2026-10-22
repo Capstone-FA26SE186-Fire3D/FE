@@ -73,7 +73,7 @@ test.describe("organization analytics", () => {
       return route.fulfill({ json: url.pathname.endsWith("/training") ? training() : operations() });
     });
     await page.goto("/workspace/analytics?from=2026-09-01&to=2026-09-30");
-    await expect(page.getByRole("heading", { name: "Báo cáo", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Báo cáo huấn luyện", exact: true })).toBeVisible();
     await expect(page.locator(".ops-stat", { hasText: "Lượt chơi (trong kỳ)" }).locator("strong")).toHaveText("40");
     await expect(page.locator(".ops-stat", { hasText: "Học viên khác nhau" }).locator("strong")).toHaveText("18");
     await expect(page.locator(".ops-stat", { hasText: "Đã có kết quả" })).toContainText("75%");

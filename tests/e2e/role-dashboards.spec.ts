@@ -31,7 +31,7 @@ test("OrganizationUser sees the BIM workspace dashboard", async ({ page }) => {
   await page.goto("/dashboard/organization");
 
   await expect(page).toHaveURL(/\/workspace\/buildings$/);
-  await expect(page.getByRole("heading", { name: "Công trình", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Công trình của tổ chức", exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Công trình", exact: true })).toHaveAttribute("href", "/workspace/buildings");
   await expect(page.getByRole("link", { name: "Quét mô hình IFC" })).toHaveAttribute("href", "/workspace/ifc");
 });
@@ -44,7 +44,7 @@ test("restored OrganizationUser session accepts the string role returned by the 
   await page.goto("/dashboard/organization");
 
   await expect(page).toHaveURL(/\/workspace\/buildings$/);
-  await expect(page.getByRole("heading", { name: "Công trình", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Công trình của tổ chức", exact: true })).toBeVisible();
 });
 
 test("password login without a next route redirects OrganizationUser to its dashboard", async ({ page }) => {
