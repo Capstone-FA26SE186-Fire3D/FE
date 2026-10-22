@@ -97,6 +97,8 @@
 .learn-blocks h4 { margin: 26px 0 8px; color: var(--text); font-size: 18px; }
 .learn-text { white-space: pre-line; overflow-wrap: anywhere; }
 .learn-list { margin: 0 0 20px; padding-left: 1.4em; }
+ol.learn-list { list-style: decimal; }
+ul.learn-list { list-style: disc; }
 .learn-list li { margin-bottom: 8px; overflow-wrap: anywhere; }
 .learn-callout { margin: 0 0 20px; padding: 14px 18px; border: 1px solid var(--line-strong); border-left-width: 4px; border-radius: 10px; background: var(--surface); }
 .learn-callout strong { display: block; margin-bottom: 4px; font-size: 13px; }

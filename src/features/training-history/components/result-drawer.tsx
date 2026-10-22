@@ -142,7 +142,7 @@ function Body({ sessionId, known, onRefresh, onClose, accessToken }: { sessionId
     </div>}
 
     {data.load?.kind === "result" && <ResultBody result={data.load.result} />}
-    {data.load?.kind === "result" && <p className="th-ask"><Link className={buttonVariants({ variant: "secondary", size: "md" })} href={`/learning-hub?view=questions&session=${encodeURIComponent(sessionId)}`} data-testid="ask-about-result">Hỏi AI về kết quả này</Link><span className="ops-muted">AI chỉ giải thích kết quả cá nhân đã lưu, không đổi điểm. Không có chứng chỉ hay điểm kinh nghiệm.</span></p>}
+    {data.load?.kind === "result" && <p className="th-ask"><Link className={buttonVariants({ variant: "secondary", size: "md" })} href={`/learning-hub?view=questions&session=${encodeURIComponent(sessionId)}`} data-testid="ask-about-result">Hỏi AI về kết quả này</Link><span className="ops-muted">AI chỉ giải thích kết quả cá nhân đã lưu, không đổi điểm.</span></p>}
 
     {data.load?.kind === "not-ready" && <Alert tone="info" title="Kết quả chưa sẵn sàng" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reload} disabled={detail.loading}><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>}>
       Máy chủ chưa lưu kết quả cho lượt tập này (mã RESULT_NOT_READY). Thường là lượt tập đang chờ thiết bị đồng bộ nốt dữ liệu. Đây không phải lỗi: hãy mở ứng dụng để đồng bộ rồi tải lại.

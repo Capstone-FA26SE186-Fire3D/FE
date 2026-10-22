@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import "@/assets/styles/ops.css";
 import { FET3DLogo } from "@/components/brand/fet3d-logo";
-import { Iconsax } from "@/components/ui/iconsax";
+import { ArrowLeft } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { routes } from "@/configs/routes";
 import { ThemeScope } from "@/features/theme/theme-scope";
@@ -31,7 +31,7 @@ export function LoginShell({ children }: { children: ReactNode }) {
         </div>
         <div className="login-side-body">
           {children}
-          <Link className="login-public-link" href={routes.learn}><Iconsax name="arrow-left" size={16} /> Tiếp tục đọc công khai</Link>
+          <Link className="login-public-link" href={routes.learn}><ArrowLeft size={16} aria-hidden="true" /> Tiếp tục đọc công khai</Link>
         </div>
       </main>
     </div>
