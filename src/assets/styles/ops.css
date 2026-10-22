@@ -427,3 +427,17 @@ select.ops-input { appearance: none; padding-right: 34px; background-image: line
 
 /* A link inside a sentence must not rely on color alone */
 .ops-theme :is(.ops-muted, .ops-alert p, .ops-field-hint, .ops-page-header p, .ops-empty p, .ops-dialog-head p, .ops-panel-head p, .ver-note, .ver-caption, .bill-dim) a:not([class*="bg-"]) { color: var(--ember); text-decoration: underline; text-underline-offset: 3px; }
+
+/* ───────── Post-login redesign: topbar breadcrumb, avatar, eyebrow ───────── */
+.ops-topbar-crumbs { display: flex; align-items: center; min-width: 0; flex: 0 1 auto; overflow: hidden; }
+.ops-topbar-crumbs:not(:empty) + .ops-area-label { display: none; }
+.ops-topbar-crumbs .ops-breadcrumb { margin: 0; min-width: 0; }
+.ops-topbar-crumbs .ops-breadcrumb ol { flex-wrap: nowrap; white-space: nowrap; }
+.ops-topbar-crumbs .ops-breadcrumb li:not(:last-child) { flex: 0 0 auto; }
+.ops-topbar-crumbs .ops-breadcrumb li:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ops-avatar { display: inline-grid; flex: none; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--ember-soft); color: var(--ember); font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+.ops-user { padding: 0 6px 0 4px; gap: 8px; }
+.ops-user-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1100px) { .ops-user-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } .ops-user { padding: 0 6px; } }
+.ops-page-header .ops-eyebrow { max-width: none; margin: 0 0 6px; color: var(--ember); font-size: 11px; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; line-height: 1.4; }
+@media (max-width: 767px) { .ops-topbar-crumbs .ops-breadcrumb li:not(:last-child) { display: none; } }
