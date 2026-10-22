@@ -100,7 +100,7 @@ test.describe("412 on commerce catalog edits (PATCH replaces every field)", () =
     const mock = newMock();
     await billingSignIn(page, billingAdmin);
     await mockBilling(page, mock);
-    await page.goto("/admin/commerce");
+    await page.goto("/admin/commerce?tab=packages");
     await page.getByRole("button", { name: "Sửa gói BLD-12", exact: true }).click();
     await page.getByLabel("Tên gói").fill("Tên gói tôi gõ");
     // Somebody else raises the price and saves first.

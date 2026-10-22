@@ -8,7 +8,7 @@ test.describe("admin commerce (mock)", () => {
     const mock = newMock();
     await signIn(page, owner);
     await mockBilling(page, mock);
-    await page.goto("/admin/commerce");
+    await page.goto("/admin/commerce?tab=packages");
     await expect(page.getByRole("heading", { name: "Không có quyền truy cập" }).first()).toBeVisible();
     expect(mock.calls.filter((call) => call.path.includes("/billing/") || call.path.includes("/admin/"))).toHaveLength(0);
   });
@@ -18,7 +18,7 @@ test.describe("admin commerce (mock)", () => {
     mock.packages.push(packageFixture({ id: ids.pkgLegacy, code: "OLD-1", name: "Gói cũ 1 tháng", durationMonths: 1, commercialVersion: 1, learnerLimit: null, aiQuotaUnits: null, aiPolicyVersionId: null, isPurchasable: false }));
     await signIn(page, admin);
     await mockBilling(page, mock);
-    await page.goto("/admin/commerce");
+    await page.goto("/admin/commerce?tab=packages");
     await expect(page.getByRole("row", { name: /BLD-12 .*500\.000/ }).first()).toContainText("60");
     await expect(page.getByRole("row", { name: /BLD-12 .*500\.000/ }).first()).toContainText("1.000");
     await expect(page.getByRole("row", { name: /BLD-12 .*500\.000/ }).first()).toContainText("tokens");
@@ -32,7 +32,7 @@ test.describe("admin commerce (mock)", () => {
     const mock = newMock();
     await signIn(page, admin);
     await mockBilling(page, mock);
-    await page.goto("/admin/commerce");
+    await page.goto("/admin/commerce?tab=packages");
     await page.getByRole("button", { name: "Tạo gói", exact: true }).first().click();
     await page.getByLabel("Mã gói").fill("bld-new");
     await page.getByLabel("Tên gói").fill("Gói mới");
@@ -59,7 +59,7 @@ test.describe("admin commerce (mock)", () => {
     mock.policies = [];
     await signIn(page, admin);
     await mockBilling(page, mock);
-    await page.goto("/admin/commerce");
+    await page.goto("/admin/commerce?tab=packages");
     await expect(page.getByText("Chưa có gói dịch vụ", { exact: true })).toBeVisible();
     await expect(page.getByText("Chưa có chính sách quota", { exact: true })).toBeVisible();
     await page.getByRole("tab", { name: "Chính sách quota" }).click();
@@ -100,7 +100,7 @@ test.describe("admin commerce (mock)", () => {
     const mock = newMock();
     await signIn(page, admin);
     await mockBilling(page, mock);
-    await page.goto("/admin/commerce");
+    await page.goto("/admin/commerce?tab=packages");
     await page.getByRole("button", { name: "Sửa gói BLD-12", exact: true }).click();
     await page.getByLabel("Tên gói").fill("Tên đã sửa");
     // Somebody else saves first: the revision moves on.
@@ -240,7 +240,7 @@ test.describe("admin commerce (mock)", () => {
     await signIn(page, admin);
     await mockBilling(page, mock);
     queue(mock, "GET /api/billing/service-packages", { status: 500, json: { title: "boom" } });
-    await page.goto("/admin/commerce");
+    await page.goto("/admin/commerce?tab=packages");
     await expect(page.getByText("Không tải được gói")).toBeVisible();
     await page.getByRole("button", { name: "Thử lại" }).click();
     await expect(page.getByRole("row", { name: /Gói Building 12 tháng/ }).first()).toBeVisible();
@@ -290,7 +290,7 @@ for (const theme of ["light", "dark"] as const) {
       await page.setViewportSize({ width, height: width === 1440 ? 900 : 700 });
       await signIn(page, admin);
       await mockBilling(page, mock);
-      await page.goto("/admin/commerce");
+      await page.goto("/admin/commerce?tab=packages");
       await expect(page.getByRole("row", { name: /Gói Building 12 tháng/ }).first()).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       await page.screenshot({ path: testInfo.outputPath(`admin-packages-${theme}-${width}.png`), fullPage: true });
