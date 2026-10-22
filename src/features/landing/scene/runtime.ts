@@ -45,8 +45,6 @@ function organizationEmitters(): Emitter[] {
 }
 
 export async function createLandingRuntime(canvas: HTMLCanvasElement, mobile: boolean, options: { tier?: Tier | "auto"; features?: Features } = {}) {
-  // Characters are decoration: if the models cannot load, the landing still works without them.
-  const assets = await loadCharacterAssets().catch(error => { console.warn("[Fire3D:characters]", error); return null; });
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !mobile, powerPreference: "high-performance" });
   liveRenderers++;
   renderer.debug.onShaderError = (gl, program, vertex, fragment) => {
@@ -81,7 +79,8 @@ export async function createLandingRuntime(canvas: HTMLCanvasElement, mobile: bo
   const orgSmoke = createSmoke(900, 420, organizationEmitters());
   orgSmoke.smoke.visible = orgSmoke.flames.visible = false;
   scene.add(corridorSmoke.smoke, corridorSmoke.flames, orgSmoke.smoke, orgSmoke.flames);
-  const characters = assets ? createCharacters(assets, scene, tier) : null;
+  // Characters are decoration (about 6 MB of models): the building renders first and they join when loaded; if the models cannot load, the landing works without them.
+  let characters: ReturnType<typeof createCharacters> | null = null;
 
   const phoneTarget = new THREE.WebGLRenderTarget(2, 2, { depthBuffer: true, type: THREE.HalfFloatType });
   const phone = createLandscapePhone(phoneTarget.texture);
@@ -120,6 +119,12 @@ export async function createLandingRuntime(canvas: HTMLCanvasElement, mobile: bo
     phone.layout(width, height, { margin: narrow ? 16 : 32, top: narrow ? 110 : 120, bottom: narrow ? 360 : wide ? 96 : 330, maxWidth: narrow ? width - 32 : wide ? Math.min(820, width * 0.52) : 640, align: wide ? "right" : "center" });
   }
   applyFeatures();
+  void loadCharacterAssets().then(assets => {
+    if (disposed) return;
+    characters = createCharacters(assets, scene, tier);
+    characters.setBudget(features.characters ? BUDGETS[tier].characters : 0, tier);
+    if (lineup) characters.setLineup(true);
+  }).catch(error => console.warn("[Fire3D:characters]", error));
 
   /** Shift the framing so the subject sits beside (wide) or above (narrow) the text instead of under it. */
   function frame(shift: number) {

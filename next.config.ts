@@ -16,6 +16,8 @@ const nextConfig: NextConfig = {
       { source: "/brand/:path*", headers: staticAsset },
       { source: "/icons/:path*", headers: staticAsset },
       { source: "/ifc/:path*", headers: staticAsset },
+      // Landing character models (~6 MB, not fingerprinted): keep them cached so a return visit does not download them again.
+      { source: "/models/:path*", headers: staticAsset },
       {
         source: "/:path*",
         headers: [
