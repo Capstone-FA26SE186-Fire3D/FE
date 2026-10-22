@@ -5,16 +5,19 @@ import { useRef, useState, type FormEvent } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/dialog";
-import { Panel, Stat } from "@/components/ui/panel";
+import { Panel } from "@/components/ui/panel";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
 import { buildingConflict, buildingsApi, sameBuildingVersion } from "../api";
 import { describeBuildingWriteError, formatDateTime } from "../format";
-import { deriveQaVerdict, jobLabel, revisionLabel, type RevisionPipeline } from "../pipeline";
+import type { EntitlementSummary } from "@/features/billing/entitlements";
+import type { ScenarioSummary } from "@/features/scenarios/types";
+import type { RevisionPipeline } from "../pipeline";
 import type { Building, BuildingRevision, RevisionIssue } from "../types";
+import { JourneyOverview } from "./journey-overview";
 import { BuildingConflictAlert, BuildingForm, buildingFormToInput, formFromBuilding, validateBuildingForm, type FormState } from "./building-form";
 
-export function OverviewTab({ accessToken, building, etag, revision, pipeline, issues, scenarioCount, isAdmin, onSaved, onGoTo }: {
+export function OverviewTab({ accessToken, building, etag, revision, pipeline, issues, scenarios, scenarioCount, service, isAdmin, onSaved, onGoTo }: {
   accessToken: string;
   building: Building;
   /** ETag of `building` from the last GET; null when the header was not readable (the save then reads it again). */
@@ -22,7 +25,9 @@ export function OverviewTab({ accessToken, building, etag, revision, pipeline, i
   revision: BuildingRevision | null;
   pipeline: RevisionPipeline;
   issues: RevisionIssue[] | undefined;
+  scenarios: ScenarioSummary[] | undefined;
   scenarioCount: number | undefined;
+  service: EntitlementSummary | undefined;
   isAdmin: boolean;
   onSaved: () => void;
   onGoTo: (tab: string) => void;
@@ -39,6 +44,12 @@ export function OverviewTab({ accessToken, building, etag, revision, pipeline, i
   const base = stale?.current ?? building;
 
   const openEdit = () => { setForm(formFromBuilding(building)); setErrors({}); setFormError(""); setStale(null); setOpen(true); };
+
+  const focusInfo = () => {
+    const panel = document.getElementById("building-info");
+    panel?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    panel?.focus({ preventScroll: true });
+  };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -75,23 +86,12 @@ export function OverviewTab({ accessToken, building, etag, revision, pipeline, i
     }
   };
 
-  const rev = revision ? revisionLabel(revision.status) : null;
-  const job = jobLabel(pipeline.job?.status);
-  const verdict = deriveQaVerdict(pipeline, issues?.filter((issue) => issue.isCurrentAttempt));
-  const blocking = (issues ?? []).filter((issue) => issue.isCurrentAttempt && (issue.severity === "Error" || issue.severity === "Critical")).length;
   const address = [building.location?.address, building.location?.district, building.location?.city].filter(Boolean).join(", ");
 
   return <div className="ops-stack">
-    <div className="ops-grid ops-grid-4">
-      <Stat label="Revision đang xem" value={revision ? revision.versionLabel : "—"} hint={rev?.label ?? "Chưa có revision"} />
-      <Stat label="Xử lý IFC" value={<StatusBadge tone={job.tone}>{job.label}</StatusBadge>} hint={pipeline.job ? pipeline.job.kind : "Chưa có job"} />
-      <Stat label="QA" value={<StatusBadge tone={verdict.tone}>{verdict.label}</StatusBadge>} hint={blocking > 0 ? `${blocking} issue Error/Critical` : undefined} />
-      <Stat label="Kịch bản" value={scenarioCount ?? "—"} hint="Trong công trình" />
-    </div>
+    <JourneyOverview accessToken={accessToken} building={building} revision={revision} pipeline={pipeline} issues={issues} scenarios={scenarios} scenarioCount={scenarioCount} service={service} onGoTo={onGoTo} onFocusInfo={focusInfo} />
 
-    {!revision && <Alert tone="info" title="Công trình chưa có mô hình IFC" action={<Button className="mt-3" onClick={() => onGoTo("ifc")}>Tải IFC đầu tiên</Button>}>Tải lên một tệp IFC để worker xử lý, kiểm tra và tạo mô hình xem trước. Sau đó bạn có thể soạn kịch bản sơ tán.</Alert>}
-
-    <Panel title="Thông tin công trình" actions={<Button size="sm" variant="secondary" onClick={openEdit}><Pencil size={14} aria-hidden="true" />Sửa nhanh</Button>}>
+    <Panel id="building-info" tabIndex={-1} title="Thông tin công trình" actions={<Button size="sm" variant="secondary" onClick={openEdit}><Pencil size={14} aria-hidden="true" />Sửa nhanh</Button>}>
       <dl className="ops-kv">
         <dt>Tên</dt><dd>{building.name}</dd>
         <dt>Loại công trình</dt><dd>{building.buildingType || "Chưa phân loại"}</dd>

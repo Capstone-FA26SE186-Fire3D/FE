@@ -1,4 +1,4 @@
-import { BarChart3, BookOpen, BrainCircuit, Building2, ClipboardCheck, CreditCard, Landmark, LayoutDashboard, LifeBuoy, Library, Receipt, ScanLine, Sparkles, UserRound, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, BookOpen, Home, BrainCircuit, Building2, ClipboardCheck, CreditCard, Landmark, LayoutDashboard, LifeBuoy, Library, Receipt, ScanLine, Sparkles, UserRound, Users, type LucideIcon } from "lucide-react";
 import type { UserRole } from "@/features/auth/types";
 import { routes } from "@/configs/routes";
 
@@ -19,7 +19,7 @@ export type OperationsArea = {
   deniedHref: string;
   deniedLabel: string;
   nav: NavItem[];
-  secondaryLink: { href: string; label: string };
+  secondaryLink: { href: string; label: string; icon?: LucideIcon };
 };
 
 export const organizationArea: OperationsArea = {
@@ -42,7 +42,7 @@ export const organizationArea: OperationsArea = {
     { href: routes.workspaceProfile, label: "Hồ sơ tổ chức", icon: UserRound, group: "Quản lý" },
     { href: routes.workspaceIfc, label: "Quét mô hình IFC", icon: ScanLine, group: "Công cụ" },
   ],
-  secondaryLink: { href: routes.learn, label: "Khám phá Learn" },
+  secondaryLink: { href: routes.learn, label: "Khám phá Learn", icon: BookOpen },
 };
 
 export const adminArea: OperationsArea = {
@@ -66,5 +66,5 @@ export const adminArea: OperationsArea = {
     { href: routes.adminAi, label: "AI & nguồn tri thức", icon: BrainCircuit, group: "Quản lý nội dung" },
     { href: routes.adminCommerce, label: "Thương mại", icon: CreditCard, group: "Thương mại" },
   ],
-  secondaryLink: { href: routes.home, label: "Về trang chủ" },
+  secondaryLink: { href: routes.home, label: "Về trang chủ", icon: Home },
 };

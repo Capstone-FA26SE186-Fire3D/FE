@@ -46,6 +46,7 @@ function SidebarContent({ area, pathname, collapsed, onNavigate, onToggleCollaps
     return acc;
   }, []);
 
+  const SecondaryIcon = area.secondaryLink.icon;
   return <>
     <Link className="ops-brand" href="/" aria-label="FET3D, về trang chủ" onClick={onNavigate}><FET3DLogo variant="mark" /><span>FET3D<small>{area.brandSubtitle}</small></span></Link>
     <nav className="ops-nav" aria-label={area.navLabel}>
@@ -63,7 +64,7 @@ function SidebarContent({ area, pathname, collapsed, onNavigate, onToggleCollaps
       </div>)}
     </nav>
     <div className="ops-sidebar-footer">
-      <Link href={area.secondaryLink.href} onClick={onNavigate} aria-label={area.secondaryLink.label} title={collapsed ? area.secondaryLink.label : undefined}><span className="ops-label">{area.secondaryLink.label}</span></Link>
+      <Link href={area.secondaryLink.href} onClick={onNavigate} aria-label={area.secondaryLink.label} title={collapsed ? area.secondaryLink.label : undefined}>{SecondaryIcon && <SecondaryIcon size={20} strokeWidth={1.75} aria-hidden="true" />}<span className="ops-label">{area.secondaryLink.label}</span></Link>
       {onToggleCollapsed && <button type="button" onClick={onToggleCollapsed} aria-label={collapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"} title={collapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}>{collapsed ? <PanelLeftOpen size={20} strokeWidth={1.75} aria-hidden="true" /> : <PanelLeftClose size={20} strokeWidth={1.75} aria-hidden="true" />}<span className="ops-label">Thu gọn</span></button>}
       <button type="button" onClick={onLogout} aria-label="Đăng xuất" title={collapsed ? "Đăng xuất" : undefined}><LogOut size={20} strokeWidth={1.75} aria-hidden="true" /><span className="ops-label">Đăng xuất</span></button>
     </div>
