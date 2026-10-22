@@ -3,7 +3,7 @@
  * Evidence level: Playwright route mocks shaped like LearnerAnalytics.sql / OperationsQueries (OpenAPI types the training and
  * revenue bodies only as JsonElement, so the shape comes from BE source and docs/learner-analytics.md). Not an integration test.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 import { parseOperations, parseRevenue, parseTraining } from "../../src/features/analytics/parse";
 
 const admin = { id: "admin-1", email: "admin@fire3d.test", fullName: "Platform Admin", role: 0, organizationId: null, profileRevision: 1 };
@@ -108,11 +108,13 @@ test.describe("organization analytics", () => {
     const reports: URLSearchParams[] = [];
     const exports: URLSearchParams[] = [];
     await signIn(page, owner);
-    await page.route("**/api/buildings*", (route) => {
+    const buildingsRoute = (route: Route) => {
       const { pathname } = new URL(route.request().url());
       if (pathname.endsWith("/scenarios")) return route.fulfill({ json: { items: [{ id: "sc-1", buildingId: "b-1", name: "Thoát hiểm tầng 3", createdAt: "2026-10-01T00:00:00Z" }, { id: "sc-2", buildingId: "b-1", name: "Hành lang có khói", createdAt: "2026-10-02T00:00:00Z" }], totalCount: 2, page: 1, pageSize: 100 } });
       return route.fulfill({ json: { items: [{ id: "b-1", name: "Tòa nhà A", buildingType: null, totalFloors: 5, isActive: true, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" }, { id: "b-2", name: "Tòa nhà B", buildingType: null, totalFloors: 3, isActive: true, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" }], totalCount: 2, page: 1, pageSize: 100 } });
-    });
+    };
+    await page.route("**/api/buildings*", buildingsRoute);
+    await page.route("**/api/buildings/**", buildingsRoute);
     await page.route("**/api/organizations/me/analytics/training/export*", (route) => { exports.push(new URL(route.request().url()).searchParams); return route.fulfill({ body: "groupBy,key\nday,2026-10-01\n", contentType: "text/csv" }); });
     await page.route("**/api/organizations/me/analytics/training?*", (route) => {
       const params = new URL(route.request().url()).searchParams;
@@ -125,8 +127,9 @@ test.describe("organization analytics", () => {
       }) });
     });
     await page.goto("/workspace/analytics?from=2026-09-01&to=2026-09-30");
-    const building = page.getByLabel("Công trình");
-    const scenario = page.getByLabel("Kịch bản");
+    const filters = page.getByRole("group", { name: "Bộ lọc báo cáo huấn luyện" });
+    const building = filters.getByLabel("Công trình");
+    const scenario = filters.getByLabel("Kịch bản");
     await expect(scenario).toBeDisabled();
     await expect(page.getByRole("table", { name: "Lượt chơi theo kịch bản" })).toContainText("Thoát hiểm tầng 3");
     await expect.poll(() => reports.length).toBe(1);
@@ -137,7 +140,7 @@ test.describe("organization analytics", () => {
     await expect(scenario).toBeEnabled();
     await expect(scenario.locator("option")).toHaveText(["Tất cả kịch bản", "Thoát hiểm tầng 3", "Hành lang có khói"]);
     await scenario.selectOption("sc-1");
-    await page.getByLabel("Nhóm theo").selectOption("week");
+    await filters.getByLabel("Nhóm theo").selectOption("week");
     await expect(page.getByRole("table", { name: "Số liệu theo nhóm" })).toContainText("2026-09-28");
     const last = reports.at(-1) as URLSearchParams;
     expect(last.get("buildingId")).toBe("b-1");
@@ -154,7 +157,7 @@ test.describe("organization analytics", () => {
     await expect((reports.at(-1) as URLSearchParams).has("scenarioId")).toBe(false);
     await page.reload();
     await expect(building).toHaveValue("b-2");
-    await expect(page.getByLabel("Nhóm theo")).toHaveValue("week");
+    await expect(filters.getByLabel("Nhóm theo")).toHaveValue("week");
   });
 
   test("every chart has a table with the same numbers", async ({ page }) => {

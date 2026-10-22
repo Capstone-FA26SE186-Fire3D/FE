@@ -33,7 +33,7 @@ export function QuickEditPane({ accessToken, postId, fallbackName, onClose, onOp
   const [rev, setRev] = useState(0);
   const loaded = useAsyncData<LoadedPost>(`learn-quick:${postId}:${rev}`, (signal) => loadPostWithVersion(accessToken, postId as string, "", signal), Boolean(postId), { keepPrevious: false });
   const view = loaded.error !== undefined && !loaded.data ? describeLearnError(loaded.error) : null;
-  return <DetailPane open={Boolean(postId)} label="Sửa nhanh bài" title={fallbackName} onClose={onClose} closeLabel="Đóng sửa nhanh">
+  return <DetailPane open={Boolean(postId)} label="Sửa nhanh bài" title={loaded.data?.version?.data.title || fallbackName} onClose={onClose} closeLabel="Đóng sửa nhanh">
     {!loaded.data && !view && <SkeletonRows rows={4} label="Đang tải bài…" />}
     {view && <Alert tone="danger" title={view.kind === "notFound" ? "Không tìm thấy bài" : "Không tải được bài"} action={view.kind === "notFound" ? undefined : <Button size="sm" variant="secondary" className="mt-3" onClick={loaded.reload}>Thử lại</Button>}>{view.message}</Alert>}
     {loaded.data && postId && <QuickBody key={`${loaded.data.post.data.id}:${loaded.data.version?.data.id ?? "none"}:${rev}`} accessToken={accessToken} initial={loaded.data} onOpenEditor={() => onOpenEditor(postId)} onChanged={onChanged} onReload={() => setRev((value) => value + 1)} />}

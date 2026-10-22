@@ -61,9 +61,9 @@ export function PostsTab({ accessToken, onOpen, onCreate }: { accessToken: strin
     <Split>
       <div>
     <Table caption="Danh sách bài Learn">
-      <thead><tr><th>Bài</th><th>Loại</th><th>Trạng thái</th><th>Bản công khai</th><th>Cập nhật</th><th><span className="sr-only">Sửa nhanh</span></th></tr></thead>
+      <thead><tr><th>Bài</th><th>Loại</th><th>Trạng thái</th><th>Bản công khai</th><th>Cập nhật</th></tr></thead>
       <tbody>
-        {list.loading && !list.data && <TableMessage colSpan={6}><SkeletonRows rows={6} label="Đang tải danh sách bài…" /></TableMessage>}
+        {list.loading && !list.data && <TableMessage colSpan={5}><SkeletonRows rows={6} label="Đang tải danh sách bài…" /></TableMessage>}
         {items.map((post) => {
           const view = postStatusView[post.publicationStatus];
           const published = post.publishedVersion;
@@ -73,15 +73,15 @@ export function PostsTab({ accessToken, onOpen, onCreate }: { accessToken: strin
                 <span style={{ display: "block", overflowWrap: "anywhere" }}>{published?.title ?? "Chưa có bản xuất bản"}</span>
                 <span className="ops-cell-sub">{post.slug}</span>
               </button>
+              <Button size="sm" variant="quiet" className="learn-quick-open" aria-pressed={quick === post.id} aria-label={`Sửa nhanh bài ${published?.title ?? post.slug}`} onClick={() => setParams({ quick: quick === post.id ? null : post.id, page }, "replace")}>Sửa nhanh</Button>
             </td>
             <td>{published ? kindLabel[published.kind] : "—"}</td>
             <td><StatusBadge tone={view.tone}>{view.label}</StatusBadge></td>
             <td>{published ? `v${published.versionNumber}` : "—"}</td>
             <td>{formatDateTime(post.updatedAt)}</td>
-            <td className="ops-cell-actions"><Button size="sm" variant="quiet" aria-pressed={quick === post.id} aria-label={`Sửa nhanh bài ${published?.title ?? post.slug}`} onClick={() => setParams({ quick: quick === post.id ? null : post.id, page }, "replace")}>Sửa nhanh</Button></td>
           </tr>;
         })}
-        {list.data && !items.length && <TableMessage colSpan={6}><EmptyState icon={status ? Search : BookOpen} title={status ? "Không có bài ở trạng thái này." : "Chưa có bài nào"} description={status ? "Thử đổi hoặc xóa bộ lọc." : "Tạo bài đầu tiên: lưu bản nháp rồi xuất bản khi nội dung và nguồn đã sẵn sàng."} action={!status && <Button size="sm" onClick={onCreate}>Tạo bài</Button>} /></TableMessage>}
+        {list.data && !items.length && <TableMessage colSpan={5}><EmptyState icon={status ? Search : BookOpen} title={status ? "Không có bài ở trạng thái này." : "Chưa có bài nào"} description={status ? "Thử đổi hoặc xóa bộ lọc." : "Tạo bài đầu tiên: lưu bản nháp rồi xuất bản khi nội dung và nguồn đã sẵn sàng."} action={!status && <Button size="sm" onClick={onCreate}>Tạo bài</Button>} /></TableMessage>}
       </tbody>
     </Table>
     {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
