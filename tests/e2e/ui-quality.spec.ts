@@ -83,7 +83,7 @@ test("a table is a named, keyboard-focusable scroll region and the action column
 test("drawer: Tab stays inside, Escape closes and focus returns to the opener", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await open(page, owner, "/workspace/buildings", "dark");
-  const opener = page.getByRole("button", { name: "Tạo công trình" }).first();
+  const opener = page.getByRole("button", { name: "Thêm công trình", exact: true }).first();
   await opener.focus();
   await page.keyboard.press("Enter");
   const drawer = page.getByRole("dialog", { name: "Tạo công trình" });
@@ -129,7 +129,7 @@ test("reduced motion: skeleton shimmer, pending pulse and dialog animation stop"
   const duration = await skeleton.evaluate((node) => ({ name: getComputedStyle(node).animationName, ms: parseFloat(getComputedStyle(node).animationDuration) * 1000 }));
   expect(duration.ms).toBeLessThan(5);
   await expect(page.getByRole("link", { name: LONG_NAME })).toBeVisible();
-  await page.getByRole("button", { name: "Tạo công trình" }).first().click();
+  await page.getByRole("button", { name: "Thêm công trình", exact: true }).first().click();
   const overlay = page.locator(".ops-overlay");
   await expect(overlay).toBeVisible();
   expect(await overlay.evaluate((node) => parseFloat(getComputedStyle(node).animationDuration) * 1000)).toBeLessThan(5);
