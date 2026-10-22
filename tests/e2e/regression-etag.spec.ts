@@ -38,7 +38,7 @@ async function openProfile(page: Page) {
   await tokenSession(page, "tok-profile");
   await page.route("**/api/auth/me", (route) => me.handle(route));
   await page.route("**/api/organizations/me", (route) => org.handle(route));
-  await page.goto("/workspace/profile");
+  await page.goto("/account");
   await expect(page.getByLabel("Họ và tên")).toHaveValue("Nguyễn Văn A");
   await expect(page.getByLabel("Tên tổ chức")).toHaveValue("Fire3D Studio");
   return { me, org };

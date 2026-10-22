@@ -362,7 +362,7 @@ test("platform admin loads and manages accounts through Fire3D endpoints", async
 
   await page.goto("/admin/accounts");
   await expect(page.getByRole("heading", { name: "Tài khoản", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: /^Trainee/ }).click();
+  await page.getByRole("button", { name: "Mở tài khoản trainee@fire3d.test" }).click();
   await expect(page.getByText(/Đăng nhập gần nhất/)).toBeVisible();
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Tạo tài khoản", exact: true }).click();
