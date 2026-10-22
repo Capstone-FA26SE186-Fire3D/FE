@@ -18,6 +18,8 @@ import { learnAdminApi } from "../api";
 import { describeLearnError } from "../errors";
 import { postStatusView } from "../status";
 import { LifecycleRules } from "./lifecycle-rules";
+import { QuickEditPane } from "./quick-edit-pane";
+import "./learn-quick.css";
 
 const PAGE_SIZE = 20;
 
@@ -35,6 +37,9 @@ export function PostsTab({ accessToken, onOpen, onCreate }: { accessToken: strin
   const loaded = list.data?.items ?? [];
   const items = kind ? loaded.filter((post) => post.publishedVersion?.kind === kind) : loaded;
   const total = list.data?.total ?? 0;
+  // The row whose side pane is open (`?quick=<id>`); the row itself still opens the full editor.
+  const quick = get("quick");
+  const quickPost = quick ? (loaded.find((post) => post.id === quick) ?? null) : null;
 
   return <>
     <Chips label="Loại bài (chỉ lọc trong trang đang xem)">
@@ -62,12 +67,13 @@ export function PostsTab({ accessToken, onOpen, onCreate }: { accessToken: strin
         {items.map((post) => {
           const view = postStatusView[post.publicationStatus];
           const published = post.publishedVersion;
-          return <tr key={post.id}>
+          return <tr key={post.id} className="learn-quick-row" data-selected={quick === post.id ? "true" : undefined}>
             <td>
               <button type="button" className="ops-cell-primary" style={{ background: "none", border: 0, padding: 0, textAlign: "left", cursor: "pointer", font: "inherit", color: "inherit", minHeight: 44 }} onClick={() => onOpen(post.id)} aria-label={`Mở bài ${published?.title ?? post.slug}`}>
                 <span style={{ display: "block", overflowWrap: "anywhere" }}>{published?.title ?? "Chưa có bản xuất bản"}</span>
                 <span className="ops-cell-sub">{post.slug}</span>
               </button>
+              <Button size="sm" variant="quiet" className="learn-quick-open" aria-pressed={quick === post.id} aria-label={`Sửa nhanh bài ${published?.title ?? post.slug}`} onClick={() => setParams({ quick: quick === post.id ? null : post.id, page }, "replace")}>Sửa nhanh</Button>
             </td>
             <td>{published ? kindLabel[published.kind] : "—"}</td>
             <td><StatusBadge tone={view.tone}>{view.label}</StatusBadge></td>
@@ -80,7 +86,10 @@ export function PostsTab({ accessToken, onOpen, onCreate }: { accessToken: strin
     </Table>
     {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
       </div>
-      <LifecycleRules />
+      <div className="learn-quick-col">
+        <QuickEditPane accessToken={accessToken} postId={quick || null} fallbackName={quickPost ? (quickPost.publishedVersion?.title ?? quickPost.slug) : "Sửa nhanh"} onClose={() => setParams({ quick: null, page }, "replace")} onOpenEditor={onOpen} onChanged={list.reload} />
+        <LifecycleRules />
+      </div>
     </Split>
   </>;
 }

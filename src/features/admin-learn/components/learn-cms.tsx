@@ -18,7 +18,7 @@ const SECTIONS = ["posts", "situations"] as const;
 type Section = (typeof SECTIONS)[number];
 const isSection = (value: string): value is Section => (SECTIONS as readonly string[]).includes(value);
 /** Parameters owned by one section, cleared when switching so filters never leak across sections. */
-const SECTION_PARAMS = ["page", "status", "q", "active"];
+const SECTION_PARAMS = ["page", "status", "q", "active", "quick"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**

@@ -12,6 +12,27 @@ export type AiUsage = {
   requests: Record<string, number>;
 };
 
+export const GROUP_BY = ["day", "week", "month", "building", "scenario"] as const;
+export type GroupBy = (typeof GROUP_BY)[number];
+
+/** `buildingId`/`scenarioId` narrow the report inside the tenant (another tenant's id is 404); `groupBy` adds `cohorts`. */
+export type TrainingFilters = { buildingId?: string; scenarioId?: string; groupBy?: GroupBy };
+
+export type TrainingCohort = {
+  key: string;
+  label: string;
+  plays: number;
+  uniqueTrainees: number;
+  completed: number;
+  abandoned: number;
+  awaitingSync: number;
+  assessed: number;
+  passed: number;
+  /** `null` when nothing was assessed. */
+  passRate: number | null;
+  averageDurationSeconds: number | null;
+};
+
 export type TrainingReport = {
   asOf: string;
   from: string;
@@ -28,7 +49,13 @@ export type TrainingReport = {
   assessment: { assessed: number; passed: number; passRate: number | null };
   duration: { sessions: number; averageSeconds: number | null; medianSeconds: number | null };
   byMode: Array<{ mode: string; plays: number; completed: number }>;
-  byTraining: Array<{ trainingId: string; plays: number; completed: number; passed: number }>;
+  byTraining: Array<{ trainingId: string; trainingName: string | null; plays: number; completed: number; passed: number }>;
+  /** Top 100 by plays, with names (BE#80). */
+  byBuilding: Array<{ buildingId: string; buildingName: string | null; plays: number; uniqueTrainees: number; completed: number }>;
+  byScenario: Array<{ scenarioId: string; scenarioName: string | null; plays: number; uniqueTrainees: number; completed: number; passed: number }>;
+  /** Present only when the request carried `groupBy`. */
+  cohorts: TrainingCohort[] | null;
+  groupBy: GroupBy | null;
   /** Platform report only. */
   byOrganization: Array<{ organizationId: string; plays: number; uniqueTrainees: number; completed: number }> | null;
   /** Admin per-organization report only. */

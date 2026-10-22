@@ -12,6 +12,7 @@ import { accountsApi } from "@/features/accounts/api";
 import { describeApiError } from "@/api/describe-error";
 import { analyticsApi } from "../api";
 import type { AnalyticsScope, OperationsReport } from "../types";
+import { readTrainingFilters, TrainingFilterBar } from "./filters";
 import { OperationsReportView } from "./operations-report";
 import { PeriodMeta, RangeBar, RangeError, useAnalyticsRange } from "./range";
 import { ReportShell } from "./report-shell";
@@ -42,9 +43,12 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
   const allowed = ready && user?.role === ROLE[variant] && Boolean(accessToken);
   const scope = useMemo<AnalyticsScope>(() => variant === "organization" ? { kind: "organization" } : variant === "platform" ? { kind: "platform" } : { kind: "admin-organization", organizationId: organizationId ?? "" }, [variant, organizationId]);
   const enabled = allowed && !rangeError && (variant !== "admin-organization" || Boolean(organizationId));
+  const filterable = variant === "organization";
+  const filters = useMemo(() => filterable ? readTrainingFilters(get) : {}, [filterable, get]);
   const key = `${variant}:${organizationId ?? ""}:${urlFrom}:${urlTo}`;
+  const trainingKey = `${key}:${filters.buildingId ?? ""}:${filters.scenarioId ?? ""}:${filters.groupBy ?? ""}`;
 
-  const training = useAsyncData(`training:${key}`, (signal) => analyticsApi.training(accessToken as string, scope, range, signal), enabled && tab === "training", { keepWhenDenied: true });
+  const training = useAsyncData(`training:${trainingKey}`, (signal) => analyticsApi.training(accessToken as string, scope, range, signal, filters), enabled && tab === "training", { keepWhenDenied: true });
   const operations = useAsyncData(`operations:${key}`, (signal) => analyticsApi.operations(accessToken as string, scope, range, signal), enabled && tab === "operations", { keepWhenDenied: true });
   const revenue = useAsyncData(`revenue:${key}`, (signal) => analyticsApi.revenue(accessToken as string, range, signal), enabled && tab === "revenue" && variant === "platform", { keepWhenDenied: true });
   const names = useAsyncData("analytics:organization-names", () => accountsApi.organizations(accessToken as string).then((page) => new Map(page.items.map((item) => [item.id, item.name]))), enabled && tab === "training" && variant === "platform");
@@ -56,7 +60,7 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
     setExporting(true);
     setExportError(null);
     try {
-      const text = await analyticsApi.exportTraining(accessToken, scope, range);
+      const text = await analyticsApi.exportTraining(accessToken, scope, range, undefined, filters);
       const url = URL.createObjectURL(new Blob(["﻿", text], { type: "text/csv;charset=utf-8" }));
       const link = document.createElement("a");
       link.href = url;
@@ -92,6 +96,7 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
     {exportError && <Alert tone="danger" title="Không xuất được CSV">{exportError}</Alert>}
 
     <RangeBar key={`${urlFrom}|${urlTo}`} urlFrom={urlFrom} urlTo={urlTo} onApply={apply} />
+    {filterable && tab === "training" && <TrainingFilterBar accessToken={accessToken} filters={filters} onChange={(patch) => setParams(patch)} />}
     <PeriodMeta data={meta} hasRange={hasRange} urlFrom={urlFrom} urlTo={urlTo} />
     <RangeError message={rangeError} />
     {identity && <p className="ops-muted" style={{ marginBottom: 14 }}>Tổ chức: <strong style={{ color: "var(--text)" }}>{identity.name}</strong> · {identity.isActive ? "đang hoạt động" : "đã vô hiệu hóa (vẫn đọc được số liệu)"}</p>}

@@ -3,12 +3,13 @@
 import { Library, Search } from "lucide-react";
 
 import { useAsyncData } from "@/api/use-async-data";
-import { useUrlParams } from "@/api/use-url-params";
+import { useUrlParams, useUrlSearch } from "@/api/use-url-params";
 import { formatDateTime } from "@/components/ops/detail-parts";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Field, Input, Select } from "@/components/ui/field";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonRows } from "@/components/ui/skeleton";
@@ -18,8 +19,12 @@ import { libraryApi } from "../api";
 import { describeLibraryError } from "../errors";
 import { LIBRARY_KINDS, isKind, kindLabel } from "../types";
 import { VersionPreview } from "./version-preview";
+import "./library-filters.css";
 
-const PAGE_SIZE = 20;
+// The organization list route has no server-side search (BE: only `kind`, `page`, `pageSize`, max 100), so the page is
+// requested at its largest size and the search / capability filters narrow what is loaded.
+const PAGE_SIZE = 100;
+const NO_CAPABILITY = "none";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function ItemDrawer({ accessToken, itemId, onClose }: { accessToken: string; itemId: string; onClose: () => void }) {
@@ -45,7 +50,20 @@ export function LibraryBrowser() {
   const kind = isKind(rawKind) ? rawKind : "";
   const selected = get("item");
   const list = useAsyncData(`library-org:${kind}:${page}`, (signal) => libraryApi.listItems(accessToken ?? "", { kind, page, pageSize: PAGE_SIZE }, signal), ready && Boolean(accessToken) && (user?.role === 0 || user?.role === 1));
-  const items = list.data?.items ?? [];
+  const urlSearch = get("q");
+  const [searchText, setSearchText] = useUrlSearch(urlSearch, setParams);
+  const capability = get("cap");
+  const loaded = list.data?.items ?? [];
+  const capabilities = [...new Set(loaded.flatMap((item) => item.latestPublished?.requiredCapabilities ?? []))].sort();
+  const needle = urlSearch.trim().toLowerCase();
+  const items = loaded.filter((item) => {
+    const version = item.latestPublished;
+    if (needle && !`${item.code} ${version?.name ?? ""}`.toLowerCase().includes(needle)) return false;
+    if (capability === NO_CAPABILITY) return !version?.requiredCapabilities.length;
+    if (capability) return Boolean(version?.requiredCapabilities.includes(capability));
+    return true;
+  });
+  const narrowed = needle !== "" || capability !== "";
 
   const header = <PageHeader title="Thư viện mẫu" description="Template kịch bản, rubric mẫu và thiết bị hỗ trợ. Dùng hay không đều tùy chọn; bạn vẫn tự soạn được." eyebrow="Huấn luyện" breadcrumbs={[{ label: "Thư viện mẫu" }]} />;
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
@@ -56,6 +74,20 @@ export function LibraryBrowser() {
       <button type="button" className="org-chip" aria-pressed={kind === ""} onClick={() => setParams({ kind: "", item: null })} data-testid="filter-kind-all">Tất cả</button>
       {LIBRARY_KINDS.map((value) => <button key={value} type="button" className="org-chip" aria-pressed={kind === value} onClick={() => setParams({ kind: value, item: null })} data-testid={`filter-kind-${value}`}>{kindLabel[value]}{kind === value && list.data ? ` · ${list.data.total}` : ""}</button>)}
     </div>
+
+    <div className="org-lib-filters" role="search" aria-label="Lọc thư viện">
+      <Field label="Tìm mẫu" className="org-lib-search">{(p) => <><Search size={16} aria-hidden="true" /><Input {...p} type="search" placeholder="Mã hoặc tên mẫu" value={searchText} onChange={(event) => setSearchText(event.target.value)} maxLength={80} /></>}</Field>
+      <Field label="Năng lực runtime yêu cầu" className="org-lib-cap">{(p) =>
+        <Select {...p} value={capability} onChange={(event) => setParams({ cap: event.target.value })}>
+          <option value="">Tất cả</option>
+          <option value={NO_CAPABILITY}>Không yêu cầu năng lực</option>
+          {capability && capability !== NO_CAPABILITY && !capabilities.includes(capability) && <option value={capability}>{capability}</option>}
+          {capabilities.map((value) => <option key={value} value={value}>{value}</option>)}
+        </Select>}
+      </Field>
+      {narrowed && <Button variant="quiet" onClick={() => { setSearchText(""); setParams({ q: null, cap: null }); }}>Xóa bộ lọc</Button>}
+    </div>
+    {narrowed && list.data && <p className="org-lib-hint" role="status">Máy chủ chưa lọc theo tên hoặc năng lực: kết quả chỉ tính trên {loaded.length} mẫu đã tải{list.data.total > loaded.length ? ` (trang ${page}/${Math.ceil(list.data.total / PAGE_SIZE)})` : ""}. Có {items.length} mẫu khớp.</p>}
 
     {list.error !== undefined && (() => {
       const view = describeLibraryError(list.error);
@@ -83,7 +115,7 @@ export function LibraryBrowser() {
         </article>;
       })}
     </div>
-    {list.data && !items.length && <EmptyState icon={kind ? Search : Library} title={kind ? "Chưa có mẫu thuộc loại này" : "Thư viện chưa có mẫu nào"} description="Chưa có mẫu nào được xuất bản. Bạn vẫn soạn kịch bản đầy đủ bằng tay; quản trị hệ thống sẽ bổ sung mẫu khi có." />}
+    {list.data && !items.length && <EmptyState icon={kind || narrowed ? Search : Library} title={narrowed && loaded.length ? "Không có mẫu khớp bộ lọc" : kind ? "Chưa có mẫu thuộc loại này" : "Thư viện chưa có mẫu nào"} description={narrowed && loaded.length ? "Thử đổi hoặc xóa bộ lọc." : "Chưa có mẫu nào được xuất bản. Bạn vẫn soạn kịch bản đầy đủ bằng tay; quản trị hệ thống sẽ bổ sung mẫu khi có."} />}
     {(list.data?.total ?? 0) > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={list.data?.total ?? 0} onPageChange={setPage} disabled={list.loading} />}
 
     <div style={{ marginTop: 24 }}><Alert tone="info" title="Áp dụng mẫu là sao chép vào bản nháp của bạn">Mở một công trình, vào trình soạn kịch bản rồi chọn thẻ Thư viện để xem trước và áp dụng. Thêm thiết bị vào thư viện không tự thêm khả năng gameplay: chỉ những đối tượng mà runtime đang hỗ trợ mới đặt được.</Alert></div>
