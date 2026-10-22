@@ -44,7 +44,7 @@ test.describe("production Library admin", () => {
     await expect(page.getByRole("heading", { name: "Thư viện chưa có mục nào" })).toBeVisible();
     await expect(page.getByText("Thư viện không có dữ liệu sẵn")).toBeVisible();
     await expect(page.locator("main tbody tr")).toHaveCount(1); // only the empty-state row
-    await expect(page.getByRole("navigation", { name: "Quản trị hệ thống" }).getByRole("link", { name: /Thư viện tổ chức/ })).not.toContainText("Chờ BE");
+    await expect(page.getByRole("navigation", { name: "Quản trị hệ thống" }).getByRole("link", { name: /Thư viện mẫu/ })).not.toContainText("Chờ BE");
     expect(backend.callsTo("GET", /^\/api\/admin\/library\/items$/).length).toBeGreaterThan(0);
     expect(backend.calls.every((call) => /^\/api\/(admin\/library|auth)/.test(call.path))).toBe(true);
     expect(backend.items).toHaveLength(0);

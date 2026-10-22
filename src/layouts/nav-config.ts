@@ -62,9 +62,9 @@ export const adminArea: OperationsArea = {
     { href: routes.adminAccounts, label: "Tài khoản", icon: Users, group: "Quản lý hệ thống" },
     { href: routes.adminOrganizations, label: "Tổ chức", icon: Landmark, group: "Quản lý hệ thống" },
     { href: routes.adminLearn, label: "Learn CMS", icon: BookOpen, group: "Quản lý nội dung" },
-    { href: routes.adminLibrary, label: "Thư viện tổ chức", icon: Library, group: "Quản lý nội dung" },
+    { href: routes.adminLibrary, label: "Thư viện mẫu", icon: Library, group: "Quản lý nội dung" },
     { href: routes.adminAi, label: "AI & nguồn tri thức", icon: BrainCircuit, group: "Quản lý nội dung" },
-    { href: routes.adminCommerce, label: "Thương mại", icon: CreditCard, group: "Thương mại" },
+    { href: routes.adminCommerce, label: "Dịch vụ & thanh toán", icon: CreditCard, group: "Thương mại" },
   ],
   secondaryLink: { href: routes.home, label: "Về trang chủ", icon: Home },
 };
