@@ -271,7 +271,7 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "overview" }:
       </TabsContent>
 
       <TabsContent value="ifc">
-        <div className="ops-stack">
+        <div className="ops-stack org">
           {revision && progress && <PipelineProgress model={progress} versionLabel={revision.versionLabel} onAction={runAction} busy={processing.working} actionError={processing.actionError} />}
           <IfcUploadPanel accessToken={accessToken} buildingId={buildingId} onRevisionChanged={onRevisionChanged} />
           {revisions.loading && !revisions.data && <Skeleton style={{ height: 160 }} />}

@@ -89,11 +89,15 @@ function Workbench({ accessToken, buildingId, scenario, versionCount, editorHref
   return <>
     <JourneyPanel input={journey} editorHref={editorHref} onTab={onTab} onSnapshot={onSnapshot} canAct={canAct} />
     {server.readiness.error !== undefined && !readiness && <Alert tone="danger" title="Không đọc được readiness từ máy chủ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={server.readiness.reload}>Thử lại</Button>}>{describeError(server.readiness.error).message} Các cổng bên dưới chỉ phản ánh phần đã tải được.</Alert>}
-    <GateStepper gates={[
-      { id: "technical", title: "Kết quả kỹ thuật", state: technical },
-      { id: "approval", title: "Duyệt nội dung", state: approvalGate(version.reviewStatus, version.rejectReason) },
-      { id: "release", title: "Release", state: releaseGate(server.releaseView.release) },
-    ]} />
+    <Alert tone="info" title={`Phiên bản v${version.versionNumber} là bản chụp bất biến: chỉ đọc`}>Hash nội dung <span className="ver-hash">#{shortHash(version.scenarioHash, 12)}</span> được ghim khi tạo phiên bản. Muốn sửa, hãy sửa bản nháp rồi tạo phiên bản mới; v{version.versionNumber} giữ nguyên để đối chiếu.</Alert>
+    <section className="org-card org-gates-card" aria-labelledby="ver-gates-title">
+      <h2 id="ver-gates-title" className="org-card-title">Chuẩn bị phát hành v{version.versionNumber}</h2>
+      <GateStepper gates={[
+        { id: "technical", title: "Kết quả kỹ thuật", state: technical },
+        { id: "approval", title: "Duyệt nội dung", state: approvalGate(version.reviewStatus, version.rejectReason) },
+        { id: "release", title: "Release", state: releaseGate(server.releaseView.release) },
+      ]} />
+    </section>
     <Tabs value={tab} onValueChange={(value) => onTab(value as TabId)}>
       <TabsList aria-label="Các bước của phiên bản">
         {TABS.map((id) => <TabsTrigger key={id} value={id}>{tabLabels[id]}</TabsTrigger>)}
@@ -160,15 +164,15 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
   const reloadAll = () => { versions.reload(); detail.reload(); scenario.reload(); };
   const reloadVersion = () => { versions.reload(); detail.reload(); };
 
-  return <>
+  return <div className="org">
     <PageHeader
       eyebrow="Bước 4–5 · Phiên bản và phát hành"
-      title="Phiên bản và readiness"
-      description={scenario.data ? `Kịch bản “${scenario.data.name}”: tạo snapshot, dựng package, kiểm tra kỹ thuật, gửi duyệt và tạo release.` : "Tạo snapshot, dựng package, kiểm tra kỹ thuật, gửi duyệt và tạo release."}
+      title="Phiên bản và phát hành"
+      description="Mỗi phiên bản được đóng băng khi tạo. Sửa nội dung sẽ tạo phiên bản mới và duyệt lại."
       breadcrumbs={crumbs}
       actions={<>
-        <Button variant="quiet" onClick={reloadAll} disabled={versions.loading}><RefreshCw size={16} aria-hidden="true" />{versions.loading ? "Đang tải…" : "Tải lại"}</Button>
-        <Button onClick={() => setSnapshotOpen(true)} disabled={!canAct}><Camera size={16} aria-hidden="true" />Tạo snapshot từ draft</Button>
+        <Button variant="quiet" size="icon" onClick={reloadAll} disabled={versions.loading} aria-label="Tải lại" title="Tải lại"><RefreshCw size={16} aria-hidden="true" /></Button>
+        <Button variant="secondary" onClick={() => setSnapshotOpen(true)} disabled={!canAct}><Camera size={16} aria-hidden="true" />Tạo phiên bản mới từ draft</Button>
       </>}
     />
 
@@ -176,8 +180,8 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
     {versions.error !== undefined && <Alert tone="danger" title="Không tải được danh sách phiên bản" action={<Button size="sm" variant="secondary" className="mt-3" onClick={versions.reload}>Thử lại</Button>}>{describeError(versions.error).message}</Alert>}
 
     <div className="ver-layout" style={{ marginTop: 16 }}>
-      <aside aria-label="Lịch sử phiên bản" className="ops-stack">
-        <h2 className="ver-section-title" style={{ margin: 0 }}>Lịch sử snapshot</h2>
+      <aside aria-label="Lịch sử phiên bản" className="org-card ops-stack">
+        <h2 className="org-card-title" style={{ margin: 0 }}>{scenario.data ? `Phiên bản của “${scenario.data.name}”` : "Lịch sử snapshot"}</h2>
         {versions.loading && !versions.data && <SkeletonRows rows={4} label="Đang tải phiên bản…" />}
         {versions.data && items.length === 0 && <EmptyState icon={GitCommitVertical} title="Chưa có phiên bản nào" description="Hoàn tất draft ở trình soạn kịch bản rồi tạo snapshot để có phiên bản bất biến đầu tiên." action={<Button onClick={() => setSnapshotOpen(true)} disabled={!canAct}><Camera size={16} aria-hidden="true" />Tạo snapshot từ draft</Button>} />}
         <ul className="ver-version-list">
@@ -238,5 +242,5 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
       editorHref={editorHref}
       onCreated={(versionId) => { versions.reload(); setParams({ version: versionId, tab: "build", page: "" }); }}
     />}
-  </>;
+  </div>;
 }

@@ -21,6 +21,10 @@ export const analyticsApi = {
   async operations(accessToken: string, scope: AnalyticsScope, range: AnalyticsRange, signal?: AbortSignal) {
     return parseOperations(await apiClient.request<unknown>(path(scope, "operations"), { headers: auth(accessToken), query: query(range), signal }));
   },
+  /** `GET {training route}/export`: UTF-8 CSV of the same period (aggregate rows only). 422 over 10000 rows, 429 after 10 exports a day. */
+  exportTraining(accessToken: string, scope: AnalyticsScope, range: AnalyticsRange, signal?: AbortSignal) {
+    return apiClient.request<string>(`${path(scope, "training")}/export`, { headers: auth(accessToken), query: query(range), signal });
+  },
   /** PlatformAdmin only. */
   async revenue(accessToken: string, range: AnalyticsRange, signal?: AbortSignal) {
     return parseRevenue(await apiClient.request<unknown>("/api/admin/analytics/revenue", { headers: auth(accessToken), query: query(range), signal }));

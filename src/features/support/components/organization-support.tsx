@@ -124,10 +124,48 @@ function TicketsTab({ accessToken, myId, audience }: { accessToken: string; myId
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const status = get("status");
   const ticketId = get("ticket");
-  const [creating, setCreating] = useState(false);
+  const master = audience === "organization";
+  const [localCreating, setLocalCreating] = useState(false);
+  // Organization: the page header button opens the form through ?create=1; the Trainee hub keeps its own toggle.
+  const creating = master ? get("create") === "1" : localCreating;
+  const setCreating = (value: boolean) => { if (master) setParams({ create: value ? "1" : null }); else setLocalCreating(value); };
   const list = useAsyncData(`org-tickets:${page}:${status}`, (signal) => supportApi.listTickets("user", accessToken, { page, pageSize: PAGE_SIZE, status: status || undefined }, signal), true);
   const items = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
+  // Organization layout: list on the left, the open request beside it; the first request is shown until one is picked.
+  const shownId = ticketId || (master ? items[0]?.id ?? "" : "");
+
+  const createDrawer = <Drawer open={creating} onOpenChange={(open) => { if (!open) setCreating(false); }} title="Tạo yêu cầu hỗ trợ" description="Đội Fire3D sẽ trả lời ngay trong yêu cầu này.">
+    <CreateTicketForm accessToken={accessToken} audience={audience} onCancel={() => setCreating(false)} onCreated={(id) => { setCreating(false); list.reload(); setParams({ ticket: id, page: 1, create: null }); }} />
+  </Drawer>;
+  const errorAlert = list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách yêu cầu" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{errorText(list.error, "Hãy kiểm tra kết nối rồi thử lại.")}</Alert>;
+
+  if (master) {
+    return <>
+      {errorAlert}
+      <div className="org-cols org-support">
+        <section className="org-card" aria-label="Yêu cầu hỗ trợ của bạn">
+          <div className="org-chips" role="group" aria-label="Trạng thái yêu cầu">
+            <button type="button" className="org-chip" aria-pressed={status === ""} onClick={() => setParams({ status: "" })}>Tất cả</button>
+            {ticketStatusOptions.map((value) => <button key={value} type="button" className="org-chip" aria-pressed={status === value} onClick={() => setParams({ status: value })}>{ticketStatusLabel(value)}</button>)}
+          </div>
+          <div className="org-stack-sm" style={{ marginTop: 14 }}>
+            {list.loading && !list.data && <SkeletonRows rows={4} label="Đang tải yêu cầu…" />}
+            {items.map((ticket) => <button key={ticket.id} type="button" className="org-pick" aria-pressed={ticket.id === shownId} onClick={() => setParams({ ticket: ticket.id, page })} aria-label={`Mở yêu cầu ${ticket.ticketNumber}: ${ticket.subject}`}>
+              <strong>{ticket.subject}</strong>
+              <span className="org-row"><span className="org-meta">{ticket.ticketNumber} · {formatDateTime(ticket.updatedAt)}</span><StatusBadge tone={ticketStatusTone(ticket.status)}>{ticketStatusLabel(ticket.status)}</StatusBadge></span>
+            </button>)}
+            {list.data && !items.length && <EmptyState icon={status ? Search : Inbox} title={status ? "Không có yêu cầu phù hợp." : "Bạn chưa gửi yêu cầu hỗ trợ nào"} description={status ? "Thử đổi bộ lọc trạng thái." : "Khi gặp sự cố với công trình, mô hình IFC hoặc tài khoản, hãy tạo yêu cầu để đội Fire3D hỗ trợ."} action={!status && <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo yêu cầu hỗ trợ</Button>} />}
+          </div>
+          {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
+        </section>
+        <section className="org-card" aria-label="Chi tiết yêu cầu">
+          {shownId ? <UserTicketPanel key={shownId} ticketId={shownId} accessToken={accessToken} myId={myId} /> : <p className="org-card-sub" style={{ margin: 0 }}>Chọn một yêu cầu để xem trao đổi, hoặc tạo yêu cầu mới.</p>}
+        </section>
+      </div>
+      {createDrawer}
+    </>;
+  }
 
   return <>
     <div className="ops-toolbar">
@@ -138,7 +176,7 @@ function TicketsTab({ accessToken, myId, audience }: { accessToken: string; myId
       <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo yêu cầu hỗ trợ</Button>
     </div>
 
-    {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách yêu cầu" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{errorText(list.error, "Hãy kiểm tra kết nối rồi thử lại.")}</Alert>}
+    {errorAlert}
 
     <Table caption="Yêu cầu hỗ trợ của bạn">
       <thead><tr><th>Yêu cầu</th><th>Trạng thái</th><th>Cập nhật</th></tr></thead>
@@ -149,14 +187,12 @@ function TicketsTab({ accessToken, myId, audience }: { accessToken: string; myId
           <td><StatusBadge tone={ticketStatusTone(ticket.status)}>{ticketStatusLabel(ticket.status)}</StatusBadge></td>
           <td>{formatDateTime(ticket.updatedAt)}</td>
         </tr>)}
-        {list.data && !items.length && <TableMessage colSpan={3}><EmptyState icon={status ? Search : Inbox} title={status ? "Không có yêu cầu phù hợp." : "Bạn chưa gửi yêu cầu hỗ trợ nào"} description={status ? "Thử đổi bộ lọc trạng thái." : audience === "trainee" ? "Khi gặp sự cố với bài học, ứng dụng hoặc tài khoản, hãy tạo yêu cầu để đội Fire3D hỗ trợ." : "Khi gặp sự cố với công trình, mô hình IFC hoặc tài khoản, hãy tạo yêu cầu để đội Fire3D hỗ trợ."} action={!status && <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo yêu cầu hỗ trợ</Button>} /></TableMessage>}
+        {list.data && !items.length && <TableMessage colSpan={3}><EmptyState icon={status ? Search : Inbox} title={status ? "Không có yêu cầu phù hợp." : "Bạn chưa gửi yêu cầu hỗ trợ nào"} description={status ? "Thử đổi bộ lọc trạng thái." : "Khi gặp sự cố với bài học, ứng dụng hoặc tài khoản, hãy tạo yêu cầu để đội Fire3D hỗ trợ."} action={!status && <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo yêu cầu hỗ trợ</Button>} /></TableMessage>}
       </tbody>
     </Table>
     {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
 
-    <Drawer open={creating} onOpenChange={(open) => { if (!open) setCreating(false); }} title="Tạo yêu cầu hỗ trợ" description="Đội Fire3D sẽ trả lời ngay trong yêu cầu này.">
-      <CreateTicketForm accessToken={accessToken} audience={audience} onCancel={() => setCreating(false)} onCreated={(id) => { setCreating(false); list.reload(); setParams({ ticket: id, page: 1 }); }} />
-    </Drawer>
+    {createDrawer}
     <Drawer open={Boolean(ticketId)} onOpenChange={(open) => { if (!open) setParams({ ticket: null, page }); }} title="Chi tiết yêu cầu" description="Lịch sử trao đổi với đội hỗ trợ." className={styles.wideDrawer}>
       {ticketId && <UserTicketPanel key={ticketId} ticketId={ticketId} accessToken={accessToken} myId={myId} />}
     </Drawer>
@@ -269,18 +305,20 @@ export function SupportTabs({ accessToken, myId, audience }: { accessToken: stri
 
 export function OrganizationSupport() {
   const { accessToken, ready, user } = useAuthSession();
+  const { setParams } = useUrlParams();
 
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
   if (user?.role !== 1 || !accessToken) {
     return <Alert tone="danger" title="Chỉ dành cho tài khoản tổ chức" action={user?.role === 0 ? <Link className="mt-3 inline-block underline" href={routes.adminSupport}>Mở hộp thư hỗ trợ của quản trị</Link> : user?.role === 2 ? <Link className="mt-3 inline-block underline" href={routes.learningHubSupport}>Mở hỗ trợ trong Góc học tập</Link> : undefined}>Yêu cầu và phản hồi thuộc về người tạo; PlatformAdmin xử lý chúng trong khu quản trị.</Alert>;
   }
 
-  return <>
+  return <div className="org">
     <PageHeader
-      title="Hỗ trợ & phản hồi"
-      description="Gửi yêu cầu hỗ trợ, theo dõi trao đổi với đội Fire3D và gửi phản hồi về sản phẩm. Chỉ bạn xem được các mục do bạn tạo."
+      title="Hỗ trợ và phản hồi"
+      description="Gửi yêu cầu hỗ trợ (tiêu đề và mô tả) hoặc góp ý. Theo dõi phản hồi ở một nơi."
       eyebrow="Quản lý" breadcrumbs={[{ label: "Hỗ trợ & phản hồi" }]}
+      actions={<Button onClick={() => setParams({ tab: null, create: "1" })}>Yêu cầu mới</Button>}
     />
     <SupportTabs accessToken={accessToken} myId={user.id} audience="organization" />
-  </>;
+  </div>;
 }

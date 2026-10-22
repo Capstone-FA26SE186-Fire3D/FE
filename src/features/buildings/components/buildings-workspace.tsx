@@ -35,6 +35,15 @@ const statusOptions: Array<{ value: StatusFilter; label: string }> = [
   { value: "archived", label: "Đã lưu trữ" },
   { value: "all", label: "Tất cả" },
 ];
+const orgStatusLabels: Record<StatusFilter, string> = { active: "Trạng thái: đang dùng", archived: "Trạng thái: đã lưu trữ", all: "Trạng thái: tất cả" };
+
+/** Type chips take a stable tone from the type text so the same type always looks the same. */
+const typeTones = ["ember", "warning", "success", "info", "danger"] as const;
+function typeTone(text: string) {
+  let hash = 0;
+  for (const char of text) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return typeTones[hash % typeTones.length];
+}
 
 const loadError = "Không thể tải danh sách công trình. Hãy thử lại sau.";
 
@@ -257,29 +266,33 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
     {building.isActive && <Button size="sm" variant="quiet" onClick={() => openArchive(building)} aria-label={`Lưu trữ ${building.name}`}><Archive size={14} aria-hidden="true" />Lưu trữ</Button>}
   </span>;
 
-  const statusBadge = (building: BuildingSummary) => <StatusBadge tone={building.isActive ? "success" : "neutral"}>{building.isActive ? "Hoạt động" : "Đã lưu trữ"}</StatusBadge>;
+  const statusBadge = (building: BuildingSummary) => <StatusBadge tone={building.isActive ? "success" : "neutral"}>{building.isActive ? (isAdmin ? "Hoạt động" : "Đang dùng") : "Đã lưu trữ"}</StatusBadge>;
 
-  return <>
+  const createLabel = isAdmin ? "Tạo công trình" : "Thêm công trình";
+  return <div className={isAdmin ? undefined : "org"}>
     <PageHeader
-      eyebrow={isAdmin ? undefined : "Huấn luyện"}
-      title={isAdmin && organizationName ? `Công trình · ${organizationName}` : "Công trình"}
+      eyebrow={isAdmin ? undefined : "Công trình"}
+      title={isAdmin && organizationName ? `Công trình · ${organizationName}` : isAdmin ? "Công trình" : "Công trình của tổ chức"}
       description={pageDescription}
       breadcrumbs={crumbs}
-      actions={<><Button variant="quiet" onClick={reload} disabled={loading}><RefreshCw size={16} aria-hidden="true" />{loading ? "Đang tải…" : "Tải lại"}</Button><Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo công trình</Button></>}
+      actions={isAdmin
+        ? <><Button variant="quiet" onClick={reload} disabled={loading}><RefreshCw size={16} aria-hidden="true" />{loading ? "Đang tải…" : "Tải lại"}</Button><Button onClick={openCreate}><Plus size={16} aria-hidden="true" />{createLabel}</Button></>
+        : <><Button variant="secondary" onClick={openCreate}>Nhập từ IFC</Button><Button onClick={openCreate}>{createLabel}</Button></>}
     />
 
     {organizationSelect}
     {organization.error !== undefined && <Alert tone="danger" title="Không đọc được tổ chức">Tổ chức không tồn tại hoặc bạn không có quyền xem. Hãy chọn lại từ danh sách tổ chức.</Alert>}
 
-    <div className="ops-toolbar">
-      <div className="ops-field ops-toolbar-grow" style={{ position: "relative" }}>
+    <div className={isAdmin ? "ops-toolbar" : "org-filters"}>
+      <div className={isAdmin ? "ops-field ops-toolbar-grow" : "org-search"} style={isAdmin ? { position: "relative" } : undefined}>
         <label htmlFor="building-search" className="sr-only" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Tìm công trình</label>
-        <Search size={16} aria-hidden="true" style={{ position: "absolute", left: 12, top: 13, color: "var(--dim)" }} />
-        <Input id="building-search" style={{ paddingLeft: 36 }} placeholder="Tìm công trình" value={searchText} onChange={(event) => setSearchText(event.target.value)} />
+        <Search size={16} aria-hidden="true" style={isAdmin ? { position: "absolute", left: 12, top: 13, color: "var(--dim)" } : undefined} />
+        <Input id="building-search" style={isAdmin ? { paddingLeft: 36 } : undefined} placeholder={isAdmin ? "Tìm công trình" : "Tìm theo tên công trình"} value={searchText} onChange={(event) => setSearchText(event.target.value)} />
       </div>
-      <Select aria-label="Trạng thái" style={{ width: 180 }} value={status} onChange={(event) => setParams({ status: event.target.value === "active" ? "" : event.target.value })}>
-        {statusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+      <Select aria-label="Trạng thái" style={isAdmin ? { width: 180 } : undefined} value={status} onChange={(event) => setParams({ status: event.target.value === "active" ? "" : event.target.value })}>
+        {statusOptions.map((option) => <option key={option.value} value={option.value}>{isAdmin ? option.label : orgStatusLabels[option.value]}</option>)}
       </Select>
+      {!isAdmin && <Button variant="quiet" size="icon" onClick={reload} disabled={loading} aria-label="Tải lại" title="Tải lại"><RefreshCw size={16} aria-hidden="true" /></Button>}
       <div className="ops-segmented" role="group" aria-label="Kiểu hiển thị">
         <button type="button" aria-pressed={view === "table"} aria-label="Dạng bảng" title="Dạng bảng" onClick={() => setParams({ view: "" })}><List size={16} aria-hidden="true" /></button>
         <button type="button" aria-pressed={view === "cards"} aria-label="Dạng thẻ" title="Dạng thẻ" onClick={() => setParams({ view: "cards" })}><LayoutGrid size={16} aria-hidden="true" /></button>
@@ -289,28 +302,30 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
     {error !== undefined && <Alert tone="danger" title="Không tải được danh sách" action={<RetryButton error={error} onRetry={reload} />}>{describeApiError(error, loadError)}</Alert>}
 
     {view === "table"
-      ? <Table caption="Danh sách công trình">
-        <thead><tr><th>Công trình</th><th>Loại</th><th>Số tầng</th><th>Trạng thái</th><th>Cập nhật</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
+      ? <div className={isAdmin ? undefined : "org-list"}><Table caption="Danh sách công trình">
+        <thead><tr><th>Công trình</th><th>{isAdmin ? "Loại" : "Loại công trình"}</th><th>Số tầng</th><th>Trạng thái</th><th>Cập nhật</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
         <tbody>
           {loading && !data && <TableMessage colSpan={6}><SkeletonRows rows={5} label="Đang tải danh sách công trình…" /></TableMessage>}
           {items.map((building) => <tr key={building.id}>
             <td><Link id={`building-name-${building.id}`} className="ops-cell-primary" href={`${routes.workspaceBuildings}/${building.id}`}>{building.name}</Link></td>
-            <td>{building.buildingType || "Chưa phân loại"}</td>
-            <td>{building.totalFloors}</td>
+            <td>{isAdmin || !building.buildingType ? (building.buildingType || "Chưa phân loại") : <StatusBadge tone={typeTone(building.buildingType)}>{building.buildingType}</StatusBadge>}</td>
+            <td>{isAdmin ? building.totalFloors : <StatusBadge>{building.totalFloors} tầng</StatusBadge>}</td>
             <td>{statusBadge(building)}</td>
             <td>{formatDate(building.updatedAt)}</td>
             <td className="ops-cell-actions">{rowActions(building)}</td>
           </tr>)}
           {data && !items.length && <TableMessage colSpan={6}>{filtering
             ? <EmptyState icon={Search} title="Chưa có công trình phù hợp." description="Thử đổi từ khóa hoặc bộ lọc trạng thái." />
-            : <EmptyState icon={Building2} title="Tạo công trình đầu tiên" description="Thêm công trình, tải lên mô hình IFC rồi xây dựng kịch bản sơ tán cho đúng không gian thật." action={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo công trình</Button>} />}</TableMessage>}
+            : <EmptyState icon={Building2} title="Tạo công trình đầu tiên" description="Thêm công trình, tải lên mô hình IFC rồi xây dựng kịch bản sơ tán cho đúng không gian thật." action={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />{createLabel}</Button>} />}</TableMessage>}
         </tbody>
       </Table>
+      {!isAdmin && data && items.length > 0 && <p className="org-list-note">Danh sách chỉ gồm tên, loại, số tầng và trạng thái dùng; hành trình chi tiết tải khi mở từng công trình. Hiển thị {items.length} trên {totalCount}.</p>}
+      </div>
       : <>
         {loading && !data && <SkeletonRows rows={4} label="Đang tải danh sách công trình…" />}
         {data && !items.length && (filtering
           ? <EmptyState icon={Search} title="Chưa có công trình phù hợp." description="Thử đổi từ khóa hoặc bộ lọc trạng thái." />
-          : <EmptyState icon={Building2} title="Tạo công trình đầu tiên" description="Thêm công trình, tải lên mô hình IFC rồi xây dựng kịch bản sơ tán cho đúng không gian thật." action={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo công trình</Button>} />)}
+          : <EmptyState icon={Building2} title="Tạo công trình đầu tiên" description="Thêm công trình, tải lên mô hình IFC rồi xây dựng kịch bản sơ tán cho đúng không gian thật." action={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />{createLabel}</Button>} />)}
         <div className="ops-card-grid">
           {items.map((building) => <article key={building.id} className="ops-item-card">
             <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><h3><Link id={`building-name-${building.id}`} href={`${routes.workspaceBuildings}/${building.id}`}>{building.name}</Link></h3>{statusBadge(building)}</div>
@@ -349,5 +364,5 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
       {archiveNotice && <Alert tone="warning" title="Công trình đã thay đổi">{archiveNotice}</Alert>}
       <p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>Công trình đã lưu trữ không xuất hiện trong danh sách mặc định; bạn có thể xem lại bằng bộ lọc “Đã lưu trữ”.</p>
     </Modal>
-  </>;
+  </div>;
 }
