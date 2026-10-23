@@ -1,17 +1,19 @@
 "use client";
 
 import { LogOut, Menu, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { MotionConfig, motion } from "motion/react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import "@/assets/styles/ops.css";
+import "@/assets/styles/ops-v2.css";
 import { FET3DLogo } from "@/components/brand/fet3d-logo";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/dialog";
+import { m, MotionProvider } from "@/components/ui/motion";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ToastProvider } from "@/components/ui/toast";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { ThemeScope } from "@/features/theme/theme-scope";
 import { TopbarSlotContext } from "@/features/theme/topbar-slot";
@@ -56,7 +58,7 @@ function SidebarContent({ area, pathname, collapsed, onNavigate, onToggleCollaps
           const active = isActive(pathname, item);
           const Icon = item.icon;
           return <Link key={item.href} className="ops-nav-link" href={item.href} aria-current={active ? "page" : undefined} aria-label={item.label} title={collapsed ? item.label : undefined} onClick={onNavigate}>
-            {active && <motion.span layoutId={`${idPrefix}-active`} className="ops-nav-active" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
+            {active && <m.span layoutId={`${idPrefix}-active`} className="ops-nav-active" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
             <Icon size={20} strokeWidth={1.75} aria-hidden="true" style={{ position: "relative" }} />
             <span className="ops-nav-text"><span style={{ position: "relative" }}>{item.label}</span>{item.status === "pending-be" && <StatusBadge tone="warning" style={{ position: "relative" }}>Chờ BE</StatusBadge>}</span>
           </Link>;
@@ -111,7 +113,7 @@ function Shell({ area, children }: { area: OperationsArea; children: ReactNode }
       </header>
       <main id="ops-main" className="ops-main" tabIndex={-1}>
         <TopbarSlotContext.Provider value={crumbSlot}>
-          <motion.div key={pathname} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18, ease: "easeOut" }}>{children}</motion.div>
+          <m.div key={pathname} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18, ease: "easeOut" }}>{children}</m.div>
         </TopbarSlotContext.Provider>
       </main>
     </div>
@@ -129,8 +131,8 @@ export function OperationsShell({ areaId, children }: { areaId: OperationsArea["
   // Resolved here (client side): nav items hold icon components, which cannot cross the server→client boundary.
   const area = areaId === "admin" ? adminArea : organizationArea;
   return <ThemeScope>
-    <MotionConfig reducedMotion="user">
-      <ToastProvider><Shell area={area}>{children}</Shell></ToastProvider>
-    </MotionConfig>
+    <MotionProvider>
+      <TooltipProvider><ToastProvider><Shell area={area}>{children}</Shell></ToastProvider></TooltipProvider>
+    </MotionProvider>
   </ThemeScope>;
 }

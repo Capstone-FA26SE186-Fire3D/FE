@@ -1,6 +1,6 @@
 "use client";
 
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, m } from "@/components/ui/motion";
 import { CircleAlert, CircleCheck, Info, TriangleAlert, X } from "lucide-react";
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 
@@ -44,11 +44,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <AnimatePresence initial={false}>
         {items.map((item) => {
           const Icon = icons[item.tone];
-          return <motion.div key={item.id} layout className="ops-toast" data-tone={item.tone} role={item.tone === "danger" ? "alert" : "status"} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.18 }}>
+          return <m.div key={item.id} layout className="ops-toast" data-tone={item.tone} role={item.tone === "danger" ? "alert" : "status"} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 24 }} transition={{ duration: 0.18 }}>
             <Icon size={18} aria-hidden="true" />
             <div><strong>{item.title}</strong>{item.description && <p>{item.description}</p>}</div>
             <button type="button" className="ops-icon-button" style={{ border: 0, margin: "-10px -10px -10px 0" }} aria-label="Đóng thông báo" onClick={() => dismiss(item.id)}><X size={14} aria-hidden="true" /></button>
-          </motion.div>;
+          </m.div>;
         })}
       </AnimatePresence>
     </div>
