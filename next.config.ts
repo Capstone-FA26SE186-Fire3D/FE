@@ -8,6 +8,11 @@ const devApiProxy = process.env.FET3D_DEV_API_PROXY?.replace(/\/+$/, "");
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  images: { formats: ["image/avif", "image/webp"] },
+  experimental: {
+    // Named imports from these packages are rewritten to direct file imports, so a page pays for the icons/charts it uses.
+    optimizePackageImports: ["lucide-react", "motion", "recharts"],
+  },
   async headers() {
     const staticAsset = [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }];
     return [
@@ -43,4 +48,11 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// `pnpm analyze` (scripts/analyze.mjs sets ANALYZE=true) writes the bundle treemaps to .next/analyze/*.html.
+async function withAnalyzer(config: NextConfig): Promise<NextConfig> {
+  if (process.env.ANALYZE !== "true") return config;
+  const { default: bundleAnalyzer } = await import("@next/bundle-analyzer");
+  return bundleAnalyzer({ enabled: true, openAnalyzer: false })(config);
+}
+
+export default withAnalyzer(nextConfig);
