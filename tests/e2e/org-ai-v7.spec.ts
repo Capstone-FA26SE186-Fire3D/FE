@@ -12,21 +12,30 @@ async function open(page: Page, mock: AiMock, url: string, user: typeof owner | 
   await page.goto(url);
 }
 
+const launcher = (page: Page) => page.getByTestId("ai-bubble-button");
+const input = (page: Page) => page.getByTestId("ai-chat-input");
+
 test.describe("Organization AI v7 details", () => {
-  test("the form shows the reserve and balance from /limits; the result shows the question, AI notes and a linked citation", async ({ page }) => {
+  test("the bubble shows the reserve from /limits; the answer carries a linked citation; 'Xem chi tiết' opens the request with the question, AI notes and relevance", async ({ page }) => {
     const mock = newAiMock();
     await open(page, mock, "/workspace/ai");
-    await expect(page.getByTestId("ai-limit-hint")).toContainText("50 tokens");
-    await expect(page.getByTestId("ai-limit-hint")).toContainText("900 tokens");
-    await page.getByLabel("Câu hỏi").fill("Lối thoát nạn rộng bao nhiêu?");
+    await launcher(page).click();
+    await expect(page.getByText("Mỗi câu hỏi dùng khoảng 50 tokens")).toBeVisible();
+    await expect(page.getByTestId("ai-chat-quota")).toHaveText("Còn 900 tokens");
+    await input(page).fill("Lối thoát nạn rộng bao nhiêu?");
     await page.getByTestId("ai-send").click();
-    await expect(page.getByTestId("ai-answer")).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByTestId("ai-input")).toContainText("Lối thoát nạn rộng bao nhiêu?");
-    const link = page.getByTestId("ai-citation-link");
-    await expect(link).toHaveAttribute("href", "https://example.gov.vn/qcvn-06");
-    await expect(link).toHaveAttribute("target", "_blank");
-    await expect(link).toHaveAttribute("rel", /noopener/);
-    await expect(page.getByTestId("ai-citation")).toContainText("độ liên quan 82%");
+    await expect(page.getByTestId("ai-chat-answer-text")).toBeVisible({ timeout: 15_000 });
+    const chip = page.getByTestId("ai-chat-citation").getByRole("link");
+    await expect(chip).toHaveAttribute("href", "https://example.gov.vn/qcvn-06");
+    await expect(chip).toHaveAttribute("target", "_blank");
+    await expect(chip).toHaveAttribute("rel", /noopener/);
+    await page.getByTestId("ai-chat-detail").click();
+    await expect(page).toHaveURL(/\/workspace\/ai\?tab=history&request=/);
+    const drawer = page.getByRole("dialog", { name: "Đọc lại hội thoại" });
+    await expect(drawer.getByTestId("ai-input")).toContainText("Lối thoát nạn rộng bao nhiêu?");
+    await expect(drawer.getByTestId("ai-citation")).toContainText("độ liên quan 82%");
+    // The limits were read again after the request settled (the balance moved).
+    expect(calls(mock, "GET", "/api/ai/organization/limits").length).toBeGreaterThanOrEqual(3);
   });
 
   test("Learn and Library citations open inside the app; a non-https sourceUri is never a link", async ({ page }) => {
@@ -51,37 +60,35 @@ test.describe("Organization AI v7 details", () => {
     await expect(notes).toContainText("Không xét nhà xưởng");
   });
 
-  test("scenario draft lists draft-ready revisions and sends the chosen revisionId", async ({ page }) => {
-    const mock = newAiMock();
+  test("a scenario draft from the bubble sends the Building and no revisionId: the server pins the newest draft-ready revision", async ({ page }) => {
+    const mock = newAiMock({ pendingPolls: 0 });
     mock.revisions = [
       { id: REVISION_ID, buildingId: BUILDING_ID, versionLabel: "IFC rev. 01", status: "ReadyForScenario", createdAt: iso(-100), sourceDocument: null },
       { id: "55555555-5555-4555-8555-555555555555", buildingId: BUILDING_ID, versionLabel: "IFC rev. 02", status: "NeedsFix", createdAt: iso(-10), sourceDocument: null },
     ];
-    await open(page, mock, "/workspace/ai?tab=draft");
-    const select = page.getByTestId("ai-revision");
-    await expect(select.locator("option")).toHaveCount(2); // server default + the one ready revision; NeedsFix is not offered
-    await select.selectOption(REVISION_ID);
-    await page.getByLabel("Yêu cầu đề xuất").fill("Sơ tán tầng 2");
+    await open(page, mock, "/workspace/ai");
+    await launcher(page).click();
+    await page.getByTestId("ai-mode-draft").click();
+    await expect(page.getByTestId("ai-chat-building")).toHaveValue(BUILDING_ID);
+    await input(page).fill("Sơ tán tầng 2");
     await page.getByTestId("ai-send").click();
     await expect.poll(() => calls(mock, "POST", "/api/ai/organization/scenario-draft").length).toBe(1);
-    expect(calls(mock, "POST", "/api/ai/organization/scenario-draft")[0].body).toMatchObject({ buildingId: BUILDING_ID, prompt: "Sơ tán tầng 2", revisionId: REVISION_ID });
+    expect(calls(mock, "POST", "/api/ai/organization/scenario-draft")[0].body).toEqual({ buildingId: BUILDING_ID, prompt: "Sơ tán tầng 2" });
+    await expect(page.getByTestId("ai-chat-draft")).toBeVisible();
+    await expect(page.getByTestId("ai-chat-detail")).toHaveAttribute("href", /tab=saved&request=/);
   });
 
-  test("a Building without a draft-ready revision explains why and sends nothing; a 409 AI_REVISION_NOT_READY is explained too", async ({ page }) => {
+  test("a Building without a draft-ready revision: the 409 AI_REVISION_NOT_READY refusal is explained in the thread and nothing is created", async ({ page }) => {
     const mock = newAiMock();
     mock.revisions = [{ id: REVISION_ID, buildingId: BUILDING_ID, versionLabel: "IFC rev. 01", status: "Processing", createdAt: iso(-100), sourceDocument: null }];
-    await open(page, mock, "/workspace/ai?tab=draft");
-    await expect(page.getByTestId("ai-no-ready-revision")).toContainText("chưa có mô hình sẵn sàng");
-    await page.getByLabel("Yêu cầu đề xuất").fill("Sơ tán tầng 2");
-    await expect(page.getByTestId("ai-send")).toBeDisabled();
-
-    // The status changed on the server meanwhile: the BE refuses, the FE shows the meaning.
-    mock.revisions = [{ id: REVISION_ID, buildingId: BUILDING_ID, versionLabel: "IFC rev. 01", status: "ReadyForScenario", createdAt: iso(-100), sourceDocument: null }];
-    mock.submitFaults.push({ status: 409, json: { status: 409, title: "not ready", code: "AI_REVISION_NOT_READY" } });
-    await page.reload();
-    await page.getByLabel("Yêu cầu đề xuất").fill("Sơ tán tầng 2");
+    await open(page, mock, "/workspace/ai");
+    await launcher(page).click();
+    await page.getByTestId("ai-mode-draft").click();
+    await input(page).fill("Sơ tán tầng 2");
     await page.getByTestId("ai-send").click();
     await expect(page.getByText(/chưa có revision mô hình sẵn sàng cho kịch bản/)).toBeVisible();
+    expect(mock.requests).toHaveLength(0);
+    await expect(page.getByTestId("ai-unknown")).toHaveCount(0);
   });
 });
 

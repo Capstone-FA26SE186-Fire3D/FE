@@ -12,6 +12,7 @@ test.describe("enterprise requests: organization side (mock)", () => {
     await mockBilling(page, mock);
     queue(mock, "POST /api/billing/enterprise-quote-requests", { status: 503, json: { title: "down" } });
     await page.goto("/workspace/billing?tab=enterprise");
+    await page.getByRole("button", { name: "Tạo yêu cầu" }).first().click();
     await page.getByLabel("Số công trình dự kiến").fill("150");
     await page.getByLabel("Người liên hệ").fill("Trần B");
     await page.getByLabel("Email liên hệ").fill("b@fire3d.test");
@@ -36,7 +37,8 @@ test.describe("enterprise requests: organization side (mock)", () => {
     await signIn(page, owner);
     await mockBilling(page, mock);
     await page.goto("/workspace/billing?tab=enterprise");
-    await page.getByRole("button", { name: /Xem yêu cầu 150 công trình/ }).click();
+    await page.getByRole("row", { name: /150 công trình/ }).click();
+    await expect(page).toHaveURL(new RegExp(`request=${ids.enterprise}`));
     const detail = page.getByTestId("enterprise-detail");
     await expect(detail).toContainText("Đã có báo giá");
     await expect(detail.getByTestId("enterprise-response")).toContainText("Chúng tôi sẽ gửi báo giá trong 2 ngày.");

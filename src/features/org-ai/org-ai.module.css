@@ -43,6 +43,8 @@
 .value { margin: 0; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-soft); color: var(--text); font-size: 13px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 180px; overflow: auto; }
 .json { margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-soft); color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; }
 
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
+.kpis .ops-kpi-value { font-size: 26px; }
 .wideDrawer.wideDrawer { width: min(680px, 100vw); }
 .wideModal.wideModal { width: min(760px, calc(100vw - 24px)); }
 .charCount { color: var(--dim); font-size: 12px; text-align: right; }

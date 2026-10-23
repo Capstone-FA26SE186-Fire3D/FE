@@ -15,8 +15,24 @@ const rev2 = { id: "rev-2", buildingId: "building-1", versionLabel: "IFC rev. 02
 const page1 = <T,>(items: T[]) => ({ items, totalCount: items.length, page: 1, pageSize: 20 });
 
 async function signIn(page: Page, user: typeof owner | typeof admin = owner) {
-  await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" })));
+  await page.addInitScript(() => {
+    sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" }));
+    localStorage.setItem("fire3d-org-tour", "done"); // the spotlight tour must never cover the page under test
+  });
   await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
+}
+
+/** Combobox (`src/components/ui/combobox.tsx`): a `button[role=combobox]` that opens a cmdk list; picks an option by its text. */
+async function pickOption(page: Page, label: string, option: string | RegExp) {
+  await page.getByRole("combobox", { name: label }).click();
+  await page.getByRole("option", { name: option }).click();
+}
+/** The IFC tab's "Revision đang xem" combobox shows "<label> · <status>". */
+const selectRevision = (page: Page, versionLabel: string) => pickOption(page, "Revision đang xem", new RegExp(`^${versionLabel}`));
+/** "···" row menu of a DataTable row. */
+async function rowAction(page: Page, rowId: string, item: RegExp) {
+  await page.locator(`tr[data-row-id="${rowId}"]`).getByRole("button", { name: "Thao tác" }).click();
+  await page.getByRole("menuitem", { name: item }).click();
 }
 
 type Mock = { revisions?: unknown[]; jobs?: () => unknown[]; qa?: unknown; issues?: unknown[]; scenarios?: unknown[]; preview?: unknown };
@@ -54,15 +70,18 @@ test.describe("tabs and URL", () => {
     await mockBuilding(page);
     await page.goto("/workspace/buildings/building-1?tab=access&revision=rev-1");
     await expect(page.getByRole("heading", { name: building.name, level: 1 })).toBeVisible();
+    await expect(page.getByTestId("building-tab-access")).toHaveAttribute("aria-selected", "true");
     await expect(page.getByRole("tab", { name: "Quyền tham gia" })).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByLabel("Revision IFC đang xem")).toHaveValue("rev-1");
     await expect(page.getByText("Phiên bản quyền")).toBeVisible();
-    await page.getByRole("tab", { name: "IFC & xử lý" }).click();
+    await page.getByTestId("building-tab-ifc").click();
     await expect(page).toHaveURL(/tab=ifc/);
     await expect(page).toHaveURL(/revision=rev-1/);
-    await expect(page.getByRole("heading", { name: "Tải lên IFC mới" })).toBeVisible();
-    await page.getByLabel("Revision IFC đang xem").selectOption("rev-2");
+    // The revision from the URL is the one selected on the IFC tab; "Tải IFC" opens the upload modal.
+    await expect(page.getByRole("combobox", { name: "Revision đang xem" })).toContainText("IFC rev. 01");
+    await expect(page.getByTestId("ifc-upload-open")).toBeVisible();
+    await selectRevision(page, "IFC rev. 02");
     await expect(page).toHaveURL(/revision=rev-2/);
+    await expect(page.getByRole("combobox", { name: "Revision đang xem" })).toContainText("IFC rev. 02");
     await page.goBack();
     await expect(page).toHaveURL(/revision=rev-1/);
     await expect(sidebar(page).getByRole("link", { name: "Công trình", exact: true })).toHaveAttribute("aria-current", "page");
@@ -73,8 +92,11 @@ test.describe("tabs and URL", () => {
     await signIn(page);
     await mockBuilding(page, { scenarios: [{ id: "sc-1", buildingId: "building-1", name: "Thoát hiểm tầng 1", createdAt: "2026-10-03T00:00:00Z" }] });
     await page.goto("/workspace/buildings/building-1/scenarios");
-    await expect(page.getByRole("tab", { name: "Kịch bản" })).toHaveAttribute("aria-selected", "true");
-    await expect(page.getByRole("link", { name: "Thoát hiểm tầng 1", exact: true })).toHaveAttribute("href", "/workspace/buildings/building-1/scenarios/sc-1");
+    await expect(page.getByTestId("building-tab-scenarios")).toHaveAttribute("aria-selected", "true");
+    // DataTable rows link to the editor through an aria-hidden anchor in the primary cell (the row itself is clickable).
+    const row = page.getByTestId("scenarios-table").locator('tr[data-row-id="sc-1"]');
+    await expect(row).toContainText("Thoát hiểm tầng 1");
+    await expect(row.locator("a").first()).toHaveAttribute("href", "/workspace/buildings/building-1/scenarios/sc-1");
     await page.getByRole("tab", { name: "Dịch vụ" }).click();
     await expect(page.getByRole("tabpanel", { name: "Dịch vụ" })).toBeVisible(); // real billing tab (see billing-building-tab.spec)
   });
@@ -113,6 +135,9 @@ test.describe("IFC upload stepper", () => {
     await page.route("**/api/revisions/rev-new/upload-complete", async (route) => { log.complete.push(route.request().postDataJSON()); await route.fulfill({ status: 204 }); });
     await page.route("**/api/revisions/rev-new/process", async (route) => { log.process.push(route.request().headers()["idempotency-key"]); await route.fulfill({ status: 202, json: { jobId: "job-new" } }); });
     await page.goto("/workspace/buildings/building-1?tab=ifc");
+    // The upload lives in a modal ("Tải IFC mới") opened from the revision bar.
+    await page.getByTestId("ifc-upload-open").click();
+    await expect(page.getByTestId("ifc-upload-modal")).toBeVisible();
     return log;
   }
 
@@ -121,7 +146,7 @@ test.describe("IFC upload stepper", () => {
   test("sends Idempotency-Key + SHA-256, PUTs to the signed URL without JWT, then completes and processes", async ({ page, baseURL }) => {
     const log = await setup(page, baseURL!);
     await page.getByLabel("Nhãn revision").fill("IFC rev. 03");
-    await page.getByLabel("Tệp IFC").setInputFiles(ifc());
+    await page.getByLabel("Chọn tệp IFC").setInputFiles(ifc());
     await expect(page.getByRole("list", { name: "Các bước tải IFC" })).toBeVisible();
     await page.getByRole("button", { name: "Tải lên và xử lý" }).click();
     await expect(page.getByText("Đã gửi xử lý IFC")).toBeVisible();
@@ -139,7 +164,7 @@ test.describe("IFC upload stepper", () => {
   test("IFC_UPLOAD_DISABLED with Retry-After waits, then the retry reuses the same Idempotency-Key; another file gets a new key", async ({ page, baseURL }) => {
     const log = await setup(page, baseURL!, { initiateFailures: [{ status: 503, code: "IFC_UPLOAD_DISABLED", retryAfter: "2" }] });
     await page.getByLabel("Nhãn revision").fill("IFC rev. 03");
-    await page.getByLabel("Tệp IFC").setInputFiles(ifc());
+    await page.getByLabel("Chọn tệp IFC").setInputFiles(ifc());
     await page.getByRole("button", { name: "Tải lên và xử lý" }).click();
     await expect(page.getByText(/tạm tắt/)).toBeVisible();
     await expect(page.getByRole("button", { name: /^Thử lại \(\d+s\)/ })).toBeDisabled();
@@ -151,7 +176,7 @@ test.describe("IFC upload stepper", () => {
 
     await page.getByRole("button", { name: "Tải IFC khác" }).click();
     await page.getByLabel("Nhãn revision").fill("IFC rev. 04");
-    await page.getByLabel("Tệp IFC").setInputFiles(ifc("other.ifc", "different content"));
+    await page.getByLabel("Chọn tệp IFC").setInputFiles(ifc("other.ifc", "different content"));
     await page.getByRole("button", { name: "Tải lên và xử lý" }).click();
     await expect.poll(() => log.initiates.length).toBe(3);
     expect(log.initiates[2].key).not.toBe(log.initiates[0].key);
@@ -160,7 +185,7 @@ test.describe("IFC upload stepper", () => {
   test("an expired signed URL (403 on PUT) asks again with the same key for a fresh URL and keeps the file", async ({ page, baseURL }) => {
     const log = await setup(page, baseURL!, { putStatuses: [403, 200] });
     await page.getByLabel("Nhãn revision").fill("IFC rev. 03");
-    await page.getByLabel("Tệp IFC").setInputFiles(ifc());
+    await page.getByLabel("Chọn tệp IFC").setInputFiles(ifc());
     await page.getByRole("button", { name: "Tải lên và xử lý" }).click();
     await expect(page.getByText(/Liên kết tải lên đã hết hạn/)).toBeVisible();
     await expect(page.getByLabel("Nhãn revision")).toHaveValue("IFC rev. 03");
@@ -175,7 +200,7 @@ test.describe("IFC upload stepper", () => {
   test("a network failure during PUT keeps the intent: retry does not initiate again", async ({ page, baseURL }) => {
     const log = await setup(page, baseURL!, { putStatuses: [503, 200] });
     await page.getByLabel("Nhãn revision").fill("IFC rev. 03");
-    await page.getByLabel("Tệp IFC").setInputFiles(ifc());
+    await page.getByLabel("Chọn tệp IFC").setInputFiles(ifc());
     await page.getByRole("button", { name: "Tải lên và xử lý" }).click();
     await expect(page.getByText("Tải lên chưa hoàn tất")).toBeVisible();
     await page.getByRole("button", { name: "Thử lại", exact: true }).click();
@@ -187,7 +212,7 @@ test.describe("IFC upload stepper", () => {
   test("double click starts one upload", async ({ page, baseURL }) => {
     const log = await setup(page, baseURL!);
     await page.getByLabel("Nhãn revision").fill("IFC rev. 03");
-    await page.getByLabel("Tệp IFC").setInputFiles(ifc());
+    await page.getByLabel("Chọn tệp IFC").setInputFiles(ifc());
     await page.getByRole("button", { name: "Tải lên và xử lý" }).dblclick();
     await expect(page.getByText("Đã gửi xử lý IFC")).toBeVisible();
     expect(log.initiates).toHaveLength(1);
@@ -197,7 +222,7 @@ test.describe("IFC upload stepper", () => {
   test("rejects a non-IFC file before any request", async ({ page, baseURL }) => {
     const log = await setup(page, baseURL!);
     await page.getByLabel("Nhãn revision").fill("IFC rev. 03");
-    await page.getByLabel("Tệp IFC").setInputFiles({ name: "model.txt", mimeType: "text/plain", buffer: Buffer.from("x") });
+    await page.getByLabel("Chọn tệp IFC").setInputFiles({ name: "model.txt", mimeType: "text/plain", buffer: Buffer.from("x") });
     await expect(page.getByText("Hãy chọn một tệp IFC (.ifc) không rỗng.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Tải lên và xử lý" })).toBeDisabled();
     expect(log.initiates).toHaveLength(0);
@@ -235,7 +260,9 @@ test.describe("processing, QA and polling", () => {
     // Run says Passed but a current Critical issue exists: not passed.
     await expect(page.getByText("QA không đạt")).toBeVisible();
     await expect(page.getByText("Có 1 issue mức Error/Critical")).toBeVisible();
-    await page.getByRole("tab", { name: "Issue" }).click();
+    // Issues live on the "Kỹ thuật" sub-tab, whose "Issue" chip is selected by default.
+    await page.getByTestId("ifc-sub-technical").click();
+    await expect(page.getByTestId("details-tab-issues")).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByText("Vấn đề mức Critical")).toBeVisible();
     await expect(page.getByText("Vấn đề mức Error")).toHaveCount(0); // history hidden by default
     await page.getByLabel("Lọc theo mức độ").selectOption("Warning");
@@ -298,7 +325,7 @@ test.describe("preview", () => {
   test("NotReady is an explained empty state, not an error", async ({ page }) => {
     await signIn(page);
     await mockBuilding(page);
-    await page.goto("/workspace/buildings/building-1?tab=ifc");
+    await page.goto("/workspace/buildings/building-1?tab=ifc&sub=preview");
     await expect(page.getByText("Preview chưa sẵn sàng")).toBeVisible();
   });
 
@@ -309,7 +336,7 @@ test.describe("preview", () => {
     await mockBuilding(page);
     await page.route("**/api/buildings/building-1/editor-preview?*", (route) => { previews++; return route.fulfill({ json: ready() }); });
     await page.route("**/mock-storage/model-*.glb", (route) => route.fulfill({ status: 403, body: "expired" }));
-    await page.goto("/workspace/buildings/building-1?tab=ifc");
+    await page.goto("/workspace/buildings/building-1?tab=ifc&sub=preview");
     await expect(page.getByText(/Không tải được mô hình/)).toBeVisible({ timeout: 15000 });
     await expect.poll(() => previews).toBeGreaterThanOrEqual(1);
     await expect(page.getByRole("button", { name: "Thử lại" }).first()).toBeVisible();
@@ -336,9 +363,9 @@ test.describe("annotations", () => {
       if (revision === "rev-2") { started.resolve(); await response.promise; }
       return route.fulfill({ json: snapshot(revision, revision === "rev-1" ? "Revision A" : "Revision B") });
     });
-    await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-1");
+    await page.goto("/workspace/buildings/building-1?tab=ifc&sub=annotations&revision=rev-1");
     await expect(page.getByLabel("Nhãn #1")).toHaveValue("Revision A");
-    await page.getByLabel("Revision IFC đang xem").selectOption("rev-2");
+    await selectRevision(page, "IFC rev. 02");
     await started.promise;
     await expect(page.getByLabel("Nhãn #1")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Lưu annotation", exact: true })).toHaveCount(0);
@@ -362,9 +389,9 @@ test.describe("annotations", () => {
           : { json: snapshot("rev-1", "Revision A") });
         return route.fulfill({ json: snapshot(revision, revision === "rev-1" ? "Revision A" : "Revision B") });
       });
-      await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-1");
+      await page.goto("/workspace/buildings/building-1?tab=ifc&sub=annotations&revision=rev-1");
       await expect(page.getByLabel("Nhãn #1")).toHaveValue("Revision A");
-      await page.getByLabel("Revision IFC đang xem").selectOption("rev-2");
+      await selectRevision(page, "IFC rev. 02");
       const panel = page.locator("section").filter({ has: page.getByRole("heading", { name: "Annotation overlay", exact: true }) });
       await expect(panel.getByText("Không tải được annotation", { exact: true })).toBeVisible();
       await expect(page.getByLabel("Nhãn #1")).toHaveCount(0);
@@ -386,11 +413,11 @@ test.describe("annotations", () => {
       await route.fulfill({ json: snapshot(revision, revision === "rev-1" ? "Revision A" : "Revision B") });
       if (revision === "rev-2") finished.resolve();
     });
-    await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-1");
+    await page.goto("/workspace/buildings/building-1?tab=ifc&sub=annotations&revision=rev-1");
     await expect(page.getByLabel("Nhãn #1")).toHaveValue("Revision A");
-    await page.getByLabel("Revision IFC đang xem").selectOption("rev-2");
+    await selectRevision(page, "IFC rev. 02");
     await started.promise;
-    await page.getByLabel("Revision IFC đang xem").selectOption("rev-1");
+    await selectRevision(page, "IFC rev. 01");
     await expect(page.getByLabel("Nhãn #1")).toHaveValue("Revision A");
     response.resolve();
     await finished.promise;
@@ -411,7 +438,7 @@ test.describe("annotations", () => {
         if (writes.length === 1) { started.resolve(); await response.promise; }
         return route.fulfill({ json: { revisionId: "rev-2", version: 3 + writes.length, data: writes.at(-1)!.body } });
       });
-      await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-2");
+      await page.goto("/workspace/buildings/building-1?tab=ifc&sub=annotations&revision=rev-2");
       await page.getByLabel("Ghi chú #1").fill("Sent content");
       await page.getByRole("button", { name: "Lưu annotation", exact: true }).click();
       await started.promise;
@@ -440,7 +467,7 @@ test.describe("annotations", () => {
       gets++;
       return route.fulfill({ json: gets === 1 ? { ...remote, version: 3, data: { items: [] } } : remote });
     });
-    await page.goto("/workspace/buildings/building-1?tab=ifc");
+    await page.goto("/workspace/buildings/building-1?tab=ifc&sub=annotations");
     await page.getByRole("button", { name: "Thêm annotation" }).first().click();
     await page.getByLabel(/IFC GlobalId #1/).fill("0abcDEF");
     await page.getByLabel(/Nhãn #1/).fill("Cửa thoát hiểm chính");
@@ -495,7 +522,7 @@ test.describe("participation access", () => {
     let revokes = 0;
     await page.route("**/api/buildings/building-1/participation-code", async (route) => { revokes++; await route.fulfill({ json: { buildingId: "building-1", visibility: "Private", accessRevision: 4, hasParticipationCode: false } }); });
     await page.goto("/workspace/buildings/building-1?tab=access");
-    await page.getByLabel("Chế độ truy cập").selectOption("Public");
+    await pickOption(page, "Chế độ truy cập", "Công khai (chỉ cần đăng nhập)");
     await page.getByRole("button", { name: "Áp dụng chế độ" }).click();
     await expect(page.getByRole("dialog")).toContainText("làm mất hiệu lực quyền tham gia");
     expect(patches).toHaveLength(0);
@@ -507,7 +534,7 @@ test.describe("participation access", () => {
     await expect(page.getByRole("dialog")).toContainText("vô hiệu");
     expect(revokes).toBe(0);
     await page.getByRole("dialog").getByRole("button", { name: "Thu hồi mã" }).click();
-    await expect(page.getByText("Chưa có mã")).toBeVisible();
+    await expect(page.getByText("Chưa có mã").first()).toBeVisible(); // status chip + the locked card both say it
     expect(revokes).toBe(1);
   });
 });
@@ -523,13 +550,17 @@ test.describe("scenarios", () => {
       return route.fulfill({ status: 201, json: { id: "sc-new" } });
     });
     await page.goto("/workspace/buildings/building-1?tab=scenarios");
-    await page.getByLabel("Tên kịch bản").fill("Thoát hiểm tầng 1");
-    await page.getByRole("button", { name: "Tạo kịch bản" }).dblclick();
-    await expect(page.getByText(/Hệ thống đang bận/)).toBeVisible();
+    // "Tạo kịch bản" opens a modal; the name is the only field and the submit opens the editor afterwards.
+    await page.getByTestId("scenario-create").click();
+    const dialog = page.getByRole("dialog", { name: "Tạo kịch bản" });
+    await dialog.getByLabel("Tên kịch bản").fill("Thoát hiểm tầng 1");
+    await dialog.getByRole("button", { name: "Tạo và mở trình soạn" }).dblclick();
+    await expect(dialog.getByText(/Hệ thống đang bận/)).toBeVisible();
     expect(calls).toHaveLength(1);
-    await expect(page.getByLabel("Tên kịch bản")).toHaveValue("Thoát hiểm tầng 1");
-    await page.getByRole("button", { name: "Tạo kịch bản" }).click();
+    await expect(dialog.getByLabel("Tên kịch bản")).toHaveValue("Thoát hiểm tầng 1");
+    await dialog.getByRole("button", { name: "Tạo và mở trình soạn" }).click();
     await expect(page.getByText("Đã tạo kịch bản")).toBeVisible();
+    await expect(page).toHaveURL(/\/workspace\/buildings\/building-1\/scenarios\/sc-new/);
     expect(calls).toHaveLength(2);
     expect(calls[1].key).toBe(calls[0].key);
     expect(calls[0].key).toBeTruthy();
@@ -537,8 +568,8 @@ test.describe("scenarios", () => {
   });
 });
 
-test.describe("overview quick edit", () => {
-  test("edits through the drawer and keeps input on failure", async ({ page }) => {
+test.describe("journey info card edit", () => {
+  test("edits through the “Sửa thông tin” modal and keeps input on failure", async ({ page }) => {
     await signIn(page);
     await mockBuilding(page);
     let attempts = 0;
@@ -553,7 +584,8 @@ test.describe("overview quick edit", () => {
       return route.fulfill({ json: { ...building, name: "Tên mới" }, headers: { ETag: '"8"' } });
     });
     await page.goto("/workspace/buildings/building-1");
-    await page.getByRole("button", { name: "Sửa nhanh" }).click();
+    await page.getByRole("button", { name: "Sửa thông tin" }).click();
+    await expect(page.getByRole("dialog", { name: "Sửa thông tin công trình" })).toBeVisible();
     await page.getByLabel("Tên công trình", { exact: true }).fill("Tên mới");
     await page.getByRole("button", { name: "Lưu thay đổi" }).click();
     await expect(page.getByText(/Nội dung bạn nhập vẫn được giữ lại/)).toBeVisible();
@@ -584,19 +616,21 @@ test.describe("PlatformAdmin by organization", () => {
     await expect(page.getByRole("heading", { name: "Công trình · FET3D Lab" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Đường dẫn" })).toContainText("Quản trị");
     await expect(page.getByRole("navigation", { name: "Đường dẫn" })).toContainText("Tổ chức");
-    await expect(page.getByRole("link", { name: summary.name })).toBeVisible();
+    // The row's primary cell is an aria-hidden link (the row itself opens the building): match the text, not a link role.
+    await expect(page.getByText(summary.name, { exact: true })).toBeVisible();
     expect(requests[0].url.searchParams.get("organizationId")).toBe("org-1");
     await expect(page.getByText("hãy đăng nhập bằng tài khoản OrganizationUser")).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Lưu trữ Trường Tiểu học" }).first().click();
-    await page.getByRole("dialog").getByRole("button", { name: "Lưu trữ" }).click();
+    await rowAction(page, "building-1", /^Lưu trữ/);
+    await page.getByRole("dialog", { name: "Lưu trữ công trình?" }).getByRole("button", { name: "Lưu trữ" }).click();
     await expect.poll(() => requests.some((request) => request.method === "DELETE")).toBe(true);
     expect(requests.find((request) => request.method === "DELETE")?.url.searchParams.get("organizationId")).toBe("org-1");
     expect(requests.find((request) => request.method === "DELETE")?.body).toBe('"9"'); // If-Match from the detail read
 
     await page.getByRole("button", { name: "Tạo công trình", exact: true }).click();
-    await page.getByLabel("Tên công trình", { exact: true }).fill("Công trình của tổ chức");
-    await page.getByRole("button", { name: "Tạo và thêm IFC" }).click();
+    const createDialog = page.getByRole("dialog", { name: "Tạo công trình" });
+    await createDialog.getByLabel("Tên công trình", { exact: true }).fill("Công trình của tổ chức");
+    await createDialog.getByRole("button", { name: "Tạo công trình", exact: true }).click();
     await expect.poll(() => requests.some((request) => request.method === "POST")).toBe(true);
     expect(requests.find((request) => request.method === "POST")?.body).toMatchObject({ name: "Công trình của tổ chức", organizationId: "org-1" });
   });
@@ -610,9 +644,9 @@ test.describe("PlatformAdmin by organization", () => {
     await page.goto("/workspace/buildings");
     await expect(page.getByText("Chọn tổ chức để xem công trình")).toBeVisible();
     expect(listCalls).toBe(0);
-    await page.getByLabel("Tổ chức", { exact: true }).selectOption("org-2");
+    await pickOption(page, "Tổ chức", "Trường ABC");
     await expect(page).toHaveURL(/org=org-2/);
-    await expect(page.getByRole("link", { name: summary.name })).toBeVisible();
+    await expect(page.getByText(summary.name, { exact: true })).toBeVisible();
     expect(listCalls).toBe(1);
   });
 
@@ -621,7 +655,7 @@ test.describe("PlatformAdmin by organization", () => {
     const urls: URL[] = [];
     await page.route("**/api/buildings?*", (route) => { urls.push(new URL(route.request().url())); return route.fulfill({ json: page1([summary]) }); });
     await page.goto("/workspace/buildings?org=org-2");
-    await expect(page.getByRole("link", { name: summary.name })).toBeVisible();
+    await expect(page.getByText(summary.name, { exact: true })).toBeVisible();
     expect(urls.every((url) => !url.searchParams.has("organizationId"))).toBe(true);
   });
 
@@ -633,7 +667,7 @@ test.describe("PlatformAdmin by organization", () => {
     await page.goto("/workspace/buildings/building-1");
     await expect(page.getByRole("heading", { name: building.name, level: 1 })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Đường dẫn" })).toContainText("Quản trị");
-    await page.getByRole("button", { name: "Sửa nhanh" }).click();
+    await page.getByRole("button", { name: "Sửa thông tin" }).click();
     await page.getByRole("button", { name: "Lưu thay đổi" }).click();
     await expect.poll(() => queries.length).toBe(1);
     expect(queries[0]).toBe("?organizationId=org-1");
@@ -650,7 +684,7 @@ test.describe("responsive and themes", () => {
         await mockBuilding(page, { jobs: () => [job("Succeeded")], issues: [issue("Critical"), issue("Warning")] });
         await page.route("**/api/processing-jobs/job-1", (route) => route.fulfill({ json: jobDetail("Succeeded") }));
         await page.route("**/api/processing-jobs/job-1/qa?*", (route) => route.fulfill({ json: { jobId: "job-1", currentAttemptId: "att-1", validationRuns: page1([run("Failed")]) } }));
-        for (const tab of ["overview", "ifc", "scenarios", "access"]) {
+        for (const tab of ["journey", "ifc", "scenarios", "access"]) {
           await page.goto(`/workspace/buildings/building-1?tab=${tab}`);
           await expect(page.getByRole("tablist", { name: "Chi tiết công trình" }).getByRole("tab", { selected: true })).toBeVisible();
           await page.waitForTimeout(500);

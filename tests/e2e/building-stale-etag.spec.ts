@@ -13,10 +13,14 @@ const summary = { id: building.id, name: building.name, buildingType: building.b
 type Write = { ifMatch?: string; body: { location?: { latitude?: number } | null; name?: string } };
 
 async function session(page: Page) {
-  await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" })));
+  await page.addInitScript(() => {
+    sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" }));
+    localStorage.setItem("fire3d-org-tour", "done"); // the spotlight tour must never cover the page under test
+  });
   await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ETag: '"1"' } }));
   await page.route("**/api/buildings?*", (route) => route.fulfill({ json: { items: [summary], totalCount: 1, page: 1, pageSize: 20 } }));
   await page.route("**/api/buildings/building-1/revisions?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 20 } }));
+  await page.route("**/api/buildings/building-1/scenarios?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 20 } }));
 }
 
 /** First GET has no ETag (header not exposed); later GETs return `later` with ETag "9". PUTs are recorded and succeed. */
@@ -37,13 +41,17 @@ for (const where of ["list", "overview"] as const) {
   test.describe(`Building save without a first ETag (${where})`, () => {
     const open = async (page: Page) => {
       if (where === "list") {
+        // List v2: "Sửa thông tin" sits in the "···" menu of the row.
         await page.goto("/workspace/buildings");
-        await page.getByRole("button", { name: `Chỉnh sửa ${building.name}` }).click();
+        await page.locator(`tr[data-row-id="${building.id}"]`).getByRole("button", { name: "Thao tác" }).click();
+        await page.getByRole("menuitem", { name: /^Sửa thông tin/ }).click();
       } else {
+        // Detail v2: "Sửa thông tin" on the "Thông tin công trình" card of the Hành trình tab.
         await page.goto("/workspace/buildings/building-1");
-        await page.getByRole("button", { name: "Sửa nhanh" }).click();
+        await page.getByRole("button", { name: "Sửa thông tin" }).click();
       }
-      await page.getByLabel("Tên công trình", { exact: true }).fill("Tên của tôi");
+      const dialog = page.getByRole("dialog", { name: "Sửa thông tin công trình" });
+      await dialog.getByLabel("Tên công trình", { exact: true }).fill("Tên của tôi");
     };
 
     test("data changed meanwhile: no PUT, the newer version is shown, the retry keeps its coordinates", async ({ page }) => {

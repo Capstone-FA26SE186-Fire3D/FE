@@ -1,3 +1,6 @@
+/* Report screens (Figma "Báo cáo · Huấn luyện / Vận hành", Admin "Tổng quan"). Colours are the .ops-theme tokens only. */
+
+/* Period chip panel */
 .range { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; padding: 14px 16px; }
 .presets { display: inline-flex; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-soft); }
 .presets button { min-height: 44px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; }
@@ -6,72 +9,71 @@
 .presets button[aria-pressed="true"] { background: var(--surface); color: var(--ember); font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); }
 .dates { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; }
 .dates > div { width: 150px; }
-.meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 12px 2px 18px; color: var(--muted); font-size: 13px; }
-.meta strong { color: var(--text); font-weight: 600; }
-.note { margin: 0 0 14px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+@media (max-width: 560px) {
+  .dates, .dates > div { width: 100%; }
+}
+
+/* Filter row + period line under the main tabs */
+.toolbar { display: grid; gap: 8px; margin-bottom: 20px; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0 2px; color: var(--dim); font-size: 12.5px; }
+.meta strong { color: var(--muted); font-weight: 600; }
+.filterError { flex-basis: 100%; margin: 0; color: var(--danger); font-size: 13px; }
+.identity { margin: -8px 0 16px; color: var(--muted); font-size: 13px; }
+.identity strong { color: var(--text); }
+
+/* Report body: KPI row 4 → 2 → 1, lead row 3fr + 2fr → stacked, three-card rows → two → one. */
+.report { display: grid; gap: 20px; }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+.kpis[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.kpis[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lead { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 20px; align-items: start; }
+.trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.trio > :only-child { grid-column: 1 / -1; }
+@media (max-width: 1100px) {
+  .kpis, .kpis[data-count="3"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lead { grid-template-columns: minmax(0, 1fr); }
+  .trio { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .trio > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+@media (max-width: 767px) {
+  .report { gap: 16px; }
+  .kpis, .lead, .trio { gap: 12px; }
+  .trio { grid-template-columns: minmax(0, 1fr); }
+  .trio > :last-child:nth-child(odd) { grid-column: auto; }
+}
+@media (max-width: 359px) {
+  .kpis, .kpis[data-count="3"] { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Small figures inside a card (duration, AI quota) */
+.miniRow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; width: 100%; }
+.miniStat { display: grid; gap: 2px; min-width: 0; padding: 12px; border-radius: 8px; background: var(--bg-soft); }
+.miniStat > span { color: var(--dim); font-size: 11px; }
+.miniStat > strong { color: var(--text); font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.miniStat > small { color: var(--dim); font-size: 11px; }
+@media (max-width: 560px) { .miniRow { grid-template-columns: minmax(0, 1fr); } }
+
+.stackBody { display: grid; gap: 14px; }
+.statusList { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; font-size: 13.5px; }
+.statusList li { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); }
+.statusList strong { color: var(--text); font-variant-numeric: tabular-nums; }
+
+.note { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .note strong { color: var(--text); font-weight: 600; }
-.sectionTitle { margin: 26px 0 12px; font-size: 16px; font-weight: 600; }
-.muted { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.muted { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+.muted strong { color: var(--text); }
 
-/* Horizontal bars: label + value in text, bar is only decoration. */
-.rows { display: grid; gap: 14px; margin: 0; padding: 0; list-style: none; }
-.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; font-size: 14px; }
-.row > span:first-child { min-width: 0; color: var(--text); overflow-wrap: anywhere; }
-.row > strong { font-variant-numeric: tabular-nums; font-weight: 600; }
-.row small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
-.track { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--hover); overflow: hidden; }
-.track > span { display: block; height: 100%; border-radius: 0 3px 3px 0; background: var(--info); min-width: 2px; }
-.track > span[data-series="done"] { background: var(--ember); }
-.track + .track { margin-top: -2px; }
-
-/* Stacked outcome bar. Segments differ by fill pattern as well as colour, and each is named in the legend with its count. */
-.stack { display: flex; gap: 2px; height: 18px; width: 100%; border-radius: 6px; overflow: hidden; }
-.stack > span { display: block; min-width: 3px; height: 100%; }
-.legend { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
-.legend li { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center; font-size: 14px; }
-.legend strong { font-variant-numeric: tabular-nums; font-weight: 600; }
-.legend small { color: var(--muted); font-weight: 400; margin-left: 6px; }
-.swatch { display: block; width: 22px; height: 12px; border-radius: 3px; }
-.stack [data-outcome="Passed"], .swatch[data-outcome="Passed"] { background: var(--success); }
-.stack [data-outcome="NotPassed"], .swatch[data-outcome="NotPassed"] { background: repeating-linear-gradient(45deg, var(--danger) 0 3px, transparent 3px 6px), var(--danger-soft); box-shadow: inset 0 0 0 1px var(--danger); }
-.stack [data-outcome="Incomplete"], .swatch[data-outcome="Incomplete"] { background: radial-gradient(circle, var(--warning) 35%, transparent 38%) 0 0 / 6px 6px, var(--warning-soft); box-shadow: inset 0 0 0 1px var(--warning); }
-.stack [data-outcome="NotAssessed"], .swatch[data-outcome="NotAssessed"] { background: var(--hover); box-shadow: inset 0 0 0 1px var(--line-strong); }
-
-/* Daily columns (SVG). Values are always available in the table below. */
-.columns { display: block; width: 100%; height: 150px; }
-.columns rect { fill: var(--ember); }
-.axis { display: flex; justify-content: space-between; margin-top: 6px; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
-.chartHead { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin-bottom: 8px; font-size: 13px; color: var(--muted); }
-.chartHead strong { color: var(--text); }
-
-.tableToggle { margin-top: 14px; }
-.tableToggle summary { cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
-.tableToggle summary:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
-.num { text-align: right; font-variant-numeric: tabular-nums; }
+/* Number tables under charts and in the drawer */
+.reportTable th, .reportTable td { padding: 10px 12px; }
+.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; }
+.drawerTable { font-size: 13.5px; }
 
 .empty { display: grid; gap: 6px; padding: 18px 16px; border: 1px dashed var(--line-strong); border-radius: 12px; background: var(--bg-soft); }
 .empty h3 { margin: 0; font-size: 15px; font-weight: 600; }
 .empty p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
 
-.count { grid-column: 1 / -1; height: 6px; border-radius: 999px; background: var(--hover); overflow: hidden; }
-.count > span { display: block; height: 100%; border-radius: 0 3px 3px 0; background: var(--ember); min-width: 2px; }
-.count[data-tone="success"] > span { background: var(--success); }
-.count[data-tone="danger"] > span { background: var(--danger); }
-.count[data-tone="warning"] > span { background: var(--warning); }
-.count[data-tone="info"] > span { background: var(--info); }
-
-@media (max-width: 560px) {
-  .dates > div { width: 100%; }
-  .dates { width: 100%; }
-}
-
-.filters { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px; margin: 0 0 14px; }
-.filters > div { width: 220px; }
-@media (max-width: 560px) {
-  .filters > div { width: 100%; }
-}
-.filterError { flex-basis: 100%; margin: 0; color: var(--danger); font-size: 13px; }
-/* Figma "Báo cáo": the outcome chart beside the per-scenario table, the other breakdowns below. */
-.leadGrid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; align-items: start; }
-@media (max-width: 1100px) { .leadGrid { grid-template-columns: minmax(0, 1fr); } }
+.definitions summary { display: inline-flex; align-items: center; min-height: 44px; color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.definitions summary:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.definitions dl { display: grid; gap: 10px; margin: 8px 0 0; }
+.definitions dd { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; }

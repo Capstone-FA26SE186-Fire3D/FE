@@ -69,9 +69,11 @@ test.describe("admin overview", () => {
     await expect(page.getByText("Cập nhật lúc")).toBeVisible();
     await expect(page.getByText("mặc định 30 ngày gần nhất")).toBeVisible();
     await expect(page.getByText("Tài khoản (hiện tại)")).toBeVisible();
-    await expect(page.locator(".ops-stat", { hasText: "Tài khoản (hiện tại)" }).locator("strong")).toHaveText("52");
-    await expect(page.locator(".ops-stat", { hasText: "Công trình (hiện tại)" }).locator("strong")).toHaveText("13");
-    await expect(page.getByRole("list", { name: "Tiến trình IfcProcessing theo trạng thái" })).toContainText("Thất bại");
+    // Analytics KPI tiles and the stacked jobs chart (src/features/analytics/components/operations-report.tsx).
+    await expect(page.getByTestId("kpi-accounts").locator(".ops-kpi-value")).toHaveText("52");
+    await expect(page.getByTestId("kpi-buildings").locator(".ops-kpi-value")).toHaveText("13");
+    await expect(page.getByTestId("chart-jobs").getByRole("img", { name: /Tiến trình Geometry theo trạng thái/ })).toHaveAccessibleName(/Thất bại/);
+    await expect(page.getByTestId("chart-jobs")).toContainText("Thất bại");
     // Only the operations endpoint is called until another tab opens; the old "Chờ BE" cards are gone.
     await expect(page.locator("#ops-main").getByText("Chờ BE")).toHaveCount(0);
     expect(queries).toEqual([""]);
@@ -400,21 +402,22 @@ test.describe("organization support", () => {
     await page.getByRole("button", { name: "Tạo yêu cầu hỗ trợ" }).first().click();
     const form = page.getByRole("dialog", { name: "Tạo yêu cầu hỗ trợ" });
     await form.getByRole("button", { name: "Gửi yêu cầu" }).click();
-    await expect(form.getByText("Tiêu đề dài từ 1 đến 255 ký tự.")).toBeVisible();
+    await expect(form.getByText("Chủ đề dài từ 1 đến 255 ký tự.")).toBeVisible();
     expect(creates).toHaveLength(0);
 
-    await form.getByLabel("Tiêu đề").fill("Không tải được mô hình IFC");
+    await form.getByLabel("Chủ đề").fill("Không tải được mô hình IFC");
     await form.getByLabel("Mô tả").fill("Tệp tải lên báo lỗi quét.");
     await form.getByRole("button", { name: "Gửi yêu cầu" }).click();
     await expect(form.getByText(/yêu cầu sẽ không bị tạo trùng/)).toBeVisible();
-    await expect(form.getByLabel("Tiêu đề")).toHaveValue("Không tải được mô hình IFC");
+    await expect(form.getByLabel("Chủ đề")).toHaveValue("Không tải được mô hình IFC");
     await form.getByRole("button", { name: "Gửi yêu cầu" }).click();
     await expect.poll(() => creates.length).toBe(2);
     expect(creates[1].key).toBe(creates[0].key);
     expect(creates[0].body).toEqual({ subject: "Không tải được mô hình IFC", description: "Tệp tải lên báo lỗi quét." });
 
     await expect(page).toHaveURL(/ticket=ticket-1/);
-    const drawer = page.getByRole("region", { name: "Chi tiết yêu cầu" });
+    const drawer = page.getByTestId("ticket-drawer");
+    await expect(drawer.getByRole("heading", { name: "Không tải được mô hình IFC" })).toBeVisible();
     await expect(drawer.getByText("Chúng tôi đã nhận yêu cầu")).toBeVisible();
     await expect(drawer.getByText("Đội hỗ trợ Fire3D")).toBeVisible();
     await expect(drawer.getByText("Bạn", { exact: true })).toBeVisible();
@@ -432,10 +435,11 @@ test.describe("organization support", () => {
     await page.route("**/api/feedback", async (route) => { feedbackPosts.push({ key: await route.request().headerValue("idempotency-key"), body: route.request().postDataJSON() }); await route.fulfill({ status: 201, json: { id: "f", category: "UI", message: "ok", rating: 5, status: "Submitted", reviewedBy: null, reviewedAt: null, revision: 1, createdAt: "2026-10-10T00:00:00Z", updatedAt: "2026-10-10T00:00:00Z" } }); });
 
     await page.goto("/workspace/support?status=Open");
-    await expect(page.getByRole("group", { name: "Trạng thái yêu cầu" }).getByRole("button", { name: "Mới" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Trạng thái: Mới" })).toHaveAttribute("data-value", "Open");
     expect(queries[0].get("status")).toBe("Open");
-    await page.getByRole("button", { name: /Mở yêu cầu SUP-0001/ }).click();
-    const drawer = page.getByRole("region", { name: "Chi tiết yêu cầu" });
+    await page.getByTestId("tickets-table").getByRole("row", { name: /SUP-0001/ }).click();
+    await expect(page).toHaveURL(/ticket=ticket-1/);
+    const drawer = page.getByTestId("ticket-drawer");
     await expect(drawer.getByText(/Chưa có phản hồi/)).toBeVisible();
     await drawer.getByLabel("Tin nhắn mới").fill("Bổ sung: lỗi xảy ra với tệp 80MB");
     await drawer.getByRole("button", { name: "Gửi tin nhắn" }).click();
@@ -448,7 +452,8 @@ test.describe("organization support", () => {
     const form = page.getByRole("dialog", { name: "Gửi phản hồi" });
     await form.getByLabel("Chủ đề").fill("UI");
     await form.getByLabel("Nội dung").fill("Rất dễ dùng");
-    await form.getByLabel("Mức hài lòng").selectOption("5");
+    await form.getByRole("combobox", { name: "Mức hài lòng" }).click();
+    await page.getByRole("option", { name: "5 / 5" }).click();
     await form.getByRole("button", { name: "Gửi phản hồi" }).click();
     await expect.poll(() => feedbackPosts.length).toBe(1);
     expect(feedbackPosts[0].body).toEqual({ category: "UI", message: "Rất dễ dùng", rating: 5 });

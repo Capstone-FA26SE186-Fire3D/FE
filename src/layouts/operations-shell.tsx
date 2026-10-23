@@ -17,6 +17,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { ThemeScope } from "@/features/theme/theme-scope";
 import { TopbarSlotContext } from "@/features/theme/topbar-slot";
+import { CommandPaletteButton, CommandPaletteProvider } from "@/features/command-palette/palette";
+import { HelpTrigger } from "@/features/tour/help-trigger";
+import { TourProvider } from "@/features/tour/tour-provider";
+import { SidebarMiniStepper } from "./sidebar-mini-stepper";
 import { useLocalPreference } from "@/utils/local-preference";
 import { adminArea, organizationArea, type NavItem, type OperationsArea } from "./nav-config";
 
@@ -57,11 +61,15 @@ function SidebarContent({ area, pathname, collapsed, onNavigate, onToggleCollaps
         {group.items.map((item) => {
           const active = isActive(pathname, item);
           const Icon = item.icon;
-          return <Link key={item.href} className="ops-nav-link" href={item.href} aria-current={active ? "page" : undefined} aria-label={item.label} title={collapsed ? item.label : undefined} onClick={onNavigate}>
-            {active && <m.span layoutId={`${idPrefix}-active`} className="ops-nav-active" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
-            <Icon size={20} strokeWidth={1.75} aria-hidden="true" style={{ position: "relative" }} />
-            <span className="ops-nav-text"><span style={{ position: "relative" }}>{item.label}</span>{item.status === "pending-be" && <StatusBadge tone="warning" style={{ position: "relative" }}>Chờ BE</StatusBadge>}</span>
-          </Link>;
+          const openBuilding = area.id === "organization" && item.href === "/workspace/buildings" ? /^\/workspace\/buildings\/([^/]+)/.exec(pathname)?.[1] : undefined;
+          return <div key={item.href} style={{ display: "contents" }}>
+            <Link className="ops-nav-link" href={item.href} aria-current={active ? "page" : undefined} aria-label={item.label} title={collapsed ? item.label : undefined} onClick={onNavigate} data-tour={item.href === "/workspace/buildings" ? "nav-buildings" : undefined}>
+              {active && <m.span layoutId={`${idPrefix}-active`} className="ops-nav-active" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
+              <Icon size={20} strokeWidth={1.75} aria-hidden="true" style={{ position: "relative" }} />
+              <span className="ops-nav-text"><span style={{ position: "relative" }}>{item.label}</span>{item.status === "pending-be" && <StatusBadge tone="warning" style={{ position: "relative" }}>Chờ BE</StatusBadge>}</span>
+            </Link>
+            {openBuilding && !collapsed && <SidebarMiniStepper buildingId={openBuilding} />}
+          </div>;
         })}
       </div>)}
     </nav>
@@ -108,6 +116,8 @@ function Shell({ area, children }: { area: OperationsArea; children: ReactNode }
         <div className="ops-topbar-crumbs" ref={setCrumbSlot} />
         <span className="ops-area-label">{current?.label ?? area.label}</span>
         <span className="ops-topbar-spacer" />
+        <CommandPaletteButton />
+        {area.id === "organization" && <HelpTrigger />}
         <ThemeToggle />
         <Link href={area.id === "organization" ? "/workspace/profile" : "/account"} className="ops-user" title={user.email}><span className="ops-avatar" aria-hidden="true">{initials(user.fullName || user.email)}</span><span className="ops-user-name">{user.fullName || user.email}</span></Link>
       </header>
@@ -132,7 +142,7 @@ export function OperationsShell({ areaId, children }: { areaId: OperationsArea["
   const area = areaId === "admin" ? adminArea : organizationArea;
   return <ThemeScope>
     <MotionProvider>
-      <TooltipProvider><ToastProvider><Shell area={area}>{children}</Shell></ToastProvider></TooltipProvider>
+      <TooltipProvider><ToastProvider><CommandPaletteProvider><TourProvider><Shell area={area}>{children}</Shell></TourProvider></CommandPaletteProvider></ToastProvider></TooltipProvider>
     </MotionProvider>
   </ThemeScope>;
 }

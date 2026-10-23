@@ -53,7 +53,7 @@ test.describe("building services tab (mock)", () => {
     await tab.getByRole("button", { name: "Gia hạn kỳ mới" }).click();
     await pick(page, ids.pkg).check({ force: true });
     await page.getByRole("button", { name: /^Tạo báo giá \(1\)$/ }).click();
-    await expect(tab.getByTestId("selected-quotation")).toBeVisible();
+    await expect(page.getByTestId("quotation-drawer").getByTestId("selected-quotation")).toBeVisible();
     const post = mock.calls.find((call) => call.method === "POST" && call.path === "/api/billing/quotations");
     expect(post?.body).toEqual({ items: [{ buildingId: "b-1", servicePackageId: ids.pkg, purchaseAction: "Renewal" }] });
   });
@@ -106,14 +106,14 @@ test.describe("building services tab (mock)", () => {
     await page.getByRole("button", { name: /^Tạo báo giá \(1\)$/ }).click();
     const post = callsTo(mock, "POST", "/api/billing/quotations")[0];
     expect(post.body).toEqual({ items: [{ buildingId: "b-1", servicePackageId: ids.pkgBig, purchaseAction: "Upgrade", upgradeEntitlementId: ids.entitlement }] });
-    const line = tab.getByTestId("quotation-line");
+    const line = page.getByTestId("quotation-drawer").getByTestId("quotation-line");
     await expect(line).toHaveAttribute("data-action", "Upgrade");
     await expect(line).toContainText("60 → 200 học viên/kỳ");
     await expect(line).toContainText("Giữ kỳ hiện tại và các suất đã dùng");
     await expect(line).toContainText("Một lần");
-    await expect(tab.getByText(/Phí nâng cấp là một lần và do PlatformAdmin ấn định/)).toBeVisible();
+    await expect(page.getByText(/Phí nâng cấp là một lần và do PlatformAdmin ấn định/)).toBeVisible();
     // The UI computed nothing: the draft total is the BE's estimate (0) until Admin fixes the fee.
-    await expect(tab.getByTestId("quotation-total")).toHaveText(/0\s*₫/);
+    await expect(page.getByTestId("quotation-total")).toHaveText(/0\s*₫/);
   });
 
   test("Upgrade refused by the BE (UPGRADE_LIMIT_NOT_HIGHER) shows the reason and keeps the selection", async ({ page }) => {

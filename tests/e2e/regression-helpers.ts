@@ -33,6 +33,8 @@ export class CallLog {
 
 export const tokenSession = (page: Page, accessToken: string, refreshToken = `${accessToken}-refresh`) =>
   page.addInitScript(([access, refresh]) => {
+    // The Organization spotlight tour auto-starts on the first /workspace visit; it must never cover the page under test.
+    localStorage.setItem("fire3d-org-tour", "done");
     // Only the first document of the tab: a later navigation must keep whatever the app did to the session.
     if (!sessionStorage.getItem("__regression_seeded")) {
       sessionStorage.setItem("__regression_seeded", "1");

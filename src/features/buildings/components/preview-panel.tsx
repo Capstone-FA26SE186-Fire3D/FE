@@ -1,13 +1,13 @@
 "use client";
 
-import { Box, RefreshCw, Upload } from "lucide-react";
+import { Box, Eraser, RefreshCw, Upload } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useRef } from "react";
 import { usePolling } from "@/api/use-polling";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Panel } from "@/components/ui/panel";
+import { FloatingButtonGroup } from "@/components/ui/floating-button-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buildingsApi } from "../api";
 import { describeApiError, formatDateTime, shortHash } from "../format";
@@ -22,9 +22,10 @@ const POLL_MS = 5000;
 const MAX_POLLS = 24; // ~2 minutes, like the editor preview; then a manual check
 
 /**
- * GLB preview of the selected revision. The signed URL is short-lived (~5 min) and never cached: it is requested
- * when the panel opens and requested again when loading fails (most likely expired). `NotReady` is a normal 200 and is
- * re-checked every 5s for ~2 minutes; `ReprocessRequired` is final for this revision.
+ * Figma "IFC · Preview 3D": the GLB viewer fills the card, the artifact/expiry meta sits top-left, and the actions live in
+ * a floating button group. The signed URL is short-lived (~5 min) and never cached: it is requested when the panel opens
+ * and requested again when loading fails (most likely expired). `NotReady` is a normal 200 and is re-checked every 5s
+ * for ~2 minutes; `ReprocessRequired` is final for this revision.
  */
 export function PreviewPanel({ accessToken, buildingId, revisionId, reloadKey, highlight, onClearHighlight, onUploadNew }: {
   accessToken: string;
@@ -65,6 +66,8 @@ export function PreviewPanel({ accessToken, buildingId, revisionId, reloadKey, h
     reload();
   };
 
+  const ready = Boolean(data && hasRuntimePreview(data));
+
   let body;
   if (loading) body = <Skeleton style={{ height: 320 }} />;
   else if (error !== undefined && !data) {
@@ -79,16 +82,22 @@ export function PreviewPanel({ accessToken, buildingId, revisionId, reloadKey, h
   } else if (data && hasRuntimePreview(data)) {
     body = <>
       <RuntimePreviewViewer key={data.downloadUrl} downloadUrl={data.downloadUrl} onLoadError={renewUrl} highlight={highlight} semanticMapping={data.semanticMapping} />
-      {highlight && highlight.length > 0 && <p className="ops-muted" style={{ marginTop: 8 }} data-testid="preview-highlight-ids">Đang đánh dấu: <span className="ops-mono">{highlight.slice(0, 5).join(", ")}{highlight.length > 5 ? ` và ${highlight.length - 5} cấu kiện khác` : ""}</span>{onClearHighlight && <> · <Button size="sm" variant="quiet" onClick={onClearHighlight}>Bỏ đánh dấu</Button></>}</p>}
-      <p className="ops-muted" style={{ marginTop: 10 }}>
-        Artifact <span className="ops-mono">{shortHash(data.artifactId, 8)}</span> · SHA-256 <span className="ops-mono" title={data.sha256Hash}>{shortHash(data.sha256Hash, 16)}</span> · liên kết hết hạn {formatDateTime(data.expiresAt)}. Preview kỹ thuật không đồng nghĩa với việc cho phép đào tạo hoặc phát hành.
-      </p>
+      {highlight && highlight.length > 0 && <p className="bd-preview-highlight" data-testid="preview-highlight-ids">Đang đánh dấu: <span className="ops-mono">{highlight.slice(0, 5).join(", ")}{highlight.length > 5 ? ` và ${highlight.length - 5} cấu kiện khác` : ""}</span></p>}
     </>;
   } else {
     body = <Alert tone="warning" title="Preview thiếu dữ liệu">Máy chủ trả trạng thái {data?.status ?? "không rõ"} nhưng không kèm liên kết tải hợp lệ.</Alert>;
   }
 
-  return <Panel id="revision-preview" title="Preview mô hình 3D" description="Mô hình GLB do worker tạo cho revision đang chọn." actions={<Button size="sm" variant="quiet" onClick={() => { autoRenewals.current = 0; reload(); }} disabled={loading}><RefreshCw size={14} aria-hidden="true" />Tải lại</Button>}>
-    {body}
-  </Panel>;
+  return <section id="revision-preview" className="bd-preview" aria-label="Preview mô hình 3D" data-ready={ready || undefined}>
+    <div className="bd-preview-stage">
+      {ready && data && <span className="bd-preview-meta">preview.glb · SHA-256 <span className="ops-mono" title={data.sha256Hash ?? undefined}>{shortHash(data.sha256Hash, 10)}</span> · link hết hạn {formatDateTime(data.expiresAt)}</span>}
+      {body}
+      {ready && <FloatingButtonGroup label="Thao tác preview" placement="bottom" onAction={(id) => { if (id === "reload") { autoRenewals.current = 0; reload(); } else if (id === "clear") onClearHighlight?.(); else if (id === "upload") onUploadNew?.(); }} items={[
+        { id: "reload", label: "Tải lại mô hình", icon: RefreshCw },
+        { id: "clear", label: "Bỏ đánh dấu cấu kiện", icon: Eraser, disabled: !highlight?.length },
+        { id: "upload", label: "Tải IFC mới", icon: Upload, separator: true },
+      ]} />}
+    </div>
+    <p className="ops-muted">Preview dùng GLB do worker tạo cho revision đang chọn, không dùng tệp IFC trên máy bạn. Tự kiểm tra lại mỗi 5 giây khi chưa sẵn sàng; preview kỹ thuật không đồng nghĩa với việc cho phép đào tạo hoặc phát hành.{!ready && !loading && <> <Button size="sm" variant="quiet" onClick={() => { autoRenewals.current = 0; reload(); }}><RefreshCw size={14} aria-hidden="true" />Tải lại</Button></>}</p>
+  </section>;
 }

@@ -11,16 +11,29 @@ const newer = { ...building, name: "Trường Tiểu học (đã đổi tên)", 
 type Write = { method: string; ifMatch?: string; key?: string; body: unknown };
 
 async function session(page: Page) {
-  await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" })));
+  await page.addInitScript(() => {
+    sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" }));
+    localStorage.setItem("fire3d-org-tour", "done"); // the spotlight tour must never cover the page under test
+  });
   await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ETag: '"1"' } }));
   await page.route("**/api/buildings?*", (route) => route.fulfill({ json: { items: [summary], totalCount: 1, page: 1, pageSize: 20 } }));
   await page.route("**/api/buildings/building-1/revisions?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 20 } }));
+  await page.route("**/api/buildings/building-1/scenarios?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 20 } }));
 }
 
 const record = (writes: Write[], route: Route) => {
   const request = route.request();
   writes.push({ method: request.method(), ifMatch: request.headers()["if-match"], key: request.headers()["idempotency-key"], body: request.postDataJSON() });
 };
+
+/** List v2: "Sửa thông tin" and "Lưu trữ" live in the "···" menu of the row. */
+async function rowAction(page: Page, item: RegExp) {
+  await page.locator(`tr[data-row-id="${building.id}"]`).getByRole("button", { name: "Thao tác" }).click();
+  await page.getByRole("menuitem", { name: item }).click();
+}
+const createDialog = (page: Page) => page.getByRole("dialog", { name: "Tạo công trình" });
+const editDialog = (page: Page) => page.getByRole("dialog", { name: "Sửa thông tin công trình" });
+const archiveDialog = (page: Page) => page.getByRole("dialog", { name: "Lưu trữ công trình?" });
 
 test.describe("Building mutations: Idempotency-Key and If-Match", () => {
   test("create sends an Idempotency-Key and reuses it when the same payload is retried after a lost response", async ({ page }) => {
@@ -34,11 +47,11 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
     await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ETag: '"1"' } }));
     await page.goto("/workspace/buildings");
     await page.getByRole("button", { name: "Thêm công trình", exact: true }).click();
-    await page.getByLabel("Tên công trình", { exact: true }).fill("Công trình mới");
-    await page.getByRole("button", { name: "Tạo và thêm IFC" }).click();
-    await expect(page.getByText(/Nội dung bạn nhập vẫn được giữ lại/)).toBeVisible();
-    await page.getByRole("button", { name: "Tạo và thêm IFC" }).click();
-    await expect(page).toHaveURL(/\/workspace\/buildings\/building-1$/);
+    await createDialog(page).getByLabel("Tên công trình", { exact: true }).fill("Công trình mới");
+    await createDialog(page).getByRole("button", { name: "Tạo công trình", exact: true }).click();
+    await expect(createDialog(page).getByText(/Nội dung bạn nhập vẫn được giữ lại/)).toBeVisible();
+    await createDialog(page).getByRole("button", { name: "Tạo công trình", exact: true }).click();
+    await expect(page).toHaveURL(/\/workspace\/buildings\/building-1\?tab=ifc$/); // straight to the IFC tab after creating
     expect(writes).toHaveLength(2);
     expect(writes[0].key).toBeTruthy();
     expect(writes[1].key).toBe(writes[0].key);
@@ -56,14 +69,15 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
     await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ETag: '"1"' } }));
     await page.goto("/workspace/buildings");
     await page.getByRole("button", { name: "Thêm công trình", exact: true }).click();
-    await page.getByLabel("Tên công trình", { exact: true }).fill("Công trình A");
-    await page.getByRole("button", { name: "Tạo và thêm IFC" }).click();
-    await expect(page.getByText(/Nội dung bạn nhập vẫn được giữ lại/)).toBeVisible();
-    await page.getByLabel("Tên công trình", { exact: true }).fill("Công trình B");
-    await page.getByRole("button", { name: "Tạo và thêm IFC" }).click();
-    await expect(page.getByText(/Khóa chống tạo trùng đã được dùng cho nội dung khác/)).toBeVisible();
-    await page.getByRole("button", { name: "Tạo và thêm IFC" }).click();
-    await expect(page).toHaveURL(/\/workspace\/buildings\/building-1$/);
+    const dialog = createDialog(page);
+    await dialog.getByLabel("Tên công trình", { exact: true }).fill("Công trình A");
+    await dialog.getByRole("button", { name: "Tạo công trình", exact: true }).click();
+    await expect(dialog.getByText(/Nội dung bạn nhập vẫn được giữ lại/)).toBeVisible();
+    await dialog.getByLabel("Tên công trình", { exact: true }).fill("Công trình B");
+    await dialog.getByRole("button", { name: "Tạo công trình", exact: true }).click();
+    await expect(dialog.getByText(/Khóa chống tạo trùng đã được dùng cho nội dung khác/)).toBeVisible();
+    await dialog.getByRole("button", { name: "Tạo công trình", exact: true }).click();
+    await expect(page).toHaveURL(/\/workspace\/buildings\/building-1\?tab=ifc$/);
     expect(new Set(writes.map((write) => write.key)).size).toBe(3);
   });
 
@@ -77,8 +91,8 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
       return route.fulfill({ json: { ...newer, name: "Tên của tôi" }, headers: { ETag: '"7"' } });
     });
     await page.goto("/workspace/buildings");
-    await page.getByRole("button", { name: `Chỉnh sửa ${building.name}` }).click();
-    await page.getByLabel("Tên công trình", { exact: true }).fill("Tên của tôi");
+    await rowAction(page, /^Sửa thông tin/);
+    await editDialog(page).getByLabel("Tên công trình", { exact: true }).fill("Tên của tôi");
     await page.getByRole("button", { name: "Lưu thay đổi" }).click();
     const conflict = page.getByTestId("building-conflict");
     await expect(conflict).toContainText("Công trình vừa được thay đổi ở nơi khác");
@@ -100,8 +114,8 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
       return route.fulfill({ json: newer, headers: { ETag: '"7"' } });
     });
     await page.goto("/workspace/buildings/building-1");
-    await page.getByRole("button", { name: "Sửa nhanh" }).click();
-    await page.getByLabel("Tên công trình", { exact: true }).fill("Tên của tôi");
+    await page.getByRole("button", { name: "Sửa thông tin" }).click(); // "Thông tin công trình" card on the Hành trình tab
+    await editDialog(page).getByLabel("Tên công trình", { exact: true }).fill("Tên của tôi");
     await page.getByRole("button", { name: "Lưu thay đổi" }).click();
     await page.getByRole("button", { name: "Dùng bản mới nhất" }).click();
     await expect(page.getByLabel("Tên công trình", { exact: true })).toHaveValue(newer.name);
@@ -120,8 +134,8 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
       return route.fulfill({ status: 428, contentType: "application/problem+json", body: JSON.stringify({ status: 428, title: "required", code: "PRECONDITION_REQUIRED" }) });
     });
     await page.goto("/workspace/buildings");
-    await page.getByRole("button", { name: `Chỉnh sửa ${building.name}` }).click();
-    await page.getByLabel("Tên công trình", { exact: true }).fill("Tên của tôi");
+    await rowAction(page, /^Sửa thông tin/);
+    await editDialog(page).getByLabel("Tên công trình", { exact: true }).fill("Tên của tôi");
     await page.getByRole("button", { name: "Lưu thay đổi" }).click();
     await expect(page.getByText(/Thiếu phiên bản công trình \(If-Match\)/)).toBeVisible();
     await expect(page.getByLabel("Tên công trình", { exact: true })).toHaveValue("Tên của tôi");
@@ -136,8 +150,8 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
       return route.fulfill({ json: { ...summary, isActive: false }, headers: { ETag: '"6"' } });
     });
     await page.goto("/workspace/buildings");
-    await page.getByRole("button", { name: `Lưu trữ ${building.name}` }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Lưu trữ" }).click();
+    await rowAction(page, /^Lưu trữ/);
+    await archiveDialog(page).getByRole("button", { name: "Lưu trữ" }).click();
     await expect(page.getByText("Đã lưu trữ công trình")).toBeVisible();
     expect(writes).toEqual([{ method: "DELETE", ifMatch: '"5"', key: undefined, body: null }]);
   });
@@ -153,8 +167,8 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
       return route.fulfill({ json: { ...summary, isActive: false }, headers: { ETag: '"8"' } });
     });
     await page.goto("/workspace/buildings");
-    await page.getByRole("button", { name: `Lưu trữ ${building.name}` }).click();
-    const dialog = page.getByRole("dialog");
+    await rowAction(page, /^Lưu trữ/);
+    const dialog = archiveDialog(page);
     await dialog.getByRole("button", { name: "Lưu trữ" }).click();
     await expect(dialog).toContainText("Công trình vừa được thay đổi ở nơi khác");
     await expect(dialog).toContainText(newer.name);

@@ -1,4 +1,4 @@
-.wideDrawer.wideDrawer { width: min(640px, 100vw); }
+.tabs { display: block; }
 .muted { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
 .thread { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .bubble { max-width: 92%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-soft); justify-self: start; }
@@ -16,7 +16,7 @@
 
 .rowButton { display: block; min-height: 44px; padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
 .rowButton:hover { color: var(--ember); }
-.clip { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-width: 200px; max-width: 460px; overflow-wrap: anywhere; }
+.clip { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-width: 0; max-width: 460px; overflow-wrap: anywhere; white-space: pre-wrap; }
 .clipSmall { display: block; min-width: 120px; max-width: 220px; color: var(--text); overflow-wrap: anywhere; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; }
 .filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 16px; margin-bottom: 14px; align-items: start; }

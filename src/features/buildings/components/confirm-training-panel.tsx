@@ -1,29 +1,32 @@
 "use client";
 
-import { ShieldCheck } from "lucide-react";
+import { Check, Lock, ShieldCheck } from "lucide-react";
 import { useRef, useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/dialog";
-import { Field, Select } from "@/components/ui/field";
-import { Panel } from "@/components/ui/panel";
+import { Combobox } from "@/components/ui/combobox";
+import { ConfirmDialog } from "@/components/ui/dialog";
+import { Field } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { buildingsApi } from "../api";
-import { describeApiError } from "../format";
-import { pickPassedRun, type RevisionPipeline } from "../pipeline";
-import type { BuildingRevision, ProcessingJob, ScenarioVersionSummary } from "../types";
+import { describeApiError, formatDateTime, shortHash } from "../format";
+import { deriveQaVerdict, pickPassedRun, type RevisionPipeline } from "../pipeline";
+import type { BuildingRevision, ProcessingJob, RevisionIssue, ScenarioVersionSummary } from "../types";
 
 /**
- * `confirm-for-training` records TECHNICAL readiness of one exact revision + scenario version + validation run.
- * It is separate from content approval (review by PlatformAdmin) and from publishing.
+ * Figma "Xác nhận kỹ thuật · 3 trạng thái": Khóa (no QA pass / no version on this revision) → Sẵn sàng (QA passed, pick
+ * a version) → Đã xác nhận (revision.status = ConfirmedForTraining, persisted; a new revision needs its own confirmation).
+ * `confirm-for-training` records TECHNICAL readiness of one exact revision + scenario version + validation run; it is
+ * separate from content approval by PlatformAdmin and from publishing.
  */
-export function ConfirmTrainingPanel({ accessToken, buildingId, revision, pipeline, jobs, onConfirmed }: {
+export function ConfirmTrainingPanel({ accessToken, buildingId, revision, pipeline, jobs, issues, onConfirmed }: {
   accessToken: string;
   buildingId: string;
   revision: BuildingRevision;
   pipeline: RevisionPipeline;
   jobs: ProcessingJob[];
+  issues: RevisionIssue[] | undefined;
   onConfirmed: () => void;
 }) {
   const toast = useToast();
@@ -40,7 +43,15 @@ export function ConfirmTrainingPanel({ accessToken, buildingId, revision, pipeli
   });
   const options = versions.data ?? [];
   const selected = options.find((version) => version.id === versionId) ?? null;
-  const alreadyConfirmed = revision.status === "ConfirmedForTraining";
+  const confirmed = revision.status === "ConfirmedForTraining";
+  const verdict = deriveQaVerdict(pipeline, issues?.filter((issue) => issue.isCurrentAttempt));
+  const qaPassed = verdict.state === "passed";
+  const ready = !confirmed && qaPassed && options.length > 0;
+  const lockReason = !qaPassed
+    ? "Chưa thể xác nhận: chưa có kết quả QA “Đạt” cho lần chạy hiện hành."
+    : versions.data && options.length === 0
+      ? "Chưa thể xác nhận: chưa có phiên bản kịch bản gắn với revision này. Hãy tạo kịch bản ở tab Kịch bản trước."
+      : null;
 
   const confirm = async () => {
     if (busy.current || !selected) return;
@@ -68,28 +79,38 @@ export function ConfirmTrainingPanel({ accessToken, buildingId, revision, pipeli
     }
   };
 
-  return <Panel title="Xác nhận sẵn sàng kỹ thuật" description="Ghi nhận revision, phiên bản kịch bản và kết quả QA khớp nhau về mặt kỹ thuật." bodyClassName="ops-stack">
-    <Alert tone="info" title="Không phải duyệt nội dung">Xác nhận kỹ thuật không thay thế việc PlatformAdmin duyệt nội dung kịch bản và không phát hành kịch bản.</Alert>
-    {alreadyConfirmed && <Alert tone="success" title="Revision đã được xác nhận kỹ thuật" />}
-    {versions.error !== undefined && <Alert tone="danger" title="Không tải được phiên bản kịch bản" action={<Button size="sm" variant="secondary" className="mt-3" onClick={versions.reload}>Thử lại</Button>}>{describeApiError(versions.error, "Hãy thử lại sau.")}</Alert>}
-    {versions.data && options.length === 0 && <p className="ops-muted">Chưa có phiên bản (snapshot) kịch bản nào gắn với revision này. Hãy tạo kịch bản và snapshot ở tab “Kịch bản” trước.</p>}
-    {options.length > 0 && <Field label="Phiên bản kịch bản">{(p) => <Select {...p} value={versionId} onChange={(event) => setVersionId(event.target.value)}>
-      <option value="">Chọn phiên bản…</option>
-      {options.map((version) => <option key={version.id} value={version.id}>{version.name} · v{version.versionNumber}</option>)}
-    </Select>}</Field>}
-    <div className="ops-actions"><Button variant="secondary" disabled={!selected || working || alreadyConfirmed} onClick={() => { setError(""); setOpen(true); }}><ShieldCheck size={16} aria-hidden="true" />Xác nhận sẵn sàng kỹ thuật</Button></div>
+  const confirmedRun = pickPassedRun(pipeline.qa);
 
-    <Modal
+  return <section className="org-card bd-confirm" data-state={confirmed ? "confirmed" : ready ? "ready" : "locked"} data-testid="confirm-training" aria-labelledby="bd-confirm-title">
+    <h2 id="bd-confirm-title" className="org-card-title">Xác nhận sẵn sàng kỹ thuật</h2>
+    <p className="org-card-sub">Không phải duyệt nội dung</p>
+
+    {confirmed ? <>
+      <div className="bd-confirm-state" data-tone="success"><Check size={18} aria-hidden="true" /><div><strong>Đã xác nhận cho huấn luyện</strong><span>Lúc {formatDateTime(confirmedRun?.finishedAt ?? revision.createdAt)}{confirmedRun ? ` · mã kiểm tra ${shortHash(confirmedRun.id, 8)}` : ""}</span></div></div>
+      <p className="ops-muted">Tải IFC mới sẽ tạo revision mới và cần xác nhận lại.</p>
+      <Button variant="secondary" disabled><Check size={16} aria-hidden="true" />Đã lưu</Button>
+    </> : ready ? <>
+      <div className="bd-confirm-state" data-tone="success"><Check size={18} aria-hidden="true" /><div><strong>QA đạt.</strong><span>Chọn phiên bản kịch bản cùng revision rồi xác nhận.</span></div></div>
+      <Field label="Phiên bản kịch bản">{(p) => <Combobox {...p} value={versionId} placeholder="Chọn phiên bản…" searchPlaceholder="Tìm phiên bản…" groupLabel="Phiên bản cùng revision" options={options.map((version) => ({ value: version.id, label: `v${version.versionNumber} · ${version.name}` }))} onChange={setVersionId} aria-label="Phiên bản kịch bản" />}</Field>
+      <Button disabled={!selected || working} onClick={() => { setError(""); setOpen(true); }} data-testid="confirm-training-button"><ShieldCheck size={16} aria-hidden="true" />Xác nhận sẵn sàng kỹ thuật</Button>
+    </> : <>
+      <div className="bd-confirm-state" data-tone="locked"><Lock size={16} aria-hidden="true" /><div><strong>{versions.loading && !versions.data ? "Đang kiểm tra phiên bản kịch bản…" : lockReason ?? "Chưa thể xác nhận."}</strong></div></div>
+      {versions.error !== undefined && <Alert tone="danger" title="Không tải được phiên bản kịch bản" action={<Button size="sm" variant="secondary" className="mt-3" onClick={versions.reload}>Thử lại</Button>}>{describeApiError(versions.error, "Hãy thử lại sau.")}</Alert>}
+      <Field label="Phiên bản kịch bản">{(p) => <Combobox {...p} value="" placeholder={options.length ? "Chọn phiên bản…" : "Chưa có phiên bản"} options={options.map((version) => ({ value: version.id, label: `v${version.versionNumber} · ${version.name}` }))} onChange={() => undefined} disabled aria-label="Phiên bản kịch bản" />}</Field>
+      <Button variant="secondary" disabled><Lock size={14} aria-hidden="true" />Xác nhận sẵn sàng kỹ thuật</Button>
+    </>}
+
+    <ConfirmDialog
       open={open}
-      onOpenChange={(next) => { if (!next && !working) setOpen(false); }}
+      onOpenChange={(next) => { if (!working) setOpen(next); }}
       title="Xác nhận sẵn sàng kỹ thuật?"
       description={selected ? `Revision “${revision.versionLabel}” và phiên bản “${selected.name} v${selected.versionNumber}” sẽ được ghi nhận khớp với kết quả QA hiện hành.` : undefined}
-      footer={<><Button variant="quiet" onClick={() => setOpen(false)} disabled={working}>Hủy</Button><Button onClick={() => void confirm()} disabled={working}>{working ? "Đang xác nhận…" : "Xác nhận"}</Button></>}
+      confirmLabel="Xác nhận"
+      busy={working}
+      onConfirm={confirm}
     >
-      <div className="ops-stack">
-        <p className="ops-muted">Thao tác này chỉ xác nhận về kỹ thuật. Nội dung kịch bản vẫn cần được duyệt riêng trước khi phát hành.</p>
-        {error && <Alert tone="danger">{error}</Alert>}
-      </div>
-    </Modal>
-  </Panel>;
+      <p className="ops-muted">Thao tác này chỉ xác nhận về kỹ thuật. Nội dung kịch bản vẫn cần được duyệt riêng trước khi phát hành.</p>
+      {error && <Alert tone="danger">{error}</Alert>}
+    </ConfirmDialog>
+  </section>;
 }

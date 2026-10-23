@@ -1,15 +1,14 @@
 "use client";
 
-import { Copy, Printer, QrCode as QrIcon, RefreshCw, ShieldOff } from "lucide-react";
+import { Copy, History, Printer, QrCode as QrIcon, RefreshCw, ShieldOff } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { ApiError } from "@/api/types/common";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/dialog";
+import { Drawer, Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field, Input } from "@/components/ui/field";
-import { Panel } from "@/components/ui/panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table } from "@/components/ui/table";
@@ -54,9 +53,9 @@ function codeNote(code: BuildingQrCode) {
 }
 
 /**
- * "QR" tab of a Building (OrganizationUser of the tenant or PlatformAdmin): the Active code, its history (never
- * the token), create / rotate / revoke with an explicit impact confirmation, and a one-time view + print of the
- * freshly issued code. The QR encodes the landing URL `<origin>/qr/<token>`; it identifies the Building and grants nothing.
+ * Figma "Truy cập · Mã QR": the Active code card (or an empty state with "Tạo mã QR"), the one-time view + print of a
+ * freshly issued code, "Lịch sử mã" in a drawer (never the token), create / rotate / revoke behind an impact confirmation.
+ * The QR encodes `<origin>/qr/<token>`; it identifies the Building and grants nothing.
  */
 export function QrPanel({ accessToken, buildingId, buildingName }: { accessToken: string; buildingId: string; buildingName: string }) {
   const toast = useToast();
@@ -68,6 +67,7 @@ export function QrPanel({ accessToken, buildingId, buildingName }: { accessToken
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const hasIssued = issued !== null;
   useEffect(() => {
@@ -125,7 +125,7 @@ export function QrPanel({ accessToken, buildingId, buildingName }: { accessToken
         // The request may have reached the server: the token of a lost response cannot be recovered, only replaced.
         setPending(null);
         list.reload();
-        setNotice({ tone: "warning", title: "Chưa nhận được phản hồi từ máy chủ", text: "Mã có thể đã được tạo nhưng token không thể xem lại. Kiểm tra danh sách mã bên dưới; nếu đã có mã hoạt động mà bạn chưa lưu, hãy dùng “Tạo mã mới”." });
+        setNotice({ tone: "warning", title: "Chưa nhận được phản hồi từ máy chủ", text: "Mã có thể đã được tạo nhưng token không thể xem lại. Kiểm tra lịch sử mã; nếu đã có mã hoạt động mà bạn chưa lưu, hãy dùng “Tạo mã mới”." });
       } else {
         setError(errorText(cause));
       }
@@ -150,50 +150,58 @@ export function QrPanel({ accessToken, buildingId, buildingName }: { accessToken
     window.print();
   };
 
-  if (list.loading && !list.data) return <Panel title="Mã QR công trình"><Skeleton style={{ height: 140 }} /></Panel>;
+  if (list.loading && !list.data) return <div className="org-card"><Skeleton style={{ height: 180 }} /></div>;
   if (list.error !== undefined && !list.data) {
     const gone = isStatus(list.error, 404);
-    return <Panel title="Mã QR công trình"><Alert tone={gone ? "warning" : "danger"} title={gone ? "Không tìm thấy công trình" : "Không tải được mã QR"} action={gone ? undefined : <Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}><RefreshCw size={14} aria-hidden="true" />Thử lại</Button>}>{errorText(list.error)}</Alert></Panel>;
+    return <div className="org-card"><Alert tone={gone ? "warning" : "danger"} title={gone ? "Không tìm thấy công trình" : "Không tải được mã QR"} action={gone ? undefined : <Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}><RefreshCw size={14} aria-hidden="true" />Thử lại</Button>}>{errorText(list.error)}</Alert></div>;
   }
 
   return <div className="ops-stack">
     {notice && <Alert tone={notice.tone} title={notice.title}>{notice.text}</Alert>}
     {list.error !== undefined && list.data && <Alert tone="warning" title="Dữ liệu có thể đã cũ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Tải lại danh sách</Button>}>Không làm mới được danh sách mã. Đang hiển thị lần tải gần nhất.</Alert>}
 
-    {issued && <Panel title={issued.kind === "created" ? "Mã QR mới" : "Mã QR mới (đã thay mã cũ)"} bodyClassName="ops-stack" data-testid="qr-issued">
-      <Alert tone="warning" title="Mã này chỉ hiển thị một lần">Hệ thống chỉ lưu dấu băm của mã, nên không xem lại được. In hoặc sao chép liên kết ngay. Rời tab, tải lại trang hoặc bấm “Ẩn mã” là mất; khi đó chỉ có thể tạo mã mới và mã hiện tại sẽ ngừng hoạt động.{issued.kind === "rotated" ? " QR cũ đã ngừng hoạt động: hãy thay mọi bản in cũ." : ""}</Alert>
-      {issued.localOrigin && <Alert tone="info" title="Liên kết đang trỏ về máy của bạn">QR này mở {new URL(issued.url).origin}, chỉ truy cập được trên mạng hiện tại. Hãy tạo mã khi đang dùng địa chỉ chính thức của FET3D để in ra dùng thật.</Alert>}
-      <div className="qr-issued-body">
-        <div className="qr-frame"><QrCode value={issued.url} size={220} label={`Mã QR của ${buildingName}`} /></div>
-        <div className="ops-stack">
-          <p className="ops-muted">QR mở trang của công trình trên FET3D. Người học đăng nhập, xem các bài đã phát hành rồi bắt đầu trong ứng dụng; QR không cấp quyền.</p>
-          <div className="ops-code-box"><code data-testid="qr-link">{issued.url}</code><Button variant="secondary" onClick={() => void copyLink()}><Copy size={16} aria-hidden="true" />Sao chép liên kết</Button></div>
-          <div className="ops-actions">
-            <Button onClick={print}><Printer size={16} aria-hidden="true" />In mã QR</Button>
-            <Button variant="quiet" onClick={() => setIssued(null)}>Ẩn mã</Button>
+    {issued && <section className="org-card" data-testid="qr-issued" aria-labelledby="qr-issued-title">
+      <h2 id="qr-issued-title" className="org-card-title">{issued.kind === "created" ? "Mã QR mới" : "Mã QR mới (đã thay mã cũ)"}</h2>
+      <div className="ops-stack">
+        <Alert tone="warning" title="Mã này chỉ hiển thị một lần">Hệ thống chỉ lưu dấu băm của mã, nên không xem lại được. In hoặc sao chép liên kết ngay. Rời tab, tải lại trang hoặc bấm “Ẩn mã” là mất; khi đó chỉ có thể tạo mã mới và mã hiện tại sẽ ngừng hoạt động.{issued.kind === "rotated" ? " QR cũ đã ngừng hoạt động: hãy thay mọi bản in cũ." : ""}</Alert>
+        {issued.localOrigin && <Alert tone="info" title="Liên kết đang trỏ về máy của bạn">QR này mở {new URL(issued.url).origin}, chỉ truy cập được trên mạng hiện tại. Hãy tạo mã khi đang dùng địa chỉ chính thức của FET3D để in ra dùng thật.</Alert>}
+        <div className="qr-issued-body">
+          <div className="qr-frame"><QrCode value={issued.url} size={220} label={`Mã QR của ${buildingName}`} /></div>
+          <div className="ops-stack">
+            <p className="ops-muted">QR mở trang của công trình trên FET3D. Người học đăng nhập, xem các bài đã phát hành rồi bắt đầu trong ứng dụng; QR không cấp quyền.</p>
+            <div className="ops-code-box"><code data-testid="qr-link">{issued.url}</code><Button variant="secondary" onClick={() => void copyLink()}><Copy size={16} aria-hidden="true" />Sao chép liên kết</Button></div>
+            <div className="ops-actions">
+              <Button onClick={print}><Printer size={16} aria-hidden="true" />In mã QR</Button>
+              <Button variant="quiet" onClick={() => setIssued(null)}>Ẩn mã</Button>
+            </div>
           </div>
         </div>
       </div>
-    </Panel>}
+    </section>}
     {issued && <QrPrintSheet buildingName={buildingName} label={issued.label} url={issued.url} />}
 
-    <Panel title="Mã QR công trình" description="Một mã QR cố định cho mỗi công trình. Người học quét để mở danh sách bài đã phát hành; QR chỉ xác định công trình và không cấp quyền." bodyClassName="ops-stack">
-      {active ? <>
-        <dl className="ops-kv">
-          <dt>Trạng thái</dt><dd><StatusBadge tone="success">Đang hoạt động</StatusBadge></dd>
-          <dt>Nhãn</dt><dd>{active.label || "—"}</dd>
-          <dt>Tạo lúc</dt><dd>{formatDateTime(active.createdAt)}</dd>
+    <section className="org-card" aria-labelledby="qr-title">
+      <div className="org-row" style={{ marginBottom: 14 }}>
+        <div><h2 id="qr-title" className="org-card-title" style={{ marginBottom: 2 }}>Mã QR công trình</h2><p className="org-card-sub" style={{ margin: 0 }}>Một mã cố định cho mỗi công trình. QR chỉ xác định công trình và không cấp quyền.</p></div>
+        <Button variant="secondary" size="sm" onClick={() => setHistoryOpen(true)} data-testid="qr-history-open"><History size={14} aria-hidden="true" />Lịch sử mã{items.length ? ` (${items.length})` : ""}</Button>
+      </div>
+      {active ? <div className="bd-qr-active">
+        <div className="bd-qr-active-icon" aria-hidden="true"><QrIcon size={28} /></div>
+        <dl className="jr-kv">
+          <div><dt>Trạng thái</dt><dd><StatusBadge tone="success">Đang hoạt động</StatusBadge></dd></div>
+          <div><dt>Nhãn</dt><dd>{active.label || "—"}</dd></div>
+          <div><dt>Tạo lúc</dt><dd>{formatDateTime(active.createdAt)}</dd></div>
         </dl>
         <p className="ops-muted">Hệ thống không lưu token ở dạng đọc lại được, nên không in lại được mã đang hoạt động. Cần bản in mới thì tạo mã mới: mã hiện tại sẽ ngừng hoạt động ngay.</p>
         <div className="ops-actions">
           <Button onClick={() => open({ kind: "rotate", code: active })} disabled={working}><RefreshCw size={16} aria-hidden="true" />Tạo mã mới</Button>
-          <Button variant="danger" onClick={() => open({ kind: "revoke", code: active })} disabled={working}><ShieldOff size={16} aria-hidden="true" />Thu hồi mã</Button>
+          <Button variant="quiet" onClick={() => open({ kind: "revoke", code: active })} disabled={working}><ShieldOff size={16} aria-hidden="true" />Thu hồi mã</Button>
         </div>
-      </> : <EmptyState icon={QrIcon} title="Công trình chưa có mã QR đang hoạt động" description={items.length ? "Mã trước đó đã bị thu hồi. Tạo mã mới để người học quét được lại." : "Tạo mã QR để in và dán tại công trình. Mã chỉ hiển thị một lần ngay sau khi tạo."} action={<Button onClick={() => open({ kind: "create" })} disabled={working}><QrIcon size={16} aria-hidden="true" />Tạo mã QR</Button>} />}
-    </Panel>
+      </div> : <EmptyState icon={QrIcon} title="Công trình chưa có mã QR đang hoạt động" description={items.length ? "Mã trước đó đã bị thu hồi. Tạo mã mới để người học quét được lại." : "Tạo mã QR để in và dán tại công trình. Mã chỉ hiển thị một lần ngay sau khi tạo."} action={<Button onClick={() => open({ kind: "create" })} disabled={working}><QrIcon size={16} aria-hidden="true" />Tạo mã QR</Button>} />}
+    </section>
 
-    <Panel title="Lịch sử mã" description="Không hiển thị token. Mới nhất ở trên." bodyClassName="qr-history">
-      {items.length === 0 ? <p className="ops-muted">Chưa có mã nào được tạo cho công trình này.</p> : <Table className="qr-table" caption="Lịch sử mã QR của công trình">
+    <Drawer open={historyOpen} onOpenChange={setHistoryOpen} size="md" title="Lịch sử mã QR" description="Không hiển thị token. Mới nhất ở trên." flush>
+      {items.length === 0 ? <p className="ops-muted" style={{ padding: 20 }}>Chưa có mã nào được tạo cho công trình này.</p> : <Table className="qr-table" caption="Lịch sử mã QR của công trình">
         <thead><tr><th>Nhãn</th><th>Trạng thái</th><th>Tạo lúc</th><th>Thu hồi lúc</th><th>Ghi chú</th></tr></thead>
         <tbody>{items.map((item) => <tr key={item.id}>
           <td>{item.label || "—"}</td>
@@ -203,15 +211,17 @@ export function QrPanel({ accessToken, buildingId, buildingName }: { accessToken
           <td>{codeNote(item)}</td>
         </tr>)}</tbody>
       </Table>}
-      {list.data && list.data.total > items.length && <p className="ops-muted">Đang hiển thị {items.length} / {list.data.total} mã gần nhất.</p>}
-    </Panel>
+      {list.data && list.data.total > items.length && <p className="ops-muted" style={{ padding: "0 20px 20px" }}>Đang hiển thị {items.length} / {list.data.total} mã gần nhất.</p>}
+    </Drawer>
 
     <Modal
       open={pending !== null}
       onOpenChange={(next) => { if (!next) close(); }}
+      size="sm"
       title={pending ? copy[pending.kind].title : ""}
       description={pending ? copy[pending.kind].impact : undefined}
-      footer={<><Button variant="quiet" onClick={close} disabled={working}>Hủy</Button><Button variant={pending?.kind === "revoke" ? "danger" : "primary"} onClick={() => void run()} disabled={working}>{working ? "Đang xử lý…" : pending ? copy[pending.kind].confirm : ""}</Button></>}
+      className={pending?.kind === "revoke" ? "ops-dialog--danger" : undefined}
+      footer={<><Button variant="ghost" onClick={close} disabled={working}>Hủy</Button><Button variant={pending?.kind === "revoke" ? "danger" : "primary"} onClick={() => void run()} disabled={working}>{working ? "Đang xử lý…" : pending ? copy[pending.kind].confirm : ""}</Button></>}
     >
       <div className="ops-stack">
         {pending && pending.kind !== "revoke" && <Field label="Nhãn (không bắt buộc)" hint={pending.kind === "rotate" ? "Để trống để giữ nhãn hiện tại." : "Ví dụ: Sảnh chính tầng 1."}>{(p) => <Input {...p} value={label} maxLength={LABEL_MAX} disabled={working} onChange={(event) => setLabel(event.target.value)} />}</Field>}

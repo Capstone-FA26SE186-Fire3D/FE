@@ -232,7 +232,7 @@ export function derivePipelineProgress({ revision, pipeline, currentIssues, load
     if (quarantine === "Rejected") {
       return { tone: "danger", title: "Tệp IFC bị từ chối khi kiểm tra", guidance: "Máy chủ không chấp nhận tệp này nên không xử lý. Kiểm tra lại tệp xuất từ phần mềm thiết kế rồi tải lên tệp IFC mới.", actions: ["upload"] };
     }
-    if (!source) return { tone: "info", title: "Chưa hoàn tất tải lên", guidance: "Revision chưa có tệp IFC đã xác nhận. Tải tệp lên ở mục “Tải lên IFC mới”.", actions: ["upload"] };
+    if (!source) return { tone: "info", title: "Chưa hoàn tất tải lên", guidance: "Revision chưa có tệp IFC đã xác nhận. Bấm “Tải IFC” để tải tệp lên.", actions: ["upload"] };
     if (!loaded) return { tone: "info", title: "Đang tải trạng thái xử lý…", guidance: "", actions: [] };
     if (job?.status === "Failed") {
       return { tone: "danger", title: "Xử lý IFC thất bại", guidance: `Worker không dựng được hình học${attemptText ? ` ở ${attemptText}` : ""}. Chạy lại job (cần nhập lý do); nếu lỗi lặp lại, kiểm tra tệp rồi tải lên IFC mới.`, actions: ["retry", "upload"] };

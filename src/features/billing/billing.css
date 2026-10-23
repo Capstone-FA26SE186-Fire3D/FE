@@ -95,3 +95,19 @@
 .bill-link-cell { padding: 0; border: 0; background: transparent; color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; min-height: 44px; }
 .bill-link-cell:hover { color: var(--ember); }
 @media (max-width: 1100px) { .bill-overview { grid-template-columns: minmax(0, 1fr); } }
+
+/* ───────── Organization v2 (Figma 48:2559, 47:2379): quota card, KPI tiles, DataTable rows, drawers ───────── */
+.bill-quota-card { display: grid; gap: 14px; }
+.bill-quota-unit { display: grid; gap: 8px; }
+.bill-quota-figure { font-size: 22px; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.bill-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.bill-kpis-6 { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.bill-kpi-text { font-size: 20px; line-height: 1.25; }
+.bill-kpis .ops-kpi-row { flex-wrap: wrap; align-items: center; }
+.bill-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; overflow-wrap: anywhere; }
+.bill-row-actions { justify-content: flex-end; flex-wrap: nowrap; }
+.bill-row-actions button { white-space: nowrap; }
+.ops-dt-card .bill-row-actions { justify-content: flex-start; flex-wrap: wrap; }
+.bill-periods { padding: 0; border: 0; background: transparent; }
+.ops-drawer .bill-table { min-width: 560px; }
+@media (max-width: 900px) { .bill-kpis { grid-template-columns: minmax(0, 1fr); } .bill-kpis-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

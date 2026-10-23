@@ -358,7 +358,7 @@ test.describe("Trainee support entry (FR-SUPPORT-01)", () => {
 
     await page.getByRole("button", { name: "Tạo yêu cầu hỗ trợ" }).first().click();
     const form = page.getByRole("dialog", { name: "Tạo yêu cầu hỗ trợ" });
-    await form.getByLabel("Tiêu đề").fill("Không mở được bài học");
+    await form.getByLabel("Chủ đề").fill("Không mở được bài học");
     await form.getByLabel("Mô tả").fill("Bấm vào bài nhưng trang trắng.");
     state.failNext = true;
     await form.getByRole("button", { name: "Gửi yêu cầu" }).click();
@@ -369,9 +369,10 @@ test.describe("Trainee support entry (FR-SUPPORT-01)", () => {
     expect(state.tickets).toHaveLength(1);
 
     await page.goto("/learning-hub?view=support");
-    await expect(page.getByRole("button", { name: /Mở yêu cầu SUP-0001/ })).toBeVisible();
-    await page.getByRole("button", { name: /Mở yêu cầu SUP-0001/ }).click();
-    const detail = page.getByRole("dialog", { name: "Chi tiết yêu cầu" });
+    const row = page.getByTestId("tickets-table").getByRole("row", { name: /SUP-0001/ });
+    await expect(row).toBeVisible();
+    await row.click();
+    const detail = page.getByTestId("ticket-drawer");
     await expect(detail.getByText("Nhân viên Fire3D · Đội hỗ trợ Fire3D")).toBeVisible();
   });
 
@@ -385,7 +386,8 @@ test.describe("Trainee support entry (FR-SUPPORT-01)", () => {
     const form = page.getByRole("dialog", { name: "Gửi phản hồi" });
     await form.getByLabel("Chủ đề").fill("Bài học");
     await form.getByLabel("Nội dung").fill("Bài đọc dễ hiểu.");
-    await form.getByLabel("Mức hài lòng").selectOption("5");
+    await form.getByRole("combobox", { name: "Mức hài lòng" }).click();
+    await page.getByRole("option", { name: "5 / 5" }).click();
     await form.getByRole("button", { name: "Gửi phản hồi" }).dblclick();
     await expect.poll(() => state.creates.length).toBeGreaterThan(0);
     expect(state.feedback).toHaveLength(1);
@@ -465,7 +467,7 @@ test.describe("layout", () => {
         await signIn(page, trainee);
         await mockUserSupport(page, support);
         await page.goto("/learning-hub?view=support");
-        await expect(page.getByRole("button", { name: /Mở yêu cầu SUP-0001/ })).toBeVisible();
+        await expect(page.getByTestId("tickets-table").getByText("SUP-0001")).toBeVisible();
         expect(await overflow(page)).toBeLessThanOrEqual(0);
         await page.screenshot({ path: testInfo.outputPath(`hub-${scheme}-${width}.png`) });
       });
