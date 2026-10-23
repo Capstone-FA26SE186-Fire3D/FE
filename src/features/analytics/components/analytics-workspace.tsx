@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { FilterChips } from "@/components/ui/filter-chip";
 import { PageHeader, type Crumb } from "@/components/ui/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthSession } from "@/features/auth/auth-session";
@@ -95,8 +96,10 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
       : <PageHeader title={title} description={description} breadcrumbs={breadcrumbs} eyebrow={eyebrow} actions={<>{exportButton}{refresh}</>} />}
     {exportError && <Alert tone="danger" title="Không xuất được CSV">{exportError}</Alert>}
 
-    <RangeBar key={`${urlFrom}|${urlTo}`} urlFrom={urlFrom} urlTo={urlTo} onApply={apply} />
-    {filterable && tab === "training" && <TrainingFilterBar accessToken={accessToken} filters={filters} onChange={(patch) => setParams(patch)} />}
+    <FilterChips label="Bộ lọc báo cáo">
+      {filterable && tab === "training" && <TrainingFilterBar accessToken={accessToken} filters={filters} onChange={(patch) => setParams(patch)} />}
+      <RangeBar key={`${urlFrom}|${urlTo}`} urlFrom={urlFrom} urlTo={urlTo} onApply={apply} />
+    </FilterChips>
     <PeriodMeta data={meta} hasRange={hasRange} urlFrom={urlFrom} urlTo={urlTo} />
     <RangeError message={rangeError} />
     {identity && <p className="ops-muted" style={{ marginBottom: 14 }}>Tổ chức: <strong style={{ color: "var(--text)" }}>{identity.name}</strong> · {identity.isActive ? "đang hoạt động" : "đã vô hiệu hóa (vẫn đọc được số liệu)"}</p>}

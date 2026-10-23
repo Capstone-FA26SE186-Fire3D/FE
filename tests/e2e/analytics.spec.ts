@@ -3,6 +3,7 @@
  * Evidence level: Playwright route mocks shaped like LearnerAnalytics.sql / OperationsQueries (OpenAPI types the training and
  * revenue bodies only as JsonElement, so the shape comes from BE source and docs/learner-analytics.md). Not an integration test.
  */
+import { chip, chipOptions, expectChipValue, openChip, pick } from "./chip-helpers";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { parseOperations, parseRevenue, parseTraining } from "../../src/features/analytics/parse";
 
@@ -100,6 +101,7 @@ test.describe("organization analytics", () => {
 
     await page.reload();
     await expect(page.getByRole("tab", { name: "Vận hành" })).toHaveAttribute("aria-selected", "true");
+    await openChip(page, "Thời gian");
     await expect(page.getByLabel("Từ ngày")).toHaveValue("2026-09-01");
     await expect(page.locator(".ops-stat", { hasText: "Công trình (hiện tại)" }).locator("strong")).toHaveText("5");
   });
@@ -127,20 +129,19 @@ test.describe("organization analytics", () => {
       }) });
     });
     await page.goto("/workspace/analytics?from=2026-09-01&to=2026-09-30");
-    const filters = page.getByRole("group", { name: "Bộ lọc báo cáo huấn luyện" });
-    const building = filters.getByLabel("Công trình");
-    const scenario = filters.getByLabel("Kịch bản");
-    await expect(scenario).toBeDisabled();
+    const filters = page.getByRole("group", { name: "Bộ lọc báo cáo" });
+    await expect(chip(filters, "Kịch bản")).toBeDisabled();
     await expect(page.getByRole("table", { name: "Lượt chơi theo kịch bản" })).toContainText("Thoát hiểm tầng 3");
     await expect.poll(() => reports.length).toBe(1);
     expect(reports[0].has("buildingId")).toBe(false);
 
-    await building.selectOption("b-1");
+    await pick(filters, "Công trình", { value: "b-1" });
     await expect(page).toHaveURL(/building=b-1/);
-    await expect(scenario).toBeEnabled();
-    await expect(scenario.locator("option")).toHaveText(["Tất cả kịch bản", "Thoát hiểm tầng 3", "Hành lang có khói"]);
-    await scenario.selectOption("sc-1");
-    await filters.getByLabel("Nhóm theo").selectOption("week");
+    await expect(chip(filters, "Kịch bản")).toBeEnabled();
+    await openChip(filters, "Kịch bản");
+    await expect(chipOptions(filters, "Kịch bản")).toHaveText(["tất cả", "Thoát hiểm tầng 3", "Hành lang có khói"]);
+    await pick(filters, "Kịch bản", { value: "sc-1" });
+    await pick(filters, "Nhóm theo", { value: "week" });
     await expect(page.getByRole("table", { name: "Số liệu theo nhóm" })).toContainText("2026-09-28");
     const last = reports.at(-1) as URLSearchParams;
     expect(last.get("buildingId")).toBe("b-1");
@@ -152,12 +153,12 @@ test.describe("organization analytics", () => {
     expect(Object.fromEntries(exports[0])).toMatchObject({ buildingId: "b-1", scenarioId: "sc-1", groupBy: "week" });
 
     // Changing the building drops the scenario of the old one; reload restores the rest from the URL.
-    await building.selectOption("b-2");
+    await pick(filters, "Công trình", { value: "b-2" });
     await expect(page).not.toHaveURL(/scenario=/);
     await expect((reports.at(-1) as URLSearchParams).has("scenarioId")).toBe(false);
     await page.reload();
-    await expect(building).toHaveValue("b-2");
-    await expect(filters.getByLabel("Nhóm theo")).toHaveValue("week");
+    await expectChipValue(filters, "Công trình", "b-2");
+    await expectChipValue(filters, "Nhóm theo", "week");
   });
 
   test("every chart has a table with the same numbers", async ({ page }) => {
@@ -192,10 +193,13 @@ test.describe("organization analytics", () => {
 
     await page.goto("/workspace/analytics?from=2026-09-01&to=2026-09-30");
     await expect.poll(() => queries.length).toBe(1);
+    await openChip(page, "Thời gian");
     await page.getByLabel("Từ ngày").fill("2026-01-01");
     await page.getByRole("button", { name: "Áp dụng" }).click();
     await expect(page.getByText(/Khoảng thời gian tối đa 90 ngày/)).toBeVisible();
     expect(queries).toHaveLength(1);
+
+    await openChip(page, "Thời gian");
 
     await page.getByRole("button", { name: "7 ngày" }).click();
     await expect.poll(() => queries.length).toBe(2);
@@ -211,6 +215,7 @@ test.describe("organization analytics", () => {
       return route.fulfill({ json: training({ plays: 222 }) });
     });
     await page.goto("/workspace/analytics?from=2026-08-01&to=2026-08-30");
+    await openChip(page, "Thời gian");
     await page.getByLabel("Từ ngày").fill("2026-09-01");
     await page.getByLabel("Đến ngày").fill("2026-09-30");
     await page.getByRole("button", { name: "Áp dụng" }).click();

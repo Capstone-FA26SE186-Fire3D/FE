@@ -1,19 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-export function useMediaQuery(query: string, serverValue = false) {
-  return useSyncExternalStore(
-    (listener) => {
-      const list = window.matchMedia(query);
-      list.addEventListener("change", listener);
-      return () => list.removeEventListener("change", listener);
-    },
-    () => window.matchMedia(query).matches,
-    () => serverValue,
-  );
-}
+export { useMediaQuery } from "@/utils/use-media-query";
 
 /**
  * Warns before unsaved work is lost:

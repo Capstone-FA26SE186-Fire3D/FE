@@ -34,6 +34,29 @@ const PAGE_SIZE = 20;
 const TABS = ["services", "quotes", "ai", "reminders", "enterprise"] as const;
 type TabId = (typeof TABS)[number];
 
+/** Figma "Quota AI trả trước": used of granted per quota unit, with a top-up action. The full ledger is the "Quota AI" tab. */
+function QuotaSummary({ accessToken, refreshKey, onTopUp, onOpen }: { accessToken: string; refreshKey: number; onTopUp?: () => void; onOpen: () => void }) {
+  const balance = useAsyncData(`quota:balance:me:${refreshKey}`, (signal) => billingApi.getAiQuota(accessToken, undefined, signal));
+  const units = balance.data?.units ?? [];
+  return <section className="org-card bill-quota-card" aria-labelledby="bill-quota-title">
+    <div className="bill-row"><h2 id="bill-quota-title" className="org-card-title" style={{ margin: 0 }}>Quota AI trả trước</h2><Button size="sm" variant="quiet" onClick={onOpen}>Chi tiết</Button></div>
+    <p className="bill-dim" style={{ margin: 0 }}>Gộp từ các gói công trình và top-up đã thanh toán. Hết quota thì chặn yêu cầu tính phí mới; không có nợ trả sau.</p>
+    {balance.error !== undefined && <p className="bill-dim" role="alert" style={{ margin: 0 }}>{billingErrorText(balance.error)}</p>}
+    {balance.loading && !balance.data && <SkeletonRows rows={2} label="Đang tải số dư quota…" />}
+    {balance.data && units.length === 0 && <p className="bill-dim" style={{ margin: 0 }}>Tổ chức chưa có quota AI còn hiệu lực.</p>}
+    {units.map((unit) => {
+      const used = unit.reserved + unit.consumed;
+      const percent = unit.granted > 0 ? Math.min(100, Math.round((used / unit.granted) * 100)) : 100;
+      return <div key={unit.quotaUnit} className="ops-stack" style={{ gap: 6 }}>
+        <div className="bill-row"><span>Đã dùng ({unit.quotaUnit})</span><strong>{formatNumber(used)} / {formatNumber(unit.granted)}</strong></div>
+        <div className="bill-meter" role="img" aria-label={`Đã dùng hoặc giữ chỗ ${used} trên ${unit.granted} ${unit.quotaUnit}`}><span style={{ width: `${percent}%` }} /></div>
+        <span className="bill-dim">Còn dùng được {formatNumber(unit.available)} {unit.quotaUnit}</span>
+      </div>;
+    })}
+    {onTopUp && <div><Button onClick={onTopUp}>Nạp quota AI</Button></div>}
+  </section>;
+}
+
 function summarizeQuotation(quotation: Quotation) {
   if (quotation.purpose === "AIQuotaTopUp") return "Top-up quota AI";
   const names = quotation.items.map((line) => line.buildingName || "Công trình");
@@ -172,6 +195,22 @@ export function BillingWorkspace() {
           })}
         </div>
         {entitlements.data && buildings.data && serviceRows.length === 0 && <EmptyState icon={ShieldAlert} title="Chưa có công trình" description="Tạo công trình (tên và địa chỉ) rồi mua gói dịch vụ để kích hoạt." />}
+        {serviceRows.length > 0 && <div className="bill-overview">
+          <QuotaSummary accessToken={token} refreshKey={settled} onTopUp={canPurchase ? () => openCreate("topup") : undefined} onOpen={() => setParams({ tab: "ai" })} />
+          <section className="org-card bill-recent" aria-labelledby="bill-recent-title">
+            <div className="bill-row"><h2 id="bill-recent-title" className="org-card-title" style={{ margin: 0 }}>Báo giá và thanh toán gần đây</h2><Button size="sm" variant="quiet" onClick={() => setParams({ tab: "quotes" })}>Xem tất cả</Button></div>
+            {quotations.data && items.length > 0 ? <Table className="bill-table" caption="Báo giá gần đây">
+              <thead><tr><th>Mã đơn</th><th>Nội dung</th><th className="bill-money">Số tiền</th><th>Trạng thái</th></tr></thead>
+              <tbody>{items.slice(0, 4).map((item) => <tr key={item.id}>
+                <td><button type="button" className="bill-link-cell" onClick={() => openQuotation(item.id)} aria-label={`Mở báo giá ${item.quotationNumber}`}>{item.quotationNumber}</button></td>
+                <td className="bill-wrap">{summarizeQuotation(item)}</td>
+                <td className="bill-money">{formatVnd(item.totalAmount)}</td>
+                <td><QuotationStatusBadge status={item.status} /></td>
+              </tr>)}</tbody>
+            </Table> : <p className="bill-dim" style={{ margin: 0 }}>{quotations.data ? "Chưa có báo giá nào. Mua gói công trình hoặc nạp quota AI để tạo báo giá đầu tiên." : "Đang tải báo giá…"}</p>}
+            <p className="bill-dim" style={{ margin: 0 }}>Giá, quota và chính sách nâng cấp hiển thị theo cấu hình từ máy chủ, không cố định trong giao diện.</p>
+          </section>
+        </div>}
         <p className="bill-dim" style={{ marginTop: 10 }}>“Chi tiết” hiện học viên tối đa hiệu lực, suất đã dùng và lịch sử nâng cấp. Báo giá và thanh toán của từng công trình nằm ở tab “Dịch vụ” trong trang công trình.</p>
       </TabsContent>
 

@@ -50,3 +50,15 @@
 @media (max-width: 760px) {
   .grid2, .diff { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Figma "Trợ lý AI": a conversation card, the question bubble above the answer and the composer at the bottom. */
+.chat { min-width: 0; }
+.thread { display: grid; gap: 12px; min-height: 140px; margin-bottom: 16px; align-content: start; }
+.threadEmpty { display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 16px; border: 1px dashed var(--line-strong); border-radius: 12px; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+.threadEmpty svg { flex: none; margin-top: 2px; color: var(--ember); }
+.bubbleUser { justify-self: end; max-width: min(560px, 85%); margin: 0; padding: 10px 14px; border: 1px solid var(--ember); border-radius: 14px 14px 4px 14px; background: var(--ember-soft); color: var(--text); font-size: 14px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bubbleAi { justify-self: start; width: min(100%, 720px); padding: 14px; border: 1px solid var(--line); border-radius: 14px 14px 14px 4px; background: var(--bg-soft); }
+.composer { display: grid; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.composerRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; }
+.composerRow > button { margin-top: 26px; }
+@media (max-width: 640px) { .composerRow { grid-template-columns: minmax(0, 1fr); } .composerRow > button { margin-top: 0; } }
