@@ -1,30 +1,36 @@
 "use client";
 
-import { FileText, RefreshCw } from "lucide-react";
+import { Eye, FileText, RefreshCw, Send } from "lucide-react";
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { ApiError } from "@/api";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
+import { ChartCard } from "@/components/charts/chart-card";
+import { RankedBars } from "@/components/charts/ranked-bars";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
+import { CellTitle, DataTable, type DataColumn } from "@/components/ui/data-table";
 import { Drawer } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, Input, Select, Textarea, type FieldControlProps } from "@/components/ui/field";
-import { SkeletonRows } from "@/components/ui/skeleton";
+import { Field, Input, Textarea, type FieldControlProps } from "@/components/ui/field";
+import { SkeletonDetail } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { organizationsApi } from "@/features/organizations/api";
 import { billingApi } from "../api";
 import { billingErrorText, isStatus } from "../errors";
 import { formatDateTime, formatNumber, formatVnd, isoToLocalInput, localInputToIso } from "../format";
 import type { IssuePeriodInput, IssueQuotationInput, QuotaPolicy, Quotation, WithEtag } from "../types";
-import { CheckoutHistory } from "./payment-states";
+import { CheckoutHistory, purposeLabel } from "./payment-states";
 import { QuotationCancel } from "./quotation-cancel";
 import { actionLabel, QuotationSnapshot, QuotationStatusBadge } from "./quotation-snapshot";
 import "../billing.css";
 
 const PAGE_SIZE = 20;
+/** Start of the 30-day window, read when a request runs (not during render). */
+const since30 = () => new Date(Date.now() - 30 * 86_400_000).toISOString();
+const REVENUE_SAMPLE = 100;
 
 type LineForm = { startsAt: string; learnerLimit: string; oneTimePrice: string; additionalQuotaUnits: string; aiPolicyVersionId: string };
 type TopUpForm = { policyVersionId: string; quotaUnits: string; amount: string; startsAt: string; endsAt: string };
@@ -47,7 +53,7 @@ function IssueForm({ accessToken, quotation, etag, onIssued, onStale }: { access
   const lock = useRef(false);
   const isTopUp = quotation.purpose === "AIQuotaTopUp";
   const policies = useAsyncData("commerce:policies:issue", (signal) => billingApi.listQuotaPolicies(accessToken, 1, 100, signal));
-  const policyItems = policies.data?.items ?? [];
+  const policyOptions = (policies.data?.items ?? []).map((policy) => ({ value: policy.id, label: policyLabel(policy) }));
 
   const [tax, setTax] = useState("0");
   const [terms, setTerms] = useState("");
@@ -117,10 +123,7 @@ function IssueForm({ accessToken, quotation, etag, onIssued, onStale }: { access
     } finally { lock.current = false; setSaving(false); }
   };
 
-  const policySelect = (props: FieldControlProps, value: string, onChange: (value: string) => void) => <Select {...props} value={value} onChange={(event) => onChange(event.target.value)}>
-    <option value="">Chọn phiên bản chính sách</option>
-    {policyItems.map((policy) => <option key={policy.id} value={policy.id}>{policyLabel(policy)}</option>)}
-  </Select>;
+  const policyPick = (props: FieldControlProps, label: string, value: string, onChange: (value: string) => void) => <Combobox {...props} aria-label={label} value={value} onChange={onChange} options={policyOptions} placeholder="Chọn phiên bản chính sách" searchPlaceholder="Tìm theo đơn vị hoặc mã" groupLabel="Phiên bản" loading={policies.loading && !policies.data} />;
 
   return <form onSubmit={submit} noValidate className="ops-stack" aria-label="Phát hành báo giá">
     <p className="ops-field-label" style={{ margin: 0 }}>Phát hành báo giá</p>
@@ -130,7 +133,7 @@ function IssueForm({ accessToken, quotation, etag, onIssued, onStale }: { access
     {isTopUp ? <fieldset className="ops-fieldset"><legend>Top-up quota AI</legend>
       <p className="bill-muted">Tổ chức yêu cầu {quotation.topUp?.requestedQuotaUnits != null ? formatNumber(quotation.topUp.requestedQuotaUnits) : "không nêu số lượng"}. Top-up không đổi dịch vụ công trình; chính sách phải phủ trọn khoảng hiệu lực.</p>
       <div className="ops-form-grid">
-        <Field label="Chính sách quota" required error={errors.topUpPolicy}>{(p) => policySelect(p, topUp.policyVersionId, (value) => setTopUp({ ...topUp, policyVersionId: value }))}</Field>
+        <Field label="Chính sách quota" required error={errors.topUpPolicy}>{(p) => policyPick(p, "Chính sách quota", topUp.policyVersionId, (value) => setTopUp({ ...topUp, policyVersionId: value }))}</Field>
         <Field label="Số lượng quota cấp" required error={errors.topUpUnits}>{(p) => <Input {...p} inputMode="numeric" value={topUp.quotaUnits} onChange={(event) => setTopUp({ ...topUp, quotaUnits: event.target.value })} />}</Field>
         <Field label="Số tiền (VND)" required error={errors.topUpAmount}>{(p) => <Input {...p} inputMode="numeric" value={topUp.amount} onChange={(event) => setTopUp({ ...topUp, amount: event.target.value })} />}</Field>
         <Field label="Hiệu lực từ" required error={errors.topUpStart} hint="Không trước hạn thanh toán.">{(p) => <Input {...p} type="datetime-local" value={topUp.startsAt} onChange={(event) => setTopUp({ ...topUp, startsAt: event.target.value })} />}</Field>
@@ -147,7 +150,7 @@ function IssueForm({ accessToken, quotation, etag, onIssued, onStale }: { access
             <Field label="Học viên sau nâng cấp" required error={errors[`${item.id}:learnerLimit`]}>{(p) => <Input {...p} inputMode="numeric" value={form.learnerLimit} onChange={(event) => setLine(item.id, { learnerLimit: event.target.value })} />}</Field>
             <Field label="Phí nâng cấp một lần (VND)" required error={errors[`${item.id}:oneTimePrice`]} hint="Admin ấn định, không prorata từ giá tháng; giảm giá không áp dụng.">{(p) => <Input {...p} inputMode="numeric" value={form.oneTimePrice} onChange={(event) => setLine(item.id, { oneTimePrice: event.target.value })} />}</Field>
             <Field label="Quota AI cấp thêm" error={errors[`${item.id}:additionalQuotaUnits`]} hint="Tùy chọn; để trống nếu không kèm.">{(p) => <Input {...p} inputMode="numeric" value={form.additionalQuotaUnits} onChange={(event) => setLine(item.id, { additionalQuotaUnits: event.target.value })} />}</Field>
-            <Field label="Chính sách cho quota thêm" error={errors[`${item.id}:aiPolicyVersionId`]}>{(p) => policySelect(p, form.aiPolicyVersionId, (value) => setLine(item.id, { aiPolicyVersionId: value }))}</Field>
+            <Field label="Chính sách cho quota thêm" error={errors[`${item.id}:aiPolicyVersionId`]}>{(p) => policyPick(p, "Chính sách cho quota thêm", form.aiPolicyVersionId, (value) => setLine(item.id, { aiPolicyVersionId: value }))}</Field>
           </>}
         </div>
       </fieldset>;
@@ -161,10 +164,38 @@ function IssueForm({ accessToken, quotation, etag, onIssued, onStale }: { access
       </div>
     </fieldset>
     {error && <Alert tone="danger" title="Chưa phát hành được">{error.message}{error.details.length > 0 && <>{" "}{error.details.join(" ")}</>}</Alert>}
-    <div className="ops-actions" style={{ justifyContent: "flex-end" }}><Button type="submit" disabled={saving}>{saving ? "Đang phát hành…" : "Phát hành báo giá"}</Button></div>
+    <div className="ops-actions" style={{ justifyContent: "flex-end" }}><Button type="submit" disabled={saving}><Send size={16} aria-hidden="true" />{saving ? "Đang phát hành…" : "Phát hành báo giá"}</Button></div>
   </form>;
 }
 
+/**
+ * "Doanh thu theo mục đích" (Figma 53:1540): paid payment requests of the last 30 days grouped by the quotation purpose
+ * (`purpose`, `amount` as the ledger returns them). The BE has no revenue-by-purpose report, so the sum covers at most
+ * the newest {REVENUE_SAMPLE} paid requests and the footer says when the window holds more.
+ */
+function RevenueByPurpose({ accessToken }: { accessToken: string }) {
+  const paid = useAsyncData("commerce:paid30:sample", (signal) => billingApi.listLedger(accessToken, "requests", { status: "Paid", from: since30(), page: 1, pageSize: REVENUE_SAMPLE }, signal));
+  const rows = useMemo(() => {
+    const sums = new Map<string, { amount: number; count: number }>();
+    for (const item of paid.data?.items ?? []) {
+      const key = String(item.purpose ?? "BuildingService");
+      const entry = sums.get(key) ?? { amount: 0, count: 0 };
+      entry.amount += item.amount;
+      entry.count += 1;
+      sums.set(key, entry);
+    }
+    return Array.from(sums, ([purpose, entry]) => ({ key: purpose, label: purposeLabel(purpose), value: entry.amount, hint: `${formatNumber(entry.count)} giao dịch` })).sort((a, b) => b.value - a.value);
+  }, [paid.data]);
+  const total = paid.data?.totalCount ?? 0;
+  const sampled = paid.data?.items.length ?? 0;
+  return <ChartCard title="Doanh thu theo mục đích" description="30 ngày gần nhất · yêu cầu thanh toán đã nhận tiền (webhook hợp lệ)" height={150} loading={paid.loading && !paid.data} empty={!paid.loading && (paid.error !== undefined || rows.length === 0)} emptyText={paid.error !== undefined ? "Chưa đọc được sổ thanh toán" : "Chưa có khoản đã nhận tiền trong 30 ngày"} data-testid="revenue-purpose-chart"
+    footer={total > sampled ? `Tính trên ${formatNumber(sampled)} giao dịch mới nhất trong ${formatNumber(total)} đã nhận tiền.` : undefined}
+    table={<table className="ops-table"><caption className="ops-sr-only">Doanh thu theo mục đích</caption><thead><tr><th>Mục đích</th><th>Số tiền</th><th>Giao dịch</th></tr></thead><tbody>{rows.map((row) => <tr key={row.key}><td>{row.label}</td><td>{formatVnd(row.value)}</td><td>{row.hint}</td></tr>)}</tbody></table>}>
+    <RankedBars rows={rows} format={formatVnd} color="var(--success)" label="Doanh thu theo mục đích" />
+  </ChartCard>;
+}
+
+/** Quotations of every organization (Figma "Thương mại · Báo giá"): a row opens the drawer where a Draft is issued or an unpaid one cancelled. */
 export function QuotationsSection({ accessToken }: { accessToken: string }) {
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const selectedId = get("quotation");
@@ -177,31 +208,47 @@ export function QuotationsSection({ accessToken }: { accessToken: string }) {
   const orgName = useMemo(() => Object.fromEntries((organizations.data?.items ?? []).map((item) => [item.id, item.name])), [organizations.data]);
   const items = list.data?.items ?? [];
   const total = list.data?.totalCount ?? 0;
+  const open = (id: string) => { setOverride(null); setParams({ quotation: id }); };
 
   const summarize = (quotation: Quotation) => (quotation.purpose === "AIQuotaTopUp" ? "Top-up quota AI" : `${quotation.items.length} công trình${quotation.items.some((line) => line.purchaseAction === "Upgrade") ? " · nâng cấp" : ""}`);
 
-  return <div className="ops-stack">
-    <div className="bill-row"><p className="bill-muted">Báo giá của mọi tổ chức. Phát hành báo giá nháp để tổ chức chấp nhận và thanh toán; hủy báo giá chưa thanh toán khi cần.</p><Button variant="quiet" onClick={list.reload} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />Tải lại</Button></div>
-    {list.error !== undefined && <Alert tone="danger" title="Không tải được báo giá" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert>}
-    <Table className="bill-table" caption="Báo giá của mọi tổ chức">
-      <thead><tr><th>Báo giá</th><th>Tổ chức</th><th>Trạng thái</th><th>Hiệu lực đến</th><th className="bill-money">Tổng thanh toán</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
-      <tbody>
-        {list.loading && !list.data && <TableMessage colSpan={6}><SkeletonRows rows={5} label="Đang tải báo giá…" /></TableMessage>}
-        {items.map((item) => <tr key={item.id}>
-          <td><span className="ops-cell-primary bill-wrap">{item.quotationNumber}<span className="ops-cell-sub">{summarize(item)}</span></span></td>
-          <td className="bill-wrap">{orgName[item.organizationId] ?? item.organizationId.slice(0, 8)}</td>
-          <td><QuotationStatusBadge status={item.status} /></td>
-          <td>{formatDateTime(item.validUntil)}</td>
-          <td className="bill-money">{formatVnd(item.totalAmount)}{item.taxAmount === null && <span className="ops-cell-sub">ước tính</span>}</td>
-          <td className="ops-cell-actions"><Button size="sm" variant="quiet" onClick={() => { setOverride(null); setParams({ quotation: item.id }); }} aria-label={`Mở báo giá ${item.quotationNumber}`}>{item.status === "Draft" ? "Phát hành" : "Xem"}</Button></td>
-        </tr>)}
-        {list.data && !items.length && <TableMessage colSpan={6}><EmptyState icon={FileText} title="Chưa có báo giá" description="Báo giá xuất hiện khi tổ chức tạo từ công trình của họ, yêu cầu top-up, hoặc khi bạn tạo từ yêu cầu doanh nghiệp." /></TableMessage>}
-      </tbody>
-    </Table>
-    {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
+  const columns: DataColumn<Quotation>[] = [
+    { key: "number", header: "Báo giá", primary: true, render: (item) => <CellTitle title={item.quotationNumber} sub={summarize(item)} /> },
+    { key: "organization", header: "Tổ chức", width: 200, render: (item) => orgName[item.organizationId] ?? item.organizationId.slice(0, 8) },
+    { key: "status", header: "Trạng thái", width: 170, render: (item) => <QuotationStatusBadge status={item.status} /> },
+    { key: "validUntil", header: "Hiệu lực đến", width: 180, hideBelow: 1000, render: (item) => formatDateTime(item.validUntil) },
+    { key: "total", header: "Tổng thanh toán", width: 170, align: "right", render: (item) => <CellTitle title={formatVnd(item.totalAmount)} sub={item.taxAmount === null ? "ước tính" : undefined} /> },
+  ];
 
-    <Drawer open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) { setOverride(null); setParams({ quotation: null }); } }} title="Chi tiết báo giá" description="Số liệu là bản chụp do hệ thống trả." className="bill-wide-drawer">
-      {selectedId && detail.loading && !current && <SkeletonRows rows={4} label="Đang tải báo giá…" />}
+  return <div className="ops-stack">
+    <div className="bill-charts"><RevenueByPurpose accessToken={accessToken} /></div>
+
+    <DataTable<Quotation>
+      caption="Báo giá của mọi tổ chức"
+      data-testid="admin-quotations-table"
+      columns={columns}
+      rows={items}
+      rowKey={(item) => item.id}
+      loading={list.loading && !list.data}
+      onRowClick={(item) => open(item.id)}
+      rowTone={(item) => (item.status === "Cancelled" || item.status === "Expired" ? "muted" : undefined)}
+      rowMenu={(item) => [
+        { label: "Xem chi tiết", icon: Eye, onSelect: () => open(item.id) },
+        ...(item.status === "Draft" ? [{ label: "Phát hành báo giá", icon: Send, onSelect: () => open(item.id), hint: "Nhập thuế, điều khoản và kỳ dịch vụ", separator: true }] : []),
+      ]}
+      error={list.error !== undefined ? <Alert tone="danger" title="Không tải được báo giá" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert> : undefined}
+      toolbar={<>
+        <p className="bill-muted ops-toolbar-grow" style={{ margin: 0 }}>Phát hành báo giá nháp để tổ chức chấp nhận và thanh toán; hủy báo giá chưa thanh toán khi cần.</p>
+        <Button variant="quiet" onClick={list.reload} disabled={list.loading} aria-label="Tải lại danh sách"><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
+      </>}
+      empty={<EmptyState icon={FileText} title="Chưa có báo giá" description="Báo giá xuất hiện khi tổ chức tạo từ công trình của họ, yêu cầu top-up, hoặc khi bạn tạo từ yêu cầu doanh nghiệp." />}
+      pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
+    />
+    <p className="bill-hint">Bấm hàng để mở báo giá; bản nháp phát hành ngay trong ngăn chi tiết.</p>
+
+    <Drawer open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) { setOverride(null); setParams({ quotation: null }); } }} size="lg" data-testid="quotation-drawer" title="Chi tiết báo giá" description="Số liệu là bản chụp do hệ thống trả."
+      eyebrow={current ? <><QuotationStatusBadge status={current.data.status} /><StatusBadge tone="neutral">{current.data.quotationNumber}</StatusBadge></> : undefined}>
+      {selectedId && detail.loading && !current && <SkeletonDetail rows={6} />}
       {selectedId && detail.error !== undefined && !current && <Alert tone="danger" title="Không tải được báo giá" action={<Button size="sm" variant="secondary" className="mt-3" onClick={detail.reload}>Thử lại</Button>}>{billingErrorText(detail.error)}</Alert>}
       {current && <div className="ops-stack">
         <QuotationSnapshot quotation={current.data} organizationName={orgName[current.data.organizationId]} />

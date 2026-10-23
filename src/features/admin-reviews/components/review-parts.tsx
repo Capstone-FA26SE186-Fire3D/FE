@@ -1,5 +1,6 @@
 "use client";
 
+import { CircleCheck, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { Panel } from "@/components/ui/panel";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -13,6 +14,16 @@ export function HashValue({ value, label }: { value: string; label: string }) {
     <code className="rev-hash" aria-label={label} data-testid={`hash-${label.toLowerCase().includes("rubric") ? "rubric" : "content"}`}>{full ? value : shortHash(value)}</code>
     <button type="button" className="rev-link-button" aria-expanded={full} onClick={() => setFull((current) => !current)}>{full ? "Thu gọn" : "Xem đầy đủ"}</button>
   </span>;
+}
+
+/** One-line readiness strip under the metadata (Figma "Readiness kỹ thuật đạt · 0 vấn đề chặn"). Information only. */
+export function ReadinessStrip({ readiness }: { readiness: ReviewReadiness }) {
+  const ready = readiness.technicalReady;
+  const Icon = ready ? CircleCheck : TriangleAlert;
+  return <p className="rev-ready" data-tone={ready ? "success" : "warning"} data-testid="readiness-strip">
+    <Icon size={16} aria-hidden="true" />
+    <span>{ready ? "Readiness kỹ thuật đạt" : "Readiness kỹ thuật chưa đạt"} · {readiness.blockerCount} lỗi chặn · {outcomeLabel(readiness.outcome)}</span>
+  </p>;
 }
 
 /** Technical readiness, shown on its own and labelled as information only. It never gates the content decision here. */

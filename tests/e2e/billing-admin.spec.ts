@@ -1,7 +1,10 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { admin, callsTo, etagOf, grant, ids, mockBilling, newMock, owner, packageFixture, queue, quotationFixture, serviceView, signIn } from "./billing-mock";
 
 // Route-mock evidence only (not the real BE).
+
+// DataTable rows: `<tr>` on desktop, cards under 640px.
+const quotaPolicyRows = (page: Page) => page.getByTestId("admin-quota-policies-table").locator("tbody tr, li.ops-dt-card");
 
 test.describe("admin commerce (mock)", () => {
   test("only PlatformAdmin opens it and tabs live in the URL", async ({ page }) => {
@@ -42,12 +45,14 @@ test.describe("admin commerce (mock)", () => {
     await expect(page.getByText("Gói v7 chỉ có thời hạn 6 hoặc 12 tháng.")).toBeVisible();
     await expect(page.getByText("Số học viên mỗi kỳ là số nguyên lớn hơn 0.")).toBeVisible();
     await page.getByLabel(/Đơn giá/).fill("750000");
-    await page.getByLabel(/Thời hạn \(tháng\)/).selectOption("12");
+    await page.getByLabel(/Thời hạn \(tháng\)/).click();
+    await page.getByRole("option", { name: "12 tháng" }).click();
     await page.getByLabel("Học viên mỗi kỳ").fill("80");
     await page.getByLabel("Quota AI kèm gói").fill("2500");
     await page.getByRole("button", { name: "Lưu gói" }).click();
     await expect(page.getByText("Gói có quota phải chọn phiên bản chính sách quota.")).toBeVisible();
-    await page.getByLabel("Phiên bản chính sách quota").selectOption(ids.policy);
+    await page.getByLabel("Phiên bản chính sách quota").click();
+    await page.getByRole("option", { name: /tokens/ }).first().click();
     await page.getByRole("button", { name: "Lưu gói" }).click();
     await expect(page.getByRole("row", { name: /Gói mới/ })).toContainText("750.000");
     expect(callsTo(mock, "POST", "/api/admin/service-packages")[0].body).toMatchObject({ code: "bld-new", unitPrice: 750000, durationMonths: 12, learnerLimit: 80, aiQuotaUnits: 2500, aiPolicyVersionId: ids.policy, isActive: true });
@@ -72,9 +77,11 @@ test.describe("admin commerce (mock)", () => {
     await signIn(page, admin);
     await mockBilling(page, mock);
     await page.goto("/admin/commerce?tab=policies");
-    await expect(page.getByTestId("policy-row")).toContainText("tokens");
-    await expect(page.getByTestId("policy-row")).toContainText("rollover: None");
+    await expect(quotaPolicyRows(page)).toContainText("tokens");
+    await expect(quotaPolicyRows(page)).toContainText("rollover: None");
     await expect(page.getByRole("button", { name: /Sửa|Xóa/ })).toHaveCount(0);
+    // Immutable versions: the row is neither clickable nor has a "···" menu.
+    await expect(quotaPolicyRows(page).getByRole("button")).toHaveCount(0);
     await page.getByRole("button", { name: "Tạo phiên bản", exact: true }).first().click();
     await page.getByLabel("Đơn vị quota").fill("Tokens VN");
     await page.getByLabel("Hiệu lực từ").fill("2026-11-01T08:00");
@@ -86,14 +93,14 @@ test.describe("admin commerce (mock)", () => {
     await expect(page.getByText(/Thời điểm kết thúc phải sau thời điểm bắt đầu/)).toBeVisible();
     await page.getByLabel("Hiệu lực đến").fill("");
     await page.getByRole("button", { name: "Tạo phiên bản" }).last().click();
-    await expect(page.getByTestId("policy-row")).toHaveCount(2);
+    await expect(quotaPolicyRows(page)).toHaveCount(2);
     const body = callsTo(mock, "POST", "/api/admin/billing/quota-policies")[0].body as { quotaUnit: string; effectiveFrom: string; effectiveUntil: string | null };
     expect(body.quotaUnit).toBe("credits");
     expect(body.effectiveFrom).toMatch(/Z$/);
     expect(body.effectiveUntil).toBeNull();
     // Reload recovers from the server list.
     await page.reload();
-    await expect(page.getByTestId("policy-row")).toHaveCount(2);
+    await expect(quotaPolicyRows(page)).toHaveCount(2);
   });
 
   test("package edit sends If-Match; a 412 keeps the typed input and offers the newer version", async ({ page }) => {
@@ -101,7 +108,8 @@ test.describe("admin commerce (mock)", () => {
     await signIn(page, admin);
     await mockBilling(page, mock);
     await page.goto("/admin/commerce?tab=packages");
-    await page.getByRole("button", { name: "Sửa gói BLD-12", exact: true }).click();
+    // A row opens the edit modal (the "···" menu offers the same "Sửa gói").
+    await page.getByRole("row", { name: /BLD-12/ }).first().click();
     await page.getByLabel("Tên gói").fill("Tên đã sửa");
     // Somebody else saves first: the revision moves on.
     mock.packages[0].revision = 4;
@@ -204,7 +212,8 @@ test.describe("admin commerce (mock)", () => {
     await page.getByLabel("Điều khoản").fill("Điều khoản top-up");
     await page.getByRole("button", { name: "Phát hành báo giá" }).click();
     await expect(page.getByText("Chọn phiên bản chính sách quota.")).toBeVisible();
-    await page.getByRole("combobox", { name: "Chính sách quota" }).selectOption(ids.policy);
+    await page.getByRole("combobox", { name: "Chính sách quota" }).click();
+    await page.getByRole("option", { name: /tokens/ }).first().click();
     await page.getByLabel(/Số tiền \(VND\)/).fill("200000");
     await page.getByLabel(/Hiệu lực từ/).fill("2027-01-05T08:00");
     await page.getByLabel(/Hiệu lực đến/).fill("2027-07-05T08:00");
@@ -254,7 +263,8 @@ test.describe("admin commerce (mock)", () => {
     await mockBilling(page, mock);
     await page.goto("/admin/commerce?tab=quota");
     await expect(page.getByText("Chọn một tổ chức")).toBeVisible();
-    await page.getByRole("combobox", { name: "Tổ chức" }).selectOption("org-1");
+    await page.getByRole("combobox", { name: "Tổ chức" }).click();
+    await page.getByRole("option", { name: "FET3D Lab" }).click();
     await expect(page.getByTestId("quota-available")).toHaveText("650");
     await expect(page.getByTestId("quota-grant")).toContainText("Gói công trình");
     expect(callsTo(mock, "GET", "/api/admin/organizations/org-1/ai-quota")).toHaveLength(1);
@@ -295,7 +305,7 @@ for (const theme of ["light", "dark"] as const) {
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       await page.screenshot({ path: testInfo.outputPath(`admin-packages-${theme}-${width}.png`), fullPage: true });
       await page.goto("/admin/commerce?tab=policies");
-      await expect(page.getByTestId("policy-row")).toBeVisible();
+      await expect(quotaPolicyRows(page).first()).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       await page.goto(`/admin/commerce?tab=quotes&quotation=${ids.quoteDraft}`);
       await expect(page.getByRole("form", { name: "Phát hành báo giá" })).toBeVisible();

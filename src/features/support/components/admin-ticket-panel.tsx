@@ -5,8 +5,9 @@ import { useState } from "react";
 import { ApiError } from "@/api";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Field, Select } from "@/components/ui/field";
-import { SkeletonRows } from "@/components/ui/skeleton";
+import { Combobox } from "@/components/ui/combobox";
+import { Field } from "@/components/ui/field";
+import { SkeletonDetail } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
 import { formatDateTime } from "@/utils/date-range";
@@ -19,7 +20,7 @@ import styles from "./support.module.css";
 export type AdminOption = { id: string; name: string };
 
 /**
- * Admin view of one ticket: summary, assign / transition (PATCH with If-Match "support-N") and the thread.
+ * Admin view of one ticket (drawer body): summary, assign / transition (PATCH with If-Match "support-N") and the thread.
  * On 412 the admin's pending choices stay in the form; they can load the newer version to compare and save again.
  */
 export function AdminTicketPanel({ ticketId, accessToken, myId, admins, onChanged }: {
@@ -40,7 +41,7 @@ export function AdminTicketPanel({ ticketId, accessToken, myId, admins, onChange
     if (error !== undefined) {
       return <Alert tone="danger" title="Không mở được ticket" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reload}>Thử lại</Button>}>{errorText(error, "Hãy kiểm tra kết nối rồi thử lại.")}</Alert>;
     }
-    return <SkeletonRows rows={6} label="Đang tải ticket…" />;
+    return <SkeletonDetail rows={6} />;
   }
 
   const { ticket, etag, messages } = state;
@@ -76,15 +77,15 @@ export function AdminTicketPanel({ ticketId, accessToken, myId, admins, onChange
   const claim = () => setDraft((current) => ({ ...current, assignedTo: myId, ...(ticket.status === "Open" ? { status: "InProgress" as TicketStatus } : {}) }));
 
   return <div>
-    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginBottom: 8 }}>
+    <div className={styles.ticketHead}>
       <span className={styles.mono}>{ticket.ticketNumber}</span>
       <StatusBadge tone={ticketStatusTone(ticket.status)}>{ticketStatusLabel(ticket.status)}</StatusBadge>
       <StatusBadge tone={priorityTone(ticket.priority)}>{priorityLabel(ticket.priority)}</StatusBadge>
       <Button size="sm" variant="quiet" onClick={reload} disabled={loading} aria-label="Tải lại ticket" style={{ marginLeft: "auto" }}><RefreshCw size={14} aria-hidden="true" />{loading ? "Đang tải…" : "Tải lại"}</Button>
     </div>
-    <h3 style={{ margin: "0 0 10px", fontSize: 17, fontWeight: 600, overflowWrap: "anywhere" }}>{ticket.subject}</h3>
+    <h3 className={styles.ticketTitle}>{ticket.subject}</h3>
     <p className={styles.description}>{ticket.description}</p>
-    <dl className={styles.meta} style={{ marginTop: 12 }}>
+    <dl className="ops-kv" style={{ marginTop: 12 }}>
       <dt>Người gửi</dt><dd>{personName(ticket.createdBy)}{ticket.createdBy?.email && <span className="ops-cell-sub">{ticket.createdBy.email}</span>}</dd>
       <dt>Tổ chức</dt><dd>{organizationName(ticket.organization)}</dd>
       <dt>Tạo lúc</dt><dd>{formatDateTime(ticket.createdAt)}</dd>
@@ -101,9 +102,9 @@ export function AdminTicketPanel({ ticketId, accessToken, myId, admins, onChange
           : "Có thể có tin nhắn mới hoặc quản trị viên khác đã cập nhật. Lựa chọn của bạn được giữ nguyên, chưa ghi đè gì."}
       </Alert>}
       <div className="ops-form-grid">
-        <Field label="Trạng thái">{(p) => <Select {...p} value={effective.status} onChange={(event) => setDraft({ ...draft, status: event.target.value as TicketStatus })}>{allowedTicketTransitions[ticket.status].map((status) => <option key={status} value={status}>{ticketStatusLabel(status)}</option>)}</Select>}</Field>
-        <Field label="Ưu tiên">{(p) => <Select {...p} value={effective.priority} onChange={(event) => setDraft({ ...draft, priority: event.target.value as TicketPriority })}>{priorityOptions.map((priority) => <option key={priority} value={priority}>{priorityLabel(priority)}</option>)}</Select>}</Field>
-        <Field label="Phân công cho" className="ops-span-all">{(p) => <Select {...p} value={effective.assignedTo ?? ""} onChange={(event) => setDraft({ ...draft, assignedTo: event.target.value || null })}><option value="">Chưa phân công</option>{assigneeOptions.map((admin) => <option key={admin.id} value={admin.id}>{admin.id === myId ? `${admin.name} (tôi)` : admin.name}</option>)}</Select>}</Field>
+        <Field label="Trạng thái">{(p) => <Combobox {...p} aria-label="Trạng thái" value={effective.status} onChange={(value) => setDraft({ ...draft, status: value as TicketStatus })} options={allowedTicketTransitions[ticket.status].map((value) => ({ value, label: ticketStatusLabel(value) }))} groupLabel="Bước tiếp theo" />}</Field>
+        <Field label="Ưu tiên">{(p) => <Combobox {...p} aria-label="Ưu tiên" value={effective.priority} onChange={(value) => setDraft({ ...draft, priority: value as TicketPriority })} options={priorityOptions.map((value) => ({ value, label: priorityLabel(value) }))} groupLabel="Mức" />}</Field>
+        <Field label="Phân công cho" className="ops-span-all">{(p) => <Combobox {...p} aria-label="Phân công cho" value={effective.assignedTo ?? ""} onChange={(value) => setDraft({ ...draft, assignedTo: value || null })} placeholder="Chưa phân công" searchPlaceholder="Tìm quản trị viên" clearable options={assigneeOptions.map((admin) => ({ value: admin.id, label: admin.id === myId ? `${admin.name} (tôi)` : admin.name }))} groupLabel="Quản trị viên" />}</Field>
       </div>
       {saveError && <Alert tone="danger">{saveError}</Alert>}
       <div className="ops-actions">

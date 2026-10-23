@@ -1,33 +1,45 @@
 "use client";
 
-import { ArrowLeft, FilePlus2, RefreshCw, Save } from "lucide-react";
+import { ArrowLeft, FilePlus2, RefreshCw, Send } from "lucide-react";
 import { useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
+import { formatDateTime } from "@/components/ops/detail-parts";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { CellTitle, DataTable, type DataColumn } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Panel } from "@/components/ui/panel";
-import { SkeletonRows } from "@/components/ui/skeleton";
+import { SkeletonDetail } from "@/components/ui/skeleton";
+import { SubmitButton } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Table } from "@/components/ui/table";
+import { SubTabs } from "@/components/ui/sub-tabs";
 import { useToast } from "@/components/ui/toast";
-import { formatDateTime } from "@/components/ops/detail-parts";
+import { Rows } from "@/features/admin-overview/components/admin-kit";
+import { kindLabel } from "@/features/learn/types";
 import { learnAdminApi } from "../api";
 import { loadPostWithVersion } from "../load-post";
 import { commandDone, commandKey } from "../command-keys";
 import { checkContent, contentFromVersion, describeDifferences, emptyContent, fingerprint, toVersionInput, type ContentIssue, type EditorContent } from "../content";
 import { describeLearnError, translateIssue, type LearnErrorView } from "../errors";
-import { lifecycleBody, lifecycleCopy, postStatusView, publishBlockReason, versionStatusView } from "../status";
-import type { AdminPost, AdminVersion, LifecycleOperation, WithEtag } from "../types";
+import { lifecycleBody, lifecycleCopy, lifecycleFor, postStatusView, publishBlockReason, versionStatusView } from "../status";
+import type { AdminPost, AdminVersion, LifecycleOperation, VersionSummary, WithEtag } from "../types";
 import { isMediaRefused, useMediaChecks } from "../use-media-checks";
 import { useSourceFlags } from "../use-source-flags";
 import { ContentFields } from "./content-fields";
+import { BlockEditor } from "./learn-blocks";
 import { PublishPanel } from "./publish-panel";
+import { SourcePicker } from "./source-picker";
+import "./learn-quick.css";
 
 type Loaded = { post: WithEtag<AdminPost>; version: WithEtag<AdminVersion> | null };
 type Conflict = { latest: WithEtag<AdminVersion>; differences: string[] };
 type Operation = { kind: "publish" } | { kind: "lifecycle"; operation: LifecycleOperation } | { kind: "newVersion" };
+
+/** The two editor screens (Figma 64:2708 / 64:3069). Older `tab=` values (info/content/classify → content, versions → publish) keep working. */
+export type EditorScreen = "content" | "publish";
+export const editorScreen = (tab: string): EditorScreen => (tab === "publish" || tab === "versions" ? "publish" : "content");
+const SCREENS = [{ value: "content", label: "Nội dung" }, { value: "publish", label: "Phiên bản & Xuất bản" }];
 
 function ErrorList({ view }: { view: LearnErrorView }) {
   return <span style={{ display: "grid", gap: 6 }}>
@@ -52,13 +64,13 @@ export function PostEditor({ accessToken, postId, versionId, tab, onTab, onBack,
     if (view.kind === "notFound") return <div className="ops-stack">{back}<EmptyState icon={FilePlus2} title="Không tìm thấy bài" description="Bài không tồn tại hoặc đường dẫn không đúng." /></div>;
     return <div className="ops-stack">{back}<Alert tone="danger" title="Không tải được bài" action={<Button size="sm" variant="secondary" className="mt-3" onClick={loaded.reload}>Thử lại</Button>}>{view.message}</Alert></div>;
   }
-  if (!loaded.data) return <div className="ops-stack">{back}<SkeletonRows rows={6} label="Đang tải bài…" /></div>;
+  if (!loaded.data) return <div className="ops-stack">{back}<Panel bodyClassName="ops-stack"><SkeletonDetail rows={6} /></Panel></div>;
   const { post, version } = loaded.data;
-  return <EditorBody key={`${post.data.id}:${version?.data.id ?? "none"}:${rev}`} accessToken={accessToken} initialPost={post} initialVersion={version} tab={tab} onTab={onTab} onBack={onBack} onOpenVersion={onOpenVersion} onReload={() => setRev((value) => value + 1)} />;
+  return <EditorBody key={`${post.data.id}:${version?.data.id ?? "none"}:${rev}`} accessToken={accessToken} initialPost={post} initialVersion={version} screen={editorScreen(tab)} onTab={onTab} onBack={onBack} onOpenVersion={onOpenVersion} onReload={() => setRev((value) => value + 1)} />;
 }
 
-function EditorBody({ accessToken, initialPost, initialVersion, tab, onTab, onBack, onOpenVersion, onReload }: {
-  accessToken: string; initialPost: WithEtag<AdminPost>; initialVersion: WithEtag<AdminVersion> | null; tab: string; onTab: (tab: string) => void;
+function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, onBack, onOpenVersion, onReload }: {
+  accessToken: string; initialPost: WithEtag<AdminPost>; initialVersion: WithEtag<AdminVersion> | null; screen: EditorScreen; onTab: (tab: string) => void;
   onBack: () => void; onOpenVersion: (versionId: string) => void; onReload: () => void;
 }) {
   const toast = useToast();
@@ -70,6 +82,7 @@ function EditorBody({ accessToken, initialPost, initialVersion, tab, onTab, onBa
   const [showIssues, setShowIssues] = useState(false);
   const [serverIssues, setServerIssues] = useState<{ print: string; issues: ContentIssue[] } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [saveState, setSaveState] = useState<"idle" | "busy" | "done">("idle");
   const [error, setError] = useState<LearnErrorView | null>(null);
   const [conflict, setConflict] = useState<Conflict | null>(null);
   // What to do once the user confirms dropping unsaved edits (go back, or open another version).
@@ -87,13 +100,15 @@ function EditorBody({ accessToken, initialPost, initialVersion, tab, onTab, onBa
   const clientIssues = checkContent(form);
   const refusedVideo = form.blocks.some((block) => block.type === "video" && isMediaRefused(media.checks, block.id, block.fields.url));
   const shownIssues: ContentIssue[] = [...(showIssues ? clientIssues : []), ...(serverIssues && serverIssues.print === print ? serverIssues.issues : [])];
+  const issueFor = (path: string) => shownIssues.find((issue) => issue.path === path)?.message;
 
   const sourceProblems = form.sources.flatMap((entry) => {
     const verdict = flags[entry.sourceId];
     const reason = verdict ? publishBlockReason(verdict) : null;
     return reason ? [`Nguồn “${entry.title}”: ${reason}`] : [];
   });
-  const publishBlockers = [...sourceProblems, ...(clientIssues.length > 0 ? ["Nội dung còn điểm chưa hợp lệ, xem thẻ Thông tin/Nội dung."] : [])];
+  const publishBlockers = [...sourceProblems, ...(clientIssues.length > 0 ? ["Nội dung còn điểm chưa hợp lệ, xem thẻ Nội dung."] : [])];
+  const publishReasons = [...(status === "Deleted" ? ["Bài đã bị xóa: khôi phục bài trước khi xuất bản."] : []), ...(dirty ? ["Lưu bản nháp trước khi xuất bản."] : []), ...publishBlockers];
 
   /** Replaces the form with what the server holds (canonical URLs, ordering) and makes it the saved baseline. */
   const applyVersion = (next: WithEtag<AdminVersion>) => {
@@ -128,6 +143,7 @@ function EditorBody({ accessToken, initialPost, initialVersion, tab, onTab, onBa
     setShowIssues(true);
     if (clientIssues.length > 0 || refusedVideo) { setError(null); return; }
     setBusy(true);
+    setSaveState("busy");
     setError(null);
     const input = toVersionInput(form);
     const intent = { op: "update-version", versionId: version.data.id, etag: version.etag, input };
@@ -136,8 +152,11 @@ function EditorBody({ accessToken, initialPost, initialVersion, tab, onTab, onBa
       commandDone(intent);
       applyVersion(result);
       setConflict(null);
+      setSaveState("done");
+      window.setTimeout(() => setSaveState("idle"), 1200);
       toast.notify({ tone: "success", title: "Đã lưu bản nháp", description: `v${result.data.versionNumber} · ETag ${result.etag}` });
     } catch (cause) {
+      setSaveState("idle");
       fail(cause, form);
     } finally {
       setBusy(false);
@@ -160,6 +179,7 @@ function EditorBody({ accessToken, initialPost, initialVersion, tab, onTab, onBa
   };
 
   const closeOperation = () => { if (!busy) { setOperation(null); setOperationError(null); } };
+  const start = (next: Operation) => { setOperationError(null); setOperation(next); };
 
   const runOperation = async () => {
     if (!operation || busy) return;
@@ -199,8 +219,8 @@ function EditorBody({ accessToken, initialPost, initialVersion, tab, onTab, onBa
     }
   };
 
-  const takeServerVersion = () => { if (conflict) { applyVersion(conflict.latest); setConflict(null); setError(null); void refreshPostOnly(); } };
   const refreshPostOnly = async () => { try { setPost(await learnAdminApi.getPost(accessToken, post.data.id)); } catch { /* the stale banner already told the user to reload */ } };
+  const takeServerVersion = () => { if (conflict) { applyVersion(conflict.latest); setConflict(null); setError(null); void refreshPostOnly(); } };
   const keepMine = () => {
     if (!conflict) return;
     // Adopt the newer ETag but keep the form: the next save carries the user's content against the newest version.
@@ -211,34 +231,51 @@ function EditorBody({ accessToken, initialPost, initialVersion, tab, onTab, onBa
     void refreshPostOnly();
   };
 
-  const leave = () => (dirty ? setLeaving(() => onBack) : onBack());
+  const guard = (go: () => void) => (dirty ? setLeaving(() => go) : go());
   const conflictPublished = conflict?.latest.data.status === "Published";
   const statusView = postStatusView[status];
   const versions = [...(post.data.versions ?? [])].sort((a, b) => b.versionNumber - a.versionNumber);
   const title = form.title.trim() || post.data.publishedVersion?.title || "Bài chưa đặt tên";
-
   const operationCopy = operation?.kind === "lifecycle" ? lifecycleCopy[operation.operation] : null;
 
-  return <div className="ops-stack">
-    <div><Button variant="quiet" size="sm" onClick={leave}><ArrowLeft size={16} aria-hidden="true" />Về danh sách</Button></div>
-    <Panel
-      title={title}
-      description={`${post.data.slug}${version ? ` · phiên bản ${version.data.versionNumber} (${versionStatusView[version.data.status].label.toLowerCase()})` : ""}`}
-      actions={<>
+  const versionColumns: DataColumn<VersionSummary>[] = [
+    { key: "version", header: "Phiên bản", primary: true, render: (item) => <CellTitle title={`v${item.versionNumber}`} sub={item.title} /> },
+    { key: "status", header: "Trạng thái", width: 260, render: (item) => <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}><StatusBadge tone={versionStatusView[item.status].tone}>{versionStatusView[item.status].label}</StatusBadge>{post.data.publishedVersionId === item.id && <StatusBadge tone="ember">Đang công khai</StatusBadge>}{version?.data.id === item.id && <StatusBadge tone="info">Đang mở</StatusBadge>}</span> },
+    { key: "etag", header: "ETag", width: 90, hideBelow: 1100, render: (item) => <code className="ops-mono">{`"${item.revision}"`}</code> },
+    { key: "updated", header: "Cập nhật", width: 170, hideBelow: 768, render: (item) => formatDateTime(item.updatedAt) },
+  ];
+  const versionMenu = (item: VersionSummary) => [
+    ...(version?.data.id !== item.id ? [{ label: "Mở phiên bản", onSelect: () => guard(() => onOpenVersion(item.id)) }] : []),
+    ...(version?.data.id === item.id && isDraft && status !== "Deleted" ? [{ label: "Xuất bản bản nháp", icon: Send, onSelect: () => start({ kind: "publish" }), disabled: publishReasons.length > 0, hint: publishReasons[0] }] : []),
+    ...(version?.data.id === item.id && !isDraft && status !== "Deleted" ? [{ label: `Tạo bản nháp mới từ v${item.versionNumber}`, icon: FilePlus2, onSelect: () => start({ kind: "newVersion" }) }] : []),
+  ];
+
+  const lifecycleButtons = lifecycleFor[status].map((op) => <Button key={op} variant={lifecycleCopy[op].danger ? "danger" : op === "show" || op === "restore" ? "primary" : "secondary"} disabled={busy} onClick={() => start({ kind: "lifecycle", operation: op })}>{lifecycleCopy[op].label}</Button>);
+
+  return <div className="ops-stack" data-testid="learn-post-editor">
+    <header className="learn-editor-head">
+      <Button size="icon" variant="quiet" aria-label="Về danh sách" onClick={() => guard(onBack)}><ArrowLeft size={18} aria-hidden="true" /></Button>
+      <div className="learn-editor-head-text">
+        <p className="learn-eyebrow">Learn CMS · {kindLabel[form.kind]}{version ? ` · v${version.data.versionNumber} (${versionStatusView[version.data.status].label.toLowerCase()})` : ""}</p>
+        <h2>{title}</h2>
+        <p className="learn-list-note">{post.data.slug}</p>
+      </div>
+      <div className="learn-editor-head-actions">
         <StatusBadge tone={statusView.tone}>{statusView.label}</StatusBadge>
         {dirty && <StatusBadge tone="warning">Chưa lưu</StatusBadge>}
-        {!readOnly && <Button disabled={busy || !dirty} onClick={() => void save()}><Save size={16} aria-hidden="true" />{busy ? "Đang lưu…" : "Lưu bản nháp"}</Button>}
-      </>}
-      bodyClassName="ops-stack"
-    >
-      <Alert tone={status === "Deleted" ? "warning" : "info"} title={`Trạng thái: ${statusView.label}`}>{statusView.visibility}</Alert>
-      {isDraft === false && status !== "Deleted" && version && <Alert tone="info" title="Đang xem bản đã xuất bản (bất biến)" action={<Button size="sm" className="mt-3" disabled={busy} onClick={() => { setOperationError(null); setOperation({ kind: "newVersion" }); }}><FilePlus2 size={16} aria-hidden="true" />Tạo bản nháp mới từ v{version.data.versionNumber}</Button>}>Không sửa trực tiếp bản đã xuất bản. Tạo bản nháp mới để chỉnh sửa; bản công khai hiện tại giữ nguyên tới khi bản mới được xuất bản.</Alert>}
-      {status === "Deleted" && <Alert tone="warning" title="Bài đã bị xóa mềm">Khôi phục bài ở thẻ “Xuất bản và hiển thị” trước khi sửa, tạo bản nháp hay xuất bản.</Alert>}
+        {!readOnly && <SubmitButton state={saveState} disabled={busy || !dirty} doneLabel="Đã lưu" onClick={() => void save()}>Lưu bản nháp</SubmitButton>}
+        {isDraft && status !== "Deleted" && <Button disabled={busy || publishReasons.length > 0} title={publishReasons[0]} onClick={() => start({ kind: "publish" })}><Send size={16} aria-hidden="true" />Xuất bản v{version?.data.versionNumber}</Button>}
+      </div>
+    </header>
+
+    <SubTabs label="Trình soạn bài" value={screen} onValueChange={(value) => onTab(value === "content" ? "" : value)} items={SCREENS} />
+
+    {(error || conflict || (showIssues && (clientIssues.length > 0 || refusedVideo) && !readOnly)) && <div className="ops-stack">
       {error && <Alert tone={error.kind === "stale" ? "warning" : "danger"} title={error.title}><ErrorList view={error} /></Alert>}
       {conflict && <Alert tone="warning" title="Đối chiếu với bản mới nhất trên máy chủ" action={<div className="ops-actions" style={{ marginTop: 10 }}>
         <Button size="sm" variant="secondary" onClick={takeServerVersion}>Tải bản mới (bỏ thay đổi của tôi)</Button>
         {conflictPublished
-          ? <Button size="sm" onClick={() => { keepMine(); setOperationError(null); setOperation({ kind: "newVersion" }); }}>Tạo bản nháp mới từ nội dung của tôi</Button>
+          ? <Button size="sm" onClick={() => { keepMine(); start({ kind: "newVersion" }); }}>Tạo bản nháp mới từ nội dung của tôi</Button>
           : <Button size="sm" variant="quiet" onClick={keepMine}>Giữ nội dung của tôi</Button>}
       </div>}>
         {conflictPublished ? "Bản nháp này đã được xuất bản ở nơi khác nên không sửa được nữa. " : ""}
@@ -247,35 +284,61 @@ function EditorBody({ accessToken, initialPost, initialVersion, tab, onTab, onBa
       </Alert>}
       {showIssues && clientIssues.length > 0 && !readOnly && <Alert tone="danger" title={`Còn ${clientIssues.length} điểm cần sửa trước khi lưu`}><ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc" }}>{clientIssues.map((issue, index) => <li key={`${issue.path}-${index}`}>{issue.message}</li>)}</ul></Alert>}
       {showIssues && refusedVideo && <Alert tone="danger" title="Có liên kết video bị máy chủ từ chối">Sửa hoặc xóa khối video đó trước khi lưu.</Alert>}
-    </Panel>
+    </div>}
 
-    <ContentFields
-      accessToken={accessToken} form={form} onChange={(update) => setForm(update)} readOnly={readOnly} busy={busy} issues={shownIssues}
-      checks={media.checks} onCheck={(blockId, url) => void media.check(blockId, url)} sourceFlags={flags} onKnownSources={known}
-      tab={tab} onTab={onTab} label="Soạn bài"
-      extraTabs={[
-        { value: "versions", label: "Phiên bản", content: <Panel title="Phiên bản" description="Bản đã xuất bản bất biến; mỗi lần sửa nội dung tạo một bản nháp mới. Chọn một phiên bản để mở." bodyClassName="ops-stack">
-          <Table caption="Các phiên bản của bài">
-            <thead><tr><th>Phiên bản</th><th>Trạng thái</th><th>Tiêu đề</th><th>ETag</th><th>Cập nhật</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
-            <tbody>{versions.map((item) => <tr key={item.id}>
-              <td className="ops-cell-primary">v{item.versionNumber}</td>
-              <td><span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}><StatusBadge tone={versionStatusView[item.status].tone}>{versionStatusView[item.status].label}</StatusBadge>{post.data.publishedVersionId === item.id && <StatusBadge tone="ember">Đang công khai</StatusBadge>}{version?.data.id === item.id && <StatusBadge tone="info">Đang mở</StatusBadge>}</span></td>
-              <td>{item.title}</td>
-              <td><code style={{ fontSize: 12 }}>{`"${item.revision}"`}</code></td>
-              <td>{formatDateTime(item.updatedAt)}</td>
-              <td className="ops-cell-actions">{version?.data.id !== item.id && <Button size="sm" variant="quiet" aria-label={`Mở phiên bản ${item.versionNumber}`} onClick={() => (dirty ? setLeaving(() => () => onOpenVersion(item.id)) : onOpenVersion(item.id))}>Mở</Button>}</td>
-            </tr>)}</tbody>
-          </Table>
-        </Panel> },
-        { value: "publish", label: "Xuất bản và hiển thị", content: <PublishPanel post={post.data} postEtag={post.etag} version={version?.data ?? null} versionEtag={version?.etag ?? null} dirty={dirty} busy={busy}
-          publishBlockers={publishBlockers}
-          onPublish={() => { setOperationError(null); setOperation({ kind: "publish" }); }}
-          onLifecycle={(op) => { setOperationError(null); setOperation({ kind: "lifecycle", operation: op }); }}
-          onNewVersion={() => { setOperationError(null); setOperation({ kind: "newVersion" }); }} /> },
-      ]}
-    />
+    {screen === "content" && <div className="learn-editor">
+      <div className="ops-stack learn-editor-main">
+        {!isDraft && status !== "Deleted" && version && <Alert tone="info" title="Đang xem bản đã xuất bản (bất biến)" action={<Button size="sm" className="mt-3" disabled={busy} onClick={() => start({ kind: "newVersion" })}><FilePlus2 size={16} aria-hidden="true" />Tạo bản nháp mới từ v{version.data.versionNumber}</Button>}>Không sửa trực tiếp bản đã xuất bản. Tạo bản nháp mới để chỉnh sửa; bản công khai hiện tại giữ nguyên tới khi bản mới được xuất bản.</Alert>}
+        {status === "Deleted" && <Alert tone="warning" title="Bài đã bị xóa mềm">Khôi phục bài (thẻ Trạng thái hoặc “Phiên bản & Xuất bản”) trước khi sửa, tạo bản nháp hay xuất bản.</Alert>}
+        <Panel title="Khối nội dung" description="Văn bản thuần, danh sách, ảnh https và liên kết video YouTube/Facebook/TikTok. Không nhận HTML, iframe hay script." bodyClassName="ops-stack">
+          <fieldset disabled={busy} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
+            <BlockEditor blocks={form.blocks} disabled={readOnly} issues={shownIssues} checks={media.checks} onCheck={(blockId, url) => void media.check(blockId, url)} onChange={(blocks) => setForm((current) => ({ ...current, blocks }))} />
+          </fieldset>
+        </Panel>
+        <Panel title="Nguồn Common" description="Bản nháp có thể trích nguồn Common chưa duyệt; xuất bản cần mọi nguồn đã duyệt và còn hiệu lực." bodyClassName="ops-stack">
+          <SourcePicker accessToken={accessToken} selected={form.sources} flags={flags} known={known} disabled={readOnly || busy}
+            onAdd={(source) => setForm((current) => current.sources.some((entry) => entry.sourceId === source.id && entry.role === "Reference") ? current : { ...current, sources: [...current.sources, { sourceId: source.id, role: "Reference", locator: {}, title: source.title, versionLabel: source.versionLabel }] })}
+            onRemove={(index) => setForm((current) => ({ ...current, sources: current.sources.filter((_, position) => position !== index) }))}
+            onRole={(index, role) => setForm((current) => ({ ...current, sources: current.sources.map((entry, position) => (position === index ? { ...entry, role } : entry)) }))} />
+          {issueFor("$.sources") && <p role="alert" className="ops-field-error" style={{ margin: 0 }}>{issueFor("$.sources")}</p>}
+        </Panel>
+      </div>
+      <aside className="ops-stack learn-editor-side" aria-label="Thông tin và trạng thái bài">
+        <Panel title="Thông tin bài" bodyClassName="ops-stack">
+          <ContentFields accessToken={accessToken} form={form} onChange={(update) => setForm(update)} readOnly={readOnly} busy={busy} issues={shownIssues} />
+        </Panel>
+        <Panel title="Trạng thái" bodyClassName="ops-stack">
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <StatusBadge tone={statusView.tone}>{statusView.label}</StatusBadge>
+            {version && <StatusBadge tone={versionStatusView[version.data.status].tone}>{versionStatusView[version.data.status].label}</StatusBadge>}
+          </div>
+          <Rows items={[
+            { label: "Phiên bản đang mở", value: version ? `v${version.data.versionNumber}` : "—" },
+            { label: "Bản công khai", value: post.data.publishedVersion ? `v${post.data.publishedVersion.versionNumber}` : "Chưa có" },
+            { label: "Lưu lần cuối", value: formatDateTime(version?.data.updatedAt ?? post.data.updatedAt) },
+            { label: "ETag", value: <code className="ops-mono">{version?.etag ?? post.etag}</code> },
+          ]} />
+          <p className="learn-list-note">{statusView.visibility}</p>
+          {lifecycleButtons.length > 0 && <div className="learn-actions-col">{lifecycleButtons}</div>}
+          {isDraft && status !== "Deleted" && publishReasons.length > 0 && <ul className="learn-reasons">{publishReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>}
+        </Panel>
+      </aside>
+    </div>}
 
-    {operation && <Modal open onOpenChange={(open) => { if (!open) closeOperation(); }}
+    {screen === "publish" && <div className="ops-stack">
+      <DataTable caption="Các phiên bản của bài" data-testid="learn-versions-table" columns={versionColumns} rows={versions} rowKey={(item) => item.id}
+        onRowClick={(item) => { if (version?.data.id !== item.id) guard(() => onOpenVersion(item.id)); }}
+        rowMenu={versionMenu}
+        toolbar={<div><strong style={{ fontSize: 15 }}>Lịch sử phiên bản</strong><p className="learn-list-note">Bản đã xuất bản bất biến; mỗi lần sửa nội dung tạo một bản nháp mới. Bấm một phiên bản để mở.</p></div>}
+        empty={<EmptyState icon={FilePlus2} title="Bài chưa có phiên bản" description="Tạo bản nháp đầu tiên từ thẻ Nội dung." />} />
+      <PublishPanel post={post.data} postEtag={post.etag} version={version?.data ?? null} versionEtag={version?.etag ?? null} dirty={dirty} busy={busy}
+        publishBlockers={publishBlockers}
+        onPublish={() => start({ kind: "publish" })}
+        onLifecycle={(op) => start({ kind: "lifecycle", operation: op })}
+        onNewVersion={() => start({ kind: "newVersion" })} />
+    </div>}
+
+    {operation && <Modal open onOpenChange={(open) => { if (!open) closeOperation(); }} size="sm"
       title={operation.kind === "publish" ? "Xuất bản bản nháp này?" : operation.kind === "newVersion" ? "Tạo bản nháp mới?" : operationCopy?.title ?? ""}
       description={operation.kind === "publish" ? "Bản nháp trở thành bản công khai và bất biến. Muốn sửa tiếp phải tạo bản nháp mới." : operation.kind === "newVersion" ? "Bản nháp mới được tạo từ nội dung đang hiển thị ở đây. Bản công khai hiện tại giữ nguyên." : lifecycleBody(operation.operation, !!post.data.publishedVersionId)}
       footer={<>
@@ -294,10 +357,10 @@ function EditorBody({ accessToken, initialPost, initialVersion, tab, onTab, onBa
       </div>
     </Modal>}
 
-    <Modal open={leaving !== null} onOpenChange={(open) => { if (!open) setLeaving(null); }} title="Bỏ thay đổi chưa lưu?" description="Nội dung bạn vừa sửa chưa được lưu và sẽ mất nếu rời khỏi bản này."
+    <Modal open={leaving !== null} onOpenChange={(open) => { if (!open) setLeaving(null); }} size="sm" title="Bỏ thay đổi chưa lưu?" description="Nội dung bạn vừa sửa chưa được lưu và sẽ mất nếu rời khỏi bản này."
       footer={<><Button variant="quiet" onClick={() => setLeaving(null)}>Tiếp tục sửa</Button><Button variant="danger" onClick={() => { const go = leaving; setLeaving(null); go?.(); }}>Bỏ thay đổi</Button></>}>
       <p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>Bấm “Lưu bản nháp” để giữ lại.</p>
     </Modal>
-    <p className="ops-field-hint" style={{ margin: 0 }}><RefreshCw size={12} aria-hidden="true" style={{ verticalAlign: "-1px" }} /> Dữ liệu lấy từ máy chủ. <button type="button" className="ops-link-button" onClick={onReload} style={{ background: "none", border: 0, padding: 0, color: "var(--ember)", textDecoration: "underline", cursor: "pointer", font: "inherit" }}>Tải lại bài</button> sẽ bỏ thay đổi chưa lưu.</p>
+    <p className="learn-list-note"><RefreshCw size={12} aria-hidden="true" style={{ verticalAlign: "-1px" }} /> Dữ liệu lấy từ máy chủ. <button type="button" className="learn-link-button" onClick={onReload}>Tải lại bài</button> sẽ bỏ thay đổi chưa lưu.</p>
   </div>;
 }

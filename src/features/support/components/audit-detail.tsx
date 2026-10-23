@@ -1,11 +1,11 @@
 "use client";
 
-import { LockKeyhole } from "lucide-react";
+import { Filter, LockKeyhole } from "lucide-react";
 import { ApiError } from "@/api";
 import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { SkeletonRows } from "@/components/ui/skeleton";
+import { SkeletonDetail } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table } from "@/components/ui/table";
 import { formatDateTime } from "@/utils/date-range";
@@ -35,8 +35,8 @@ function Changes({ changes }: { changes: AuditFieldChange[] }) {
 }
 
 /**
- * One audit record from `GET /api/admin/audit-logs/{id}`: metadata with display names, the allowlisted field changes and
- * whether an administrative reason was recorded. The reason itself is free text and is deliberately not shown here.
+ * One audit record from `GET /api/admin/audit-logs/{id}` (drawer body): metadata with display names, the allowlisted
+ * field changes and whether an administrative reason was recorded. The reason itself is free text and is never shown.
  */
 export function AuditDetail({ id, accessToken, onFilter }: { id: string; accessToken: string; onFilter: (patch: FilterPatch) => void }) {
   const detail = useAsyncData(`audit-detail:${id}`, (signal) => supportApi.getAuditLog(accessToken, id, signal), true);
@@ -47,7 +47,7 @@ export function AuditDetail({ id, accessToken, onFilter }: { id: string; accessT
       const missing = detail.error instanceof ApiError && detail.error.status === 404;
       return <Alert tone="danger" title={missing ? "Không tìm thấy bản ghi" : "Không mở được bản ghi audit"} action={missing ? undefined : <Button size="sm" variant="secondary" className="mt-3" onClick={detail.reload}>Thử lại</Button>}>{missing ? "Bản ghi không tồn tại hoặc không còn truy cập được." : "Hãy kiểm tra kết nối rồi thử lại."}</Alert>;
     }
-    return <SkeletonRows rows={6} label="Đang tải bản ghi audit…" />;
+    return <SkeletonDetail rows={8} />;
   }
 
   const rows: Array<[string, string, FilterPatch | null, boolean]> = [
@@ -63,12 +63,12 @@ export function AuditDetail({ id, accessToken, onFilter }: { id: string; accessT
     ["Mã bản ghi", log.id, null, true],
   ];
 
-  return <div className="ops-stack">
-    <Alert tone="info">Chỉ hiển thị metadata và các trường thay đổi được backend cho phép (trạng thái, mã, thời điểm, số liệu). Không có mật khẩu, token, nội dung ticket hay dữ liệu cá nhân.</Alert>
-    <dl className={styles.meta}>
+  return <div className="ops-stack" data-testid="audit-detail">
+    <div className={styles.ticketHead}><StatusBadge tone="neutral">{log.action}</StatusBadge><StatusBadge tone="info">Chỉ metadata</StatusBadge></div>
+    <dl className="ops-kv">
       {rows.map(([label, value, filter, mono]) => <div key={label} style={{ display: "contents" }}>
         <dt>{label}</dt>
-        <dd><span className={mono ? styles.mono : undefined}>{value}</span>{filter && <> <Button size="sm" variant="quiet" onClick={() => onFilter(filter)} aria-label={`Lọc theo ${label.toLowerCase()}`} style={{ minHeight: 28, padding: "0 8px", marginLeft: 6 }}>Lọc</Button></>}</dd>
+        <dd><span className={mono ? styles.mono : undefined}>{value}</span>{filter && <> <Button size="sm" variant="quiet" onClick={() => onFilter(filter)} aria-label={`Lọc theo ${label.toLowerCase()}`} style={{ minHeight: 28, padding: "0 8px", marginLeft: 6 }}><Filter size={12} aria-hidden="true" />Lọc</Button></>}</dd>
       </div>)}
     </dl>
     <section className={styles.section} aria-label="Thay đổi">
@@ -76,5 +76,6 @@ export function AuditDetail({ id, accessToken, onFilter }: { id: string; accessT
       <Changes changes={log.changes ?? []} />
     </section>
     {log.reason && <p className={styles.muted} style={{ display: "flex", alignItems: "center", gap: 8 }}><LockKeyhole size={16} aria-hidden="true" /><StatusBadge tone="neutral">Có lý do quản trị</StatusBadge>Lý do là văn bản tự do nên không hiển thị ở giao diện này.</p>}
+    <Alert tone="info">Chỉ hiển thị metadata và các trường thay đổi được backend cho phép (trạng thái, mã, thời điểm, số liệu). Không có mật khẩu, token, nội dung ticket hay dữ liệu cá nhân.</Alert>
   </div>;
 }

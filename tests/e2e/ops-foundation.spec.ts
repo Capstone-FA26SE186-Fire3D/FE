@@ -148,7 +148,8 @@ test.describe("roles and deep links", () => {
     await expect(page).toHaveURL(/page=3/);
     await expect(page.getByText("user3-0@fire3d.test")).toBeVisible();
 
-    await page.getByLabel("Vai trò", { exact: true }).selectOption("1");
+    await page.getByRole("button", { name: /^Vai trò:/ }).click();
+    await page.getByRole("option", { name: "Thành viên tổ chức" }).click();
     await expect(page).toHaveURL(/role=1/);
     await expect(page).not.toHaveURL(/page=/); // changing a filter returns to page 1
     await page.goBack();

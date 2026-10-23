@@ -1,18 +1,18 @@
 "use client";
 
 import { Plus } from "lucide-react";
-import type { ReactNode } from "react";
 import { useUrlParams } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SubTabs } from "@/components/ui/sub-tabs";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
-import { NewPost } from "./new-post";
+import { NewPostModal } from "./new-post";
 import { PostEditor } from "./post-editor";
 import { PostsTab } from "./posts-tab";
 import { SituationsTab } from "./situations-tab";
+import "./learn-quick.css";
 
 const SECTIONS = ["posts", "situations"] as const;
 type Section = (typeof SECTIONS)[number];
@@ -20,10 +20,12 @@ const isSection = (value: string): value is Section => (SECTIONS as readonly str
 /** Parameters owned by one section, cleared when switching so filters never leak across sections. */
 const SECTION_PARAMS = ["page", "status", "q", "active", "quick"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DESCRIPTION = "Bài viết, mẹo và video công khai. Bấm hàng để sửa nhanh; thao tác hợp lệ thay đổi theo trạng thái, Learn không có quy trình duyệt riêng.";
 
 /**
- * PlatformAdmin Learn CMS over the real contract (BE#57/#69). URL state: `?section=posts|situations`, `?post=<id>|new`,
- * `&version=<id>`, `&tab=`, plus the list filters. Role is checked in the client; the API enforces it on every call.
+ * PlatformAdmin Learn CMS over the real contract (BE#57/#69), Admin v2 (Figma 53:758). URL state: `?section=posts|situations`,
+ * `?post=<id>` (editor) or `?post=new` (the "Bài mới" modal over the list), `&version=<id>`, `&tab=content|publish`,
+ * `?quick=<id>` (the quick-edit drawer), plus the list filters. Role is checked in the client; the API enforces it on every call.
  */
 export function LearnCms() {
   const { accessToken, ready, user } = useAuthSession();
@@ -32,37 +34,26 @@ export function LearnCms() {
   const sectionParam = get("section");
   const section: Section = isSection(sectionParam) ? sectionParam : "posts";
 
-  const header = (title: string, description: string, actions?: ReactNode) => <PageHeader eyebrow="Quản lý nội dung" title={title} description={description} breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Learn CMS" }]} actions={actions} />;
-
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
   if (user?.role !== 0 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin có thể quản lý nội dung Learn.</Alert>;
 
-  const tab = get("tab") || "info";
   const closeEditor = () => setParams({ post: null, version: null, tab: null });
+  const openNew = () => setParams({ post: "new", tab: null });
+  const header = <PageHeader eyebrow="Quản lý nội dung" title="Learn CMS" description={DESCRIPTION} breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Learn CMS" }]} actions={!post || post === "new" ? <Button onClick={openNew}><Plus size={16} aria-hidden="true" />Tạo bài</Button> : undefined} />;
 
-  if (post === "new") {
+  if (post && post !== "new") {
+    if (!UUID.test(post)) return <>{header}<Alert tone="danger" title="Đường dẫn bài không hợp lệ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={closeEditor}>Về danh sách</Button>}>Mã bài phải là một UUID.</Alert></>;
     return <>
-      {header("Learn CMS", "Soạn bài viết, mẹo và video ngắn công khai theo tình huống.")}
-      <NewPost accessToken={accessToken} tab={tab} onTab={(value) => setParams({ tab: value }, "replace")} onBack={closeEditor} onCreated={(id) => setParams({ post: id, version: null, tab: null })} />
-    </>;
-  }
-  if (post) {
-    if (!UUID.test(post)) return <>{header("Learn CMS", "Soạn bài viết, mẹo và video ngắn công khai theo tình huống.")}<Alert tone="danger" title="Đường dẫn bài không hợp lệ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={closeEditor}>Về danh sách</Button>}>Mã bài phải là một UUID.</Alert></>;
-    return <>
-      {header("Learn CMS", "Soạn bài viết, mẹo và video ngắn công khai theo tình huống.")}
-      <PostEditor accessToken={accessToken} postId={post} versionId={UUID.test(get("version")) ? get("version") : ""} tab={tab} onTab={(value) => setParams({ tab: value }, "replace")} onBack={closeEditor} onOpenVersion={(id) => setParams({ version: id, tab: null })} />
+      {header}
+      <PostEditor accessToken={accessToken} postId={post} versionId={UUID.test(get("version")) ? get("version") : ""} tab={get("tab")} onTab={(value) => setParams({ tab: value || null }, "replace")} onBack={closeEditor} onOpenVersion={(id) => setParams({ version: id, tab: null })} />
     </>;
   }
 
   return <>
-    {header("Learn CMS", "Bài viết, mẹo và video. Thao tác hợp lệ thay đổi theo trạng thái; Learn không có quy trình duyệt riêng.", <Button onClick={() => setParams({ post: "new", tab: null })}><Plus size={16} aria-hidden="true" />Tạo bài</Button>)}
-    <Tabs value={section} onValueChange={(value) => { if (isSection(value) && value !== section) setParams({ ...Object.fromEntries(SECTION_PARAMS.map((key) => [key, null])), section: value === "posts" ? null : value }); }}>
-      <TabsList aria-label="Learn CMS">
-        <TabsTrigger value="posts">Bài viết</TabsTrigger>
-        <TabsTrigger value="situations">Tình huống</TabsTrigger>
-      </TabsList>
-      <TabsContent value="posts"><PostsTab accessToken={accessToken} onOpen={(id) => setParams({ post: id })} onCreate={() => setParams({ post: "new", tab: null })} /></TabsContent>
-      <TabsContent value="situations"><SituationsTab accessToken={accessToken} /></TabsContent>
-    </Tabs>
+    {header}
+    <SubTabs label="Learn CMS" value={section} className="mb-4" onValueChange={(value) => { if (isSection(value) && value !== section) setParams({ ...Object.fromEntries(SECTION_PARAMS.map((key) => [key, null])), section: value === "posts" ? null : value }); }}
+      items={[{ value: "posts", label: "Bài viết" }, { value: "situations", label: "Tình huống" }]} />
+    {section === "posts" ? <PostsTab accessToken={accessToken} onOpen={(id) => setParams({ post: id, quick: null })} onCreate={openNew} /> : <SituationsTab accessToken={accessToken} />}
+    {post === "new" && <NewPostModal accessToken={accessToken} onClose={() => setParams({ post: null })} onCreated={(id) => setParams({ post: id, version: null, tab: null })} />}
   </>;
 }

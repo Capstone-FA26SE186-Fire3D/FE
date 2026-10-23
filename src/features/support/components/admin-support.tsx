@@ -3,21 +3,25 @@
 import { useUrlParams } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
 import { PageHeader } from "@/components/ui/page-header";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SubTabs } from "@/components/ui/sub-tabs";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { AdminFeedbackTab } from "./admin-feedback-tab";
 import { AdminTicketsTab } from "./admin-tickets-tab";
 import { AuditLogTab } from "./audit-log-tab";
-import { RecentAudit } from "./recent-audit";
+import "@/assets/styles/ops-v2.css";
 
 const TABS = ["tickets", "feedback", "audit"] as const;
 type TabKey = (typeof TABS)[number];
 const isTab = (value: string): value is TabKey => (TABS as readonly string[]).includes(value);
 
 /** Every URL parameter owned by a tab; switching tabs clears them so filters never leak across tabs. */
-const TAB_PARAMS = ["page", "ticket", "status", "priority", "assignedTo", "organizationId", "fbStatus", "fbOrganizationId", "feedback", "log", "actorId", "action", "targetId", "correlationId", "from", "to"];
+const TAB_PARAMS = ["page", "q", "ticket", "status", "priority", "assignedTo", "organizationId", "fbStatus", "fbOrganizationId", "feedback", "log", "actorId", "action", "targetId", "correlationId", "from", "to"];
 
+/**
+ * `/admin/support` (Figma Admin v2 "Hỗ trợ & audit"): three sub-tabs — the ticket queue, product feedback and the
+ * audit log. The audit log lives only here; each list is a DataTable whose row opens a drawer.
+ */
 export function AdminSupport() {
   const { accessToken, ready, user } = useAuthSession();
   const { get, setParams } = useUrlParams();
@@ -35,22 +39,16 @@ export function AdminSupport() {
   return <>
     <PageHeader
       eyebrow="Xử lý công việc"
-      title="Hỗ trợ & audit"
-      description="Hàng đợi hỗ trợ và nhật ký thao tác quan trọng. Số lượng lấy từ máy chủ."
+      title="Hỗ trợ và audit"
+      description="Hàng đợi hỗ trợ và nhật ký thao tác quan trọng. Audit chỉ nằm ở trang này; số lượng lấy từ máy chủ."
       breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Hỗ trợ & audit" }]}
     />
-    <Tabs value={tab} onValueChange={changeTab}>
-      <TabsList aria-label="Hỗ trợ và audit">
-        <TabsTrigger value="tickets">Ticket</TabsTrigger>
-        <TabsTrigger value="feedback">Phản hồi</TabsTrigger>
-        <TabsTrigger value="audit">Nhật ký audit</TabsTrigger>
-      </TabsList>
-      <TabsContent value="tickets">
-        <AdminTicketsTab accessToken={accessToken} myId={user.id} />
-        <RecentAudit accessToken={accessToken} onOpenAll={() => changeTab("audit")} />
-      </TabsContent>
-      <TabsContent value="feedback"><AdminFeedbackTab accessToken={accessToken} /></TabsContent>
-      <TabsContent value="audit"><AuditLogTab accessToken={accessToken} /></TabsContent>
-    </Tabs>
+    <SubTabs label="Hỗ trợ và audit" value={tab} onValueChange={changeTab} items={[{ value: "tickets", label: "Ticket" }, { value: "feedback", label: "Phản hồi" }, { value: "audit", label: "Nhật ký audit" }]}>
+      <div className="ops-subtabs-content">
+        {tab === "tickets" && <AdminTicketsTab accessToken={accessToken} myId={user.id} />}
+        {tab === "feedback" && <AdminFeedbackTab accessToken={accessToken} />}
+        {tab === "audit" && <AuditLogTab accessToken={accessToken} />}
+      </div>
+    </SubTabs>
   </>;
 }

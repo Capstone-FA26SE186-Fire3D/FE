@@ -1,7 +1,10 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { admin, callsTo, etagOf, ids, mockBilling, newMock, owner, queue, signIn } from "./billing-mock";
 
 // Route-mock evidence only (not the real BE). Both sides share one stateful mock, like one server.
+
+// Admin DataTable rows: `<tr>` on desktop, cards under 640px.
+const enterpriseRows = (page: Page) => page.getByTestId("admin-enterprise-table").locator("tbody tr, li.ops-dt-card");
 
 const request = (overrides: Record<string, unknown> = {}) => ({ id: ids.enterprise, organizationId: "org-1", requestedBuildingCount: 150, requestedDurationMonths: 12, contactName: "Trần B", contactEmail: "b@fire3d.test", contactPhone: null, notes: "Chuỗi trường học", status: "New", createdAt: "2026-10-09T00:00:00Z", revision: 1, quotationId: null, assignedTo: null, closedAt: null, closeReason: null, ...overrides });
 
@@ -68,10 +71,10 @@ test.describe("enterprise requests: administrator side (mock)", () => {
     await signIn(page, admin);
     await mockBilling(page, mock);
     await page.goto("/admin/commerce?tab=enterprise");
-    await expect(page.getByTestId("enterprise-row")).toHaveCount(2);
-    await expect(page.getByTestId("enterprise-row").first()).toContainText("FET3D Lab");
-    await expect(page.getByTestId("enterprise-row").first()).toContainText("150 công trình");
-    await expect(page.getByTestId("enterprise-row").nth(1)).toContainText("Đã phân công");
+    await expect(enterpriseRows(page)).toHaveCount(2);
+    await expect(enterpriseRows(page).first()).toContainText("FET3D Lab");
+    await expect(enterpriseRows(page).first()).toContainText("150 công trình");
+    await expect(enterpriseRows(page).nth(1)).toContainText("Đã phân công");
     await expect(page.getByText("Chờ BE: xử lý yêu cầu liên hệ")).toHaveCount(0);
   });
 
@@ -201,7 +204,7 @@ for (const theme of ["light", "dark"] as const) {
       await signIn(page, admin);
       await mockBilling(page, mock);
       await page.goto("/admin/commerce?tab=enterprise");
-      await expect(page.getByTestId("enterprise-row")).toBeVisible();
+      await expect(enterpriseRows(page).first()).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       await page.goto(`/admin/commerce?tab=enterprise&request=${ids.enterprise}`);
       await expect(page.getByTestId("enterprise-admin-detail")).toBeVisible();

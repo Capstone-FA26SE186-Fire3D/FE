@@ -319,7 +319,7 @@ test.describe("organization analytics", () => {
 });
 
 test.describe("admin analytics", () => {
-  test("overview tabs: training with organization names and links, revenue per currency, revenue is requested only when its tab opens", async ({ page }) => {
+  test("overview tabs: training with organization names and links, revenue per currency; the overview tiles read each default report once", async ({ page }) => {
     const urls: string[] = [];
     await signIn(page, admin);
     await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Trường An Toàn", slug: "an-toan", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }], totalCount: 1, page: 1, pageSize: 100 } }));
@@ -329,10 +329,14 @@ test.describe("admin analytics", () => {
       return route.fulfill({ json: path.endsWith("/operations") ? platformOps() : path.endsWith("/training") ? platformTraining() : revenue() });
     });
     await page.goto("/admin/overview");
-    await expect(kpi(page, "kpi-accounts")).toHaveText("45");
+    // "kpi-accounts" exists twice: the overview's system tile and the operations report's own tile (same figure).
+    await expect(page.getByRole("group", { name: "Chỉ số vận hành" }).getByTestId("kpi-accounts").locator(".ops-kpi-value")).toHaveText("45");
+    await expect(page.getByRole("group", { name: "Tổng quan hệ thống" }).getByTestId("kpi-accounts").locator(".ops-kpi-value")).toHaveText("45");
+    await expect(kpi(page, "kpi-sessions")).toHaveText("40"); // default training report: plays
+    await expect(kpi(page, "kpi-payments")).toHaveText("7"); // default revenue report: 2 USD + 5 VND transactions
     await expect(page.locator("#ops-main").getByText("Chờ BE")).toHaveCount(0);
-    // The report section asks for operations; the "Phiên 30 ngày" tile reads the default training report. Revenue waits for its tab.
-    expect([...urls].sort()).toEqual(["/api/admin/analytics/operations", "/api/admin/analytics/training"]);
+    // The report section asks for operations; the "Phiên 30 ngày" and "Thanh toán 30 ngày" tiles read the default training and revenue reports once each.
+    expect([...urls].sort()).toEqual(["/api/admin/analytics/operations", "/api/admin/analytics/revenue", "/api/admin/analytics/training"]);
     // Platform-only cards: accounts by role (bar, one colour per role) and organizations (donut).
     await expect(page.getByTestId("chart-accounts").getByRole("list", { name: "Chú giải" }).getByRole("listitem")).toHaveText([/Học viên\s*40/, /Tổ chức\s*5/]);
     await expect(page.getByTestId("chart-organizations").getByRole("list", { name: "Giá trị" }).getByRole("listitem")).toHaveText([/Hoạt động\s*5/, /Vô hiệu\s*1/]);
@@ -409,7 +413,7 @@ test.describe("admin analytics", () => {
     await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [{ id: "org-1", name: "Fire3D Lab", slug: "fire3d-lab", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }], totalCount: 1, page: 1, pageSize: 20 } }));
     await page.route("**/api/organizations/org-1", (route) => route.fulfill({ json: { id: "org-1", name: "Fire3D Lab", slug: "fire3d-lab", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }, headers: { ETag: '"1"' } }));
     await page.goto("/admin/organizations?organization=org-1");
-    await expect(page.getByRole("region", { name: "Thông tin tổ chức" }).getByRole("link", { name: "Xem báo cáo" })).toHaveAttribute("href", "/admin/organizations/org-1/analytics");
+    await expect(page.getByTestId("organization-drawer").getByRole("link", { name: "Xem báo cáo" })).toHaveAttribute("href", "/admin/organizations/org-1/analytics");
   });
 });
 

@@ -53,7 +53,7 @@ test.describe("admin organization profile", () => {
     await signIn(page, admin);
     await mockOrganizations(page, org);
     await page.goto("/admin/organizations?organization=org-1");
-    const drawer = page.getByRole("region", { name: "Thông tin tổ chức" });
+    const drawer = page.getByTestId("organization-drawer");
     await expect(drawer.getByText("1 Lê Lợi, Đà Nẵng")).toBeVisible();
     await expect(drawer.getByText("+842361234567")).toBeVisible();
     await expect(drawer.getByText("2 công trình · 5 tài khoản")).toBeVisible();
@@ -66,9 +66,9 @@ test.describe("admin organization profile", () => {
     expect(org.patches).toEqual([{ ifMatch: '"3"', body: { name: "Fire3D Lab Việt Nam" } }]);
 
     await page.reload();
-    await expect(page.getByRole("region", { name: "Thông tin tổ chức" }).getByText("Fire3D Lab Việt Nam").first()).toBeVisible();
+    await expect(page.getByTestId("organization-drawer").getByText("Fire3D Lab Việt Nam").first()).toBeVisible();
     await page.keyboard.press("Escape");
-    await expect(page.getByRole("button", { name: "Fire3D Lab Việt Nam fire3d-lab" })).toBeVisible();
+    await expect(page.getByTestId("organizations-table").getByRole("row", { name: /Fire3D Lab Việt Nam/ })).toBeVisible();
   });
 
   test("412 keeps the typed values, loads the newer version to compare and saves with the new ETag", async ({ page }) => {
@@ -76,7 +76,7 @@ test.describe("admin organization profile", () => {
     await signIn(page, admin);
     await mockOrganizations(page, org);
     await page.goto("/admin/organizations?organization=org-1");
-    const drawer = page.getByRole("region", { name: "Thông tin tổ chức" });
+    const drawer = page.getByTestId("organization-drawer");
     await drawer.getByRole("button", { name: "Sửa hồ sơ" }).click();
     await drawer.getByLabel("Địa chỉ").fill("99 Nguyễn Văn Linh");
     // Someone else edits the phone number first.
@@ -100,7 +100,7 @@ test.describe("admin organization profile", () => {
     await signIn(page, admin);
     await mockOrganizations(page, org);
     await page.goto("/admin/organizations?organization=org-1");
-    const drawer = page.getByRole("region", { name: "Thông tin tổ chức" });
+    const drawer = page.getByTestId("organization-drawer");
     await drawer.getByRole("button", { name: "Sửa hồ sơ" }).click();
     await drawer.getByLabel("Số điện thoại").fill("+84999999999");
     await drawer.getByRole("button", { name: "Lưu hồ sơ" }).click();
@@ -114,7 +114,7 @@ test.describe("admin organization profile", () => {
     await signIn(page, admin);
     await mockOrganizations(page, org);
     await page.goto("/admin/organizations?organization=org-1");
-    const drawer = page.getByRole("region", { name: "Thông tin tổ chức" });
+    const drawer = page.getByTestId("organization-drawer");
     await drawer.getByRole("button", { name: "Sửa hồ sơ" }).click();
     await drawer.getByLabel("Địa chỉ").fill("");
     await drawer.getByRole("button", { name: "Lưu hồ sơ" }).click();
@@ -128,7 +128,7 @@ test.describe("admin organization profile", () => {
     await signIn(page, admin);
     await mockOrganizations(page, org);
     await page.goto("/admin/organizations?organization=org-1");
-    const drawer = page.getByRole("region", { name: "Thông tin tổ chức" });
+    const drawer = page.getByTestId("organization-drawer");
     await drawer.getByRole("button", { name: "Sửa hồ sơ" }).click();
     await drawer.getByRole("button", { name: "Tải lại tổ chức" }).click();
     await drawer.getByLabel("Tên tổ chức").fill("Tên đang gõ");
@@ -149,7 +149,7 @@ test.describe("admin organization profile", () => {
     status = 200;
     await page.route("**/api/organizations/org-1", (route) => route.fulfill({ json: { id: "org-1", name: "Phục hồi", slug: "phuc-hoi", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" } }));
     await page.getByRole("button", { name: "Thử lại" }).click();
-    await expect(page.getByRole("region", { name: "Thông tin tổ chức" }).getByText("Phục hồi").first()).toBeVisible();
+    await expect(page.getByTestId("organization-drawer").getByText("Phục hồi").first()).toBeVisible();
     // No counts and no revision from an older deployment: still readable, edit stays safe (no ETag, no save).
     await expect(page.getByText("công trình ·")).toHaveCount(0);
   });
@@ -188,8 +188,8 @@ test.describe("who sent it", () => {
     // Email is not in the list, only in the detail (admin response).
     await expect(page.getByText("b@school.test")).toHaveCount(0);
 
-    await page.getByRole("button", { name: /Mở ticket SUP-0001/ }).click();
-    const drawer = page.getByRole("region", { name: "Chi tiết ticket" });
+    await row.click();
+    const drawer = page.getByTestId("admin-ticket-drawer");
     await expect(drawer.getByText("b@school.test")).toBeVisible();
     await expect(drawer.getByText("Trường An Toàn")).toBeVisible();
     await expect(drawer.getByRole("listitem").filter({ hasText: "Em cần hỗ trợ gấp" }).getByText("Trần Thị B")).toBeVisible();
@@ -216,14 +216,15 @@ test.describe("who sent it", () => {
     const row = page.getByRole("row").filter({ hasText: "Nút hơi nhỏ" });
     await expect(row.getByText("Trần Thị B")).toBeVisible();
     await expect(row.getByText("Trường An Toàn")).toBeVisible();
-    await row.getByRole("button", { name: "Mở phản hồi Giao diện" }).click();
-    const drawer = page.getByRole("dialog", { name: "Chi tiết phản hồi" });
+    await row.click();
+    const drawer = page.getByTestId("admin-feedback-drawer");
     await expect(page).toHaveURL(/feedback=f-1/);
     await expect(drawer.getByText("b@school.test")).toBeVisible();
-    await drawer.getByLabel("Trạng thái xử lý").selectOption("Reviewed");
+    await drawer.getByLabel("Trạng thái xử lý").click();
+    await page.getByRole("option", { name: "Đã xem" }).click();
     await drawer.getByRole("button", { name: "Lưu trạng thái" }).click();
     await expect.poll(() => patches).toEqual(['"support-5"']);
-    await expect(drawer.getByLabel("Trạng thái xử lý")).toHaveValue("Reviewed");
+    await expect(drawer.getByLabel("Trạng thái xử lý")).toContainText("Đã xem");
 
     // Deep link and reload restore the saved state from the server.
     await page.reload();
@@ -240,11 +241,12 @@ test.describe("who sent it", () => {
     await page.route("**/api/admin/feedback/f-1", (route) => route.fulfill({ headers: { ETag: '"support-1"' }, json: listItem }));
     await page.route("**/api/admin/feedback/f-1/status", (route) => route.fulfill(mode === "412" ? { status: 412, json: { code: "PRECONDITION_FAILED" } } : { status: 404, json: { code: "NOT_FOUND" } }));
     await page.goto("/admin/support?tab=feedback&feedback=f-1");
-    const drawer = page.getByRole("dialog", { name: "Chi tiết phản hồi" });
-    await drawer.getByLabel("Trạng thái xử lý").selectOption("Reviewed");
+    const drawer = page.getByTestId("admin-feedback-drawer");
+    await drawer.getByLabel("Trạng thái xử lý").click();
+    await page.getByRole("option", { name: "Đã xem" }).click();
     await drawer.getByRole("button", { name: "Lưu trạng thái" }).click();
     await expect(drawer.getByText("Phản hồi vừa được cập nhật ở nơi khác")).toBeVisible();
-    await expect(drawer.getByLabel("Trạng thái xử lý")).toHaveValue("Reviewed");
+    await expect(drawer.getByLabel("Trạng thái xử lý")).toContainText("Đã xem");
     mode = "404";
     await drawer.getByRole("button", { name: "Lưu trạng thái" }).click();
     await expect(drawer.getByText(/không còn khả dụng/)).toBeVisible();
@@ -272,7 +274,7 @@ test.describe("audit detail", () => {
     await expect(page.getByRole("row").filter({ hasText: "Support" }).first().getByText("Trường An Toàn")).toBeVisible();
     await expect(page.getByRole("row").nth(2).getByText("Hệ thống")).toBeVisible();
 
-    await page.getByRole("button", { name: /Xem bản ghi Support/ }).first().click();
+    await page.getByRole("row").filter({ hasText: "Support" }).first().click();
     await expect(page).toHaveURL(new RegExp(`log=${guid(5)}`));
     const drawer = page.getByRole("dialog", { name: "Chi tiết bản ghi audit" });
     const diff = drawer.getByRole("table", { name: "Thay đổi theo từng trường" });
@@ -436,10 +438,12 @@ test.describe("layout", () => {
         await page.route(`**/api/admin/audit-logs/${guid(5)}`, (route) => route.fulfill({ json: { ...auditRow, reason: "x", changes: [{ field: "status", before: "Open", after: "InProgress" }, { field: "assignedTo", before: null, after: guid(1) }] } }));
 
         await page.goto("/admin/support");
-        await expect(page.getByRole("row").filter({ hasText: "SUP-0001" }).getByText("Trần Thị B")).toBeVisible();
+        // Under 640px the DataTable renders cards instead of rows, so the assertions go through the table's test id.
+        const tickets = page.getByTestId("admin-tickets-table");
+        await expect(tickets.getByText("Trần Thị B")).toBeVisible();
         expect(await overflow(page)).toBeLessThanOrEqual(0);
-        await page.getByRole("button", { name: /Mở ticket SUP-0001/ }).click();
-        await expect(page.getByRole("region", { name: "Chi tiết ticket" }).getByText("b@school.test")).toBeVisible();
+        await tickets.getByText("SUP-0001").click();
+        await expect(page.getByTestId("admin-ticket-drawer").getByText("b@school.test")).toBeVisible();
         await page.waitForTimeout(400);
         expect(await overflow(page)).toBeLessThanOrEqual(0);
         await page.screenshot({ path: testInfo.outputPath(`ticket-${scheme}-${width}.png`) });
@@ -451,7 +455,7 @@ test.describe("layout", () => {
         await page.screenshot({ path: testInfo.outputPath(`audit-${scheme}-${width}.png`) });
 
         await page.goto("/admin/organizations?organization=org-1");
-        const drawer = page.getByRole("region", { name: "Thông tin tổ chức" });
+        const drawer = page.getByTestId("organization-drawer");
         await drawer.getByRole("button", { name: "Sửa hồ sơ" }).click();
         await expect(drawer.getByLabel("Số điện thoại")).toBeVisible();
         await page.waitForTimeout(400);

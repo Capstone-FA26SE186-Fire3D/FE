@@ -34,16 +34,16 @@ test("PlatformAdmin creates, reviews and locks an Organization through the Fire3
   await page.goto("/admin/organizations");
   await expect(page.getByRole("heading", { name: "Tổ chức", exact: true })).toBeVisible();
 
-  // Detail drawer is deep-linkable and only shows fields the API returns.
-  await page.getByRole("button", { name: "Fire3D Lab fire3d-lab" }).click();
+  // Row click opens the detail drawer, which is deep-linkable and only shows fields the API returns.
+  await page.getByTestId("organizations-table").getByRole("row", { name: /Fire3D Lab/ }).click();
   await expect(page).toHaveURL(/organization=org-1/);
-  const detail = page.getByRole("region", { name: "Thông tin tổ chức" });
+  const detail = page.getByTestId("organization-drawer");
   await expect(detail.getByRole("link", { name: "Tạo OrganizationUser" })).toHaveAttribute("href", "/admin/accounts?organizationId=org-1");
   await expect(detail.getByRole("link", { name: "Xem công trình" })).toHaveAttribute("href", "/admin/organizations/org-1/buildings");
   await expect(detail.getByText("Chờ BE: địa chỉ và số điện thoại")).toHaveCount(0);
   await expect(detail.getByRole("button", { name: "Sửa hồ sơ" })).toBeVisible();
 
-  // Locking needs an explicit confirmation.
+  // Locking lives in the drawer footer and needs an explicit confirmation.
   await detail.getByRole("button", { name: "Vô hiệu hóa tổ chức" }).click();
   const confirm = page.getByRole("dialog", { name: "Vô hiệu hóa tổ chức?" });
   expect(statusPayload).toBeUndefined();
@@ -69,7 +69,9 @@ test("organization list keeps filters and page in the URL and queries the API wi
   await page.route("**/api/organizations?*", (route) => { queries.push(new URL(route.request().url()).searchParams); return route.fulfill({ json: { items: [organization], totalCount: 45, page: 2, pageSize: 20 } }); });
 
   await page.goto("/admin/organizations?page=2&status=false&q=lab");
-  await expect(page.getByLabel("Trạng thái")).toHaveValue("false");
+  const statusChip = page.getByRole("button", { name: /^Trạng thái:/ });
+  await expect(statusChip).toHaveAttribute("data-value", "false");
+  await expect(statusChip).toContainText("Vô hiệu");
   await expect(page.getByLabel("Tìm tổ chức")).toHaveValue("lab");
   await expect.poll(() => queries.at(-1)?.toString()).toContain("page=2");
   expect(queries.at(-1)?.get("isActive")).toBe("false");
@@ -77,7 +79,8 @@ test("organization list keeps filters and page in the URL and queries the API wi
 
   await page.getByRole("button", { name: "Trang sau" }).click();
   await expect(page).toHaveURL(/page=3/);
-  await page.getByLabel("Trạng thái").selectOption("true");
+  await statusChip.click();
+  await page.getByRole("option", { name: "Hoạt động" }).click();
   await expect(page).not.toHaveURL(/page=/);
   await expect(page).toHaveURL(/status=true/);
 });
@@ -120,6 +123,7 @@ test("Accounts form receives Organization scope from the admin handoff", async (
 
   await page.getByRole("button", { name: "Tạo tài khoản", exact: true }).click();
   const form = page.getByRole("dialog", { name: "Tạo tài khoản" });
-  await expect(form.getByLabel("Vai trò")).toHaveValue("1");
-  await expect(form.getByLabel("Tổ chức")).toHaveValue("org-1");
+  // Fixed-choice fields are comboboxes (Admin v2): the trigger shows the chosen label.
+  await expect(form.getByRole("combobox", { name: "Vai trò" })).toHaveText("Thành viên tổ chức");
+  await expect(form.getByRole("combobox", { name: "Tổ chức" })).toHaveText("Fire3D Lab");
 });

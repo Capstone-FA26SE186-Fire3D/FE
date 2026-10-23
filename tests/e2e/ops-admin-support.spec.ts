@@ -3,7 +3,7 @@
  * Evidence level: Playwright route mocks of the BE contract (SupportController, AuditLogsController,
  * OperationsAnalyticsController, OrganizationProfileController). Not an integration test against the real API.
  */
-import { openChip } from "./chip-helpers";
+import { expectChipValue, openChip, pick } from "./chip-helpers";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { buildRange } from "../../src/utils/date-range";
 import { parseOperationsAnalytics } from "../../src/features/admin-overview/api";
@@ -65,13 +65,21 @@ test.describe("admin overview", () => {
     await page.route("**/api/admin/analytics/operations*", (route) => { queries.push(new URL(route.request().url()).search); return route.fulfill({ json: analytics }); });
     await page.goto("/admin/overview");
 
-    await expect(page.getByRole("heading", { name: "Tổng quan vận hành" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Tổng quan hệ thống" })).toBeVisible();
+    // Overview v2 (Figma Admin v2 · Tổng quan): clickable queue tiles, system KPIs from the shared operations report, no audit list.
+    await expect(page.getByTestId("tile-reviews")).toHaveAttribute("href", "/admin/reviews");
+    await expect(page.getByTestId("tile-payments")).toHaveAttribute("href", "/admin/commerce?tab=payments");
+    const system = page.getByRole("group", { name: "Tổng quan hệ thống" });
+    await expect(system.getByTestId("kpi-accounts").locator(".ops-kpi-value")).toHaveText("52");
+    await expect(system.getByTestId("kpi-accounts")).toContainText("Học viên 43 · Tổ chức 7 · Admin 2");
+    await expect(page.getByText("Hoạt động gần đây")).toHaveCount(0);
     await expect(page.getByText("Cập nhật lúc")).toBeVisible();
     await expect(page.getByText("mặc định 30 ngày gần nhất")).toBeVisible();
     await expect(page.getByText("Tài khoản (hiện tại)")).toBeVisible();
     // Analytics KPI tiles and the stacked jobs chart (src/features/analytics/components/operations-report.tsx).
-    await expect(page.getByTestId("kpi-accounts").locator(".ops-kpi-value")).toHaveText("52");
-    await expect(page.getByTestId("kpi-buildings").locator(".ops-kpi-value")).toHaveText("13");
+    const report = page.getByRole("group", { name: "Chỉ số vận hành" });
+    await expect(report.getByTestId("kpi-accounts").locator(".ops-kpi-value")).toHaveText("52");
+    await expect(report.getByTestId("kpi-buildings").locator(".ops-kpi-value")).toHaveText("13");
     await expect(page.getByTestId("chart-jobs").getByRole("img", { name: /Tiến trình Geometry theo trạng thái/ })).toHaveAccessibleName(/Thất bại/);
     await expect(page.getByTestId("chart-jobs")).toContainText("Thất bại");
     // Only the operations endpoint is called until another tab opens; the old "Chờ BE" cards are gone.
@@ -145,22 +153,22 @@ test.describe("admin support inbox", () => {
     await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ETag: '"support-2"' }, json: { ...ticket(), messages: messagesPage([message("m1", "u-9", "Em cần hỗ trợ gấp")]) } }));
 
     await page.goto("/admin/support?page=2&status=InProgress&priority=High");
-    await expect(page.getByLabel("Trạng thái ticket")).toHaveValue("InProgress");
+    await expectChipValue(page, "Trạng thái", "InProgress");
     await expect.poll(() => queries.at(-1)?.get("status")).toBe("InProgress");
     expect(queries.at(-1)?.get("priority")).toBe("High");
     expect(queries.at(-1)?.get("page")).toBe("2");
     await expect(page.getByText("21–40 / 45")).toBeVisible();
 
-    await page.getByLabel("Mức ưu tiên").selectOption("Urgent");
+    await pick(page, "Mức", { value: "Urgent" });
     await expect(page).not.toHaveURL(/page=2/);
     await expect(page).toHaveURL(/priority=Urgent/);
 
-    await page.getByRole("button", { name: /Mở ticket SUP-0001/ }).click();
+    await page.getByRole("row").filter({ hasText: "SUP-0001" }).click();
     await expect(page).toHaveURL(/ticket=ticket-1/);
-    await expect(page.getByRole("region", { name: "Chi tiết ticket" }).getByText("Em cần hỗ trợ gấp")).toBeVisible();
+    await expect(page.getByTestId("admin-ticket-drawer").getByText("Em cần hỗ trợ gấp")).toBeVisible();
 
     await page.goto("/admin/support?ticket=ticket-1");
-    await expect(page.getByRole("region", { name: "Chi tiết ticket" }).getByRole("heading", { name: "Không tải được mô hình IFC" })).toBeVisible();
+    await expect(page.getByTestId("admin-ticket-drawer").getByRole("heading", { name: "Không tải được mô hình IFC" })).toBeVisible();
   });
 
   test("assign/transition sends PATCH with If-Match; 412 keeps the choices and lets the admin load the newer version", async ({ page }) => {
@@ -182,22 +190,26 @@ test.describe("admin support inbox", () => {
     });
 
     await page.goto("/admin/support?ticket=ticket-1");
-    const drawer = page.getByRole("region", { name: "Chi tiết ticket" });
+    const drawer = page.getByTestId("admin-ticket-drawer");
     await expect(drawer.getByRole("heading", { name: "Không tải được mô hình IFC" })).toBeVisible();
-    await drawer.getByLabel("Trạng thái", { exact: true }).selectOption("InProgress");
-    await drawer.getByLabel("Ưu tiên").selectOption("High");
-    await drawer.getByLabel("Phân công cho").selectOption("admin-1");
+    // Fixed fields are comboboxes: open, then pick the option by its label.
+    await drawer.getByLabel("Trạng thái", { exact: true }).click();
+    await page.getByRole("option", { name: "Đang xử lý" }).click();
+    await drawer.getByLabel("Ưu tiên").click();
+    await page.getByRole("option", { name: "Cao", exact: true }).click();
+    await drawer.getByLabel("Phân công cho").click();
+    await page.getByRole("option", { name: "Platform Admin (tôi)" }).click();
     await drawer.getByRole("button", { name: "Lưu thay đổi" }).click();
 
     await expect(drawer.getByText("Ticket vừa được thay đổi ở nơi khác")).toBeVisible();
     expect(patches[0]).toEqual({ ifMatch: '"support-2"', body: { status: "InProgress", priority: "High", assignedTo: "admin-1" } });
     // Choices are kept, nothing was overwritten.
-    await expect(drawer.getByLabel("Ưu tiên")).toHaveValue("High");
-    await expect(drawer.getByLabel("Trạng thái", { exact: true })).toHaveValue("InProgress");
+    await expect(drawer.getByLabel("Ưu tiên")).toContainText("Cao");
+    await expect(drawer.getByLabel("Trạng thái", { exact: true })).toContainText("Đang xử lý");
 
     await drawer.getByRole("button", { name: "Tải bản mới để đối chiếu" }).click();
     await expect(drawer.getByText("Đã tải bản mới nhất")).toBeVisible();
-    await expect(drawer.getByLabel("Ưu tiên")).toHaveValue("High");
+    await expect(drawer.getByLabel("Ưu tiên")).toContainText("Cao");
     await drawer.getByRole("button", { name: "Lưu thay đổi" }).click();
     await expect.poll(() => patches.length).toBe(2);
     expect(patches[1].ifMatch).toBe('"support-3"');
@@ -219,7 +231,7 @@ test.describe("admin support inbox", () => {
     });
 
     await page.goto("/admin/support?ticket=ticket-1");
-    const drawer = page.getByRole("region", { name: "Chi tiết ticket" });
+    const drawer = page.getByTestId("admin-ticket-drawer");
     await drawer.getByLabel("Tin nhắn mới").fill("  Chúng tôi đang kiểm tra  ");
     await drawer.getByRole("button", { name: "Gửi tin nhắn" }).dblclick();
     await expect.poll(() => sends.length).toBe(1);
@@ -244,7 +256,7 @@ test.describe("admin support inbox", () => {
     await page.route("**/api/admin/support/tickets?*", (route) => route.fulfill({ json: page1([ticket({ status: "Closed" })]) }));
     await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ETag: '"support-2"' }, json: { ...ticket({ status: "Closed" }), messages: messagesPage([]) } }));
     await page.goto("/admin/support?ticket=ticket-1");
-    const drawer = page.getByRole("region", { name: "Chi tiết ticket" });
+    const drawer = page.getByTestId("admin-ticket-drawer");
     await expect(drawer.getByText(/Ticket đã đóng/)).toBeVisible();
     await expect(drawer.getByRole("button", { name: "Gửi tin nhắn" })).toBeDisabled();
   });
@@ -259,7 +271,8 @@ test.describe("admin support inbox", () => {
       return route.fulfill({ json: page1([]) });
     });
     await page.goto("/admin/support");
-    await expect(page.getByText("Đang tải danh sách ticket…")).toBeAttached();
+    // The DataTable shows its skeleton while the first page loads (`data-loading`), then the error, then the empty state.
+    await expect(page.getByTestId("admin-tickets-table")).toHaveAttribute("data-loading", "true");
     await expect(page.getByText("Không tải được danh sách ticket")).toBeVisible();
     fail = false;
     await page.getByRole("button", { name: "Thử lại" }).click();
@@ -283,12 +296,13 @@ test.describe("admin support inbox", () => {
 
     await page.goto("/admin/support?tab=feedback");
     await expect(page.getByRole("tab", { name: "Phản hồi" })).toHaveAttribute("aria-selected", "true");
-    await page.getByRole("button", { name: "Mở phản hồi Giao diện" }).click();
-    const drawer = page.getByRole("dialog", { name: "Chi tiết phản hồi" });
-    await drawer.getByLabel("Trạng thái xử lý").selectOption("Reviewed");
+    await page.getByRole("row").filter({ hasText: "Nút hơi nhỏ" }).click();
+    const drawer = page.getByTestId("admin-feedback-drawer");
+    await drawer.getByLabel("Trạng thái xử lý").click();
+    await page.getByRole("option", { name: "Đã xem" }).click();
     await drawer.getByRole("button", { name: "Lưu trạng thái" }).click();
     await expect(drawer.getByText("Phản hồi vừa được cập nhật ở nơi khác")).toBeVisible();
-    await expect(drawer.getByLabel("Trạng thái xử lý")).toHaveValue("Reviewed");
+    await expect(drawer.getByLabel("Trạng thái xử lý")).toContainText("Đã xem");
     await drawer.getByRole("button", { name: "Lưu trạng thái" }).click();
     await expect.poll(() => patches.length).toBe(2);
     expect(patches[0]).toEqual({ ifMatch: '"support-1"', body: { status: "Reviewed" } });
@@ -328,7 +342,7 @@ test.describe("audit log", () => {
     expect(queries[0].has("from")).toBe(false);
     expect(queries[0].has("to")).toBe(false);
     await page.route("**/api/admin/audit-logs/a-1", (route) => route.fulfill({ json: { ...log, changes: [] } }));
-    await page.getByRole("button", { name: /Xem bản ghi Update/ }).click();
+    await page.getByRole("row").filter({ hasText: "Update" }).first().click();
     const drawer = page.getByRole("dialog", { name: "Chi tiết bản ghi audit" });
     await expect(drawer.getByText("Chỉ hiển thị metadata")).toBeVisible();
     await drawer.getByRole("button", { name: "Lọc theo người thực hiện" }).click();
@@ -344,13 +358,21 @@ test.describe("audit log", () => {
     await expect.poll(() => queries.length).toBe(1);
 
 
+    // Each chip stages its value; "Áp dụng bộ lọc" sends all seven in one request.
+    const stage = async (chip: string, label: string, value: string) => {
+      await openChip(page, chip);
+      await page.getByLabel(label).fill(value);
+      await page.getByRole("button", { name: "Xong" }).click();
+    };
+    await openChip(page, "Thời gian");
     await page.getByLabel("Từ ngày").fill("2026-09-01");
     await page.getByLabel("Đến ngày").fill("2026-09-30");
-    await page.getByLabel("Hành động").selectOption("Payment");
-    await page.getByLabel("Mã người thực hiện").fill(g(1));
-    await page.getByLabel("Mã tổ chức").fill(g(2));
-    await page.getByLabel("Mã đối tượng").fill(g(3));
-    await page.getByLabel("Mã correlation").fill(g(4));
+    await page.getByRole("button", { name: "Xong" }).click();
+    await pick(page, "Hành động", { value: "Payment" });
+    await stage("Người thực hiện", "Mã người thực hiện", g(1));
+    await stage("Tổ chức", "Mã tổ chức", g(2));
+    await stage("Đối tượng", "Mã đối tượng", g(3));
+    await stage("Correlation", "Mã correlation", g(4));
     await page.getByRole("button", { name: "Áp dụng bộ lọc" }).click();
     await expect.poll(() => queries.length).toBe(2);
     const q = queries[1];
@@ -358,13 +380,13 @@ test.describe("audit log", () => {
     await expect(page).toHaveURL(/action=Payment/);
 
     const before = queries.length;
-    await page.getByLabel("Từ ngày").fill("2026-01-01");
+    await stage("Thời gian", "Từ ngày", "2026-01-01");
     await page.getByRole("button", { name: "Áp dụng bộ lọc" }).click();
-    await expect(page.getByText(/Khoảng thời gian tối đa 90 ngày/)).toBeVisible();
-    await page.getByLabel("Từ ngày").fill("2026-09-01");
-    await page.getByLabel("Mã tổ chức").fill("not-a-guid");
+    await expect(page.getByText(/Khoảng thời gian tối đa 90 ngày/).first()).toBeVisible();
+    await stage("Thời gian", "Từ ngày", "2026-09-01");
+    await stage("Tổ chức", "Mã tổ chức", "not-a-guid");
     await page.getByRole("button", { name: "Áp dụng bộ lọc" }).click();
-    await expect(page.getByText(/Nhập mã dạng GUID/)).toBeVisible();
+    await expect(page.getByText(/Nhập mã dạng GUID/).first()).toBeVisible();
     expect(queries).toHaveLength(before);
   });
 

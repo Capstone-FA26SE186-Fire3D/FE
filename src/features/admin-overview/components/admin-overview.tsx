@@ -1,14 +1,18 @@
 "use client";
 
-import { BookOpen, ClipboardCheck, CreditCard, LifeBuoy } from "lucide-react";
-import { useEffect, useState } from "react";
+import { BookOpen, ChevronRight, ClipboardCheck, CreditCard, LifeBuoy, type LucideIcon } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAsyncData } from "@/api/use-async-data";
-import { Panel } from "@/components/ui/panel";
-import { StatusBadge, type Tone } from "@/components/ui/status-badge";
+import { seriesColor } from "@/components/charts/chart-config";
+import { Sparkline } from "@/components/charts/sparkline";
+import { NumberPop } from "@/components/ui/number-pop";
 import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { routes } from "@/configs/routes";
 import { AnalyticsWorkspace } from "@/features/analytics/components/analytics-workspace";
 import { analyticsApi } from "@/features/analytics/api";
+import { formatMoney } from "@/features/analytics/format";
 import type { OperationsReport } from "@/features/analytics/types";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { learnAdminApi } from "@/features/admin-learn/api";
@@ -16,10 +20,10 @@ import { reviewsApi } from "@/features/admin-reviews/api";
 import { billingApi } from "@/features/billing/api";
 import { supportApi } from "@/features/support/api";
 import { formatCount } from "../format";
-import { KpiRow, KpiTile } from "./admin-kit";
 
-const since30 = () => new Date(Date.now() - 30 * 86_400_000).toISOString();
 const sum = (items: Array<{ count: number }>) => items.reduce((total, item) => total + item.count, 0);
+/** Role order of the "Tài khoản" hint (Figma "Học viên 61 · Tổ chức 22 · Admin 1"). */
+const roleOrder: Array<[role: string, label: string]> = [["Trainee", "Học viên"], ["OrganizationUser", "Tổ chức"], ["PlatformAdmin", "Admin"]];
 
 /** One server total read with page size 1 (only `total`/`totalCount` is used). Null while unknown or when the read failed. */
 function useTotal(key: string, load: (signal: AbortSignal) => Promise<number>, enabled: boolean) {
@@ -27,22 +31,66 @@ function useTotal(key: string, load: (signal: AbortSignal) => Promise<number>, e
   return { value: result.data ?? null, loading: result.loading && result.data === undefined && result.error === undefined };
 }
 
-const kindLabel: Record<string, string> = { IfcProcessing: "Tác vụ IFC", PackageBuild: "Tác vụ build package" };
-
-/** Failed beats running beats idle; the counts are the jobs created in the selected report period (default 30 days). */
-function jobSummary(jobs: OperationsReport["processingJobs"], kind: string): { tone: Tone; label: string } {
-  const own = jobs.filter((job) => job.kind === kind);
-  const failed = sum(own.filter((job) => /fail|error|dead/i.test(job.status)));
-  const running = sum(own.filter((job) => /run|process|claim|queue/i.test(job.status)));
-  if (failed > 0) return { tone: "danger", label: `Thất bại ${formatCount(failed)}` };
-  if (running > 0) return { tone: "warning", label: `Đang chạy ${formatCount(running)}` };
-  return { tone: "success", label: "Bình thường" };
+/** "—" with a title: the server value could not be read. Never a guessed 0. */
+function Unavailable() {
+  return <span className="adm-unavailable" title="Chưa lấy được từ máy chủ">—</span>;
 }
 
 /**
- * Platform overview (Figma "Tổng quan"): what needs handling first (review queue, support, reconcile, unpublished Learn),
- * system totals, recent audit and job health, then the period reports. Every number comes from an admin endpoint; a read
- * that fails shows an em dash instead of a guess. The three ranges below it are the existing analytics reports.
+ * "Việc cần xử lý" tile (Figma Admin v2 · Tổng quan): icon tile, big number, hint and a chevron. The whole tile is the
+ * link to the queue it counts.
+ */
+function ActionTile({ href, icon: Icon, tone, label, value, hint, loading, testId }: {
+  href: string;
+  icon: LucideIcon;
+  tone: "warning" | "danger" | "success" | "info";
+  label: string;
+  value: number | null;
+  hint: ReactNode;
+  loading: boolean;
+  testId: string;
+}) {
+  return <Link href={href} className="adm-tile" data-tone={tone} data-testid={testId} aria-busy={loading || undefined}>
+    <span className="adm-tile-icon" aria-hidden="true"><Icon size={20} /></span>
+    <span className="adm-tile-body">
+      <span className="adm-tile-label">{label}</span>
+      {loading
+        ? <><Skeleton className="adm-tile-skeleton" /><span className="ops-sr-only" role="status">Đang tải {label}…</span></>
+        : <strong className="adm-tile-value">{value === null ? <Unavailable /> : <NumberPop value={value} />}</strong>}
+      <span className="adm-tile-hint">{hint}</span>
+    </span>
+    <ChevronRight size={16} aria-hidden="true" className="adm-tile-chevron" />
+  </Link>;
+}
+
+/** System KPI tile on the chart kit's `.ops-kpi` (label, counted-up number, optional sparkline, hint). */
+function SystemKpi({ label, value, hint, spark, sparkColor, loading, testId }: {
+  label: string;
+  value: number | null;
+  hint?: ReactNode;
+  spark?: number[];
+  sparkColor?: string;
+  loading: boolean;
+  testId: string;
+}) {
+  const trend = spark && spark.length >= 2 ? spark : null;
+  return <div className="ops-kpi" data-testid={testId} aria-busy={loading || undefined}>
+    <span className="ops-kpi-label">{label}</span>
+    <div className="ops-kpi-row">
+      {loading
+        ? <><Skeleton style={{ height: 30, width: 72 }} /><span className="ops-sr-only" role="status">Đang tải {label}…</span></>
+        : <strong className="ops-kpi-value">{value === null ? <Unavailable /> : <NumberPop value={value} />}</strong>}
+    </div>
+    {trend && <Sparkline className="ops-kpi-spark" values={trend} height={36} color={sparkColor} />}
+    {hint && <span className="ops-kpi-hint">{hint}</span>}
+  </div>;
+}
+
+/**
+ * Platform overview (Figma "Admin v2 · Tổng quan"): the four queues that need handling first, then system totals with
+ * 30-day trends, then the period reports (operations / training / revenue charts). Every number comes from an admin
+ * endpoint; a read that fails shows an em dash instead of a guess. The audit log is no longer here: it lives only in
+ * "Hỗ trợ & audit".
  */
 export function AdminOverview() {
   const { accessToken, ready, user } = useAuthSession();
@@ -55,81 +103,66 @@ export function AdminOverview() {
   const reconcile = useTotal("overview:reconcile", (signal) => billingApi.listLedger(token, "checkouts", { status: "NeedsReconcile", page: 1, pageSize: 1 }, signal).then((page) => page.totalCount), enabled);
   const unpublished = useTotal("overview:learn-unpublished", (signal) => learnAdminApi.listPosts(token, { status: "Unpublished", page: 1, pageSize: 1 }, signal).then((page) => page.total), enabled);
 
-  // The operations report is requested once, by the period section below, and shared here; the sessions tile reads the default
-  // 30-day training report. Revenue is only requested when its tab opens (payments here come from the payment ledger).
+  // The operations report is requested once, by the report section below, and shared here. The two trend tiles read the
+  // default 30-day training report (daily cohorts) and the default 30-day revenue report (received payments by day).
   const [operations, setOperations] = useState<OperationsReport | null>(null);
   // Skeleton for a few seconds, then an em dash: the shared report has no error channel here (its own section shows the error).
   const [waited, setWaited] = useState(false);
   useEffect(() => { const timer = window.setTimeout(() => setWaited(true), 4000); return () => window.clearTimeout(timer); }, []);
-  const training = useAsyncData("overview:training", (signal) => analyticsApi.training(token, { kind: "platform" }, {}, signal), enabled);
-    const paid = useTotal("overview:paid30", (signal) => billingApi.listLedger(token, "requests", { status: "Paid", from: since30(), page: 1, pageSize: 1 }, signal).then((page) => page.totalCount), enabled);
-  const audit = useAsyncData("overview:audit", (signal) => supportApi.listAuditLogs(token, { page: 1, pageSize: 4 }, signal), enabled);
+  const training = useAsyncData("overview:training", (signal) => analyticsApi.training(token, { kind: "platform" }, {}, signal, { groupBy: "day" }), enabled);
+  const revenue = useAsyncData("overview:revenue", (signal) => analyticsApi.revenue(token, {}, signal), enabled);
 
   const accounts = operations?.accounts ?? null;
   const organizations = operations?.organizations ?? null;
   const accountsTotal = accounts ? sum(accounts) : null;
   const organizationsTotal = organizations ? sum(organizations) : null;
   const organizationsActive = organizations ? sum(organizations.filter((item) => item.isActive)) : null;
-  const traineeCount = accounts ? sum(accounts.filter((item) => item.role === "Trainee")) : null;
-  const orgUserCount = accounts ? sum(accounts.filter((item) => item.role === "OrganizationUser")) : null;
-  const jobs = operations?.processingJobs ?? [];
-  const jobKinds = Array.from(new Set(jobs.map((job) => job.kind)));
-  const auditItems = audit.data?.items ?? [];
-  const timeOf = (iso: string) => new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-  const needs = (value: number | null) => (value !== null && value > 0 ? { label: "Cần xử lý", tone: "warning" as Tone } : undefined);
+  const accountsHint = accounts
+    ? roleOrder.filter(([role]) => accounts.some((item) => item.role === role)).map(([role, label]) => `${label} ${formatCount(sum(accounts.filter((item) => item.role === role)))}`).join(" · ") || "Chưa có tài khoản"
+    : undefined;
+  const systemLoading = operations === null && !waited;
+
+  const sessionsSpark = training.data?.cohorts?.map((row) => row.plays);
+  const paymentsTotal = revenue.data ? revenue.data.totals.reduce((total, item) => total + item.transactions, 0) : null;
+  const paymentsSpark = useMemo(() => {
+    if (!revenue.data) return undefined;
+    const byDate = new Map<string, number>();
+    for (const day of revenue.data.byDay) byDate.set(day.date, (byDate.get(day.date) ?? 0) + day.transactions);
+    return Array.from(byDate.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([, transactions]) => transactions);
+  }, [revenue.data]);
+  const paymentsHint = revenue.data
+    ? revenue.data.totals.length ? `Đơn đã nhận tiền · ${revenue.data.totals.map((item) => formatMoney(item.amount, item.currency)).join(" · ")}` : "Đơn đã nhận tiền · chưa có khoản thu"
+    : "Đơn đã nhận tiền";
 
   return <>
     <PageHeader
       eyebrow="Xử lý công việc"
-      title="Tổng quan vận hành"
-      description="Việc cần xử lý đặt trước số liệu. Mọi con số lấy từ máy chủ, không suy ra từ một trang dữ liệu."
+      title="Tổng quan hệ thống"
+      description="Việc cần xử lý ở trên cùng; nhật ký audit chuyển sang trang Hỗ trợ & audit."
       breadcrumbs={[{ label: "Quản trị" }, { label: "Tổng quan" }]}
     />
 
-    <KpiRow label="Việc cần xử lý">
-      <KpiTile icon={ClipboardCheck} label="Duyệt kịch bản" badge={needs(reviews.value)} value={formatCount(reviews.value)} loading={reviews.loading} hint="đang chờ duyệt" href={routes.adminReviews} linkLabel="Mở hàng đợi" />
-      <KpiTile icon={LifeBuoy} label="Hỗ trợ" badge={urgent.value ? { label: "Cần xử lý", tone: "danger" } : needs(tickets.value)} value={formatCount(tickets.value)} loading={tickets.loading} hint={urgent.value === null ? "đang mở" : `đang mở · ${formatCount(urgent.value)} khẩn`} href={routes.adminSupport} linkLabel="Mở hỗ trợ" />
-      <KpiTile icon={CreditCard} label="Đối soát thanh toán" badge={needs(reconcile.value)} value={formatCount(reconcile.value)} loading={reconcile.loading} hint="checkout cần đối soát" href={routes.adminCommerce} linkLabel="Mở thương mại" />
-      <KpiTile icon={BookOpen} label="Learn chưa xuất bản" badge={unpublished.value ? { label: "Cần xử lý", tone: "info" } : undefined} value={formatCount(unpublished.value)} loading={unpublished.loading} hint="bài chưa xuất bản" href={`${routes.adminLearn}?status=Unpublished`} linkLabel="Mở Learn CMS" />
-    </KpiRow>
-
-    <KpiRow label="Tổng quan hệ thống">
-      <KpiTile label="Tổ chức" value={formatCount(organizationsTotal)} loading={operations === null && !waited} hint={organizationsActive === null ? undefined : `Đang hoạt động ${formatCount(organizationsActive)}`} />
-      <KpiTile label="Tài khoản" value={formatCount(accountsTotal)} loading={operations === null && !waited} hint={traineeCount === null || orgUserCount === null ? undefined : `Học viên ${formatCount(traineeCount)} · Tổ chức ${formatCount(orgUserCount)}`} />
-      <KpiTile label="Phiên 30 ngày" value={formatCount(training.data?.plays)} loading={training.loading && !training.data} hint="Toàn hệ thống" />
-      <KpiTile label="Thanh toán 30 ngày" value={formatCount(paid.value)} loading={paid.loading} hint="giao dịch đã nhận tiền" />
-    </KpiRow>
-
-    <div className="adm-split" style={{ marginBottom: 8 }}>
-      <Panel title="Hoạt động gần đây">
-        {audit.loading && !audit.data && <p className="ops-muted" role="status">Đang tải hoạt động…</p>}
-        {audit.error !== undefined && !audit.data && <p className="ops-muted" role="status">Không tải được nhật ký hoạt động.</p>}
-        {audit.data && !auditItems.length && <p className="ops-muted" role="status">Chưa có hoạt động nào trong 30 ngày gần đây.</p>}
-        {auditItems.length > 0 && <ul className="adm-list">
-          {auditItems.map((log) => <li key={log.id}>
-            <span className="adm-list-main"><time dateTime={log.createdAt}>{timeOf(log.createdAt)}</time><span>{log.actorDisplayName ?? log.organizationName ?? "—"} · {log.action}{log.targetEntity ? ` (${log.targetEntity})` : ""}</span></span>
-            {log.organizationName && <StatusBadge tone="neutral">{log.organizationName}</StatusBadge>}
-          </li>)}
-        </ul>}
-      </Panel>
-      <Panel title="Tác vụ xử lý (kỳ báo cáo)">
-        {operations === null && <p className="ops-muted" role="status">{waited ? "Chưa có báo cáo tác vụ (xem thông báo lỗi ở phần báo cáo theo kỳ)." : "Đang tải tác vụ…"}</p>}
-        {operations !== null && !jobKinds.length && <p className="ops-muted" role="status">Không có tác vụ nào trong kỳ báo cáo.</p>}
-        {jobKinds.length > 0 && <ul className="adm-list">
-          {jobKinds.map((kind) => { const summary = jobSummary(jobs, kind); return <li key={kind}><span>{kindLabel[kind] ?? kind}</span><StatusBadge tone={summary.tone}>{summary.label}</StatusBadge></li>; })}
-        </ul>}
-      </Panel>
+    <div className="adm-tiles" role="group" aria-label="Việc cần xử lý">
+      <ActionTile testId="tile-reviews" href={routes.adminReviews} icon={ClipboardCheck} tone="warning" label="Duyệt kịch bản" value={reviews.value} loading={reviews.loading} hint="chờ duyệt" />
+      <ActionTile testId="tile-support" href={routes.adminSupport} icon={LifeBuoy} tone="danger" label="Hỗ trợ" value={tickets.value} loading={tickets.loading} hint={urgent.value === null ? "ticket mở" : `ticket mở · ${formatCount(urgent.value)} khẩn`} />
+      <ActionTile testId="tile-payments" href={`${routes.adminCommerce}?tab=payments`} icon={CreditCard} tone="success" label="Đối soát thanh toán" value={reconcile.value} loading={reconcile.loading} hint="cần đối soát" />
+      <ActionTile testId="tile-learn" href={routes.adminLearn} icon={BookOpen} tone="info" label="Learn chưa xuất bản" value={unpublished.value} loading={unpublished.loading} hint="bài nháp" />
     </div>
 
-    <div style={{ marginTop: 28 }}>
-      <AnalyticsWorkspace
-        variant="platform"
-        sectionHeading
-        title="Báo cáo theo kỳ"
-        description="Vận hành, huấn luyện của học viên và doanh thu toàn hệ thống lấy trực tiếp từ Fire3D API."
-        breadcrumbs={[]}
-        onOperations={setOperations}
-      />
+    <div className="adm-okpis" role="group" aria-label="Tổng quan hệ thống">
+      <SystemKpi testId="kpi-organizations" label="Tổ chức" value={organizationsTotal} loading={systemLoading} hint={organizationsActive === null ? "Ảnh chụp hiện tại" : `${formatCount(organizationsActive)} đang hoạt động`} />
+      <SystemKpi testId="kpi-accounts" label="Tài khoản" value={accountsTotal} loading={systemLoading} hint={accountsHint ?? "Ảnh chụp hiện tại"} />
+      <SystemKpi testId="kpi-sessions" label="Phiên 30 ngày" value={training.data?.plays ?? null} loading={training.loading && !training.data && training.error === undefined} spark={sessionsSpark} sparkColor={seriesColor.plays} hint="Lượt chơi toàn hệ thống" />
+      <SystemKpi testId="kpi-payments" label="Thanh toán 30 ngày" value={paymentsTotal} loading={revenue.loading && !revenue.data && revenue.error === undefined} spark={paymentsSpark} sparkColor={seriesColor.revenue} hint={paymentsHint} />
     </div>
+
+    <AnalyticsWorkspace
+      variant="platform"
+      sectionHeading
+      title="Báo cáo theo kỳ"
+      description="Vận hành, huấn luyện của học viên và doanh thu toàn hệ thống lấy trực tiếp từ Fire3D API."
+      breadcrumbs={[]}
+      onOperations={setOperations}
+    />
   </>;
 }

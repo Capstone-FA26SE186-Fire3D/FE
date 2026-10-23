@@ -1,9 +1,9 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { installLearnBackend, LearnBackend, signIn } from "./learn-mock";
 
 /*
- * Learn CMS against a STATEFUL MOCK of the real contract (learn-mock.ts). Mock evidence only: it shows the UI sends the
- * right routes, headers (If-Match, Idempotency-Key), payloads and handles the documented responses. It proves nothing
+ * Learn CMS (Admin v2) against a STATEFUL MOCK of the real contract (learn-mock.ts). Mock evidence only: it shows the UI sends
+ * the right routes, headers (If-Match, Idempotency-Key), payloads and handles the documented responses. It proves nothing
  * about the deployed API.
  */
 
@@ -17,26 +17,58 @@ async function setup(page: Page, seed: (backend: LearnBackend) => void = () => u
 
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
 const publishedCalls = (backend: LearnBackend) => backend.callsTo("POST", /\/api\/admin\/learn\/versions\/[^/]+\/publish$/);
-
-/** Opens the new-post form through the UI (a direct goto can be filled before hydration, which then resets the inputs). */
-async function openNew(page: Page, tabName?: string) {
-  await page.goto("/admin/learn");
-  await page.getByRole("button", { name: "Tạo bài" }).first().click();
-  await expect(page.getByRole("heading", { name: "Bài mới" })).toBeVisible();
-  if (tabName) await tab(page, tabName).click();
+const postsTable = (page: Page) => page.getByTestId("learn-posts-table");
+const quickDrawer = (page: Page) => page.getByTestId("learn-quick-drawer");
+/** A confirmation dialog stacked over the drawer or the list, picked by its question. */
+const confirmDialog = (page: Page, question: string | RegExp) => page.getByRole("dialog").filter({ hasText: question });
+/** Picks one value in a toolbar FilterChip ("Trạng thái: tất cả ›"). */
+async function pickChip(page: Page, label: string, option: string) {
+  await page.getByRole("button", { name: new RegExp(`^${label}:`) }).click();
+  await page.getByRole("option", { name: option, exact: true }).click();
 }
 
-async function fillBasics(page: Page, slug: string, title: string, summary: string) {
-  await page.getByLabel(/^Slug/).fill(slug);
-  await page.getByLabel("Tiêu đề", { exact: true }).fill(title);
-  await page.getByLabel(/^Tóm tắt/).fill(summary);
+/** Opens the "Bài mới" modal through the list (a direct goto can be filled before hydration, which then resets the inputs). */
+async function openNew(page: Page): Promise<Locator> {
+  await page.goto("/admin/learn");
+  await page.getByRole("button", { name: "Tạo bài" }).first().click();
+  await expect(page).toHaveURL(/post=new/);
+  const dialog = page.getByTestId("learn-new-post");
+  await expect(dialog.getByRole("heading", { name: "Bài mới" })).toBeVisible();
+  return dialog;
+}
+
+async function fillBasics(dialog: Locator, slug: string, title: string, summary: string, intro = "Đoạn mở đầu của bài.") {
+  await dialog.getByLabel(/^Slug/).fill(slug);
+  await dialog.getByLabel("Tiêu đề", { exact: true }).fill(title);
+  await dialog.getByLabel(/^Tóm tắt/).fill(summary);
+  await dialog.getByLabel(/^Đoạn mở đầu/).fill(intro);
+}
+
+/** Creates a Draft through the modal and lands in the editor (`?post=<id>`). */
+async function createDraft(page: Page, slug: string, title: string, summary: string, intro?: string) {
+  const dialog = await openNew(page);
+  await fillBasics(dialog, slug, title, summary, intro);
+  await dialog.getByTestId("create-post").click();
+  await expect(page).toHaveURL(/post=[0-9a-f-]{36}/);
+}
+
+/** Adds a block of `type` in the editor's "Khối nội dung" card and returns it. */
+async function addBlock(page: Page, type: string) {
+  await page.getByLabel("Loại khối").selectOption(type);
+  await page.getByRole("button", { name: "Thêm khối" }).click();
+  return page.getByTestId("content-block").last();
 }
 
 async function addParagraph(page: Page, text: string) {
-  await tab(page, "Nội dung").click();
-  await page.getByLabel("Loại khối").selectOption("paragraph");
-  await page.getByRole("button", { name: "Thêm khối" }).click();
-  await page.getByTestId("content-block").last().getByLabel(/^Nội dung/).fill(text);
+  const block = await addBlock(page, "paragraph");
+  await block.getByLabel(/^Nội dung/).fill(text);
+}
+
+/** Chooses one entry in a kind/situation combobox; a multi-select stays open after a pick, so it is closed with Escape (the topmost layer only). */
+async function pickOption(page: Page, trigger: Locator, option: string | RegExp) {
+  await trigger.click();
+  await page.getByRole("option", { name: option }).click();
+  if ((await trigger.getAttribute("aria-expanded")) === "true") await page.keyboard.press("Escape");
 }
 
 test.describe("production Learn CMS", () => {
@@ -47,6 +79,7 @@ test.describe("production Learn CMS", () => {
     await expect(page.getByTestId("pending-module")).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Chưa có bài nào" })).toBeVisible();
     await expect(page.getByTestId("prototype-banner")).toHaveCount(0);
+    await expect(tab(page, "Bài viết")).toHaveAttribute("data-state", "active");
     expect(backend.callsTo("GET", /^\/api\/admin\/learn\/posts$/).length).toBeGreaterThan(0);
     expect(backend.calls.every((call) => /^\/api\/(admin\/learn|auth)/.test(call.path))).toBe(true);
   });
@@ -67,24 +100,26 @@ test.describe("production Learn CMS", () => {
 });
 
 test.describe("situations", () => {
-  test("empty guidance, create with an Idempotency-Key, reload keeps it, duplicate slug is refused", async ({ page }) => {
+  test("empty guidance, create (modal) with an Idempotency-Key, reload keeps it, duplicate slug is refused", async ({ page }) => {
     const backend = await setup(page);
     await page.goto("/admin/learn?section=situations");
+    await expect(tab(page, "Tình huống")).toHaveAttribute("data-state", "active");
     await expect(page.getByText("Chưa có tình huống nào")).toBeVisible();
     await page.getByRole("button", { name: "Tạo tình huống" }).first().click();
-    const drawer = page.getByRole("dialog");
-    await drawer.getByLabel("Tên tình huống").fill("Cháy trong nhà");
-    await drawer.getByLabel("Slug", { exact: true }).fill("chay-trong-nha");
-    await drawer.getByRole("button", { name: "Tạo tình huống" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Tên tình huống").fill("Cháy trong nhà");
+    await dialog.getByLabel("Slug", { exact: true }).fill("chay-trong-nha");
+    await dialog.getByRole("button", { name: "Tạo tình huống" }).click();
     await expect(page.getByText("Đã tạo tình huống")).toBeVisible();
-    await expect(page.getByRole("table", { name: "Danh mục tình huống Learn" }).getByText("Cháy trong nhà")).toBeVisible();
+    const table = page.getByRole("table", { name: "Danh mục tình huống Learn" });
+    await expect(table.getByText("Cháy trong nhà")).toBeVisible();
     const create = backend.callsTo("POST", /\/api\/admin\/learn\/situations$/);
     expect(create).toHaveLength(1);
     expect(create[0].headers["idempotency-key"]).toBeTruthy();
     expect(create[0].body).toMatchObject({ slug: "chay-trong-nha", name: "Cháy trong nhà" });
 
     await page.reload();
-    await expect(page.getByRole("table", { name: "Danh mục tình huống Learn" }).getByText("Cháy trong nhà")).toBeVisible();
+    await expect(table.getByText("Cháy trong nhà")).toBeVisible();
 
     await page.getByRole("button", { name: "Tạo tình huống" }).first().click();
     await page.getByRole("dialog").getByLabel("Tên tình huống").fill("Trùng");
@@ -95,13 +130,14 @@ test.describe("situations", () => {
     expect(backend.situations).toHaveLength(1);
   });
 
-  test("filters by status and search live in the URL", async ({ page }) => {
+  test("filters by status (chip) and search live in the URL", async ({ page }) => {
     await setup(page, (backend) => { backend.seedSituation("a", "Thoát nạn"); backend.seedSituation("b", "Cũ", { isActive: false }); });
     await page.goto("/admin/learn?section=situations&active=false");
     const table = page.getByRole("table", { name: "Danh mục tình huống Learn" });
     await expect(table.getByText("Cũ", { exact: true })).toBeVisible();
     await expect(table.getByText("Thoát nạn")).toHaveCount(0);
-    await page.getByLabel("Trạng thái tình huống").selectOption("");
+    await pickChip(page, "Trạng thái", "mọi trạng thái");
+    await expect(page).not.toHaveURL(/active=/);
     await expect(table.getByText("Thoát nạn")).toBeVisible();
     await page.getByLabel("Tìm tình huống").fill("thoat");
     await expect(page).toHaveURL(/q=thoat/);
@@ -109,30 +145,34 @@ test.describe("situations", () => {
 });
 
 test.describe("post lifecycle", () => {
-  test("draft -> publish -> hide -> show -> delete -> restore with durable keys and If-Match", async ({ page }) => {
+  test("modal draft -> editor source -> publish -> hide -> show -> delete -> restore with durable keys and If-Match", async ({ page }) => {
     const backend = await setup(page, (b) => { b.seedSituation("chay-nha", "Cháy trong nhà"); b.seedSource("QCVN 06:2022"); });
-    await page.goto("/admin/learn");
-    await page.getByRole("button", { name: "Tạo bài" }).first().click();
-    await expect(page).toHaveURL(/post=new/);
-    await fillBasics(page, "thoat-nan-an-toan", "Thoát nạn an toàn", "Ba bước thoát nạn.");
-    await addParagraph(page, "Giữ bình tĩnh và đi theo lối thoát gần nhất.");
-    await tab(page, "Phân loại và nguồn").click();
-    await page.getByRole("checkbox", { name: /Cháy trong nhà/ }).check();
-    await page.getByRole("button", { name: "Thêm nguồn QCVN 06:2022" }).click();
-    await expect(page.getByTestId("selected-source")).toContainText("Dùng được khi xuất bản");
-    await page.getByRole("button", { name: "Lưu bản nháp" }).click();
+    const dialog = await openNew(page);
+    await fillBasics(dialog, "thoat-nan-an-toan", "Thoát nạn an toàn", "Ba bước thoát nạn.", "Giữ bình tĩnh và đi theo lối thoát gần nhất.");
+    await pickOption(page, dialog.getByLabel("Tình huống"), /Cháy trong nhà/);
+    await dialog.getByTestId("create-post").click();
     await expect(page).toHaveURL(/post=[0-9a-f-]{36}/);
 
     const created = backend.callsTo("POST", /\/api\/admin\/learn\/posts$/);
     expect(created).toHaveLength(1);
     expect(created[0].headers["idempotency-key"]).toBeTruthy();
-    expect(created[0].body).toMatchObject({ slug: "thoat-nan-an-toan", publish: false, version: { kind: "Article", title: "Thoát nạn an toàn", blocks: [{ type: "paragraph", text: "Giữ bình tĩnh và đi theo lối thoát gần nhất." }] } });
+    expect(created[0].body).toMatchObject({ slug: "thoat-nan-an-toan", publish: false, version: { kind: "Article", title: "Thoát nạn an toàn", situationIds: [backend.situations[0].id], blocks: [{ type: "paragraph", text: "Giữ bình tĩnh và đi theo lối thoát gần nhất." }] } });
     const post = backend.bySlug("thoat-nan-an-toan")!;
     expect(post.status).toBe("Unpublished");
 
-    // Draft is open for editing; publish from the "Xuất bản và hiển thị" tab.
+    // The editor opens the Draft: cite a source in the "Nguồn Common" card and save with If-Match.
+    await page.getByRole("button", { name: "Thêm nguồn QCVN 06:2022" }).click();
+    await expect(page.getByTestId("selected-source")).toContainText("Dùng được khi xuất bản");
+    await page.getByRole("button", { name: "Lưu bản nháp" }).click();
+    await expect(page.getByText("Đã lưu bản nháp")).toBeVisible();
+    const put = backend.callsTo("PUT", /\/versions\/[^/]+$/)[0];
+    expect(put.headers["if-match"]).toBe('"1"');
+    expect(put.headers["idempotency-key"]).toBeTruthy();
+
+    // Publish from the "Phiên bản & Xuất bản" screen.
     await expect(page.getByText("Chưa xuất bản").first()).toBeVisible();
-    await tab(page, "Xuất bản và hiển thị").click();
+    await tab(page, "Phiên bản & Xuất bản").click();
+    await expect(page).toHaveURL(/tab=publish/);
     await page.getByRole("button", { name: "Xuất bản bản nháp" }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Xuất bản", exact: true }).click();
     await expect(page.getByText("Đã xuất bản", { exact: true }).first()).toBeVisible();
@@ -177,27 +217,38 @@ test.describe("post lifecycle", () => {
     await expect.poll(() => seeded.status).toBe("Unpublished");
   });
 
-  test("create and publish immediately sends publish:true", async ({ page }) => {
+  test("the modal's 'Xuất bản ngay' toggle sends publish:true", async ({ page }) => {
     const backend = await setup(page);
-    await openNew(page);
-    await fillBasics(page, "mot-buoc", "Một bước", "Tóm tắt.");
-    await addParagraph(page, "Nội dung.");
-    await page.getByRole("button", { name: "Tạo và xuất bản ngay" }).click();
+    const dialog = await openNew(page);
+    await fillBasics(dialog, "mot-buoc", "Một bước", "Tóm tắt.", "Nội dung.");
+    await dialog.getByLabel("Xuất bản ngay").check();
+    await dialog.getByRole("button", { name: "Tạo và xuất bản ngay" }).click();
     await expect(page).toHaveURL(/post=[0-9a-f-]{36}/);
     expect(backend.callsTo("POST", /\/posts$/)[0].body).toMatchObject({ publish: true });
     expect(backend.bySlug("mot-buoc")!.status).toBe("Published");
   });
 
-  test("a duplicate slug is explained at the slug field and the content is kept", async ({ page }) => {
+  test("a duplicate slug is explained at the slug field and the modal keeps its content", async ({ page }) => {
     await setup(page, (b) => { b.seedPost("da-co"); });
-    await openNew(page);
-    await fillBasics(page, "da-co", "Tiêu đề của tôi", "Tóm tắt của tôi.");
-    await addParagraph(page, "Nội dung của tôi.");
-    await page.getByRole("button", { name: "Lưu bản nháp" }).click();
-    await expect(page.getByText("Đã có bài khác dùng slug này").first()).toBeVisible();
+    const dialog = await openNew(page);
+    await fillBasics(dialog, "da-co", "Tiêu đề của tôi", "Tóm tắt của tôi.", "Nội dung của tôi.");
+    await dialog.getByTestId("create-post").click();
+    await expect(dialog.getByText("Đã có bài khác dùng slug này").first()).toBeVisible();
     await expect(page).toHaveURL(/post=new/);
-    await tab(page, "Thông tin").click();
-    await expect(page.getByLabel("Tiêu đề", { exact: true })).toHaveValue("Tiêu đề của tôi");
+    await expect(dialog.getByLabel("Tiêu đề", { exact: true })).toHaveValue("Tiêu đề của tôi");
+  });
+
+  test("closing a started modal asks first", async ({ page }) => {
+    await setup(page);
+    const dialog = await openNew(page);
+    await dialog.getByLabel("Tiêu đề", { exact: true }).fill("Dở dang");
+    await dialog.getByRole("button", { name: "Hủy" }).click();
+    await expect(confirmDialog(page, "Bỏ bài đang soạn?")).toBeVisible();
+    await confirmDialog(page, "Bỏ bài đang soạn?").getByRole("button", { name: "Tiếp tục soạn" }).click();
+    await expect(dialog.getByLabel("Tiêu đề", { exact: true })).toHaveValue("Dở dang");
+    await dialog.getByRole("button", { name: "Hủy" }).click();
+    await confirmDialog(page, "Bỏ bài đang soạn?").getByRole("button", { name: "Bỏ bài" }).click();
+    await expect(page).not.toHaveURL(/post=/);
   });
 });
 
@@ -213,7 +264,7 @@ test.describe("published versions are immutable", () => {
     await page.getByRole("button", { name: /Tạo bản nháp mới từ v1/ }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Tạo bản nháp" }).click();
     await expect(page).toHaveURL(/version=/);
-    await expect(page.getByText(/phiên bản 2 \(bản nháp\)/)).toBeVisible();
+    await expect(page.getByText(/v2 \(bản nháp\)/)).toBeVisible();
     const createCall = backend.callsTo("POST", /\/posts\/[^/]+\/versions$/);
     expect(createCall).toHaveLength(1);
     expect(createCall[0].headers["idempotency-key"]).toBeTruthy();
@@ -225,7 +276,7 @@ test.describe("published versions are immutable", () => {
     expect(put.headers["if-match"]).toBe('"1"');
     expect(put.headers["idempotency-key"]).toBeTruthy();
 
-    await tab(page, "Xuất bản và hiển thị").click();
+    await tab(page, "Phiên bản & Xuất bản").click();
     await page.getByRole("button", { name: "Xuất bản bản nháp" }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Xuất bản", exact: true }).click();
     await expect.poll(() => backend.versionsOf(post.id).every((version) => version.status === "Published")).toBe(true);
@@ -236,8 +287,13 @@ test.describe("published versions are immutable", () => {
     // Editing the first version through the API is refused: the UI never even offers it.
     await page.goto(`/admin/learn?post=${post.id}&version=${v1.id}`);
     await expect(page.getByText("Đang xem bản đã xuất bản (bất biến)")).toBeVisible();
-    await tab(page, "Phiên bản").click();
-    await expect(page.getByRole("table", { name: "Các phiên bản của bài" }).getByText("Đang công khai")).toHaveCount(1);
+    await tab(page, "Phiên bản & Xuất bản").click();
+    const versions = page.getByRole("table", { name: "Các phiên bản của bài" });
+    await expect(versions.getByText("Đang công khai")).toHaveCount(1);
+    await expect(versions.getByText("Đang mở")).toHaveCount(1);
+    // A row click opens that version.
+    await versions.getByText("v2", { exact: true }).click();
+    await expect(page).toHaveURL(new RegExp(`version=${v2.id}`));
   });
 });
 
@@ -367,26 +423,19 @@ test.describe("idempotent retry", () => {
 });
 
 test.describe("media", () => {
-  async function addVideo(page: Page) {
-    await tab(page, "Nội dung").click();
-    await page.getByLabel("Loại khối").selectOption("video");
-    await page.getByRole("button", { name: "Thêm khối" }).click();
-    return page.getByTestId("content-block").last();
-  }
-
   test("only YouTube, Facebook and TikTok links pass; the result shows provider and canonical URL; never an iframe", async ({ page }) => {
     const backend = await setup(page);
-    await openNew(page);
-    await fillBasics(page, "co-video", "Có video", "Tóm tắt video.");
-    await page.getByLabel("Loại bài").selectOption("Video");
-    const block = await addVideo(page);
+    await createDraft(page, "co-video", "Có video", "Tóm tắt video.");
+    const post = backend.bySlug("co-video")!;
+    await pickOption(page, page.getByLabel("Loại bài"), "Video");
+    const block = await addBlock(page, "video");
     await block.getByLabel(/^Liên kết video/).fill("https://vimeo.com/123456");
     await block.getByLabel(/^Liên kết video/).blur();
     await expect(block.getByText("Dùng liên kết đầy đủ từ YouTube, Facebook hoặc TikTok")).toBeVisible();
     // A refused link blocks saving.
     await page.getByRole("button", { name: "Lưu bản nháp" }).click();
     await expect(page.getByText("Có liên kết video bị máy chủ từ chối")).toBeVisible();
-    expect(backend.callsTo("POST", /\/posts$/)).toHaveLength(0);
+    expect(backend.callsTo("PUT", /\/versions\//)).toHaveLength(0);
 
     await block.getByLabel(/^Liên kết video/).fill("https://youtu.be/dQw4w9WgXcQ");
     await block.getByLabel(/^Liên kết video/).blur();
@@ -394,17 +443,33 @@ test.describe("media", () => {
     await expect(block.getByTestId("media-result")).toContainText("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
     await expect(page.locator("iframe")).toHaveCount(0);
     await page.getByRole("button", { name: "Lưu bản nháp" }).click();
+    await expect(page.getByText("Đã lưu bản nháp")).toBeVisible();
+    const saved = backend.versionsOf(post.id)[0];
+    expect(saved.kind).toBe("Video");
+    expect(saved.blocks[1]).toEqual({ type: "video", provider: "YouTube", videoId: "dQw4w9WgXcQ", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" });
+    // The save sent only {type, url}; the server derived the rest.
+    expect(backend.callsTo("PUT", /\/versions\//)[0].body).toMatchObject({ kind: "Video", blocks: [{ type: "paragraph" }, { type: "video", url: "https://youtu.be/dQw4w9WgXcQ" }] });
+  });
+
+  test("the Bài mới modal creates a Video post with its link; the server rejects an unsupported one at the field", async ({ page }) => {
+    const backend = await setup(page);
+    const dialog = await openNew(page);
+    await fillBasics(dialog, "video-ngay", "Video ngay", "Tóm tắt.", "Mở đầu.");
+    await pickOption(page, dialog.getByLabel("Loại bài"), "Video");
+    await dialog.getByLabel(/^Liên kết video/).fill("https://vimeo.com/123456");
+    await dialog.getByTestId("create-post").click();
+    await expect(dialog.getByText(/LEARN_MEDIA_INVALID/).first()).toBeVisible();
+    expect(backend.bySlug("video-ngay")).toBeUndefined();
+    await dialog.getByLabel(/^Liên kết video/).fill("https://youtu.be/dQw4w9WgXcQ");
+    await dialog.getByTestId("create-post").click();
     await expect(page).toHaveURL(/post=[0-9a-f-]{36}/);
-    const saved = backend.versionsOf(backend.bySlug("co-video")!.id)[0];
-    expect(saved.blocks[0]).toEqual({ type: "video", provider: "YouTube", videoId: "dQw4w9WgXcQ", url: "https://www.youtube.com/watch?v=dQw4w9WgXcQ" });
-    // The create request sent only {type, url}; the server derived the rest.
-    expect(backend.callsTo("POST", /\/posts$/)[0].body).toMatchObject({ version: { blocks: [{ type: "video", url: "https://youtu.be/dQw4w9WgXcQ" }] } });
+    expect(backend.versionsOf(backend.bySlug("video-ngay")!.id)[0].blocks[1]).toMatchObject({ type: "video", provider: "YouTube" });
   });
 
   test("short links and embed markup are rejected by the validate route", async ({ page }) => {
     const backend = await setup(page);
-    await openNew(page);
-    const block = await addVideo(page);
+    await createDraft(page, "kiem-tra-link", "Kiểm tra liên kết", "Tóm tắt.");
+    const block = await addBlock(page, "video");
     for (const url of ["https://fb.watch/abcd1234/", "https://www.youtube.com/embed/abc", "http://www.youtube.com/watch?v=dQw4w9WgXcQ", "https://evil.example/watch?v=dQw4w9WgXcQ"]) {
       await block.getByLabel(/^Liên kết video/).fill(url);
       await block.getByRole("button", { name: "Kiểm tra liên kết" }).click();
@@ -418,8 +483,8 @@ test.describe("media", () => {
 
   test("a late validate answer for an old link never decorates the new one", async ({ page }) => {
     const backend = await setup(page);
-    await openNew(page);
-    const block = await addVideo(page);
+    await createDraft(page, "tre-link", "Trễ liên kết", "Tóm tắt.");
+    const block = await addBlock(page, "video");
     backend.failNext("POST", /media\/validate$/, { status: 200, delayMs: 1200, json: { provider: "YouTube", videoId: "AAAAAAAAAAA", canonicalUrl: "https://www.youtube.com/watch?v=AAAAAAAAAAA" } });
     await block.getByLabel(/^Liên kết video/).fill("https://youtu.be/AAAAAAAAAAA");
     await block.getByRole("button", { name: "Kiểm tra liên kết" }).click();
@@ -444,17 +509,21 @@ test.describe("media", () => {
     expect(Object.keys((backend.callsTo("PUT", /\/versions\//)[0].body as { blocks: Array<Record<string, unknown>> }).blocks[0]).sort()).toEqual(["type", "url"]);
   });
 
-  test("HTML in text is refused before saving and the server's refusal is shown inline", async ({ page }) => {
+  test("HTML in text is refused before creating and the server's refusal is shown inline", async ({ page }) => {
     const backend = await setup(page);
-    await openNew(page);
-    await fillBasics(page, "co-html", "Có html", "Tóm tắt.");
-    await addParagraph(page, "Xin chào <script>alert(1)</script>");
+    const dialog = await openNew(page);
+    await fillBasics(dialog, "co-html", "Có html", "Tóm tắt.", "Xin chào <script>alert(1)</script>");
+    await dialog.getByTestId("create-post").click();
+    await expect(dialog.getByText("Chỉ nhận văn bản thuần: không dùng thẻ HTML, iframe hay script.").first()).toBeVisible();
+    expect(backend.callsTo("POST", /\/posts$/)).toHaveLength(0);
+    await dialog.getByLabel(/^Đoạn mở đầu/).fill("1 < 2 vẫn là văn bản");
+    await dialog.getByTestId("create-post").click();
+    await expect(page).toHaveURL(/post=[0-9a-f-]{36}/);
+    // In the editor the same rule holds for every block.
+    await addParagraph(page, "<b>đậm</b>");
     await page.getByRole("button", { name: "Lưu bản nháp" }).click();
     await expect(page.getByText("Chỉ nhận văn bản thuần: không dùng thẻ HTML, iframe hay script.").first()).toBeVisible();
-    expect(backend.callsTo("POST", /\/posts$/)).toHaveLength(0);
-    await page.getByTestId("content-block").last().getByLabel(/^Nội dung/).fill("1 < 2 vẫn là văn bản");
-    await page.getByRole("button", { name: "Lưu bản nháp" }).click();
-    await expect(page).toHaveURL(/post=[0-9a-f-]{36}/);
+    expect(backend.callsTo("PUT", /\/versions\//)).toHaveLength(0);
   });
 });
 
@@ -467,13 +536,11 @@ test.describe("unknown block fields", () => {
     await page.goto(`/admin/learn?post=${post.id}&tab=content`);
     await expect(page.getByTestId("block-extras")).toContainText("futureField");
     await expect(page.getByText("Khối không hỗ trợ 2")).toBeVisible();
-    await tab(page, "Thông tin").click();
     await page.getByLabel("Tiêu đề", { exact: true }).fill("Có trường lạ");
     await page.getByRole("button", { name: "Lưu bản nháp" }).click();
     const put = backend.callsTo("PUT", /\/versions\//)[0];
     expect(put.body).toMatchObject({ blocks: [{ type: "paragraph", text: "Đoạn một", futureField: "giữ lại" }, { type: "carousel", slides: [1, 2] }] });
     await expect(page.getByText(/FIELD_UNKNOWN/).first()).toBeVisible();
-    await tab(page, "Nội dung").click();
     await expect(page.getByTestId("content-block").first().getByRole("alert")).toContainText("FIELD_UNKNOWN");
     expect(backend.versionsOf(post.id)[0].title).not.toBe("Có trường lạ"); // nothing was silently dropped or half-saved
   });
@@ -490,7 +557,7 @@ test.describe("sources", () => {
       b.seedPost("co-nguon");
     });
     const post = backend.bySlug("co-nguon")!;
-    await page.goto(`/admin/learn?post=${post.id}&tab=classify`);
+    await page.goto(`/admin/learn?post=${post.id}&tab=classify`); // the old tab value still opens the content screen
     const options = page.getByTestId("source-option");
     await expect(options).toHaveCount(4); // the Organization source never enters the Learn catalog
     await expect(page.getByRole("button", { name: "Thêm nguồn Quy chuẩn hết hạn" })).toBeDisabled();
@@ -503,26 +570,17 @@ test.describe("sources", () => {
     await page.getByRole("button", { name: "Lưu bản nháp" }).click();
     await expect(page.getByText("Đã lưu bản nháp")).toBeVisible(); // a draft may cite it
     expect(backend.versionsOf(post.id)[0].sources).toHaveLength(1);
+    await expect(page.getByRole("button", { name: /^Xuất bản v1/ })).toBeDisabled(); // the header publish button says why
 
-    await tab(page, "Xuất bản và hiển thị").click();
+    await tab(page, "Phiên bản & Xuất bản").click();
     await expect(page.getByRole("button", { name: "Xuất bản bản nháp" })).toBeDisabled();
-    await expect(page.getByText(/Nguồn “Quy chuẩn chờ duyệt”: Nguồn chưa được duyệt \(Draft\)/)).toBeVisible();
+    await expect(page.getByText(/Nguồn “Quy chuẩn chờ duyệt”: Nguồn chưa được duyệt \(Draft\)/).first()).toBeVisible();
     expect(publishedCalls(backend)).toHaveLength(0);
 
     // The verdict survives a reload: it is fetched by id for the stored source.
     await page.reload();
-    await tab(page, "Xuất bản và hiển thị").click();
     await expect(page.getByRole("button", { name: "Xuất bản bản nháp" })).toBeDisabled();
     expect(backend.callsTo("GET", /knowledge-sources\/[0-9a-f-]{36}$/).length).toBeGreaterThan(0);
-  });
-
-  test("create-and-publish is blocked while a chosen source is not publishable", async ({ page }) => {
-    await setup(page, (b) => { b.seedSource("Chưa duyệt", { approvalStatus: "Draft" }); });
-    await openNew(page, "Phân loại và nguồn");
-    await page.getByRole("button", { name: "Thêm nguồn Chưa duyệt" }).click();
-    await expect(page.getByRole("button", { name: "Tạo và xuất bản ngay" })).toBeDisabled();
-    await expect(page.getByText("Chưa thể xuất bản ngay")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Lưu bản nháp" })).toBeEnabled();
   });
 
   test("when the verdict cannot be read the backend still decides at publish (409 shown)", async ({ page }) => {
@@ -549,19 +607,20 @@ test.describe("statuses in the list", () => {
     b.seedPost("d-xoa", { title: "Đã xóa", status: "Deleted" });
   };
 
-  test("quick-edit pane: loads the draft of a never-published post, saves with If-Match + Idempotency-Key, publishes, and the row still opens the editor", async ({ page }) => {
+  test("quick-edit drawer: a row click loads the draft of a never-published post, saves with If-Match + Idempotency-Key, publishes, and opens the editor", async ({ page }) => {
     const backend = await setup(page, (b) => { b.seedPost("nhap-nhanh", { title: "Tiêu đề nháp", summary: "Tóm tắt nháp." }); });
     await page.goto("/admin/learn");
-    const row = page.getByRole("row").filter({ hasText: "nhap-nhanh" });
+    const row = postsTable(page).getByRole("row").filter({ hasText: "nhap-nhanh" });
     await expect(row.getByText("Chưa có bản xuất bản")).toBeVisible(); // the list carries no title for it (BE#154)
-    await page.getByRole("button", { name: "Sửa nhanh bài nhap-nhanh" }).click();
+    await row.click();
     await expect(page).toHaveURL(/quick=/);
-    const pane = page.getByRole("region", { name: "Sửa nhanh bài" });
+    const pane = quickDrawer(page);
     await expect(pane.getByLabel("Tiêu đề")).toHaveValue("Tiêu đề nháp");
     await expect(pane.getByRole("button", { name: "Lưu nháp" })).toBeDisabled();
 
     await pane.getByLabel("Tiêu đề").fill("Tiêu đề đã sửa nhanh");
-    await expect(pane.getByRole("button", { name: "Xuất bản" })).toBeDisabled(); // save first
+    await expect(pane.getByText("Chưa lưu")).toBeVisible();
+    await expect(pane.getByRole("button", { name: "Xuất bản", exact: true })).toBeDisabled(); // save first
     await pane.getByRole("button", { name: "Lưu nháp" }).click();
     await expect(pane.getByText("Chưa lưu")).toHaveCount(0);
     const puts = backend.callsTo("PUT", /\/api\/admin\/learn\/versions\/[^/]+$/);
@@ -572,60 +631,96 @@ test.describe("statuses in the list", () => {
     expect((puts[0].body as { blocks: unknown[] }).blocks).toHaveLength(1); // the rest of the version is sent unchanged
 
     await pane.getByRole("button", { name: "Xuất bản", exact: true }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Xuất bản", exact: true }).click();
+    await confirmDialog(page, "Xuất bản bản nháp này?").getByRole("button", { name: "Xuất bản", exact: true }).click();
     await expect.poll(() => publishedCalls(backend).length).toBe(1);
     expect(publishedCalls(backend)[0].headers["if-match"]).toMatch(/^"\d+"$/);
     expect(publishedCalls(backend)[0].headers["idempotency-key"]).toBeTruthy();
-    await expect(row.getByText("Tiêu đề đã sửa nhanh")).toBeVisible();
     await expect(pane.getByRole("button", { name: "Ẩn bài" })).toBeVisible();
     await expect(pane.getByLabel("Tiêu đề")).toHaveJSProperty("readOnly", true);
 
-    await page.getByRole("button", { name: /^Mở bài/ }).click();
+    await pane.getByRole("button", { name: "Mở trình soạn đầy đủ" }).click();
     await expect(page).toHaveURL(/post=[0-9a-f-]{36}/);
+    await expect(page).not.toHaveURL(/quick=/);
     await expect(page.getByLabel("Tiêu đề", { exact: true })).toBeVisible();
+    // The list behind was refreshed with the published title.
+    await page.getByRole("button", { name: "Về danh sách" }).click();
+    await expect(postsTable(page).getByText("Tiêu đề đã sửa nhanh")).toBeVisible();
   });
 
-  test("quick-edit pane: lifecycle commands follow the status and hide sends If-Match; Deleted offers only restore", async ({ page }) => {
+  test("quick-edit drawer: lifecycle commands follow the status and hide sends If-Match; Deleted offers only restore", async ({ page }) => {
     const backend = await setup(page, (b) => {
       b.seedPost("dang-cong-khai", { title: "Đang công khai", status: "Published" });
       b.seedPost("da-xoa-roi", { title: "Đã xóa rồi", status: "Deleted" });
     });
     await page.goto("/admin/learn");
-    await page.getByRole("button", { name: "Sửa nhanh bài Đang công khai" }).click();
-    const pane = page.getByRole("region", { name: "Sửa nhanh bài" });
+    await postsTable(page).getByRole("row").filter({ hasText: "dang-cong-khai" }).click();
+    const pane = quickDrawer(page);
     await expect(pane.getByText("Bản đã xuất bản là bất biến")).toBeVisible();
     await expect(pane.getByRole("button", { name: "Lưu nháp" })).toHaveCount(0);
     await expect(pane.getByRole("button", { name: "Hiện lại" })).toHaveCount(0);
     await pane.getByRole("button", { name: "Ẩn bài" }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Ẩn bài" }).click();
+    await confirmDialog(page, "Ẩn bài khỏi công khai?").getByRole("button", { name: "Ẩn bài" }).click();
     await expect.poll(() => backend.callsTo("POST", /\/posts\/[^/]+\/hide$/).length).toBe(1);
     const hide = backend.callsTo("POST", /\/posts\/[^/]+\/hide$/)[0];
     expect(hide.headers["if-match"]).toMatch(/^"\d+"$/);
     expect(hide.headers["idempotency-key"]).toBeTruthy();
     await expect(pane.getByRole("button", { name: "Hiện lại" })).toBeVisible();
+    await pane.getByRole("button", { name: "Đóng" }).click();
+    await expect(page).not.toHaveURL(/quick=/);
 
-    await page.getByRole("button", { name: "Sửa nhanh bài Đã xóa rồi" }).click();
+    await postsTable(page).getByRole("row").filter({ hasText: "da-xoa-roi" }).click();
     await expect(pane.getByRole("button", { name: "Khôi phục" })).toBeVisible();
     await expect(pane.getByRole("button", { name: /Xuất bản|Ẩn bài|Xóa bài/ })).toHaveCount(0);
-    await pane.getByRole("button", { name: "Đóng sửa nhanh" }).click();
+    await pane.getByRole("button", { name: "Đóng" }).click();
     await expect(page).not.toHaveURL(/quick=/);
   });
 
-  test("every state is labelled, the filter lives in the URL, and drafts without a published version say so", async ({ page }) => {
+  test("row menu: hide from the list sends If-Match from the row's revision; publish loads the draft first", async ({ page }) => {
+    const backend = await setup(page, (b) => {
+      b.seedPost("menu-cong-khai", { title: "Menu công khai", status: "Published" });
+      b.seedPost("menu-nhap", { title: "Menu nháp" });
+    });
+    await page.goto("/admin/learn");
+    const table = postsTable(page);
+    await table.getByRole("row").filter({ hasText: "menu-cong-khai" }).getByRole("button", { name: "Thao tác" }).click();
+    await page.getByRole("menuitem", { name: "Ẩn bài" }).click();
+    await confirmDialog(page, "Ẩn bài khỏi công khai?").getByRole("button", { name: "Ẩn bài" }).click();
+    await expect.poll(() => backend.bySlug("menu-cong-khai")!.status).toBe("Hidden");
+    const hide = backend.callsTo("POST", /\/posts\/[^/]+\/hide$/)[0];
+    expect(hide.headers["if-match"]).toBe('"2"');
+    expect(hide.headers["idempotency-key"]).toBeTruthy();
+    await expect(table.getByRole("row").filter({ hasText: "menu-cong-khai" }).getByText("Đã ẩn")).toBeVisible();
+
+    await table.getByRole("row").filter({ hasText: "menu-nhap" }).getByRole("button", { name: "Thao tác" }).click();
+    await page.getByRole("menuitem", { name: "Xuất bản bản nháp" }).click();
+    const dialog = confirmDialog(page, "Xuất bản bản nháp này?");
+    await expect(dialog).toContainText("v1");
+    await dialog.getByRole("button", { name: "Xuất bản", exact: true }).click();
+    await expect.poll(() => backend.bySlug("menu-nhap")!.status).toBe("Published");
+    expect(publishedCalls(backend)[0].headers["if-match"]).toBe('"1"');
+    await expect(table.getByRole("row").filter({ hasText: "menu-nhap" }).getByText("Menu nháp")).toBeVisible();
+  });
+
+  test("every state is labelled, the status filter lives in the URL, and drafts without a published version say so", async ({ page }) => {
     await setup(page, seed);
     await page.goto("/admin/learn");
     const table = page.getByRole("table", { name: "Danh sách bài Learn" });
     await expect(table.getByRole("row")).toHaveCount(5);
     await expect(table.getByText("Chưa có bản xuất bản")).toBeVisible();
     for (const label of ["Chưa xuất bản", "Đang công khai", "Đã ẩn", "Đã xóa"]) await expect(table.getByText(label, { exact: true }).first()).toBeVisible();
-    await page.getByLabel("Trạng thái bài").selectOption("Hidden");
+    await pickChip(page, "Trạng thái", "Đã ẩn");
     await expect(page).toHaveURL(/status=Hidden/);
     await expect(table.getByRole("row")).toHaveCount(2);
     await page.reload();
-    await expect(page.getByLabel("Trạng thái bài")).toHaveValue("Hidden");
+    await expect(page.getByRole("button", { name: /^Trạng thái:/ })).toContainText("Đã ẩn");
     await expect(table.getByText("Đang ẩn")).toBeVisible();
-    await page.getByLabel("Trạng thái bài").selectOption("Deleted");
+    await pickChip(page, "Trạng thái", "Đã xóa");
     await expect(table.getByText("Đã xóa", { exact: true }).first()).toBeVisible();
+    // Search and kind only narrow the loaded page (the admin API has neither) and say so.
+    await pickChip(page, "Trạng thái", "tất cả");
+    await page.getByLabel("Tìm bài").fill("cong-khai");
+    await expect(table.getByRole("row")).toHaveCount(2);
+    await expect(page.getByText(/chỉ áp dụng cho .* bài của trang đang mở/)).toBeVisible();
   });
 
   test("hidden and deleted posts explain their RAG behaviour; a deleted post only offers restore", async ({ page }) => {
@@ -669,22 +764,18 @@ test.describe("statuses in the list", () => {
 
   test("reload of an open draft restores the saved content from the server", async ({ page }) => {
     const backend = await setup(page);
-    await openNew(page);
-    await fillBasics(page, "khoi-phuc", "Khôi phục sau reload", "Tóm tắt đã lưu.");
-    await addParagraph(page, "Đoạn đã lưu.");
-    await page.getByRole("button", { name: "Lưu bản nháp" }).click();
-    await expect(page).toHaveURL(/post=[0-9a-f-]{36}/);
+    await createDraft(page, "khoi-phuc", "Khôi phục sau reload", "Tóm tắt đã lưu.", "Đoạn đã lưu.");
     await page.reload();
     await expect(page.getByLabel("Tiêu đề", { exact: true })).toHaveValue("Khôi phục sau reload");
-    await tab(page, "Nội dung").click();
     await expect(page.getByTestId("content-block").first().getByLabel(/^Nội dung/)).toHaveValue("Đoạn đã lưu.");
     expect(backend.versionsOf(backend.bySlug("khoi-phuc")!.id)).toHaveLength(1);
   });
 
-  test("leaving a form with unsaved changes asks first", async ({ page }) => {
+  test("leaving the editor with unsaved changes asks first", async ({ page }) => {
     await setup(page, (b) => { b.seedPost("roi-di"); });
     await page.goto("/admin/learn");
-    await page.getByRole("button", { name: /Mở bài/ }).click();
+    await postsTable(page).getByRole("row").filter({ hasText: "roi-di" }).click();
+    await quickDrawer(page).getByRole("button", { name: "Mở trình soạn đầy đủ" }).click();
     await page.getByLabel("Tiêu đề", { exact: true }).fill("Chưa lưu");
     await page.getByRole("button", { name: "Về danh sách" }).click();
     await expect(page.getByRole("dialog")).toContainText("Bỏ thay đổi chưa lưu?");
@@ -709,7 +800,8 @@ for (const width of [1440, 375]) {
         b.seedPost("da-xuat-ban", { status: "Published", title: "Đã xuất bản" });
       });
       const draft = backend.bySlug("ban-nhap-dai")!;
-      const paths = ["/admin/learn", "/admin/learn?section=situations", `/admin/learn?post=${draft.id}`, `/admin/learn?post=${draft.id}&tab=content`, `/admin/learn?post=${draft.id}&tab=classify`, `/admin/learn?post=${draft.id}&tab=publish`, `/admin/learn?post=${draft.id}&tab=versions`, "/admin/learn?post=new&tab=content"];
+      const published = backend.bySlug("da-xuat-ban")!;
+      const paths = ["/admin/learn", `/admin/learn?quick=${published.id}`, "/admin/learn?section=situations", `/admin/learn?post=${draft.id}`, `/admin/learn?post=${draft.id}&tab=publish`, "/admin/learn?post=new"];
       for (const path of paths) {
         await page.goto(path);
         await expect(page.getByRole("heading", { level: 1, name: "Learn CMS" })).toBeVisible();
@@ -719,7 +811,7 @@ for (const width of [1440, 375]) {
         const resolved = await page.locator(".ops-theme").first().getAttribute("data-resolved-theme");
         expect(resolved).toBe(theme);
       }
-      await page.goto(`/admin/learn?post=${draft.id}&tab=content`);
+      await page.goto(`/admin/learn?post=${draft.id}`);
       await page.screenshot({ path: testInfo.outputPath(`cms-editor-${width}-${theme}.png`), fullPage: true });
     });
   }

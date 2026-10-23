@@ -178,7 +178,7 @@ test.describe("412 on the PlatformAdmin organization editor", () => {
     await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [server.state.record], totalCount: 1, page: 1, pageSize: 20 } }));
     await page.route("**/api/organizations/org-1", (route) => server.handle(route));
     await page.goto("/admin/organizations?organization=org-1");
-    const drawer = page.getByRole("region", { name: "Thông tin tổ chức" });
+    const drawer = page.getByTestId("organization-drawer");
     await drawer.getByRole("button", { name: "Sửa hồ sơ" }).click();
     await drawer.getByLabel("Tên tổ chức").fill("Tên do admin gõ");
     server.otherEditor({ phoneNumber: "+842369999999" });

@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, RefreshCw, SlidersHorizontal } from "lucide-react";
-import { useRef, useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 
 import { useUrlParams } from "@/api/use-url-params";
 
@@ -9,12 +9,13 @@ import { useIdempotencyKey } from "@/api/idempotency";
 import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Drawer } from "@/components/ui/dialog";
+import { Combobox } from "@/components/ui/combobox";
+import { CellTitle, DataTable, type DataColumn } from "@/components/ui/data-table";
+import { Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, Input, Select } from "@/components/ui/field";
-import { SkeletonRows } from "@/components/ui/skeleton";
+import { Field, Input } from "@/components/ui/field";
+import { FilterChip, FilterChips } from "@/components/ui/filter-chip";
 import { StatusBadge, type Tone } from "@/components/ui/status-badge";
-import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { formatDateTime, formatNumber } from "@/features/billing/format";
 
@@ -73,7 +74,9 @@ function periodState(policy: AiPolicy, now: number): { label: string; tone: Tone
   return { label: "Đang hiệu lực", tone: "success" };
 }
 
-function PolicyForm({ accessToken, onCreated, onClose }: { accessToken: string; onCreated: (policy: AiPolicy) => void; onClose: () => void }) {
+/** Create modal (Figma "Modal / Tạo chính sách"): one effective period for one operation; immutable afterwards. */
+function PolicyModal({ open, accessToken, onCreated, onClose }: { open: boolean; accessToken: string; onCreated: (policy: AiPolicy) => void; onClose: () => void }) {
+  const formId = useId();
   const { keyFor, done } = useIdempotencyKey();
   const [form, setForm] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Errors>({});
@@ -95,6 +98,8 @@ function PolicyForm({ accessToken, onCreated, onClose }: { accessToken: string; 
       // The key follows the payload: a retry after a timeout replays the same create, a changed field mints a new key.
       const created = await adminAiApi.createPolicy(accessToken, checked.input, keyFor(checked.input));
       done();
+      setForm(EMPTY);
+      setErrors({});
       onCreated(created);
     } catch (cause) {
       setError(cause);
@@ -105,29 +110,32 @@ function PolicyForm({ accessToken, onCreated, onClose }: { accessToken: string; 
   };
   const server = (path: string, key: keyof Form) => errors[key] ?? fieldIssue(error, path);
 
-  return <form className={styles.stack} onSubmit={submit} aria-label="Tạo chính sách AI" noValidate>
-    <Alert tone="info" title="Chính sách bất biến">Chính sách không sửa được sau khi tạo. Muốn đổi, tạo kỳ hiệu lực mới cho thao tác đó (các kỳ của cùng thao tác không được chồng nhau). Không có giá trị mặc định: mọi con số do bạn quyết định.</Alert>
-    <Field label="Thao tác" required error={server("$.operation", "operation")}>
-      {(props) => <Select {...props} value={form.operation} onChange={set("operation")}><option value="">Chọn thao tác…</option>{ADMIN_AI_OPERATIONS.map((value) => <option key={value} value={value}>{operationLabel(value)} ({value})</option>)}</Select>}
-    </Field>
-    <Field label="Đơn vị quota" required hint="Khớp đơn vị của quota đã cấp (ví dụ đơn vị trong chính sách quota của gói). Backend không quy đổi tiền hay token." error={server("$.quotaUnit", "quotaUnit")}>
-      {(props) => <Input {...props} value={form.quotaUnit} onChange={set("quotaUnit")} autoComplete="off" spellCheck={false} />}
-    </Field>
-    <div className={styles.grid2}>
-      <Field label="Giữ chỗ mỗi yêu cầu" required error={server("$.reserveUnits", "reserveUnits")}>{(props) => <Input {...props} inputMode="numeric" value={form.reserveUnits} onChange={set("reserveUnits")} />}</Field>
-      <Field label="Số ký tự đầu vào tối đa" required error={server("$.maxInputChars", "maxInputChars")}>{(props) => <Input {...props} inputMode="numeric" value={form.maxInputChars} onChange={set("maxInputChars")} />}</Field>
-      <Field label="Số nguồn tối đa" required error={server("$.maxSources", "maxSources")}>{(props) => <Input {...props} inputMode="numeric" value={form.maxSources} onChange={set("maxSources")} />}</Field>
-      {form.operation === "TraineeAnswer" && <Field label="Hạn mức mỗi Trainee mỗi ngày" required hint="Theo ngày Asia/Ho_Chi_Minh; gồm phần đã tính và phần đang giữ chỗ. Không lấy từ quota của tổ chức." error={server("$.dailyUnits", "dailyUnits")}>{(props) => <Input {...props} inputMode="numeric" value={form.dailyUnits} onChange={set("dailyUnits")} data-testid="policy-daily-units" />}</Field>}
-    </div>
-    <div className={styles.grid2}>
-      <Field label="Hiệu lực từ" hint="Để trống: có hiệu lực ngay khi tạo." error={server("$.effectiveFrom", "effectiveFrom")}>{(props) => <Input {...props} type="datetime-local" value={form.effectiveFrom} onChange={set("effectiveFrom")} />}</Field>
-      <Field label="Hiệu lực đến" hint="Để trống: không có ngày kết thúc." error={server("$.effectiveUntil", "effectiveUntil")}>{(props) => <Input {...props} type="datetime-local" value={form.effectiveUntil} onChange={set("effectiveUntil")} />}</Field>
-    </div>
-    {error !== undefined && <Alert tone="danger" title="Chưa tạo được chính sách">{aiErrorText(error)}{" "}Nội dung bạn nhập vẫn được giữ; bấm Tạo để thử lại với cùng khóa chống trùng.</Alert>}
-    <div className="ops-actions"><Button type="submit" disabled={busy} data-testid="policy-create">{busy ? "Đang tạo…" : "Tạo chính sách"}</Button><Button type="button" variant="quiet" onClick={onClose} disabled={busy}>Hủy</Button></div>
-  </form>;
+  return <Modal open={open} onOpenChange={(next) => { if (!next && !busy) onClose(); }} size="lg" title="Tạo chính sách AI" description="Một kỳ hiệu lực cho một thao tác; không sửa được sau khi tạo."
+    footer={<><Button type="button" variant="quiet" onClick={onClose} disabled={busy}>Hủy</Button><Button type="submit" form={formId} disabled={busy} data-testid="policy-create">{busy ? "Đang tạo…" : "Tạo chính sách"}</Button></>}>
+    <form id={formId} className={styles.stack} onSubmit={submit} aria-label="Tạo chính sách AI" noValidate>
+      <Alert tone="info" title="Chính sách bất biến">Chính sách không sửa được sau khi tạo. Muốn đổi, tạo kỳ hiệu lực mới cho thao tác đó (các kỳ của cùng thao tác không được chồng nhau). Không có giá trị mặc định: mọi con số do bạn quyết định.</Alert>
+      <Field label="Thao tác" required error={server("$.operation", "operation")}>
+        {(props) => <Combobox {...props} aria-label="Thao tác" value={form.operation} onChange={(value) => setForm((current) => ({ ...current, operation: value }))} placeholder="Chọn thao tác…" groupLabel="Thao tác" options={ADMIN_AI_OPERATIONS.map((value) => ({ value, label: `${operationLabel(value)} (${value})` }))} />}
+      </Field>
+      <Field label="Đơn vị quota" required hint="Khớp đơn vị của quota đã cấp (ví dụ đơn vị trong chính sách quota của gói). Backend không quy đổi tiền hay token." error={server("$.quotaUnit", "quotaUnit")}>
+        {(props) => <Input {...props} value={form.quotaUnit} onChange={set("quotaUnit")} autoComplete="off" spellCheck={false} />}
+      </Field>
+      <div className={styles.grid2}>
+        <Field label="Giữ chỗ mỗi yêu cầu" required error={server("$.reserveUnits", "reserveUnits")}>{(props) => <Input {...props} inputMode="numeric" value={form.reserveUnits} onChange={set("reserveUnits")} />}</Field>
+        <Field label="Số ký tự đầu vào tối đa" required error={server("$.maxInputChars", "maxInputChars")}>{(props) => <Input {...props} inputMode="numeric" value={form.maxInputChars} onChange={set("maxInputChars")} />}</Field>
+        <Field label="Số nguồn tối đa" required error={server("$.maxSources", "maxSources")}>{(props) => <Input {...props} inputMode="numeric" value={form.maxSources} onChange={set("maxSources")} />}</Field>
+        {form.operation === "TraineeAnswer" && <Field label="Hạn mức mỗi Trainee mỗi ngày" required hint="Theo ngày Asia/Ho_Chi_Minh; gồm phần đã tính và phần đang giữ chỗ. Không lấy từ quota của tổ chức." error={server("$.dailyUnits", "dailyUnits")}>{(props) => <Input {...props} inputMode="numeric" value={form.dailyUnits} onChange={set("dailyUnits")} data-testid="policy-daily-units" />}</Field>}
+      </div>
+      <div className={styles.grid2}>
+        <Field label="Hiệu lực từ" hint="Để trống: có hiệu lực ngay khi tạo." error={server("$.effectiveFrom", "effectiveFrom")}>{(props) => <Input {...props} type="datetime-local" value={form.effectiveFrom} onChange={set("effectiveFrom")} />}</Field>
+        <Field label="Hiệu lực đến" hint="Để trống: không có ngày kết thúc." error={server("$.effectiveUntil", "effectiveUntil")}>{(props) => <Input {...props} type="datetime-local" value={form.effectiveUntil} onChange={set("effectiveUntil")} />}</Field>
+      </div>
+      {error !== undefined && <Alert tone="danger" title="Chưa tạo được chính sách">{aiErrorText(error)}{" "}Nội dung bạn nhập vẫn được giữ; bấm Tạo để thử lại với cùng khóa chống trùng.</Alert>}
+    </form>
+  </Modal>;
 }
 
+/** Policy versions (immutable: no row action, no edit); the "Thao tác" chip filters on the server. */
 export function AdminPoliciesTab({ accessToken }: { accessToken: string }) {
   const toast = useToast();
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
@@ -138,41 +146,42 @@ export function AdminPoliciesTab({ accessToken }: { accessToken: string }) {
   const total = list.data?.total ?? 0;
   const [now] = useState(() => Date.now());
 
-  return <>
-    <div className="ops-toolbar">
-      <Select aria-label="Thao tác" style={{ width: 220 }} value={operation} onChange={(event) => setParams({ operation: event.target.value })}>
-        <option value="">Mọi thao tác</option>{ADMIN_AI_OPERATIONS.map((value) => <option key={value} value={value}>{operationLabel(value)}</option>)}
-      </Select>
-      <Button onClick={() => setCreating(true)} data-testid="policy-new"><Plus size={16} aria-hidden="true" />Tạo chính sách</Button>
-      <Button variant="quiet" onClick={list.reload} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
-    </div>
-    {list.error !== undefined && <Alert tone="danger" title="Không tải được chính sách AI" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{aiErrorText(list.error)}</Alert>}
-    <Table caption="Chính sách giữ chỗ quota AI" data-testid="admin-ai-policies">
-      <thead><tr><th>Thao tác</th><th>Đơn vị</th><th>Giữ chỗ</th><th>Ký tự tối đa</th><th>Nguồn tối đa</th><th>Hạn mức/ngày</th><th>Hiệu lực</th><th>Trạng thái</th></tr></thead>
-      <tbody>
-        {list.loading && !list.data && <TableMessage colSpan={8}><SkeletonRows rows={4} label="Đang tải chính sách…" /></TableMessage>}
-        {items.map((policy) => {
-          const state = periodState(policy, now);
-          return <tr key={policy.id} data-testid="policy-row">
-            <td>{operationLabel(policy.operation)}<span className="ops-cell-sub">{policy.operation}</span></td>
-            <td>{policy.quotaUnit}</td>
-            <td>{formatNumber(policy.reserveUnits)}</td>
-            <td>{formatNumber(policy.maxInputChars)}</td>
-            <td>{formatNumber(policy.maxSources)}</td>
-            <td>{policy.dailyUnits != null ? formatNumber(policy.dailyUnits) : "—"}</td>
-            <td>{formatDateTime(policy.effectiveFrom)}<span className="ops-cell-sub">{policy.effectiveUntil ? `đến ${formatDateTime(policy.effectiveUntil)}` : "không có ngày kết thúc"}</span></td>
-            <td><StatusBadge tone={state.tone}>{state.label}</StatusBadge></td>
-          </tr>;
-        })}
-        {list.data && !items.length && operation && <TableMessage colSpan={8}><EmptyState icon={SlidersHorizontal} title="Không có chính sách cho thao tác này" description="Đổi hoặc xóa bộ lọc thao tác." /></TableMessage>}
-        {list.data && !items.length && !operation && <TableMessage colSpan={8}><EmptyState icon={SlidersHorizontal} title="Chưa có chính sách AI" description="Không có chính sách đang hiệu lực thì yêu cầu AI của tổ chức bị từ chối (AI_POLICY_UNAVAILABLE). Tạo chính sách cho từng thao tác; hệ thống không có giá trị seed." action={<Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo chính sách</Button>} /></TableMessage>}
-      </tbody>
-    </Table>
-    {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
-    <p className={styles.dim}>Trạng thái hiệu lực chỉ so ngày giờ của kỳ với đồng hồ trình duyệt; máy chủ quyết định chính sách áp dụng lúc gửi yêu cầu.</p>
+  const columns: DataColumn<AiPolicy>[] = [
+    { key: "operation", header: "Thao tác", primary: true, render: (policy) => <CellTitle title={operationLabel(policy.operation)} sub={policy.operation} /> },
+    { key: "unit", header: "Đơn vị", width: 110, render: (policy) => policy.quotaUnit },
+    { key: "reserve", header: "Giữ chỗ", width: 110, align: "right", render: (policy) => formatNumber(policy.reserveUnits) },
+    { key: "chars", header: "Ký tự tối đa", width: 120, align: "right", hideBelow: 1100, render: (policy) => formatNumber(policy.maxInputChars) },
+    { key: "sources", header: "Nguồn tối đa", width: 120, align: "right", hideBelow: 1100, render: (policy) => formatNumber(policy.maxSources) },
+    { key: "daily", header: "Hạn mức/ngày", width: 130, align: "right", hideBelow: 1200, render: (policy) => (policy.dailyUnits != null ? formatNumber(policy.dailyUnits) : "—") },
+    { key: "period", header: "Hiệu lực", width: 220, hideBelow: 900, render: (policy) => <CellTitle title={formatDateTime(policy.effectiveFrom)} sub={policy.effectiveUntil ? `đến ${formatDateTime(policy.effectiveUntil)}` : "không có ngày kết thúc"} /> },
+    { key: "state", header: "Trạng thái", width: 140, render: (policy) => { const state = periodState(policy, now); return <StatusBadge tone={state.tone}>{state.label}</StatusBadge>; } },
+  ];
 
-    <Drawer open={creating} onOpenChange={setCreating} title="Tạo chính sách AI" description="Một kỳ hiệu lực cho một thao tác; không sửa được sau khi tạo.">
-      {creating && <PolicyForm accessToken={accessToken} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); list.reload(); toast.notify({ tone: "success", title: "Đã tạo chính sách AI" }); }} />}
-    </Drawer>
-  </>;
+  return <div className={styles.stack}>
+    <DataTable<AiPolicy>
+      caption="Chính sách giữ chỗ quota AI"
+      data-testid="ai-policies-table"
+      columns={columns}
+      rows={items}
+      rowKey={(policy) => policy.id}
+      loading={list.loading && !list.data}
+      rowTone={(policy) => (periodState(policy, now).label === "Đã hết hạn" ? "muted" : undefined)}
+      error={list.error !== undefined ? <Alert tone="danger" title="Không tải được chính sách AI" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{aiErrorText(list.error)}</Alert> : undefined}
+      toolbar={<>
+        <FilterChips label="Bộ lọc chính sách">
+          <FilterChip label="Thao tác" value={operation} onChange={(value) => setParams({ operation: value })} options={ADMIN_AI_OPERATIONS.map((value) => ({ value, label: operationLabel(value) }))} />
+        </FilterChips>
+        <span className="ops-toolbar-grow" />
+        <Button variant="quiet" onClick={list.reload} disabled={list.loading} aria-label="Tải lại danh sách"><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
+        <Button onClick={() => setCreating(true)} data-testid="policy-new"><Plus size={16} aria-hidden="true" />Tạo chính sách</Button>
+      </>}
+      empty={operation
+        ? <EmptyState icon={SlidersHorizontal} title="Không có chính sách cho thao tác này" description="Đổi hoặc xóa bộ lọc thao tác." />
+        : <EmptyState icon={SlidersHorizontal} title="Chưa có chính sách AI" description="Không có chính sách đang hiệu lực thì yêu cầu AI của tổ chức bị từ chối (AI_POLICY_UNAVAILABLE). Tạo chính sách cho từng thao tác; hệ thống không có giá trị seed." action={<Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo chính sách</Button>} />}
+      pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
+    />
+    <p className={styles.hint}>Chính sách bất biến nên hàng không có thao tác. Trạng thái hiệu lực chỉ so ngày giờ của kỳ với đồng hồ trình duyệt; máy chủ quyết định chính sách áp dụng lúc gửi yêu cầu.</p>
+
+    <PolicyModal open={creating} accessToken={accessToken} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); list.reload(); toast.notify({ tone: "success", title: "Đã tạo chính sách AI" }); }} />
+  </div>;
 }

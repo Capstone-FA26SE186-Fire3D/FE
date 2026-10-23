@@ -1,8 +1,15 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { pick } from "./chip-helpers";
 import { admin, calls, ids, mockAi, newAiMock, owner, requestId, seedRequest, signInAs, type AiMock } from "./org-ai-mock";
 
 // Route mocks that follow the BE source (admin gates in OrganizationAi.sql, AdminAiController). Mock evidence only.
+
+// DataTable rows: `<tr>` on desktop, cards under 640px.
+const rows = (page: Page, table: string) => page.getByTestId(table).locator("tbody tr, li.ops-dt-card");
+const requestRows = (page: Page) => rows(page, "ai-requests-table");
+const policyRows = (page: Page) => rows(page, "ai-policies-table");
+const sourceRows = (page: Page) => rows(page, "ai-sources-table");
 
 async function open(page: Page, mock: AiMock, url: string, user: typeof owner | typeof admin = admin, theme?: "light" | "dark") {
   if (theme) await page.addInitScript((value) => localStorage.setItem("fire3d-ops-theme", value), theme);
@@ -19,19 +26,20 @@ test.describe("Admin AI: requests and reconcile", () => {
     seedRequest(mock, { status: "Succeeded", organizationId: "org-1" });
     const stuck = seedRequest(mock, { status: "NeedsReconcile", failureCode: "AI_OUTCOME_UNKNOWN", result: undefined, consumedUnits: undefined, organizationId: "org-2", providerResult: { requestId: "x", outcome: "Succeeded", answer: "withheld" }, allocations: [{ grantId: ids.grant, reservedUnits: 50, consumedUnits: null, status: "Reserved" }] });
     await open(page, mock, "/admin/ai");
-    await expect(page.getByTestId("admin-ai-row")).toHaveCount(2);
-    await page.getByLabel("Trạng thái").selectOption("NeedsReconcile");
+    await expect(requestRows(page)).toHaveCount(2);
+    await pick(page, "Trạng thái", { value: "NeedsReconcile" });
     await expect(page).toHaveURL(/status=NeedsReconcile/);
-    await expect(page.getByTestId("admin-ai-row")).toHaveCount(1);
-    await expect(page.getByTestId("admin-ai-row")).toContainText("Công ty B");
-    await page.getByLabel("Trạng thái").selectOption("");
-    await page.getByRole("combobox", { name: "Tổ chức" }).selectOption("org-1");
+    await expect(requestRows(page)).toHaveCount(1);
+    await expect(requestRows(page)).toContainText("Công ty B");
+    await pick(page, "Trạng thái", { value: "" });
+    await page.getByRole("combobox", { name: "Tổ chức" }).click();
+    await page.getByRole("option", { name: "Trường Mẫu" }).click();
     await expect.poll(() => calls(mock, "GET", "/api/admin/ai/requests").at(-1)?.search).toContain("organizationId=org-1");
-    await expect(page.getByTestId("admin-ai-row")).toHaveCount(1);
+    await expect(requestRows(page)).toHaveCount(1);
 
-    await page.getByRole("combobox", { name: "Tổ chức" }).selectOption("");
-    await expect(page.getByTestId("admin-ai-row")).toHaveCount(2);
-    await page.getByTestId("admin-ai-row").filter({ hasText: "Công ty B" }).getByRole("button").click();
+    await page.getByRole("button", { name: "Xóa lựa chọn" }).click();
+    await expect(requestRows(page)).toHaveCount(2);
+    await requestRows(page).filter({ hasText: "Công ty B" }).click();
     await expect(page).toHaveURL(new RegExp(`request=${stuck.requestId}`));
     await expect(page.getByTestId("ai-admin-meta")).toContainText("Công ty B");
     await expect(page.getByTestId("ai-admin-meta")).toContainText("AI_OUTCOME_UNKNOWN");
@@ -113,13 +121,14 @@ test.describe("Admin AI: policies", () => {
   test("lists policies; creating has no defaults, validates like the controller and sends the exact values once", async ({ page }) => {
     const mock = newAiMock();
     await open(page, mock, "/admin/ai?tab=policies");
-    await expect(page.getByTestId("policy-row")).toHaveCount(1);
-    await expect(page.getByTestId("policy-row")).toContainText("Hỏi đáp");
-    await expect(page.getByTestId("policy-row")).toContainText("tokens");
+    await expect(policyRows(page)).toHaveCount(1);
+    await expect(policyRows(page)).toContainText("Hỏi đáp");
+    await expect(policyRows(page)).toContainText("tokens");
     await page.getByTestId("policy-new").click();
     const form = page.getByRole("form", { name: "Tạo chính sách AI" });
     for (const label of ["Đơn vị quota", "Giữ chỗ mỗi yêu cầu", "Số ký tự đầu vào tối đa", "Số nguồn tối đa", "Hiệu lực từ", "Hiệu lực đến"]) await expect(form.getByLabel(label)).toHaveValue("");
-    await expect(form.getByLabel("Thao tác")).toHaveValue("");
+    // The operation combobox has no preset either: it still shows its placeholder.
+    await expect(form.getByLabel("Thao tác")).toHaveAttribute("data-placeholder", "true");
     await expect(form).toContainText("Chính sách bất biến");
 
     await page.getByTestId("policy-create").click();
@@ -127,7 +136,8 @@ test.describe("Admin AI: policies", () => {
     await expect(form.getByText("Số nguyên từ 1 đến 100.000.000.")).toBeVisible();
     expect(calls(mock, "POST", "/api/admin/ai/policies")).toHaveLength(0);
 
-    await form.getByLabel("Thao tác").selectOption("ScenarioDraft");
+    await form.getByLabel("Thao tác").click();
+    await page.getByRole("option", { name: /\(ScenarioDraft\)/ }).click();
     await form.getByLabel("Đơn vị quota").fill("Tokens");
     await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("0");
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("20001");
@@ -143,13 +153,13 @@ test.describe("Admin AI: policies", () => {
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("6000");
     await form.getByLabel("Số nguồn tối đa").fill("12");
     await page.getByTestId("policy-create").click();
-    await expect(page.getByTestId("policy-row")).toHaveCount(2);
+    await expect(policyRows(page)).toHaveCount(2);
     const posts = calls(mock, "POST", "/api/admin/ai/policies");
     expect(posts).toHaveLength(1);
     expect(posts[0].headers["idempotency-key"]).toMatch(/\S+/);
     expect(posts[0].body).toEqual({ operation: "ScenarioDraft", quotaUnit: "tokens", reserveUnits: 120, maxInputChars: 6000, maxSources: 12 });
-    // Policies are immutable: no edit control exists on a row.
-    await expect(page.getByTestId("policy-row").getByRole("button")).toHaveCount(0);
+    // Policies are immutable: no edit control or row menu exists on a row.
+    await expect(policyRows(page).getByRole("button")).toHaveCount(0);
   });
 
   test("an overlapping period is refused with 409 and the typed values stay; a lost response retries with the same key", async ({ page }) => {
@@ -157,7 +167,8 @@ test.describe("Admin AI: policies", () => {
     await open(page, mock, "/admin/ai?tab=policies");
     await page.getByTestId("policy-new").click();
     const form = page.getByRole("form", { name: "Tạo chính sách AI" });
-    await form.getByLabel("Thao tác").selectOption("Answer");
+    await form.getByLabel("Thao tác").click();
+    await page.getByRole("option", { name: /\(Answer\)/ }).click();
     await form.getByLabel("Đơn vị quota").fill("tokens");
     await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("10");
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("100");
@@ -177,20 +188,20 @@ test.describe("Admin AI: knowledge sources", () => {
   test("lists with filters in the URL and opens the detail by id after a reload", async ({ page }) => {
     const mock = newAiMock();
     await open(page, mock, "/admin/ai?tab=sources");
-    await expect(page.getByTestId("source-row")).toHaveCount(2);
-    await page.getByLabel("Trạng thái nguồn").selectOption("Draft");
+    await expect(sourceRows(page)).toHaveCount(2);
+    await pick(page, "Trạng thái", { value: "Draft" });
     await expect(page).toHaveURL(/status=Draft/);
-    await expect(page.getByTestId("source-row")).toHaveCount(1);
-    await page.getByRole("button", { name: /Mở nguồn TCVN 3890:2023/ }).click();
+    await expect(sourceRows(page)).toHaveCount(1);
+    await sourceRows(page).filter({ hasText: "TCVN 3890:2023" }).click();
     await expect(page.getByTestId("source-detail")).toContainText("TCVN 3890:2023");
     await expect(page.getByTestId("source-status")).toHaveText("Bản nháp");
     await page.reload();
     await expect(page.getByTestId("source-detail")).toContainText("TCVN 3890:2023");
-    await page.getByRole("button", { name: "Đóng" }).click();
+    await page.getByTestId("ai-source-drawer").getByRole("button", { name: "Đóng" }).click();
     await page.getByLabel("Tìm nguồn").fill("qcvn");
-    await expect(page.getByTestId("source-row")).toHaveCount(0); // status=Draft is still applied
+    await expect(sourceRows(page)).toHaveCount(0); // status=Draft is still applied
     await page.getByRole("button", { name: "Xóa bộ lọc" }).click();
-    await expect(page.getByTestId("source-row")).toHaveCount(2);
+    await expect(sourceRows(page)).toHaveCount(2);
   });
 
   test("create: http and credentials in the link are refused before any call; a valid source is registered as Draft with one key", async ({ page }) => {
@@ -198,7 +209,8 @@ test.describe("Admin AI: knowledge sources", () => {
     await open(page, mock, "/admin/ai?tab=sources");
     await page.getByTestId("source-new").click();
     const form = page.getByRole("form", { name: "Đăng ký nguồn tri thức" });
-    await form.getByLabel("Phạm vi dùng").selectOption("Common");
+    await form.getByLabel("Phạm vi dùng").click();
+    await page.getByRole("option", { name: "Dùng chung (mọi tổ chức)" }).click();
     await form.getByLabel("Tiêu đề").fill("Nghị định 136/2020/NĐ-CP");
     await form.getByLabel("Nhãn phiên bản").fill("2020");
     await form.getByLabel("SHA-256 của tài liệu").fill("abc");
@@ -238,7 +250,8 @@ test.describe("Admin AI: knowledge sources", () => {
     await open(page, mock, "/admin/ai?tab=sources");
     await page.getByTestId("source-new").click();
     const form = page.getByRole("form", { name: "Đăng ký nguồn tri thức" });
-    await form.getByLabel("Phạm vi dùng").selectOption("Organization");
+    await form.getByLabel("Phạm vi dùng").click();
+    await page.getByRole("option", { name: "Riêng một tổ chức" }).click();
     await page.getByTestId("source-create").click();
     await expect(form.getByText("Nguồn riêng phải gắn một tổ chức.")).toBeVisible();
     expect(calls(mock, "POST", "/api/admin/knowledge-sources")).toHaveLength(0);
@@ -303,13 +316,13 @@ test.describe("Admin AI: layout", () => {
         seedRequest(mock, { status: "NeedsReconcile", failureCode: "AI_OUTCOME_UNKNOWN", result: undefined, consumedUnits: undefined, providerResult: { outcome: "Succeeded", answer: "x".repeat(300) } });
         await page.setViewportSize({ width, height: 900 });
         await open(page, mock, "/admin/ai", admin, theme);
-        await expect(page.getByTestId("admin-ai-row").first()).toBeVisible();
+        await expect(requestRows(page).first()).toBeVisible();
         expect(await noOverflow(page)).toBe(true);
         await page.goto("/admin/ai?tab=policies");
-        await expect(page.getByTestId("policy-row").first()).toBeVisible();
+        await expect(policyRows(page).first()).toBeVisible();
         expect(await noOverflow(page)).toBe(true);
         await page.goto("/admin/ai?tab=sources");
-        await expect(page.getByTestId("source-row").first()).toBeVisible();
+        await expect(sourceRows(page).first()).toBeVisible();
         expect(await noOverflow(page)).toBe(true);
         await page.goto(`/admin/ai?tab=sources&source=${ids.src1}`);
         await expect(page.getByTestId("source-detail")).toBeVisible();

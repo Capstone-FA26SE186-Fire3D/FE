@@ -1,24 +1,26 @@
 "use client";
 
-import { MessageSquareText, RefreshCw, Search, Star } from "lucide-react";
+import { CheckCheck, Eye, MessageSquareText, RefreshCw, Search, Star } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@/api";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
+import { CellTitle, DataTable, type DataColumn } from "@/components/ui/data-table";
 import { Drawer } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, Select } from "@/components/ui/field";
-import { SkeletonRows } from "@/components/ui/skeleton";
+import { Field } from "@/components/ui/field";
+import { FilterChip, FilterChips } from "@/components/ui/filter-chip";
+import { SkeletonDetail } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { accountsApi } from "@/features/accounts/api";
 import { formatDateTime } from "@/utils/date-range";
 import { supportApi, type FeedbackWithEtag } from "../api";
 import { feedbackStatusLabel, feedbackStatusOptions, feedbackStatusTone, organizationName, personName } from "../labels";
-import type { FeedbackStatus } from "../types";
+import type { Feedback, FeedbackStatus } from "../types";
 import { PendingBox } from "./pending-box";
 import { errorText } from "./ticket-thread";
 import styles from "./support.module.css";
@@ -29,6 +31,8 @@ const nextStatuses: Record<FeedbackStatus, FeedbackStatus[]> = {
   Reviewed: ["Reviewed", "Closed"],
   Closed: ["Closed"],
 };
+/** The single forward step a row menu may take (Submitted → Reviewed → Closed). */
+const forwardStep: Partial<Record<FeedbackStatus, FeedbackStatus>> = { Submitted: "Reviewed", Reviewed: "Closed" };
 
 /**
  * One feedback from `GET /api/admin/feedback/{id}` (creator with email, organization, ETag). The status change is a
@@ -61,7 +65,7 @@ function FeedbackDetail({ id, accessToken, onChanged }: { id: string; accessToke
 
   if (!state) {
     if (loadError !== undefined) return <Alert tone="danger" title="Không mở được phản hồi" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reload}>Thử lại</Button>}>{errorText(loadError, "Hãy kiểm tra kết nối rồi thử lại.")}</Alert>;
-    return <SkeletonRows rows={5} label="Đang tải phản hồi…" />;
+    return <SkeletonDetail rows={5} />;
   }
 
   const { feedback, etag } = state;
@@ -90,14 +94,14 @@ function FeedbackDetail({ id, accessToken, onChanged }: { id: string; accessToke
   };
 
   return <div className="ops-stack">
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+    <div className={styles.ticketHead}>
       <StatusBadge tone={feedbackStatusTone(feedback.status)}>{feedbackStatusLabel(feedback.status)}</StatusBadge>
       <StatusBadge tone="neutral">{feedback.category}</StatusBadge>
       {feedback.rating !== null && <span style={{ display: "inline-flex", alignItems: "center", gap: 4, color: "var(--muted)", fontSize: 13 }}><Star size={14} aria-hidden="true" />{feedback.rating}/5</span>}
       <Button size="sm" variant="quiet" onClick={reload} disabled={loading} aria-label="Tải lại phản hồi" style={{ marginLeft: "auto" }}><RefreshCw size={14} aria-hidden="true" />{loading ? "Đang tải…" : "Tải lại"}</Button>
     </div>
     <p className={styles.description}>{feedback.message}</p>
-    <dl className={styles.meta}>
+    <dl className="ops-kv">
       <dt>Người gửi</dt><dd>{personName(feedback.createdBy)}{feedback.createdBy?.email && <span className="ops-cell-sub">{feedback.createdBy.email}</span>}</dd>
       <dt>Tổ chức</dt><dd>{organizationName(feedback.organization)}</dd>
       <dt>Gửi lúc</dt><dd>{formatDateTime(feedback.createdAt)}</dd>
@@ -108,7 +112,7 @@ function FeedbackDetail({ id, accessToken, onChanged }: { id: string; accessToke
     </Alert>}
     {saveError && <Alert tone="danger">{saveError}</Alert>}
     <Field label="Trạng thái xử lý" hint="Phản hồi đi theo thứ tự Mới gửi → Đã xem → Đã đóng.">
-      {(p) => <Select {...p} value={chosen} disabled={feedback.status === "Closed"} onChange={(event) => setChoice(event.target.value as FeedbackStatus)}>{nextStatuses[feedback.status].map((value) => <option key={value} value={value}>{feedbackStatusLabel(value)}</option>)}</Select>}
+      {(p) => <Combobox {...p} aria-label="Trạng thái xử lý" value={chosen} disabled={feedback.status === "Closed"} onChange={(value) => setChoice(value as FeedbackStatus)} options={nextStatuses[feedback.status].map((value) => ({ value, label: feedbackStatusLabel(value) }))} groupLabel="Bước tiếp theo" />}
     </Field>
     <div className="ops-actions" style={{ justifyContent: "flex-end" }}>
       <Button onClick={() => void save()} disabled={saving || chosen === feedback.status}>{saving ? "Đang lưu…" : "Lưu trạng thái"}</Button>
@@ -116,11 +120,14 @@ function FeedbackDetail({ id, accessToken, onChanged }: { id: string; accessToke
   </div>;
 }
 
+/** Feedback inbox (Figma "Hỗ trợ & audit · Phản hồi"): a row opens the detail drawer; the "···" menu takes the next status step. */
 export function AdminFeedbackTab({ accessToken }: { accessToken: string }) {
+  const toast = useToast();
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const status = get("fbStatus");
   const organizationId = get("fbOrganizationId");
   const feedbackId = get("feedback");
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const list = useAsyncData(
     `admin-feedback:${page}:${status}:${organizationId}`,
@@ -131,45 +138,65 @@ export function AdminFeedbackTab({ accessToken }: { accessToken: string }) {
   const items = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
   const filtering = Boolean(status || organizationId);
+  const open = (id: string) => setParams({ feedback: id, page });
+
+  /** Row-menu step: read the detail for its ETag (the list revision is not the ETag), then PATCH with it. */
+  const step = async (item: Feedback) => {
+    const next = forwardStep[item.status];
+    if (!next || busyId) return;
+    setBusyId(item.id);
+    try {
+      const detail = await supportApi.getFeedback(accessToken, item.id);
+      const updated = await supportApi.updateFeedbackStatus(accessToken, item.id, next, detail.etag);
+      toast.notify({ tone: "success", title: "Đã cập nhật phản hồi", description: feedbackStatusLabel(updated.feedback.status) });
+      list.reload();
+    } catch (cause) {
+      if (cause instanceof ApiError && cause.isPreconditionFailed) toast.notify({ tone: "warning", title: "Phản hồi vừa được cập nhật ở nơi khác", description: "Chưa ghi đè gì. Mở chi tiết để xem trạng thái hiện tại." });
+      else toast.notify({ tone: "danger", title: "Không cập nhật được phản hồi", description: errorText(cause, "Hãy thử lại.") });
+      list.reload();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const columns: DataColumn<Feedback>[] = [
+    { key: "message", header: "Phản hồi", primary: true, render: (item) => <CellTitle title={<span className={styles.clip}>{item.message}</span>} sub={item.category} /> },
+    { key: "from", header: "Người gửi", width: 220, render: (item) => <CellTitle title={personName(item.createdBy)} sub={organizationName(item.organization)} /> },
+    { key: "rating", header: "Đánh giá", width: 110, render: (item) => item.rating === null ? "—" : <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}><Star size={14} aria-hidden="true" />{item.rating}/5</span> },
+    { key: "status", header: "Trạng thái", width: 140, render: (item) => <StatusBadge tone={feedbackStatusTone(item.status)}>{feedbackStatusLabel(item.status)}</StatusBadge> },
+    { key: "created", header: "Gửi lúc", width: 170, hideBelow: 900, render: (item) => formatDateTime(item.createdAt) },
+  ];
 
   return <>
-    <div className="ops-toolbar">
-      <Select aria-label="Trạng thái phản hồi" style={{ width: 180 }} value={status} onChange={(event) => setParams({ fbStatus: event.target.value })}>
-        <option value="">Mọi trạng thái</option>{feedbackStatusOptions.map((value) => <option key={value} value={value}>{feedbackStatusLabel(value)}</option>)}
-      </Select>
-      <Select aria-label="Tổ chức" style={{ width: 210 }} value={organizationId} onChange={(event) => setParams({ fbOrganizationId: event.target.value })}>
-        <option value="">Mọi tổ chức</option>
-        {(organizations.data?.items ?? []).map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
-      </Select>
-      {filtering && <Button variant="quiet" onClick={() => setParams({ fbStatus: null, fbOrganizationId: null })}>Xóa bộ lọc</Button>}
-    </div>
-
-    {list.error !== undefined && <Alert tone="danger" title="Không tải được phản hồi" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{errorText(list.error, "Hãy kiểm tra kết nối rồi thử lại.")}</Alert>}
-
-    <Table caption="Danh sách phản hồi">
-      <thead><tr><th>Phản hồi</th><th>Người gửi</th><th>Đánh giá</th><th>Trạng thái</th><th>Gửi lúc</th></tr></thead>
-      <tbody>
-        {list.loading && !list.data && <TableMessage colSpan={5}><SkeletonRows rows={5} label="Đang tải phản hồi…" /></TableMessage>}
-        {items.map((item) => <tr key={item.id}>
-          <td>
-            <button type="button" className={styles.rowButton} onClick={() => setParams({ feedback: item.id, page })} aria-label={`Mở phản hồi ${item.category}`}>
-              <span className={styles.clip}>{item.message}</span>
-              <span className="ops-cell-sub">{item.category}</span>
-            </button>
-          </td>
-          <td><span className={styles.clipSmall}>{personName(item.createdBy)}</span><span className="ops-cell-sub">{organizationName(item.organization)}</span></td>
-          <td>{item.rating === null ? "—" : `${item.rating}/5`}</td>
-          <td><StatusBadge tone={feedbackStatusTone(item.status)}>{feedbackStatusLabel(item.status)}</StatusBadge></td>
-          <td>{formatDateTime(item.createdAt)}</td>
-        </tr>)}
-        {list.data && !items.length && <TableMessage colSpan={5}><EmptyState icon={filtering ? Search : MessageSquareText} title={filtering ? "Không có phản hồi phù hợp." : "Chưa có phản hồi nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Phản hồi của học viên và tổ chức sẽ xuất hiện ở đây."} /></TableMessage>}
-      </tbody>
-    </Table>
-    {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
+    <DataTable<Feedback>
+      caption="Danh sách phản hồi"
+      data-testid="admin-feedback-table"
+      columns={columns}
+      rows={items}
+      rowKey={(item) => item.id}
+      loading={list.loading && !list.data}
+      onRowClick={(item) => open(item.id)}
+      rowTone={(item) => (item.status === "Closed" ? "muted" : undefined)}
+      rowMenu={(item) => [
+        { label: "Xem chi tiết", icon: Eye, onSelect: () => open(item.id) },
+        ...(forwardStep[item.status] ? [{ label: item.status === "Submitted" ? "Đánh dấu đã xem" : "Đóng phản hồi", icon: CheckCheck, onSelect: () => void step(item), disabled: busyId !== null, separator: true }] : []),
+      ]}
+      error={list.error !== undefined ? <Alert tone="danger" title="Không tải được phản hồi" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{errorText(list.error, "Hãy kiểm tra kết nối rồi thử lại.")}</Alert> : undefined}
+      toolbar={<>
+        <FilterChips label="Bộ lọc phản hồi">
+          <FilterChip label="Trạng thái" value={status} onChange={(value) => setParams({ fbStatus: value })} options={feedbackStatusOptions.map((value) => ({ value, label: feedbackStatusLabel(value) }))} />
+        </FilterChips>
+        <Combobox aria-label="Tổ chức" value={organizationId} onChange={(value) => setParams({ fbOrganizationId: value })} options={(organizations.data?.items ?? []).map((organization) => ({ value: organization.id, label: organization.name }))} placeholder="Tổ chức: tất cả" searchPlaceholder="Tìm tổ chức" groupLabel="Tổ chức" loading={organizations.loading && !organizations.data} clearable className={styles.toolbarPick} />
+        {filtering && <Button variant="quiet" onClick={() => setParams({ fbStatus: null, fbOrganizationId: null })}>Xóa bộ lọc</Button>}
+      </>}
+      empty={<EmptyState icon={filtering ? Search : MessageSquareText} title={filtering ? "Không có phản hồi phù hợp." : "Chưa có phản hồi nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Phản hồi của học viên và tổ chức sẽ xuất hiện ở đây."} />}
+      pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
+    />
+    <p className={styles.hint}>Bấm một hàng để xem người gửi và đổi trạng thái; menu “···” đi bước tiếp theo ngay trên danh sách.</p>
 
     <PendingBox title="Chưa có từ backend" items={["Tệp đính kèm: API phản hồi chỉ nhận văn bản thuần.", "Thông báo email/push khi phản hồi được xử lý."]} />
 
-    <Drawer open={Boolean(feedbackId)} onOpenChange={(value) => { if (!value) setParams({ feedback: null, page }); }} title="Chi tiết phản hồi" description="Xem người gửi, đánh dấu đã xem hoặc đóng phản hồi.">
+    <Drawer open={Boolean(feedbackId)} onOpenChange={(value) => { if (!value) setParams({ feedback: null, page }); }} size="md" data-testid="admin-feedback-drawer" title="Chi tiết phản hồi" description="Xem người gửi, đánh dấu đã xem hoặc đóng phản hồi.">
       {feedbackId && <FeedbackDetail key={feedbackId} id={feedbackId} accessToken={accessToken} onChanged={list.reload} />}
     </Drawer>
   </>;

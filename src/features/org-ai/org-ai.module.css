@@ -64,3 +64,9 @@
 .composerRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: start; }
 .composerRow > button { margin-top: 26px; }
 @media (max-width: 640px) { .composerRow { grid-template-columns: minmax(0, 1fr); } .composerRow > button { margin-top: 0; } }
+
+/* Admin v2 (Figma 53:1294): searchable pickers in the table toolbar keep a chip-like width; chart under the requests table. */
+.toolbarPick.toolbarPick { flex: 0 1 230px; width: auto; min-width: 180px; }
+.chartRow { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.hint { margin: 10px 0 0; color: var(--dim); font-size: 12px; }
+.ticketHead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
