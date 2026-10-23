@@ -1,3 +1,4 @@
+import { chip, chipOptions, expectChipValue, openChip, pick } from "./chip-helpers";
 import { expect, test, type Page } from "@playwright/test";
 import { buildingIds, criteriaFixture, installTrainingBackend, learner, metricsFixture, signInAs, TrainingBackend, type Actor } from "./training-history-mock";
 
@@ -43,6 +44,8 @@ const shotPath = (testInfo: import("@playwright/test").TestInfo, name: string) =
 
 const row = (page: Page, id: string) => page.locator(`[data-session-id="${id}"]`);
 const rows = (page: Page) => page.getByTestId("history-row");
+/** The detail: an inline pane from 1100px, a drawer (dialog) below. */
+const detail = (page: Page) => page.locator('[role="dialog"]:has([data-testid="history-detail"]), [data-testid="history-detail"]').first();
 const openDetail = (page: Page, id: string) => row(page, id).getByRole("button", { name: /Xem chi tiết/ }).click();
 
 test.describe("list: session state and result are shown apart", () => {
@@ -94,17 +97,19 @@ test.describe("list: session state and result are shown apart", () => {
     const labels: Record<string, [string, number]> = {
       Launching: ["Đang khởi động", 1], Running: ["Đang chơi", 1], AwaitingSync: ["Chờ đồng bộ", 1], Completed: ["Đã hoàn thành", 4],
     };
-    await expect(page.getByLabel("Trạng thái", { exact: true }).locator("option")).toHaveCount(5);
+    await openChip(page, "Trạng thái");
+    await expect(chipOptions(page, "Trạng thái")).toHaveCount(5);
+    await page.keyboard.press("Escape");
     // An old link with a legacy status shows the unfiltered list instead of a 400.
     await page.goto("/learning-hub?view=history&status=Crashed");
     await expect(rows(page)).toHaveCount(10);
-    await expect(page.getByLabel("Trạng thái", { exact: true })).toHaveValue("");
+    await expectChipValue(page, "Trạng thái", "");
     expect(backend.lists().every((call) => !["Crashed", "Aborted", "Abandoned"].includes(call.params.get("status") ?? ""))).toBe(true);
     for (const [status, [label, count]] of Object.entries(labels)) {
       await page.goto(`/learning-hub?view=history&status=${status}`);
       await expect(rows(page), status).toHaveCount(count);
       await expect(page.getByTestId("row-session-status").first()).toContainText(label);
-      await expect(page.getByLabel("Trạng thái", { exact: true })).toHaveValue(status);
+      await expectChipValue(page, "Trạng thái", status);
     }
     // AwaitingSync (a Running session with a pinned completion) is not mixed into Running.
     expect(backend.lists().some((call) => call.params.get("status") === "AwaitingSync")).toBe(true);
@@ -124,19 +129,19 @@ test.describe("list: session state and result are shown apart", () => {
     await page.goForward();
     await expect(rows(page)).toHaveCount(2);
 
-    await page.getByLabel("Chế độ").selectOption("Assessment");
+    await pick(page, "Chế độ", { value: "Assessment" });
     await expect(page).toHaveURL(/mode=Assessment/);
     await expect(page).not.toHaveURL(/page=2/); // a filter change goes back to page 1
     await expect(rows(page)).toHaveCount(3);
-    await page.getByLabel("Building").selectOption({ label: HOA_SEN });
+    await pick(page, "Tòa nhà", { text: HOA_SEN });
     await expect(page).toHaveURL(new RegExp(`building=${buildingIds[HOA_SEN]}`));
     await expect(page.getByTestId("history-filtered-empty")).toBeVisible();
     await page.reload();
-    await expect(page.getByLabel("Chế độ")).toHaveValue("Assessment");
-    await expect(page.getByLabel("Building")).toHaveValue(buildingIds[HOA_SEN]);
+    await expectChipValue(page, "Chế độ", "Assessment");
+    await expectChipValue(page, "Tòa nhà", buildingIds[HOA_SEN]);
     await expect(page.getByTestId("history-filtered-empty")).toBeVisible();
     await page.goBack();
-    await expect(page.getByLabel("Building")).toHaveValue("");
+    await expectChipValue(page, "Tòa nhà", "");
     await expect(rows(page)).toHaveCount(3);
     const last = backend.lists().at(-1)!;
     expect(last.params.get("mode")).toBe("Assessment");
@@ -151,6 +156,7 @@ test.describe("list: session state and result are shown apart", () => {
     const backend = new TrainingBackend();
     seedMix(backend);
     await start(page, backend);
+    await openChip(page, "Thời gian");
     await page.getByLabel("Từ ngày").fill("2026-10-10");
     await page.getByLabel("Đến ngày").fill("2026-10-12");
     await expect(page).toHaveURL(/from=2026-10-10/);
@@ -248,7 +254,7 @@ test.describe("list: empty, loading, errors", () => {
     const offline = (route: import("@playwright/test").Route) => route.abort("internetdisconnected");
     const listUrl = /\/api\/training\/sessions(\?|$)/;
     await page.route(listUrl, offline);
-    await page.getByLabel("Chế độ").selectOption("Learn");
+    await pick(page, "Chế độ", { value: "Learn" });
     await expect(page.getByRole("alert").filter({ hasText: "Mất kết nối tới máy chủ" })).toBeVisible();
     await expect(rows(page)).toHaveCount(0); // no row of the previous filter stays under the failure
     await page.unroute(listUrl, offline);
@@ -278,8 +284,8 @@ test.describe("list: empty, loading, errors", () => {
     await expect(rows(page)).toHaveCount(10);
     const staleItem = { sessionId: sid(500), status: "Completed", mode: "Learn", resultStatus: null, endReason: null, startedAt: at(1), endedAt: null, resultCreatedAt: null, training: { id: sid(501), name: "BÀI CŨ ĐẾN MUỘN" }, releaseId: sid(502), building: { id: sid(503), name: "X" }, scenario: { id: sid(504), versionId: sid(505), name: "Y", versionNumber: 1 } };
     backend.failNext("GET", /^\/api\/training\/sessions$/, { status: 200, delayMs: 1200, json: { items: [staleItem], totalCount: 1, page: 1, pageSize: 10 } });
-    await page.getByLabel("Chế độ").selectOption("Guided");
-    await page.getByLabel("Chế độ").selectOption("Assessment");
+    await pick(page, "Chế độ", { value: "Guided" });
+    await pick(page, "Chế độ", { value: "Assessment" });
     await expect(rows(page)).toHaveCount(3);
     await page.waitForTimeout(1500);
     await expect(rows(page)).toHaveCount(3);
@@ -294,7 +300,7 @@ test.describe("detail drawer: result", () => {
     await start(page, backend);
     await openDetail(page, ids.passed);
     await expect(page).toHaveURL(new RegExp(`session=${ids.passed}`));
-    const drawer = page.getByRole("dialog");
+    const drawer = detail(page);
     await expect(drawer.getByRole("heading", { name: "Sơ tán tầng 3" })).toBeVisible();
     await expect(drawer.getByTestId("detail-session-status")).toContainText("Đã hoàn thành");
     await expect(drawer.getByTestId("detail-session-status")).toContainText("không có nghĩa là đạt");
@@ -335,7 +341,7 @@ test.describe("detail drawer: result", () => {
     backend.storeResult(ids.incomplete, { outcome: "Incomplete", reason: "SOMETHING_NEW", scorePercent: null, criteria: [], metrics: {} });
     await start(page, backend);
     await openDetail(page, ids.notPassed);
-    const drawer = page.getByRole("dialog");
+    const drawer = detail(page);
     await expect(drawer.getByTestId("detail-result-status")).toContainText("Chưa đạt");
     await expect(drawer.getByTestId("result-outcome")).toContainText("Có tiêu chí bắt buộc chưa đạt.");
     await expect(drawer.getByTestId("result-score")).toContainText("35,5%");
@@ -352,7 +358,7 @@ test.describe("detail drawer: result", () => {
     seedMix(backend);
     await start(page, backend);
     await openDetail(page, ids.learn);
-    const drawer = page.getByRole("dialog");
+    const drawer = detail(page);
     await expect(drawer.getByTestId("detail-result-status")).toContainText("Không chấm điểm");
     await expect(drawer.getByTestId("result-outcome")).toContainText("Chế độ này không chấm đạt hoặc chưa đạt.");
     await expect(drawer.getByTestId("result-score")).toContainText("Chưa có");
@@ -367,10 +373,10 @@ test.describe("detail drawer: result", () => {
     seedMix(backend);
     await start(page, backend);
     await openDetail(page, ids.passed);
-    const links = page.getByRole("dialog").getByRole("link");
+    const links = detail(page).getByRole("link");
     await expect(links).toHaveCount(1);
     await expect(links).toHaveText("Hỏi AI về kết quả này");
-    await expect(page.getByRole("dialog")).not.toContainText(/chứng nhận\b(?! hay)|chứng chỉ/i);
+    await expect(detail(page)).not.toContainText(/chứng nhận\b(?! hay)|chứng chỉ/i);
   });
 
   test("409 RESULT_NOT_READY is a waiting state with reload, not an error; the result appears after sync", async ({ page }) => {
@@ -379,7 +385,7 @@ test.describe("detail drawer: result", () => {
     backend.failNext("GET", new RegExp(`/${ids.passed}/result$`), { status: 409, json: { title: "Result is not ready.", status: 409, code: "RESULT_NOT_READY" } });
     await start(page, backend);
     await openDetail(page, ids.passed);
-    const drawer = page.getByRole("dialog");
+    const drawer = detail(page);
     await expect(drawer.getByText("Kết quả chưa sẵn sàng")).toBeVisible();
     await expect(drawer).toContainText("Đây không phải lỗi");
     await expect(drawer.getByRole("alert")).toHaveCount(0);
@@ -393,7 +399,7 @@ test.describe("detail drawer: result", () => {
     seedMix(backend);
     await start(page, backend);
     await openDetail(page, ids.awaiting);
-    const drawer = page.getByRole("dialog");
+    const drawer = detail(page);
     await expect(drawer.getByTestId("detail-session-status")).toContainText("Chờ đồng bộ");
     await expect(drawer.getByTestId("detail-result-status")).toContainText("Chưa có kết quả");
     await expect(drawer.getByText("Lượt tập này chưa có kết quả")).toBeVisible();
@@ -412,7 +418,7 @@ test.describe("detail drawer: result", () => {
     seedMix(backend);
     await start(page, backend);
     await openDetail(page, ids.crashed);
-    const drawer = page.getByRole("dialog");
+    const drawer = detail(page);
     await expect(drawer.getByTestId("detail-session-status")).toContainText("Gặp lỗi");
     await expect(drawer.getByTestId("detail-result-status")).toContainText("Không có kết quả");
     await expect(drawer).toContainText("không có điểm hay tiêu chí để hiển thị");
@@ -423,34 +429,34 @@ test.describe("detail drawer: result", () => {
     const backend = new TrainingBackend();
     seedMix(backend);
     await start(page, backend, `/learning-hub?view=history&session=${ids.superseded}`);
-    const drawer = page.getByRole("dialog");
+    const drawer = detail(page);
     await expect(drawer.getByTestId("detail-session-status")).toContainText("Hoàn thành, bản phát hành đã thay");
     await expect(drawer.getByTestId("detail-result-status")).toContainText("Không chấm điểm");
     expect(backend.callsTo("GET", new RegExp(`/${ids.superseded}$`)).length).toBeGreaterThan(0);
     await page.reload();
-    await expect(page.getByRole("dialog").getByTestId("detail-result-status")).toContainText("Không chấm điểm");
-    await page.getByRole("dialog").getByRole("button", { name: "Đóng" }).click();
-    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(detail(page).getByTestId("detail-result-status")).toContainText("Không chấm điểm");
+    await detail(page).getByRole("button", { name: "Đóng" }).click();
+    await expect(detail(page)).toHaveCount(0);
     await expect(page).not.toHaveURL(/session=/);
     await page.goBack();
-    await expect(page.getByRole("dialog")).toBeVisible();
+    await expect(detail(page)).toBeVisible();
   });
 
   test("another learner's id, an unknown id and a malformed id are not found and show nothing of any session", async ({ page }) => {
     const backend = new TrainingBackend();
     seedMix(backend);
     await start(page, backend, `/learning-hub?view=history&session=${ids.foreign}`);
-    let drawer = page.getByRole("dialog");
+    let drawer = detail(page);
     await expect(drawer.getByText("Không tìm thấy lượt tập này")).toBeVisible();
     await expect(drawer).toContainText("không thuộc tài khoản của bạn");
     await expect(drawer).not.toContainText("BÀI CỦA NGƯỜI KHÁC");
     await expect(drawer).not.toContainText("99%");
     await expect(drawer.getByRole("button", { name: "Thử lại" })).toHaveCount(0);
     await page.goto(`/learning-hub?view=history&session=${sid(404)}`);
-    await expect(page.getByRole("dialog").getByText("Không tìm thấy lượt tập này")).toBeVisible();
+    await expect(detail(page).getByText("Không tìm thấy lượt tập này")).toBeVisible();
     const before = backend.calls.length;
     await page.goto("/learning-hub?view=history&session=../../admin");
-    drawer = page.getByRole("dialog");
+    drawer = detail(page);
     await expect(drawer.getByText("Liên kết lượt tập không hợp lệ")).toBeVisible();
     expect(backend.calls.slice(before).filter((call) => /\/api\/training\/sessions\/../.test(call.path))).toHaveLength(0);
   });
@@ -461,7 +467,7 @@ test.describe("detail drawer: result", () => {
     backend.failNext("GET", new RegExp(`/${ids.passed}/result$`), { status: 403, json: { title: "no", status: 403, code: "FORBIDDEN" } });
     await start(page, backend);
     await openDetail(page, ids.passed);
-    const drawer = page.getByRole("dialog");
+    const drawer = detail(page);
     await expect(drawer.getByRole("alert").filter({ hasText: "không có lịch sử lượt tập" })).toBeVisible();
     await expect(drawer.getByRole("button", { name: "Thử lại" })).toHaveCount(0);
     await page.keyboard.press("Escape");
@@ -480,9 +486,9 @@ test.describe("detail drawer: result", () => {
     // Open A (slow result), then go to B through the router while A is still loading.
     backend.failNext("GET", new RegExp(`/${ids.passed}/result$`), { status: 200, delayMs: 1200, json: { sessionId: ids.passed, mode: "Assessment", outcome: "Passed", reason: "ALL_REQUIREMENTS_MET", scorePercent: 80, rubricHash: null, criteria: null, metrics: {}, lastEventSequence: 1, createdAt: at(12) } });
     await openDetail(page, ids.passed);
-    await expect(page.getByRole("dialog").getByRole("status").filter({ hasText: "Đang tải kết quả lượt tập…" })).toBeVisible();
+    await expect(detail(page).getByRole("status").filter({ hasText: "Đang tải kết quả lượt tập…" })).toBeVisible();
     await page.evaluate((id) => (window as unknown as { next: { router: { push: (href: string) => void } } }).next.router.push(`/learning-hub?view=history&session=${id}`), ids.notPassed);
-    const drawer = page.getByRole("dialog");
+    const drawer = detail(page);
     await expect(drawer.getByTestId("detail-result-status")).toContainText("Chưa đạt");
     await expect(drawer.getByTestId("result-score")).toContainText("35,5%");
     await page.waitForTimeout(1500);
@@ -495,13 +501,14 @@ test.describe("detail drawer: result", () => {
   });
 
   test("keyboard: the drawer traps focus, Escape closes it and focus returns to the row button that opened it", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 667 });
     const backend = new TrainingBackend();
     seedMix(backend);
     await start(page, backend);
     const opener = row(page, ids.notPassed).getByRole("button", { name: /Xem chi tiết/ });
     await opener.focus();
     await page.keyboard.press("Enter");
-    const drawer = page.getByRole("dialog");
+    const drawer = detail(page);
     await expect(drawer.getByTestId("result-outcome")).toBeVisible();
     for (let index = 0; index < 14; index += 1) {
       await page.keyboard.press("Tab");
@@ -553,7 +560,7 @@ test.describe("hub integration", () => {
     await start(page, backend);
     await expect(rows(page)).toHaveCount(10);
     await openDetail(page, ids.passed);
-    await expect(page.getByRole("dialog").getByTestId("result-score")).toBeVisible();
+    await expect(detail(page).getByTestId("result-score")).toBeVisible();
     for (const call of backend.calls) expect(call.headers.authorization, call.path).toBe("Bearer history-access");
     expect(backend.calls.every((call) => !call.search.includes(learner.id))).toBe(true);
   });
@@ -569,12 +576,12 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 375, height: 667 
       await start(page, backend);
       await expect(rows(page)).toHaveCount(10);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
-      for (const control of [page.getByLabel("Chế độ"), page.getByLabel("Từ ngày"), row(page, ids.passed).getByRole("button", { name: /Xem chi tiết/ }), page.getByRole("button", { name: "Trang sau" })]) {
+      for (const control of [chip(page, "Chế độ"), chip(page, "Thời gian"), row(page, ids.passed).getByRole("button", { name: /Xem chi tiết/ }), page.getByRole("button", { name: "Trang sau" })]) {
         expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(43.5);
       }
       await page.screenshot({ path: shotPath(testInfo, `history-${viewport.width}-${scheme}.png`), fullPage: true });
       await openDetail(page, ids.passed);
-      const drawer = page.getByRole("dialog");
+      const drawer = detail(page);
       await expect(drawer.getByTestId("criterion")).toHaveCount(4);
       const box = (await drawer.boundingBox())!;
       expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 0.5);
@@ -592,8 +599,9 @@ test.describe("v7 contract details", () => {
     // 120 newer sessions in one Building would push Hoa Sen out of a "latest 100 sessions" sample.
     for (let n = 0; n < 120; n += 1) backend.add({ status: "Completed", mode: "Learn", startedAt: `2026-10-20T${String(n % 24).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}:00Z`, building: ANH_DUONG, training: `Bài ${n}`, result: { outcome: "NotAssessed", reason: "MODE_NOT_ASSESSED", scorePercent: null, criteria: null, metrics: {} } });
     await start(page, backend);
-    await expect(page.getByLabel("Building").locator("option", { hasText: HOA_SEN })).toHaveCount(1);
-    await expect(page.getByLabel("Building").locator("option", { hasText: ANH_DUONG })).toHaveCount(1);
+    await openChip(page, "Tòa nhà");
+    await expect(chipOptions(page, "Tòa nhà").filter({ hasText: HOA_SEN })).toHaveCount(1);
+    await expect(chipOptions(page, "Tòa nhà").filter({ hasText: ANH_DUONG })).toHaveCount(1);
     expect(backend.callsTo("GET", /^\/api\/training\/buildings$/).length).toBeGreaterThan(0);
     // The filter options no longer come from a 100-session read of the history list.
     expect(backend.lists().some((call) => call.params.get("pageSize") === "100")).toBe(false);
@@ -604,7 +612,7 @@ test.describe("v7 contract details", () => {
     backend.add({ id: ids.passed, status: "Completed", mode: "Assessment", startedAt: at(12, 9), endedAt: at(12, 10), endReason: "Finished", training: "Sơ tán tầng 3", result: { outcome: "Passed", reason: "ALL_REQUIREMENTS_MET", scorePercent: 80, criteria: criteriaFixture().map((criterion, index) => (index === 0 ? { ...criterion, label: "Thoát ra ngoài an toàn", description: "Tới lối ra cuối cùng trước khi hết giờ." } : criterion)), metrics: metricsFixture }, resultCreatedAt: at(12, 10) });
     await start(page, backend);
     await openDetail(page, ids.passed);
-    const drawer = page.getByRole("dialog");
+    const drawer = detail(page);
     await expect(drawer.getByTestId("result-threshold")).toContainText("70");
     await expect(drawer.getByTestId("criterion-label").first()).toHaveText("Thoát ra ngoài an toàn");
     await expect(drawer.getByTestId("criterion").first()).toContainText("Tới lối ra cuối cùng trước khi hết giờ.");

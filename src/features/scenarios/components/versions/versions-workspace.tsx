@@ -87,9 +87,9 @@ function Workbench({ accessToken, buildingId, scenario, versionCount, editorHref
   };
 
   return <>
+    <Alert tone="info" title={`Phiên bản v${version.versionNumber} là bản chụp bất biến: chỉ đọc`}>Hash nội dung <span className="ver-hash">#{shortHash(version.scenarioHash, 12)}</span> được ghim khi tạo phiên bản. Muốn sửa, hãy sửa bản nháp rồi tạo phiên bản mới; v{version.versionNumber} giữ nguyên để đối chiếu.</Alert>
     <JourneyPanel input={journey} editorHref={editorHref} onTab={onTab} onSnapshot={onSnapshot} canAct={canAct} />
     {server.readiness.error !== undefined && !readiness && <Alert tone="danger" title="Không đọc được readiness từ máy chủ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={server.readiness.reload}>Thử lại</Button>}>{describeError(server.readiness.error).message} Các cổng bên dưới chỉ phản ánh phần đã tải được.</Alert>}
-    <Alert tone="info" title={`Phiên bản v${version.versionNumber} là bản chụp bất biến: chỉ đọc`}>Hash nội dung <span className="ver-hash">#{shortHash(version.scenarioHash, 12)}</span> được ghim khi tạo phiên bản. Muốn sửa, hãy sửa bản nháp rồi tạo phiên bản mới; v{version.versionNumber} giữ nguyên để đối chiếu.</Alert>
     <section className="org-card org-gates-card" aria-labelledby="ver-gates-title">
       <h2 id="ver-gates-title" className="org-card-title">Chuẩn bị phát hành v{version.versionNumber}</h2>
       <GateStepper gates={[

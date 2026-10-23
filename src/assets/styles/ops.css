@@ -442,3 +442,33 @@ select.ops-input { appearance: none; padding-right: 34px; background-image: line
 .ops-page-header .ops-eyebrow { max-width: none; margin: 0 0 6px; color: var(--ember); font-size: 11px; font-weight: 650; letter-spacing: .12em; text-transform: uppercase; line-height: 1.4; }
 @media (max-width: 767px) { .ops-topbar-crumbs .ops-breadcrumb li:not(:last-child) { display: none; } }
 .ops-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: -10px 0 18px; }
+
+/* ───────── Filter chips with a small panel (Figma "Công trình: tất cả ›") ───────── */
+.ops-fchips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 16px; }
+.ops-fchip { position: relative; }
+.ops-fchip > button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; max-width: 320px; padding: 0 12px 0 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; transition: border-color 150ms ease, color 150ms ease; }
+.ops-fchip > button:hover:not(:disabled) { border-color: var(--line-strong); color: var(--text); }
+.ops-fchip > button:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
+.ops-fchip > button:disabled { opacity: .55; cursor: not-allowed; }
+.ops-fchip > button[data-active] { border-color: var(--ember); color: var(--text); }
+.ops-fchip > button[aria-expanded="true"] { border-color: var(--line-strong); color: var(--text); }
+.ops-fchip-value { min-width: 0; overflow: hidden; color: var(--text); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.ops-fchip > button svg { flex: none; color: var(--dim); }
+.ops-fchip-pop { position: absolute; left: 0; top: calc(100% + 6px); z-index: 30; min-width: 240px; max-width: min(360px, calc(100vw - 32px)); padding: 6px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); box-shadow: 0 18px 40px rgba(0, 0, 0, .28); }
+.ops-fchip-list { display: grid; max-height: 320px; overflow-y: auto; }
+.ops-fchip-opt { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 40px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-size: 13.5px; text-align: left; cursor: pointer; }
+.ops-fchip-opt:hover, .ops-fchip-opt:focus-visible { background: var(--hover); outline: none; }
+.ops-fchip-opt[aria-selected="true"] { color: var(--ember); font-weight: 600; }
+.ops-fchip-form { display: grid; gap: 10px; padding: 8px; }
+.ops-fchip-form .ops-fchip-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+@media (max-width: 560px) { .ops-fchip, .ops-fchip > button { max-width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .ops-fchip > button { transition: none; } }
+
+/* ───────── Building · IFC tab (Figma "IFC và xử lý"): model column + side column ───────── */
+.bd-ifc-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(340px, 400px); gap: 18px; align-items: start; }
+.bd-ifc-grid > * { min-width: 0; }
+.bd-ifc-side { position: sticky; top: calc(var(--ops-topbar, 60px) + 16px); }
+@media (max-width: 1180px) { .bd-ifc-grid { grid-template-columns: minmax(0, 1fr); } .bd-ifc-side { position: static; } }
+.bd-ifc-side .ops-form-grid { grid-template-columns: minmax(0, 1fr); }
+.bd-ifc-side .ops-stepper li { flex-direction: column; align-items: center; gap: 4px; text-align: center; font-size: 11.5px; }
+.bd-ifc-side .ops-stepper-label { white-space: normal; overflow: visible; }

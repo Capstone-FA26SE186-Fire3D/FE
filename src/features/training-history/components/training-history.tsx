@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { History, RefreshCw, SearchX } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
@@ -11,6 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { Pagination } from "@/components/ui/table";
 import { routes } from "@/configs/routes";
+import { useMediaQuery } from "@/utils/use-media-query";
 import { trainingHistoryApi } from "../api";
 import { describeFailure } from "../errors";
 import { PAGE_SIZE, hasFilters, rangeError, readFilters } from "../filters";
@@ -18,7 +19,7 @@ import { useHistoryBuildings } from "../hooks";
 import type { HistoryItem } from "../types";
 import "../history.css";
 import { HistoryFilterBar } from "./history-filters";
-import { HistoryRow } from "./history-list";
+import { HistoryRow, HistoryTable } from "./history-list";
 import { ResultDrawer } from "./result-drawer";
 
 /** While a listed session is still running or waiting for the device to sync, re-read the list this often (visible tab only). */
@@ -47,8 +48,11 @@ export function TrainingHistory({ accessToken, userId }: { accessToken: string; 
   const names = useMemo(() => new Map(items.map((item) => [item.building.id, item.building.name])), [items]);
   const known = sessionParam ? items.find((item) => item.sessionId.toLowerCase() === sessionParam.toLowerCase()) ?? null : null;
 
-  const openSession = (item: HistoryItem) => setParams({ session: item.sessionId, page });
-  const closeSession = () => setParams({ session: null, page });
+  const wide = useMediaQuery("(min-width: 1100px)");
+  const opener = useRef<HTMLElement | null>(null);
+  const openSession = (item: HistoryItem, from?: HTMLElement) => { opener.current = from ?? null; setParams({ session: item.sessionId, page }); };
+  // The inline pane is not a modal: give focus back to the row that opened it (the drawer restores focus itself).
+  const closeSession = () => { setParams({ session: null, page }); if (wide) window.setTimeout(() => opener.current?.focus(), 0); };
   const changeFilter = (patch: Partial<Record<keyof typeof FILTER_PARAM, string>>) =>
     setParams(Object.fromEntries(Object.entries(patch).map(([name, value]) => [FILTER_PARAM[name as keyof typeof FILTER_PARAM], value])));
   const clearFilters = () => setParams({ status: null, mode: null, building: null, from: null, to: null });
@@ -93,18 +97,20 @@ export function TrainingHistory({ accessToken, userId }: { accessToken: string; 
   } else {
     body = <>
       <p className="th-summary" aria-live="polite">{totalCount.toLocaleString("vi-VN")} lượt tập, mới nhất trước.</p>
-      <ul className="th-list" aria-busy={list.loading} aria-label="Danh sách lượt tập">
-        {items.map((item) => <HistoryRow key={item.sessionId} item={item} stale={list.loading} onOpen={openSession} />)}
-      </ul>
+      <HistoryTable busy={list.loading}>
+        {items.map((item) => <HistoryRow key={item.sessionId} item={item} stale={list.loading} selected={item.sessionId.toLowerCase() === sessionParam.toLowerCase()} onOpen={openSession} />)}
+      </HistoryTable>
       <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} disabled={list.loading} className="mt-4" />
     </>;
   }
 
   return <div className="ops-stack" data-testid="training-history">
-    <p className="th-note">Danh sách lượt tập của riêng bạn. Trạng thái phiên cho biết lượt tập đang ở đâu; kết quả là điểm hoặc đánh giá máy chủ đã lưu. Hoàn thành lượt tập không có nghĩa là đạt. Kết quả mô phỏng không phải chứng nhận.</p>
-    <HistoryFilterBar filters={filters} buildings={buildings} knownBuildingNames={names} onChange={changeFilter} onClear={clearFilters} />
-    {!invalidRange && <div className="ops-actions"><Button size="sm" variant="quiet" onClick={list.reload} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />{list.loading ? "Đang tải…" : "Tải lại"}</Button></div>}
-    {body}
-    {sessionParam && <ResultDrawer sessionId={sessionParam} known={known} accessToken={accessToken} onClose={closeSession} onRefresh={list.reload} />}
+    <HistoryFilterBar filters={filters} buildings={buildings} knownBuildingNames={names} onChange={changeFilter} onClear={clearFilters}
+      actions={!invalidRange && <Button variant="quiet" onClick={list.reload} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />{list.loading ? "Đang tải…" : "Tải lại"}</Button>} />
+    <div className="th-split" data-open={Boolean(sessionParam && wide) || undefined}>
+      <div className="th-main">{body}</div>
+      {sessionParam && <ResultDrawer inline={wide} sessionId={sessionParam} known={known} accessToken={accessToken} onClose={closeSession} onRefresh={list.reload} />}
+    </div>
+    <p className="th-foot th-note">Danh sách lượt tập của riêng bạn. Trạng thái phiên cho biết lượt tập đang ở đâu; kết quả là điểm hoặc đánh giá máy chủ đã lưu. Hoàn thành lượt tập không có nghĩa là đạt. Kết quả mô phỏng không phải chứng nhận.</p>
   </div>;
 }
