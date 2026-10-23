@@ -1,7 +1,7 @@
 "use client";
 
 import { useAsyncData } from "@/api/use-async-data";
-import { Field, Select } from "@/components/ui/field";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { buildingsApi } from "@/features/buildings/api";
 import { GROUP_BY, type GroupBy, type TrainingFilters } from "../types";
 import styles from "./analytics.module.css";
@@ -17,7 +17,7 @@ export function readTrainingFilters(get: (key: string) => string): TrainingFilte
 }
 
 /**
- * Building / scenario / grouping of the training report. Options come from the tenant's own lists (buildings, then the
+ * Building / scenario / grouping chips of the training report (rendered inside the report's chip row). Options come from the tenant's own lists (buildings, then the
  * scenarios of the chosen building); the server re-checks both ids inside the tenant.
  */
 export function TrainingFilterBar({ accessToken, filters, onChange }: { accessToken: string | null; filters: TrainingFilters; onChange: (patch: Record<string, string | null>) => void }) {
@@ -27,28 +27,16 @@ export function TrainingFilterBar({ accessToken, filters, onChange }: { accessTo
   const scenarioItems = scenarios.data?.items ?? [];
   const hasOption = (items: Array<{ id: string }>, id?: string) => !id || items.some((item) => item.id === id);
 
-  return <div className={styles.filters} role="group" aria-label="Bộ lọc báo cáo huấn luyện">
-    <Field label="Công trình" error={buildings.error ? "Không tải được danh sách công trình." : undefined}>{(p) =>
-      <Select {...p} value={filters.buildingId ?? ""} onChange={(event) => onChange({ building: event.target.value || null, scenario: null })}>
-        <option value="">Tất cả công trình</option>
-        {!buildings.data && filters.buildingId && <option value={filters.buildingId}>Đang tải…</option>}
-        {buildings.data && !hasOption(buildingItems, filters.buildingId) && <option value={filters.buildingId}>Công trình đã chọn</option>}
-        {buildingItems.map((item) => <option key={item.id} value={item.id}>{item.name}{item.isActive ? "" : " (đã lưu trữ)"}</option>)}
-      </Select>}
-    </Field>
-    <Field label="Kịch bản" hint={filters.buildingId ? undefined : "Chọn công trình trước"} error={scenarios.error ? "Không tải được kịch bản." : undefined}>{(p) =>
-      <Select {...p} value={filters.scenarioId ?? ""} disabled={!filters.buildingId} onChange={(event) => onChange({ scenario: event.target.value || null })}>
-        <option value="">Tất cả kịch bản</option>
-        {scenarios.data && !hasOption(scenarioItems, filters.scenarioId) && <option value={filters.scenarioId}>Kịch bản đã chọn</option>}
-        {!scenarios.data && filters.scenarioId && <option value={filters.scenarioId}>Đang tải…</option>}
-        {scenarioItems.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-      </Select>}
-    </Field>
-    <Field label="Nhóm theo" hint="Thêm bảng nhóm số liệu; cũng áp dụng cho CSV.">{(p) =>
-      <Select {...p} value={filters.groupBy ?? ""} onChange={(event) => onChange({ groupBy: event.target.value || null })}>
-        <option value="">Không nhóm</option>
-        {GROUP_BY.map((key) => <option key={key} value={key}>{GROUP_LABELS[key]}</option>)}
-      </Select>}
-    </Field>
-  </div>;
+  const buildingOptions = buildingItems.map((item) => ({ value: item.id, label: `${item.name}${item.isActive ? "" : " (đã lưu trữ)"}` }));
+  if (filters.buildingId && !hasOption(buildingItems, filters.buildingId)) buildingOptions.unshift({ value: filters.buildingId, label: buildings.data ? "Công trình đã chọn" : "Đang tải…" });
+  const scenarioOptions = scenarioItems.map((item) => ({ value: item.id, label: item.name }));
+  if (filters.scenarioId && !hasOption(scenarioItems, filters.scenarioId)) scenarioOptions.unshift({ value: filters.scenarioId, label: scenarios.data ? "Kịch bản đã chọn" : "Đang tải…" });
+  const errors = [buildings.error && "Không tải được danh sách công trình.", scenarios.error && "Không tải được kịch bản."].filter(Boolean);
+
+  return <>
+    <FilterChip label="Công trình" value={filters.buildingId ?? ""} options={buildingOptions} onChange={(value) => onChange({ building: value || null, scenario: null })} />
+    <FilterChip label="Kịch bản" value={filters.scenarioId ?? ""} options={scenarioOptions} disabled={!filters.buildingId} hint={filters.buildingId ? undefined : "Chọn công trình trước"} onChange={(value) => onChange({ scenario: value || null })} />
+    <FilterChip label="Nhóm theo" allLabel="không nhóm" value={filters.groupBy ?? ""} options={GROUP_BY.map((key) => ({ value: key, label: GROUP_LABELS[key] }))} hint="Thêm bảng nhóm số liệu; cũng áp dụng cho CSV." onChange={(value) => onChange({ groupBy: value || null })} />
+    {errors.length > 0 && <p className={styles.filterError} role="alert">{errors.join(" ")}</p>}
+  </>;
 }

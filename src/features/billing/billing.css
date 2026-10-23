@@ -89,3 +89,9 @@
 .bill-table { min-width: 640px; }
 .bill-form-grid, .ops-drawer .ops-form-grid { align-items: start; }
 .bill-totals dd { white-space: nowrap; }
+/* Figma "Dịch vụ và thanh toán": quota summary beside the latest quotations, under the service cards. */
+.bill-overview { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 16px; align-items: start; margin-top: 16px; }
+.bill-overview > .org-card { display: grid; gap: 12px; min-width: 0; }
+.bill-link-cell { padding: 0; border: 0; background: transparent; color: var(--text); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; min-height: 44px; }
+.bill-link-cell:hover { color: var(--ember); }
+@media (max-width: 1100px) { .bill-overview { grid-template-columns: minmax(0, 1fr); } }

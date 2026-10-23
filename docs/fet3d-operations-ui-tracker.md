@@ -83,6 +83,19 @@ Cập nhật bảng này khi hoàn thành từng đợt.
 | Org | Trợ lý AI `/workspace/ai` | Contract v7 + FE đã tích hợp; API/provider thật chưa nghiệm thu trong đợt tài liệu này | `src/features/org-ai`: answer/scenario-draft/history; đọc `/api/ai/organization/limits` trước submit, giới hạn maxInputChars/maxSources do server trả; draft pin revision ReadyForScenario/ConfirmedForTraining. Request status `Accepted/Processing/Succeeded/Failed/NeedsReconcile` tách khỏi resultType `KnowledgeAnswer/ScenarioDraft/InsufficientEvidence/RejectedBySafetyGate` và result.status (draft `NeedsUserEdit`). Citation top-level có link Learn/Library/https, confidence/assumptions/limitations; URL filter qua allowlist v7. Timeout tra request/reconcile hoặc retry cùng key, không tự trừ quota. Áp dụng draft vào editor là thao tác người dùng, chưa tự lưu/publish. Test: `org-ai-v7.spec.ts`, `org-ai-url-filters.spec.ts`, `org-ai-apply.spec.ts`. |
 | Admin | AI & nguồn tri thức `/admin/ai` | Contract + FE đã tích hợp (mock); API thật chưa nghiệm thu trong đợt tài liệu này | Request list lọc status/resultType/operation/audience/organizationId theo allowlist; chi tiết, reconcile NeedsReconcile với idempotency; policies phân trang, có TraineeAnswer/dailyUnits, không đặt giá trị sản phẩm mặc định; nguồn tri thức draft/approve/retire với ETag/412. Source `src/features/org-ai`; test `admin-ai.spec.ts`, `org-ai-v7.spec.ts`. |
 
+### Rà soát theo Figma sau đăng nhập (23/10/2026)
+
+So ảnh chụp 1440px (dark, dữ liệu mock giống production) với Figma `bmEp9L3tQSjxTrrrU3WmCR`. Các trang lệch bố cục đã sửa:
+
+- **Báo cáo** (Org/Admin): bộ lọc chip `FilterChip`/`ChipPopover` (`src/components/ui/filter-chip.tsx`): Công trình, Kịch bản, Nhóm theo, Thời gian (7/30/90 ngày + Từ/Đến trong panel). Kết quả của phiên nằm cạnh bảng "Theo kịch bản".
+- **Lịch sử luyện tập** (Trainee): bảng kèm ngăn chi tiết bên phải từ 1100px, dưới 1100px vẫn là drawer. Bộ lọc dạng chip.
+- **IFC & xử lý**: thanh bước ở trên; cột trái có xử lý/QA, preview, thiết bị, chi tiết kỹ thuật, annotation; cột phải là tải IFC mới và xác nhận sẵn sàng kỹ thuật.
+- **Phiên bản & phát hành**: chú thích "bản chụp bất biến" lên đầu; hành trình 8 bước chuyển thành checklist theo Figma.
+- **Dịch vụ & thanh toán** (Org): dưới thẻ công trình có panel "Quota AI trả trước" và "Báo giá và thanh toán gần đây". Bảng này dùng báo giá vì BE chưa có lịch sử thanh toán của tổ chức.
+- **Trợ lý AI** (Org, Hỏi đáp): khung hội thoại (câu hỏi bên phải, trả lời bên trái, ô soạn ở dưới; Enter gửi, Shift+Enter xuống dòng).
+
+Khớp bố cục, chỉ lệch chi tiết hoặc theo giới hạn BE (chưa đổi): Danh sách công trình (thiếu thẻ "Tiếp tục" — BE#152), Thư viện mẫu ("Dùng làm mẫu" cần `?libraryItem=`), Duyệt kịch bản, Hỗ trợ & audit, Thương mại, Tổng quan admin, AI & nguồn tri thức (Figma gộp một trang, code giữ tab), thanh theme 3 nút (Figma là một nút). "Phiên theo ngày" vẫn chờ chuỗi theo ngày từ BE.
+
 ### Prototype (dev)
 
 Không còn màn hình prototype nào: Duyệt kịch bản (F3), Learn CMS (F6) và Thư viện (F7) đều là màn thật; `src/features/dev-prototype` và `PendingModule` đã bị gỡ. `tests/e2e/ops-no-prototype.spec.ts` kiểm tra bản production: không banner/dữ liệu mẫu/khối "Chưa thể mở tính năng này" và bundle client không chứa chuỗi mẫu.

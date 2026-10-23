@@ -86,7 +86,7 @@ export function IfcUploadPanel({ accessToken, buildingId, onRevisionChanged }: {
         {waitSeconds > 0 && ` Hệ thống yêu cầu chờ ${waitSeconds} giây trước khi thử lại.`}
       </Alert>}
       {notice && <Alert tone="info">{notice}</Alert>}
-      {status === "done" && <Alert tone="success" title="Đã gửi xử lý IFC">Yêu cầu đã được nhận (202), chưa phải đã xử lý xong. Tiến trình và kết quả QA hiển thị bên dưới và tự cập nhật.</Alert>}
+      {status === "done" && <Alert tone="success" title="Đã gửi xử lý IFC">Yêu cầu đã được nhận (202), chưa phải đã xử lý xong. Tiến trình và kết quả QA hiển thị trong tab này và tự cập nhật.</Alert>}
 
       <div className="ops-actions">
         {status !== "done" && <Button type="submit" disabled={!canStart || running || blockedRetry}>

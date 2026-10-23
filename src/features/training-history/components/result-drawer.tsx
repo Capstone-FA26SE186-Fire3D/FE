@@ -1,7 +1,8 @@
 "use client";
 
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, X } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/dialog";
@@ -158,22 +159,51 @@ function Body({ sessionId, known, onRefresh, onClose, accessToken }: { sessionId
 
 /**
  * Detail of one of the learner's own sessions, opened by `?session=<id>`. Another learner's id (or a made-up one) gets the
- * server's 404 and is shown as "not found", never with data of the previously opened session.
+ * server's 404 and is shown as "not found", never with data of the previously opened session. Wide screens show it as a
+ * pane beside the list (Figma "Lịch sử luyện tập"); narrow ones as a drawer. Escape closes both.
  */
-export function ResultDrawer({ sessionId, known, accessToken, onClose, onRefresh }: {
+export function ResultDrawer({ sessionId, known, accessToken, onClose, onRefresh, inline }: {
   sessionId: string;
   known: HistoryItem | null;
   accessToken: string | null;
   onClose: () => void;
   onRefresh: () => void;
+  inline?: boolean;
 }) {
+  const title = known ? trainingTitle(known).title : "Chi tiết lượt tập";
+  const body = <Body sessionId={sessionId} known={known} accessToken={accessToken} onRefresh={onRefresh} onClose={onClose} />;
+  if (inline) return <InlinePane title={title} onClose={onClose}>{body}</InlinePane>;
   return <Drawer
     open
     onOpenChange={(open) => { if (!open) onClose(); }}
-    title={known ? trainingTitle(known).title : "Chi tiết lượt tập"}
+    title={title}
     description="Trạng thái phiên và kết quả được máy chủ lưu riêng cho tài khoản của bạn."
     className="th-drawer"
   >
-    <Body sessionId={sessionId} known={known} accessToken={accessToken} onRefresh={onRefresh} onClose={onClose} />
+    <div data-testid="history-detail">{body}</div>
   </Drawer>;
+}
+
+/** The non-modal pane: takes focus when it opens (so screen readers announce it) and closes on Escape anywhere on the page. */
+function InlinePane({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  const ref = useRef<HTMLElement>(null);
+  const closeRef = useRef(onClose);
+  useEffect(() => { closeRef.current = onClose; });
+  useEffect(() => { ref.current?.focus({ preventScroll: true }); }, []);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || document.querySelector("[role=dialog]")) return;
+      closeRef.current();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+  return <section ref={ref} tabIndex={-1} className="th-pane" role="region" aria-label={`Chi tiết: ${title}`} data-testid="history-detail">
+    <div className="th-pane-head">
+      <h2>{title}</h2>
+      <Button size="icon" variant="ghost" onClick={onClose} aria-label="Đóng"><X size={18} aria-hidden="true" /></Button>
+    </div>
+    <p className="th-pane-sub">Trạng thái phiên và kết quả được máy chủ lưu riêng cho tài khoản của bạn.</p>
+    {children}
+  </section>;
 }

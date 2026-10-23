@@ -57,7 +57,7 @@ export function TrainingReportView({ data, organizationNames, showOrganizationLi
 
     {empty && <EmptyReport title="Chưa có lượt chơi trong khoảng thời gian này">Đây là kết quả hợp lệ, không phải lỗi. Thử mở rộng khoảng thời gian (tối đa 90 ngày) hoặc kiểm tra Building đã có kịch bản phát hành và học viên đã bắt đầu phiên. Playtest và bước chuẩn bị gói không được tính.</EmptyReport>}
 
-    {!empty && <div className="ops-grid ops-grid-2">
+    {!empty && <div className={styles.leadGrid}>
       <Panel title="Kết quả của phiên" description="Kết quả do máy chủ ghi nhận. Phiên chưa có kết quả không nằm trong các nhóm này.">
         <OutcomeBar outcomes={data.outcomes} total={data.completed} />
         <p className={styles.note} style={{ marginTop: 12 }}>Tỷ lệ đạt = Đạt / (Đạt + Chưa đạt): <strong>{formatRate(data.assessment.passRate, "chưa có mẫu")}</strong> · {assessmentText}</p>
@@ -67,6 +67,15 @@ export function TrainingReportView({ data, organizationNames, showOrganizationLi
         </DataTable>
       </Panel>
 
+      <Panel title="Theo kịch bản" description="Tối đa 100 kịch bản có nhiều lượt chơi nhất.">
+        {data.byScenario.length ? <Table caption="Lượt chơi theo kịch bản">
+          <thead><tr><th>Kịch bản</th><th className={styles.num}>Lượt chơi</th><th className={styles.num}>Có kết quả</th><th className={styles.num}>Đạt</th></tr></thead>
+          <tbody>{data.byScenario.map((row) => <tr key={row.scenarioId}><td>{row.scenarioName ?? `Kịch bản ${shortId(row.scenarioId)}`}</td><td className={styles.num}>{fmt(row.plays)}</td><td className={styles.num}>{fmt(row.completed)}</td><td className={styles.num}><StatusBadge tone={row.passed > 0 ? "success" : "neutral"}>{fmt(row.passed)}</StatusBadge></td></tr>)}</tbody>
+        </Table> : <p className={styles.muted}>Chưa có kịch bản nào có lượt chơi trong kỳ.</p>}
+      </Panel>
+    </div>}
+
+    {!empty && <div className="ops-grid ops-grid-2" style={{ marginTop: 16 }}>
       <Panel title="Thời lượng" description="Từ lúc khởi chạy đến lúc kết thúc của phiên đã có kết quả (giờ máy chủ).">
         <div className="ops-grid ops-grid-3">
           <Stat label="Trung bình" value={formatSeconds(data.duration.averageSeconds)} />
@@ -92,15 +101,6 @@ export function TrainingReportView({ data, organizationNames, showOrganizationLi
           </DataTable>
         </> : <p className={styles.muted}>Chưa có bài huấn luyện nào có lượt chơi trong kỳ.</p>}
       </Panel>
-    </div>}
-
-    {!empty && (data.byBuilding.length > 0 || data.byScenario.length > 0) && <div className="ops-grid ops-grid-2" style={{ marginTop: 16 }}>
-      {data.byScenario.length > 0 && <Panel title="Theo kịch bản" description="Tối đa 100 kịch bản có nhiều lượt chơi nhất.">
-        <Table caption="Lượt chơi theo kịch bản">
-          <thead><tr><th>Kịch bản</th><th className={styles.num}>Lượt chơi</th><th className={styles.num}>Có kết quả</th><th className={styles.num}>Đạt</th></tr></thead>
-          <tbody>{data.byScenario.map((row) => <tr key={row.scenarioId}><td>{row.scenarioName ?? `Kịch bản ${shortId(row.scenarioId)}`}</td><td className={styles.num}>{fmt(row.plays)}</td><td className={styles.num}>{fmt(row.completed)}</td><td className={styles.num}>{fmt(row.passed)}</td></tr>)}</tbody>
-        </Table>
-      </Panel>}
       {data.byBuilding.length > 0 && <Panel title="Theo công trình" description="Tối đa 100 công trình có nhiều lượt chơi nhất.">
         <Table caption="Lượt chơi theo công trình">
           <thead><tr><th>Công trình</th><th className={styles.num}>Lượt chơi</th><th className={styles.num}>Học viên</th><th className={styles.num}>Có kết quả</th></tr></thead>

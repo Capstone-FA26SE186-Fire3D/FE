@@ -39,20 +39,25 @@
 
 /* Journey: eight steps from draft to publish, next step highlighted. */
 .ver-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.ver-journey { display: grid; gap: 12px; margin: 0 0 16px; }
+/* Journey as the Figma "Chuẩn bị phát hành" checklist: one row per step inside a card, the next step highlighted. */
+.ver-journey { display: grid; gap: 12px; margin: 16px 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .ver-journey-head { display: grid; gap: 4px; }
-.ver-journey-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
-.ver-journey-step { display: grid; align-content: start; gap: 8px; min-width: 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
-.ver-journey-step[data-state="unknown"] { border-style: dashed; border-color: var(--line-strong); }
-.ver-journey-step[data-state="done"] { border-color: var(--success); }
-.ver-journey-step[data-state="blocked"] { border-color: var(--danger); }
-.ver-journey-step[data-branch="true"] { border-style: dashed; background: var(--bg-soft); }
-.ver-journey-step[data-next="true"] { border: 2px solid var(--ember); background: var(--ember-soft); padding: 11px 13px; }
+.ver-journey-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.ver-journey-step { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "top badges" "detail detail" "action action"; align-items: center; gap: 4px 12px; min-width: 0; padding: 12px 0; border-top: 1px solid var(--line); }
+.ver-journey-step:first-child { border-top: 0; }
+.ver-journey-step > .ver-journey-top { grid-area: top; }
+.ver-journey-step > .ver-actions-row { grid-area: badges; justify-content: flex-end; }
+.ver-journey-step > .ver-gate-detail { grid-area: detail; margin: 0; }
+.ver-journey-step > :last-child:not(.ver-gate-detail):not(.ver-actions-row):not(.ver-journey-top) { grid-area: action; justify-self: start; margin-top: 6px; }
+.ver-journey-step[data-state="unknown"] .ver-journey-title, .ver-journey-step[data-state="todo"] .ver-journey-title { color: var(--muted); }
+.ver-journey-step[data-branch="true"] .ver-journey-title { font-style: italic; }
+.ver-journey-step[data-next="true"] { margin: 4px -12px; padding: 12px; border: 1px solid var(--ember); border-radius: 12px; background: var(--ember-soft); }
+.ver-journey-step[data-next="true"] + .ver-journey-step { border-top: 0; }
 .ver-journey-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .ver-journey-index { display: inline-grid; flex: none; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--hover); color: var(--muted); font-size: 12px; font-weight: 700; }
-.ver-journey-title { margin: 0; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
-@media (max-width: 1279px) { .ver-journey-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 639px) { .ver-journey-list { grid-template-columns: minmax(0, 1fr); } }
+.ver-journey-step[data-state="done"] .ver-journey-index { background: var(--success-soft, var(--hover)); color: var(--success); }
+.ver-journey-title { margin: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+@media (max-width: 639px) { .ver-journey-step { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "badges" "detail" "action"; } .ver-journey-step > .ver-actions-row { justify-content: flex-start; } }
 
 @media (max-width: 1279px) {
   /* With the 248px sidebar a 300px history column leaves the content too narrow to read: stack instead. */

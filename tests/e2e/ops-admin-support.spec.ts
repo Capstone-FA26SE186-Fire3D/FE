@@ -3,6 +3,7 @@
  * Evidence level: Playwright route mocks of the BE contract (SupportController, AuditLogsController,
  * OperationsAnalyticsController, OrganizationProfileController). Not an integration test against the real API.
  */
+import { openChip } from "./chip-helpers";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { buildRange } from "../../src/utils/date-range";
 import { parseOperationsAnalytics } from "../../src/features/admin-overview/api";
@@ -81,10 +82,13 @@ test.describe("admin overview", () => {
     await signIn(page, admin);
     await page.route("**/api/admin/analytics/operations*", (route) => { queries.push(new URL(route.request().url()).searchParams); return route.fulfill({ json: analytics }); });
     await page.goto("/admin/overview?from=2026-09-01&to=2026-09-30");
+    await openChip(page, "Thời gian");
     await expect(page.getByLabel("Từ ngày")).toHaveValue("2026-09-01");
     await expect.poll(() => queries.length).toBe(1);
     expect(queries[0].get("from")).toBe("2026-09-01T00:00:00.000Z");
     expect(queries[0].get("to")).toBe("2026-10-01T00:00:00.000Z");
+
+    await openChip(page, "Thời gian");
 
     await page.getByLabel("Từ ngày").fill("2026-01-01");
     await page.getByLabel("Đến ngày").fill("2026-09-30");
@@ -92,6 +96,8 @@ test.describe("admin overview", () => {
     await expect(page.getByText(/Khoảng thời gian tối đa 90 ngày/)).toBeVisible();
     await expect(page).toHaveURL(/from=2026-09-01/);
     expect(queries).toHaveLength(1);
+
+    await openChip(page, "Thời gian");
 
     await page.getByRole("button", { name: "7 ngày" }).click();
     await expect(page).toHaveURL(/from=\d{4}-\d{2}-\d{2}&to=\d{4}-\d{2}-\d{2}/);
@@ -334,6 +340,7 @@ test.describe("audit log", () => {
     const g = (n: number) => `${String(n).repeat(8)}-${String(n).repeat(4)}-4${String(n).repeat(3)}-8${String(n).repeat(3)}-${String(n).repeat(12)}`;
     await page.goto("/admin/support?tab=audit");
     await expect.poll(() => queries.length).toBe(1);
+
 
     await page.getByLabel("Từ ngày").fill("2026-09-01");
     await page.getByLabel("Đến ngày").fill("2026-09-30");

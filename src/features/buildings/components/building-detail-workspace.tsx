@@ -271,20 +271,27 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "overview" }:
       </TabsContent>
 
       <TabsContent value="ifc">
+        {/* Figma "IFC và xử lý": the step bar on top, the model on the left, upload and the technical confirmation on the right. */}
         <div className="ops-stack org">
           {revision && progress && <PipelineProgress model={progress} versionLabel={revision.versionLabel} onAction={runAction} busy={processing.working} actionError={processing.actionError} />}
-          <IfcUploadPanel accessToken={accessToken} buildingId={buildingId} onRevisionChanged={onRevisionChanged} />
-          {revisions.loading && !revisions.data && <Skeleton style={{ height: 160 }} />}
-          {revision && accessToken && <>
-            <ProcessingStatusPanel revision={revision} pipeline={pipeline} issues={issues.data?.items} polling={pipelineState.polling} pollError={pollError} onRefresh={pipelineState.refresh} />
-            <PreviewPanel accessToken={accessToken} buildingId={buildingId} revisionId={revision.id} reloadKey={reloadKey} highlight={highlight.revisionId === revision.id ? highlight.ids : undefined} onClearHighlight={() => setHighlight({ revisionId: "", ids: [] })} onUploadNew={() => focusSection("ifc-upload")} />
-            <EquipmentPanel key={revision.id} accessToken={accessToken} revisionId={revision.id} onChanged={() => { revisions.reload(); pipelineState.refresh(); }} onHighlight={(ids) => showInPreview(revision.id, ids)} />
-            <RevisionDetailsPanel accessToken={accessToken} revisionId={revision.id} issues={{ data: issues.data?.items, error: issues.error, loading: issues.loading, reload: issues.reload }} reloadKey={reloadKey} onHighlight={(ids) => showInPreview(revision.id, ids)} onIssueAction={runAction} tab={detailsTab} onTabChange={setDetailsTab} />
-            <AnnotationsPanel accessToken={accessToken} revisionId={revision.id} />
-            <ConfirmTrainingPanel accessToken={accessToken} buildingId={buildingId} revision={revision} pipeline={pipeline} jobs={jobs} onConfirmed={revisions.reload} />
-            {processing.modal}
-          </>}
-          {revisions.data && !revision && <Alert tone="info" title="Chưa có revision nào">Tải lên tệp IFC đầu tiên ở trên. Sau khi tải xong, tiến trình xử lý, QA và preview sẽ hiển thị ở đây.</Alert>}
+          <div className="bd-ifc-grid" data-empty={!revision || undefined}>
+            <div className="ops-stack bd-ifc-main">
+              {revisions.loading && !revisions.data && <Skeleton style={{ height: 160 }} />}
+              {revisions.data && !revision && <Alert tone="info" title="Chưa có revision nào">Tải lên tệp IFC đầu tiên. Sau khi tải xong, tiến trình xử lý, QA và preview sẽ hiển thị ở đây.</Alert>}
+              {revision && accessToken && <>
+                <ProcessingStatusPanel revision={revision} pipeline={pipeline} issues={issues.data?.items} polling={pipelineState.polling} pollError={pollError} onRefresh={pipelineState.refresh} />
+                <PreviewPanel accessToken={accessToken} buildingId={buildingId} revisionId={revision.id} reloadKey={reloadKey} highlight={highlight.revisionId === revision.id ? highlight.ids : undefined} onClearHighlight={() => setHighlight({ revisionId: "", ids: [] })} onUploadNew={() => focusSection("ifc-upload")} />
+                <EquipmentPanel key={revision.id} accessToken={accessToken} revisionId={revision.id} onChanged={() => { revisions.reload(); pipelineState.refresh(); }} onHighlight={(ids) => showInPreview(revision.id, ids)} />
+                <RevisionDetailsPanel accessToken={accessToken} revisionId={revision.id} issues={{ data: issues.data?.items, error: issues.error, loading: issues.loading, reload: issues.reload }} reloadKey={reloadKey} onHighlight={(ids) => showInPreview(revision.id, ids)} onIssueAction={runAction} tab={detailsTab} onTabChange={setDetailsTab} />
+                <AnnotationsPanel accessToken={accessToken} revisionId={revision.id} />
+              </>}
+            </div>
+            <div className="ops-stack bd-ifc-side">
+              <IfcUploadPanel accessToken={accessToken} buildingId={buildingId} onRevisionChanged={onRevisionChanged} />
+              {revision && accessToken && <ConfirmTrainingPanel accessToken={accessToken} buildingId={buildingId} revision={revision} pipeline={pipeline} jobs={jobs} onConfirmed={revisions.reload} />}
+            </div>
+          </div>
+          {processing.modal}
         </div>
       </TabsContent>
 
