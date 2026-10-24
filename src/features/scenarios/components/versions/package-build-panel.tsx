@@ -8,7 +8,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, Input, Select, Textarea } from "@/components/ui/field";
+import { Field, Select, Textarea } from "@/components/ui/field";
 import { Panel } from "@/components/ui/panel";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge, type Tone } from "@/components/ui/status-badge";
@@ -22,6 +22,12 @@ import { scenarioVersionsApi } from "../../versions-api";
 import { formatDateTime } from "./version-content";
 
 const kindLabel: Record<string, string> = { ReleasePackage: "Release package", PlaytestPackage: "Playtest package" };
+
+/**
+ * The Unity package runs in the Android app and the build worker serves `Android` only (`ProcessingWorker:PackageBuildTargets`,
+ * default Android): any other target answers 400 BUILD_TARGET_UNSUPPORTED or is never leased. Add targets here when the BE serves them.
+ */
+const BUILD_TARGETS = ["Android"] as const;
 
 export function jobTone(status: string | undefined): Tone {
   switch (status?.toLowerCase()) {
@@ -59,7 +65,7 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
   const buildKey = useIdempotencyKey();
   const retryKey = useIdempotencyKey();
   const [kind, setKind] = useState<PackageKind>("ReleasePackage");
-  const [buildTarget, setBuildTarget] = useState("Windows");
+  const [buildTarget, setBuildTarget] = useState<string>(BUILD_TARGETS[0]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<DescribedError | null>(null);
   const [retrying, setRetrying] = useState(false);
@@ -126,8 +132,10 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
               <option value="PlaytestPackage">Playtest package</option>
             </Select>}
           </Field>
-          <Field label="Nền tảng dựng" required error={targetError} hint="Ví dụ: Windows.">
-            {(p) => <Input {...p} value={buildTarget} maxLength={100} onChange={(event) => setBuildTarget(event.target.value)} />}
+          <Field label="Nền tảng dựng" required error={targetError} hint="Chỉ hỗ trợ Android: gói chạy trong ứng dụng Android.">
+            {(p) => <Select {...p} value={buildTarget} onChange={(event) => setBuildTarget(event.target.value)}>
+              {BUILD_TARGETS.map((value) => <option key={value} value={value}>{value}</option>)}
+            </Select>}
           </Field>
         </div>
         {error && <Alert tone="danger" title={error.message} action={<div className="ver-actions-row" style={{ marginTop: 10 }}>

@@ -111,7 +111,7 @@ function releaseBody(status: string) {
     id: IDS.release, revisionId: IDS.revision, scenarioVersionId: IDS.version, buildingId: "building-1", organizationId: "org-1", confirmationReviewId: IDS.confirm, status, safetyThresholds: "{}",
     publishedBy: status === "Published" ? "owner" : null, publishedAt: status === "Published" ? "2026-10-10T04:00:00Z" : null, revokedBy: null, revokedReason: null, revokedAt: null,
     createdAt: "2026-10-10T03:00:00Z", updatedAt: "2026-10-10T03:00:00Z",
-    package: { id: "pkg-1", candidateArtifactId: IDS.artifact, manifestUrl: "k/manifest", manifestSha256: "d".repeat(64), packageUrl: "k/package", checksumSha256: "e".repeat(64), packageSizeBytes: 123456, minRuntimeVersion: "1.0.0", schemaVersion: "1", buildTarget: "Windows" },
+    package: { id: "pkg-1", candidateArtifactId: IDS.artifact, manifestUrl: "k/manifest", manifestSha256: "d".repeat(64), packageUrl: "k/package", checksumSha256: "e".repeat(64), packageSizeBytes: 123456, minRuntimeVersion: "1.0.0", schemaVersion: "1", buildTarget: "Android" },
     entitlement: { id: "ent-1", status: "Active", startsAt: "2026-10-01T00:00:00Z", endsAt: "2027-04-01T00:00:00Z", paid: true, learnerLimit: 50 },
   };
 }
@@ -218,7 +218,7 @@ test.describe("snapshot", () => {
     await expect(page.getByRole("heading", { name: "Phiên bản và phát hành" })).toBeVisible();
     await page.getByRole("button", { name: "Tạo phiên bản mới từ draft" }).first().click();
     await expect(page.getByLabel("Bản nháp")).toHaveValue(IDS.draft);
-    await page.getByRole("button", { name: "Tải draft" }).click();
+    // The draft loads on its own: no extra "Tải draft" click before "Tạo snapshot" is usable.
     await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"12"');
     await page.getByRole("button", { name: "Kiểm tra draft" }).click();
     await expect(page.getByText("SPAWN_REQUIRED")).toBeVisible();
@@ -246,11 +246,9 @@ test.describe("snapshot", () => {
     await expect(page.getByLabel("Bản nháp")).toHaveValue(IDS.draft2);
     await expect(page.getByLabel("Bản nháp").getByRole("option")).toHaveCount(2);
     await expect(page.getByLabel("Bản nháp").getByRole("option").first()).toContainText("hiện tại");
-    await page.getByRole("button", { name: "Tải draft" }).click();
     await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"4"');
     await page.getByLabel("Bản nháp").selectOption(IDS.draft);
-    await expect(page.getByLabel("Tóm tắt draft đang xem")).toHaveCount(0);
-    await page.getByRole("button", { name: "Tải draft" }).click();
+    // Picking another draft loads that one (the summary never shows the previous draft's ETag for it).
     await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"12"');
   });
 
@@ -262,6 +260,9 @@ test.describe("snapshot", () => {
     await expect(page.getByText("Kịch bản này chưa có draft")).toBeVisible();
     await expect(page.getByRole("link", { name: "Mở trình soạn để tạo draft" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Tải draft" })).toBeDisabled();
+    // A disabled snapshot button says why.
+    await expect(page.getByRole("button", { name: "Tạo snapshot", exact: true })).toBeDisabled();
+    await expect(page.getByRole("status").filter({ hasText: "Chưa có draft để tạo snapshot." })).toBeVisible();
   });
 
   test("412 keeps the draft the user was viewing and offers the newer one for comparison", async ({ page }) => {
@@ -269,7 +270,7 @@ test.describe("snapshot", () => {
     await setup(page, mock);
     await page.goto(`${base}?draft=${IDS.draft}`);
     await page.getByRole("button", { name: "Tạo phiên bản mới từ draft" }).first().click();
-    await page.getByRole("button", { name: "Tải draft" }).click();
+    await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"12"');
     await page.getByRole("button", { name: "Tạo snapshot", exact: true }).click();
     await expect(page.getByText("Draft đã thay đổi từ lần bạn tải")).toBeVisible();
     await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"12"');
@@ -277,6 +278,7 @@ test.describe("snapshot", () => {
     await expect(page.getByLabel("Bản mới")).toContainText('"13"');
     await expect(page.getByLabel("Bản cũ")).toContainText('"12"');
     await expect(page.getByRole("button", { name: "Tạo snapshot", exact: true })).toBeDisabled();
+    await expect(page.getByRole("status").filter({ hasText: "Chọn bản draft để dùng ở phần đối chiếu trước." })).toBeVisible();
     await page.getByRole("button", { name: "Dùng bản mới" }).click();
     await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"13"');
     await expect(page.getByRole("button", { name: "Tạo snapshot", exact: true })).toBeEnabled();
@@ -288,9 +290,12 @@ test.describe("package build and technical readiness", () => {
     const mock = newMock({ jobSequence: ["Queued", "Running", "Succeeded"], qa: { runs: [], issues: [] } });
     await setup(page, mock);
     await page.goto(`${base}?tab=build`);
+    // The platform is a select with Android only and preselected (the BE serves no other target by default).
+    await expect(page.getByLabel("Nền tảng dựng")).toHaveValue("Android");
+    await expect(page.getByLabel("Nền tảng dựng").getByRole("option")).toHaveCount(1);
     await page.getByRole("button", { name: "Chạy package build" }).click();
     await expect(page.getByText("Đã xếp hàng package build")).toBeVisible();
-    expect(mock.buildCalls[0].body).toEqual({ kind: "ReleasePackage", buildTarget: "Windows" });
+    expect(mock.buildCalls[0].body).toEqual({ kind: "ReleasePackage", buildTarget: "Android" });
     await expect(page.getByText("Đang chờ kết quả")).toBeVisible();
     await expect(page.locator("[data-gate=technical]")).toContainText("Đang xử lý");
     await expect(page.getByText("Job Succeeded chưa phải QA Passed", { exact: true })).toBeVisible({ timeout: 20_000 });

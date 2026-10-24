@@ -88,6 +88,21 @@ test.describe("tabs and URL", () => {
     await expect(page.getByRole("navigation", { name: "Đường dẫn" })).toContainText("Công trình");
   });
 
+  test("the journey does not call a saved draft finished: the scenario step says a draft exists", async ({ page }) => {
+    await signIn(page);
+    await mockBuilding(page, { revisions: [{ ...rev2, status: "ReadyForScenario" }], scenarios: [{ id: "sc-1", buildingId: "building-1", name: "Thoát hiểm tầng 1", createdAt: "2026-10-03T00:00:00Z" }] });
+    await page.route("**/api/scenarios/sc-1", (route) => route.fulfill({ json: { id: "sc-1", buildingId: "building-1", organizationId: "org-1", name: "Thoát hiểm tầng 1", createdAt: "2026-10-03T00:00:00Z", currentDraftId: "d-1", currentDraftVersion: 3, draftCount: 1 } }));
+    await page.goto("/workspace/buildings/building-1");
+    const steps = page.getByRole("list", { name: "Các bước của công trình" });
+    const scenarioStep = steps.getByRole("listitem").filter({ hasText: "Soạn kịch bản" });
+    // The server keeps no draft validation, so a saved draft is not proof that the scenario is complete.
+    await expect(scenarioStep).toContainText("Đã có bản nháp");
+    await expect(scenarioStep).not.toContainText("Hoàn tất");
+    await expect(scenarioStep.getByRole("img")).toHaveAttribute("aria-label", "Soạn kịch bản: Đã có bản nháp");
+    // Steps backed by verified server data keep saying "Hoàn tất".
+    await expect(steps.getByRole("listitem").filter({ hasText: "Thông tin" })).toContainText("Hoàn tất");
+  });
+
   test("the old scenarios route opens the scenarios tab, and the services tab opens", async ({ page }) => {
     await signIn(page);
     await mockBuilding(page, { scenarios: [{ id: "sc-1", buildingId: "building-1", name: "Thoát hiểm tầng 1", createdAt: "2026-10-03T00:00:00Z" }] });
