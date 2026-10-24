@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { storedSession } from "./session";
 import { installLearnBackend, LearnBackend, signIn, type Actor } from "./learn-mock";
 import { installTraineeAi, TraineeAiBackend } from "./trainee-ai-mock";
 import { installTrainingBackend, TrainingBackend } from "./training-history-mock";
@@ -238,7 +239,7 @@ test("logout returns home even on backend failure and the Q&A view respects redu
   await page.route("**/api/auth/logout", (route) => route.fulfill({ status: 503 }));
   await page.getByRole("button", { name: "Đăng xuất", exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
-  expect(await page.evaluate(() => sessionStorage.getItem("fire3d-auth-tokens"))).toBeNull();
+  expect(await storedSession(page)).toBeNull();
 });
 
 test("mobile organization form and OTP step scroll without overflow", async ({ page }, testInfo) => {

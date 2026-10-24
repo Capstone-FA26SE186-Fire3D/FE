@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { storedSession } from "./session";
 import { safeNext, postLoginRoute } from "../../src/features/auth/redirect";
 
 const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "Trường học", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: null, contact: null };
@@ -106,7 +107,7 @@ test("PlatformAdmin can still open local IFC and logout clears the session", asy
   await page.route("**/api/auth/logout", (route) => route.fulfill({ status: 204 }));
   await page.getByRole("button", { name: "Đăng xuất", exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
-  expect(await page.evaluate(() => sessionStorage.getItem("fire3d-auth-tokens"))).toBeNull();
+  expect(await storedSession(page)).toBeNull();
 });
 
 test("next permits workspace details, scenarios and profile while rejecting unrelated paths", () => {

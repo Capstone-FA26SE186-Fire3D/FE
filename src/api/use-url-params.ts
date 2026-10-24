@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 type ParamValue = string | number | null | undefined;
@@ -14,7 +14,6 @@ export type UrlParamsSpec = { page?: number; pageSize?: number };
  * Needs a Suspense boundary above it (the operations layouts provide one).
  */
 export function useUrlParams(defaults: UrlParamsSpec = {}) {
-  const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
   const defaultPageSize = defaults.pageSize ?? 20;
@@ -44,9 +43,12 @@ export function useUrlParams(defaults: UrlParamsSpec = {}) {
     const query = next.toString();
     latest.current = query;
     const href = query ? `${pathname}?${query}` : pathname;
-    if (mode === "replace") router.replace(href, { scroll: false });
-    else router.push(href, { scroll: false });
-  }, [pathname, router]);
+    // Only the query of the current page changes: the native History API updates useSearchParams without a server round
+    // trip, so a tab or filter click neither waits for the network nor re-mounts the page (state kept only in memory,
+    // like a QR shown once, survives). router.push/replace would refetch the route, which re-mounts a static page.
+    if (mode === "replace") window.history.replaceState(null, "", href);
+    else window.history.pushState(null, "", href);
+  }, [pathname]);
 
   return { page, pageSize: defaultPageSize, get, setParams, setPage: (value: number) => setParams({ page: value }) };
 }

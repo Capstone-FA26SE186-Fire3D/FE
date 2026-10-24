@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { storedSession } from "./session";
 import { postLoginRoute, safeNext } from "../../src/features/auth/redirect";
 import { isQrToken, qrLandingUrl } from "../../src/features/qr-landing/token";
 
@@ -693,7 +694,7 @@ test.describe("Building QR landing", () => {
     await installLanding(page, world, { resolveStatus: 401 });
     await page.goto(`/qr/${token}`);
     await expect(page.getByRole("heading", { name: "Phiên đăng nhập đã hết hạn" })).toBeVisible();
-    await expect.poll(() => page.evaluate(() => sessionStorage.getItem("fire3d-auth-tokens"))).toBeNull();
+    await expect.poll(() => storedSession(page)).toBeNull();
     await page.getByRole("link", { name: "Đăng nhập", exact: true }).click();
     await expect(page).toHaveURL(/\/login\?next=/);
     await expect(page.getByLabel("Email")).toBeVisible(); // not bounced back: the session is gone

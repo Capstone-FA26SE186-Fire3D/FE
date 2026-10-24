@@ -122,6 +122,13 @@ Theo các khung `Org v2 · Phiên bản · …`, `Org v2 · Trình soạn kịch
 - **Hiệu năng**: năm panel tab và modal tạo phiên bản tách thành chunk `next/dynamic` (modal tải trước khi rê chuột/focus vào nút). First-load gzip trang phiên bản 317 → 289 KB; trình soạn 357 KB, chi tiết công trình 367 KB giữ nguyên.
 - Sửa kèm: `<td className="ops-cell-primary">` bị `display: inline-block` nên ô đầu hàng co lại, lộ nền bảng thành mảng tối ở hàng đang chọn; quy tắc inline-block giờ chỉ áp cho phần tử không phải `td`.
 
+### Tải trang động chậm (25/10/2026)
+
+- **Đo được**: các route động (`/workspace/buildings/[id]`, trình soạn, phiên bản) chạy hàm Vercel ở `iad1` (Mỹ) cho mọi lượt mở, không cache (`X-Vercel-Id: hkg1::iad1`, `X-Vercel-Cache: MISS`); RSC của chi tiết công trình có lượt 9 s, ảnh qua `/_next/image` 12 s; sidebar prefetch ~10 route cùng lúc.
+- **Sửa**: các trang chỉ chuyển id cho code phía trình duyệt nên dùng `generateStaticParams() { return []; }` (ISR theo URL, phục vụ từ CDN); `vercel.json` `regions: ["hkg1"]` cạnh API (Azure East Asia); `prefetch={false}` cho liên kết sidebar; `useUrlParams` đổi query bằng `history.pushState/replaceState` (Next 16 đồng bộ `useSearchParams`) nên đổi tab/bộ lọc không gọi server và không dựng lại trang — bắt buộc khi trang là static, nếu không `router.replace` dựng lại cây và mất trạng thái chỉ có trong bộ nhớ (mã QR hiện một lần).
+- **BE**: mỗi lần đọc tốn 200–430 ms ở server do 2–7 lần đi-về DB nối tiếp (~60 ms/lần, nhiều khả năng DB khác vùng); chi tiết và đề xuất ở BE#168.
+- **Test cũ đã sửa**: đọc phiên qua cookie `fire3d_session` (`tests/e2e/session.ts`), bundle Google fixture bỏ qua CSS, nhãn "Đang xử lý", bỏ nút "Tải lại" không còn trên danh sách công trình.
+
 ### Kích thước bundle v2 và đo tải (24/10/2026)
 
 JS first-load (gzip, KB; `.next/diagnostics/route-bundle-stats.json` của `next build`, ba bản build sạch không `.env`): **trước v2** = `41bd600`, **v2** = `b6b7542`, **sau trim** = nhánh `chore/v2-bundle-trim`.

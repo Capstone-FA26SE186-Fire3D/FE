@@ -58,7 +58,7 @@ function SidebarContent({ area, pathname, collapsed, onNavigate, onToggleCollaps
 
   const SecondaryIcon = area.secondaryLink.icon;
   return <>
-    <Link className="ops-brand" href="/" aria-label="FET3D, về trang chủ" onClick={onNavigate}><FET3DLogo variant="mark" /><span>FET3D<small>{area.brandSubtitle}</small></span></Link>
+    <Link className="ops-brand" href="/" prefetch={false} aria-label="FET3D, về trang chủ" onClick={onNavigate}><FET3DLogo variant="mark" /><span>FET3D<small>{area.brandSubtitle}</small></span></Link>
     <nav className="ops-nav" aria-label={area.navLabel}>
       {groups.map((group, index) => <div key={group.name ?? index} style={{ display: "grid", gap: 2 }}>
         {group.name && <p className="ops-nav-label">{group.name}</p>}
@@ -67,7 +67,7 @@ function SidebarContent({ area, pathname, collapsed, onNavigate, onToggleCollaps
           const Icon = item.icon;
           const openBuilding = area.id === "organization" && item.href === "/workspace/buildings" ? /^\/workspace\/buildings\/([^/]+)/.exec(pathname)?.[1] : undefined;
           return <div key={item.href} style={{ display: "contents" }}>
-            <Link className="ops-nav-link" href={item.href} aria-current={active ? "page" : undefined} aria-label={item.label} title={collapsed ? item.label : undefined} onClick={onNavigate} data-tour={item.href === "/workspace/buildings" ? "nav-buildings" : undefined}>
+            <Link className="ops-nav-link" href={item.href} prefetch={false} aria-current={active ? "page" : undefined} aria-label={item.label} title={collapsed ? item.label : undefined} onClick={onNavigate} data-tour={item.href === "/workspace/buildings" ? "nav-buildings" : undefined}>
               {active && <m.span layoutId={`${idPrefix}-active`} className="ops-nav-active" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
               <Icon size={20} strokeWidth={1.75} aria-hidden="true" style={{ position: "relative" }} />
               <span className="ops-nav-text"><span style={{ position: "relative" }}>{item.label}</span>{item.status === "pending-be" && <StatusBadge tone="warning" style={{ position: "relative" }}>Chờ BE</StatusBadge>}{counts[item.href] ? <span className="ops-nav-count" aria-label={`${counts[item.href]} việc cần xử lý`}>{counts[item.href]}</span> : null}</span>
@@ -78,7 +78,7 @@ function SidebarContent({ area, pathname, collapsed, onNavigate, onToggleCollaps
       </div>)}
     </nav>
     <div className="ops-sidebar-footer">
-      <Link href={area.secondaryLink.href} onClick={onNavigate} aria-label={area.secondaryLink.label} title={collapsed ? area.secondaryLink.label : undefined}>{SecondaryIcon && <SecondaryIcon size={20} strokeWidth={1.75} aria-hidden="true" />}<span className="ops-label">{area.secondaryLink.label}</span></Link>
+      <Link href={area.secondaryLink.href} prefetch={false} onClick={onNavigate} aria-label={area.secondaryLink.label} title={collapsed ? area.secondaryLink.label : undefined}>{SecondaryIcon && <SecondaryIcon size={20} strokeWidth={1.75} aria-hidden="true" />}<span className="ops-label">{area.secondaryLink.label}</span></Link>
       {onToggleCollapsed && <button type="button" onClick={onToggleCollapsed} aria-label={collapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"} title={collapsed ? "Mở rộng thanh bên" : "Thu gọn thanh bên"}>{collapsed ? <PanelLeftOpen size={20} strokeWidth={1.75} aria-hidden="true" /> : <PanelLeftClose size={20} strokeWidth={1.75} aria-hidden="true" />}<span className="ops-label">Thu gọn</span></button>}
       <button type="button" onClick={onLogout} aria-label="Đăng xuất" title={collapsed ? "Đăng xuất" : undefined}><LogOut size={20} strokeWidth={1.75} aria-hidden="true" /><span className="ops-label">Đăng xuất</span></button>
     </div>
@@ -124,7 +124,7 @@ function Shell({ area, children }: { area: OperationsArea; children: ReactNode }
         <CommandPaletteButton />
         {area.id === "organization" && <HelpTrigger />}
         <ThemeToggle />
-        <Link href={area.id === "organization" ? "/workspace/profile" : "/account"} className="ops-user" title={user.email}><span className="ops-avatar" aria-hidden="true">{initials(user.fullName || user.email)}</span><span className="ops-user-name">{user.fullName || user.email}</span></Link>
+        <Link href={area.id === "organization" ? "/workspace/profile" : "/account"} prefetch={false} className="ops-user" title={user.email}><span className="ops-avatar" aria-hidden="true">{initials(user.fullName || user.email)}</span><span className="ops-user-name">{user.fullName || user.email}</span></Link>
       </header>
       <main id="ops-main" className="ops-main" tabIndex={-1}>
         <TopbarSlotContext.Provider value={crumbSlot}>
