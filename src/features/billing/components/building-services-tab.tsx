@@ -28,6 +28,7 @@ import { QuotationCreateModal, type CreateMode } from "./quotation-create-modal"
 import { QuotationSnapshot, QuotationStatusBadge } from "./quotation-snapshot";
 import { ServiceCapacity } from "./service-capacity";
 import "../billing.css";
+import { LoadingBlock } from "@/components/ui/spinner";
 
 const entitlementStatus: Record<string, string> = { Active: "Đang hoạt động", Trial: "Dùng thử", Expired: "Hết hạn", Revoked: "Đã thu hồi", Suspended: "Tạm ngưng" };
 
@@ -98,7 +99,7 @@ export function BuildingServicesTab({ buildingId }: { buildingId: string }) {
   };
   const closeQuotation = () => { setOverride(null); setParams({ quotation: null, payment: null }, "replace"); };
 
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (!enabled) return <Alert tone="danger" title="Không có quyền truy cập">Tab này dành cho tài khoản tổ chức.</Alert>;
 
   const stateBadge = {

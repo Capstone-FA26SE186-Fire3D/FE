@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SubmitButton } from "@/components/ui/spinner";
+import { SubmitButton, LoadingBlock } from "@/components/ui/spinner";
 import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
@@ -108,7 +108,7 @@ export function OrganizationProfile() {
     }
   };
 
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (!allowed) return <Alert tone="danger" title="Không có quyền truy cập">Hồ sơ tổ chức dành cho tài khoản tổ chức. Tài khoản cá nhân nằm ở <Link href={routes.account}>Tài khoản của bạn</Link>.</Alert>;
 
   const locked = loading && !profile;

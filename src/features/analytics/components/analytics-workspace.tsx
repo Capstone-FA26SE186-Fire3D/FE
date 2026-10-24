@@ -20,6 +20,7 @@ import { ReportShell } from "./report-shell";
 import { RevenueReportView } from "./revenue-report";
 import { TrainingReportView } from "./training-report";
 import styles from "./analytics.module.css";
+import { LoadingBlock } from "@/components/ui/spinner";
 
 export type AnalyticsVariant = "organization" | "platform" | "admin-organization";
 type TabKey = "training" | "operations" | "revenue";
@@ -82,7 +83,7 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
   const operationsData = operations.data;
   useEffect(() => { if (operationsData) onOperations?.(operationsData); }, [operationsData, onOperations]);
 
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (user?.role !== ROLE[variant]) return <Alert tone="danger" title="Không có quyền truy cập">{variant === "organization" ? "Báo cáo này dành cho tài khoản tổ chức." : "Chỉ PlatformAdmin có thể xem báo cáo này."}</Alert>;
 
   const active = tab === "training" ? training : tab === "operations" ? operations : revenue;

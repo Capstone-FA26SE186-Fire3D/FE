@@ -33,6 +33,7 @@ import { ReleasePanel } from "./release-panel";
 import { ReviewPanel } from "./review-panel";
 import { SnapshotDrawer } from "./snapshot-drawer";
 import { VersionContent, formatDateTime } from "./version-content";
+import { LoadingBlock } from "@/components/ui/spinner";
 
 const PAGE_SIZE = 20;
 const TABS = ["content", "build", "playtest", "readiness", "review", "release"] as const;
@@ -159,7 +160,7 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
     { label: "Phiên bản" },
   ];
 
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
 
   const reloadAll = () => { versions.reload(); detail.reload(); scenario.reload(); };
   const reloadVersion = () => { versions.reload(); detail.reload(); };

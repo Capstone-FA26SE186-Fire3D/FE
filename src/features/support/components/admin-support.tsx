@@ -10,6 +10,7 @@ import { AdminFeedbackTab } from "./admin-feedback-tab";
 import { AdminTicketsTab } from "./admin-tickets-tab";
 import { AuditLogTab } from "./audit-log-tab";
 import "@/assets/styles/ops-v2.css";
+import { LoadingBlock } from "@/components/ui/spinner";
 
 const TABS = ["tickets", "feedback", "audit"] as const;
 type TabKey = (typeof TABS)[number];
@@ -28,7 +29,7 @@ export function AdminSupport() {
   const tabParam = get("tab");
   const tab: TabKey = isTab(tabParam) ? tabParam : "tickets";
 
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (user?.role !== 0 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin có thể xem hộp thư hỗ trợ và nhật ký audit.</Alert>;
 
   const changeTab = (value: string) => {

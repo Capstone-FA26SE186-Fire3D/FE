@@ -18,6 +18,7 @@ import { AdminPoliciesTab } from "./admin-policies-tab";
 import { AdminRequestsTab } from "./admin-requests-tab";
 import { AdminSourcesTab } from "./admin-sources-tab";
 import "@/assets/styles/ops-v2.css";
+import { LoadingBlock } from "@/components/ui/spinner";
 
 const TABS = ["requests", "policies", "sources"] as const;
 type TabKey = (typeof TABS)[number];
@@ -47,7 +48,7 @@ export function AdminAi() {
   const requestsByStatus = usage.data?.aiUsage?.requests ?? null;
   const requestTotal = requestsByStatus ? Object.values(requestsByStatus).reduce((sum, value) => sum + value, 0) : null;
 
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (user?.role !== 0 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin quản trị yêu cầu AI, chính sách và nguồn tri thức.</Alert>;
 
   const clearTabParams = () => Object.fromEntries(TAB_PARAMS.map((key) => [key, null]));

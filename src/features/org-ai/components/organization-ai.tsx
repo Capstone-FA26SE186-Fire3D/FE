@@ -17,6 +17,7 @@ import { AiQuotaCard } from "./ai-side-rail";
 import { ApplyTargetDialog } from "./apply-target-dialog";
 import { HistoryTab } from "./history-tab";
 import { BILLING_AI_HREF } from "./request-view";
+import { LoadingBlock } from "@/components/ui/spinner";
 
 const TABS = ["history", "saved", "quota"] as const;
 type TabKey = (typeof TABS)[number];
@@ -38,7 +39,7 @@ export function OrganizationAi() {
   const tabParam = get("tab");
   const tab: TabKey = isTab(tabParam) ? tabParam : "history";
 
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (user?.role !== 1 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Hỏi đáp và đề xuất kịch bản bằng AI dành cho tài khoản tổ chức (OrganizationUser).</Alert>;
 
   const changeTab = (value: string) => {

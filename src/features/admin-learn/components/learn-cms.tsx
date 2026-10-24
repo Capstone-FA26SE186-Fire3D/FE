@@ -13,6 +13,7 @@ import { PostEditor } from "./post-editor";
 import { PostsTab } from "./posts-tab";
 import { SituationsTab } from "./situations-tab";
 import "./learn-quick.css";
+import { LoadingBlock } from "@/components/ui/spinner";
 
 const SECTIONS = ["posts", "situations"] as const;
 type Section = (typeof SECTIONS)[number];
@@ -34,7 +35,7 @@ export function LearnCms() {
   const sectionParam = get("section");
   const section: Section = isSection(sectionParam) ? sectionParam : "posts";
 
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (user?.role !== 0 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin có thể quản lý nội dung Learn.</Alert>;
 
   const closeEditor = () => setParams({ post: null, version: null, tab: null });
