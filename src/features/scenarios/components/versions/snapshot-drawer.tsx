@@ -1,7 +1,7 @@
 "use client";
 
 import { Camera, RefreshCw, ShieldCheck } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useIdempotencyKey } from "@/api";
 import { useAsyncData } from "@/api/use-async-data";
@@ -145,7 +145,22 @@ export function SnapshotDrawer({ open, onOpenChange, accessToken, scenarioId, in
     setValidation(null);
   };
 
+  // Opening the drawer (or picking another draft) loads that draft at once, so "Tạo snapshot" is usable without an extra
+  // "Tải draft" click. It runs once per draft id and re-arms when the drawer closes (a reopened drawer reads a fresh ETag).
+  const autoLoaded = useRef("");
+  useEffect(() => {
+    if (!open) { autoLoaded.current = ""; return; }
+    if (!trimmed || busy || autoLoaded.current === trimmed) return;
+    const timer = window.setTimeout(() => { autoLoaded.current = trimmed; void load(); }, 0);
+    return () => window.clearTimeout(timer);
+  });
+
   const precondition = error?.status === 412;
+  // Why the primary button is off, shown next to it instead of leaving a dimmed button unexplained.
+  const snapshotHint = busy === "load" ? "Đang tải bản nháp…"
+    : conflict ? "Chọn bản draft để dùng ở phần đối chiếu trước."
+    : !loaded ? (draftItems.length === 0 && drafts.data ? "Chưa có draft để tạo snapshot." : error ? "Chưa tải được bản nháp: bấm “Tải draft” để thử lại." : "Cần tải bản nháp trước.")
+    : "";
 
   return <Drawer
     open={open}
@@ -208,9 +223,10 @@ export function SnapshotDrawer({ open, onOpenChange, accessToken, scenarioId, in
 
       <p className="ver-note">Sau khi tạo, bạn sẽ chạy package build, kiểm tra kết quả kỹ thuật rồi gửi duyệt. Gửi lại cùng yêu cầu khi mạng lỗi sẽ không tạo thêm phiên bản (cùng Idempotency-Key).</p>
 
+      {snapshotHint && <p className="ver-note" role="status" id="snapshot-hint">{snapshotHint}</p>}
       <div className="ops-actions" style={{ justifyContent: "flex-end" }}>
         <Button variant="quiet" onClick={() => onOpenChange(false)} disabled={busy !== ""}>Hủy</Button>
-        <Button onClick={() => void snapshot()} disabled={!loaded || busy !== "" || Boolean(conflict)}><Camera size={16} aria-hidden="true" />{busy === "snapshot" ? "Đang tạo…" : "Tạo snapshot"}</Button>
+        <Button onClick={() => void snapshot()} disabled={!loaded || busy !== "" || Boolean(conflict)} aria-describedby={snapshotHint ? "snapshot-hint" : undefined}><Camera size={16} aria-hidden="true" />{busy === "snapshot" ? "Đang tạo…" : "Tạo snapshot"}</Button>
       </div>
     </div>
   </Drawer>;
