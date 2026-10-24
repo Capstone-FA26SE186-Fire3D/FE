@@ -3,6 +3,7 @@
 import { Check } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button, type ButtonProps } from "@/components/ui/button";
+import "./spinner.css";
 import { cn } from "@/utils/cn";
 
 /**

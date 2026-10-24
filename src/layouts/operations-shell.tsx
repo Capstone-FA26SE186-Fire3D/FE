@@ -86,7 +86,7 @@ function SidebarContent({ area, pathname, collapsed, onNavigate, onToggleCollaps
 }
 
 function AccessScreen({ title, message, action, busy }: { title: string; message: string; action: ReactNode; /** Waiting, not refusing: shows the brand spinner (Figma "Loading / Brand spinner") instead of plain text. */ busy?: boolean }) {
-  return <main className="ops-access"><div className="ops-panel ops-panel-body"><h1>{title}</h1>{busy ? <LoadingBlock label={message} /> : <p>{message}</p>}{action}</div></main>;
+  return <main className="ops-access" data-busy={busy || undefined}><div className="ops-panel ops-panel-body"><h1>{title}</h1>{busy ? <LoadingBlock label={message} /> : <p>{message}</p>}{action}</div></main>;
 }
 
 function Shell({ area, children }: { area: OperationsArea; children: ReactNode }) {

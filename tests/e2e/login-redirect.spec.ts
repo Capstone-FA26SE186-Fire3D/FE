@@ -9,6 +9,10 @@ test("signed in on /login: the page redirects; when the redirect never completes
   await page.route(/\/workspace(\/|$|\?)/, () => new Promise<void>(() => undefined));
   await page.goto("/login");
   await expect(page.getByText("Bạn đã đăng nhập. Đang chuyển hướng…")).toBeVisible();
+  // The wait shows the animated brand spinner, and its stylesheet is loaded on the login route.
+  const ring = page.locator(".auth-redirect .ops-spinner-ring");
+  await expect(ring).toBeVisible();
+  expect(await ring.evaluate((node) => getComputedStyle(node).animationName)).toContain("ops-spin");
   await expect(page.getByRole("link", { name: "Mở trang làm việc" })).toHaveCount(0);
   const link = page.getByRole("link", { name: "Mở trang làm việc" });
   await expect(link).toBeVisible({ timeout: 10_000 });

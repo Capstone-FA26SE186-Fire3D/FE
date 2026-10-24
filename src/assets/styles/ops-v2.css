@@ -253,15 +253,6 @@ kbd { display: inline-block; min-width: 18px; padding: 1px 5px; border: 1px soli
 .ops-kpi-spark { margin-top: 2px; width: 100%; }
 
 /* ───────── Loading: spinner, blocks, skeleton layouts, reveal ───────── */
-.ops-spinner { display: inline-grid; place-items: center; flex: none; }
-.ops-spinner svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.ops-spinner-track { fill: none; stroke: var(--line); stroke-width: 4; }
-.ops-spinner-ring { fill: none; stroke: var(--ember); stroke-width: 4; stroke-linecap: round; stroke-dasharray: 70 56; transform-origin: 50% 50%; animation: ops-spin 1.2s linear infinite; }
-.ops-spinner-spark { fill: var(--ember); animation: ops-spark 1.2s ease-in-out infinite; }
-@keyframes ops-spin { to { transform: rotate(360deg); } }
-@keyframes ops-spark { 0%, 100% { opacity: .15; transform: scale(.6); } 50% { opacity: 1; transform: scale(1); } }
-.ops-loading-block { display: grid; justify-items: center; gap: 12px; padding: 40px 16px; color: var(--muted); font-size: 13px; text-align: center; }
-.ops-loading-block p { margin: 0; }
 .ops-submit { position: relative; min-width: 120px; }
 .ops-submit[data-state="done"] { background: var(--success); color: var(--ember-foreground); }
 .ops-submit-check { animation: ops-pop-check 320ms cubic-bezier(.2,.8,.2,1); }
@@ -304,7 +295,6 @@ kbd { display: inline-block; min-width: 18px; padding: 1px 5px; border: 1px soli
 .ops-cv-auto { content-visibility: auto; contain-intrinsic-size: auto 400px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .ops-spinner-ring { animation: none; stroke-dasharray: 100 26; }
   .ops-popover, .ops-menu, .ops-tooltip, .ops-dialog, .ops-drawer, .ops-reveal, .ops-ranked-track > span, .ops-submit-check { animation: none !important; }
   .ops-dt-chevron, .ops-combobox-chevron, .ops-fbg-button { transition: none; }
 }

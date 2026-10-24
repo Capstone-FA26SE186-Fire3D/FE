@@ -347,6 +347,7 @@ select.ops-input { appearance: none; padding-right: 34px; background-image: line
 .ops-access { display: grid; place-items: center; min-height: 100dvh; padding: 24px; }
 .ops-access > .ops-panel { max-width: 460px; width: 100%; }
 .ops-access h1 { margin: 0 0 10px; font-size: 24px; font-weight: 600; }
+.ops-access[data-busy] h1 { text-align: center; }
 .ops-access p { margin: 0 0 20px; color: var(--muted); line-height: 1.6; }
 
 /* Legacy admin/workspace screens rendered inside the shell */
