@@ -168,7 +168,7 @@ async function setup(page: Page, mock: Mock, role = 1) {
     if (url.includes("/qa")) return route.fulfill({ json: { jobId, currentAttemptId: "att-1", validationRuns: { items: mock.qa.runs, totalCount: mock.qa.runs.length, page: 1, pageSize: 20 } } });
     const status = mock.jobSequence[Math.min(mock.jobPolls, mock.jobSequence.length - 1)];
     mock.jobPolls += 1;
-    return route.fulfill({ json: { job: job(status, jobId), inputHash: "c".repeat(64), currentAttemptId: "att-1", currentAttempt: { id: "att-1", attemptNumber: 1, status, toolchainVersion: "tc-1", startedAt: "2026-10-10T02:01:00Z", finishedAt: status === "Succeeded" || status === "Failed" ? "2026-10-10T02:05:00Z" : null, outputHash: null } } });
+    return route.fulfill({ json: { job: job(status, jobId), inputHash: "c".repeat(64), currentAttemptId: status === "Queued" ? null : "att-1", currentAttempt: status === "Queued" ? null : { id: "att-1", attemptNumber: 1, status, toolchainVersion: "tc-1", startedAt: "2026-10-10T02:01:00Z", finishedAt: status === "Succeeded" || status === "Failed" ? "2026-10-10T02:05:00Z" : null, outputHash: null } } });
   });
   await page.route("**/api/processing-jobs/*/retry", (route) => {
     const body = route.request().postDataJSON() as { requestId: string };
@@ -306,6 +306,55 @@ test.describe("package build and technical readiness", () => {
     await expect(page.getByRole("button", { name: "Xác nhận kỹ thuật" })).toBeDisabled();
     await expect(page.getByTestId("readiness-missing")).toContainText("PACKAGE_VALIDATION_REQUIRED");
     expect(mock.jobPolls).toBeGreaterThanOrEqual(3);
+  });
+
+  test("while a job is queued the build form is hidden; the watched job is a label, not a button that does nothing", async ({ page }) => {
+    const mock = newMock({ jobSequence: ["Queued"], jobList: [job("Queued")] });
+    await setup(page, mock);
+    await page.goto(`${base}?tab=build`);
+    await expect(page.getByRole("status").filter({ hasText: "Đang dựng Release package: Đang chờ" })).toBeVisible();
+    // No second build can be started while one is queued or running (the BE runs one job per revision at a time).
+    await expect(page.getByRole("button", { name: "Chạy package build" })).toHaveCount(0);
+    await expect(page.getByLabel("Loại package")).toHaveCount(0);
+    // The job being watched says so; it is not a button that does nothing.
+    await expect(page.getByRole("button", { name: "Đang xem" })).toHaveCount(0);
+    await expect(page.getByRole("table", { name: "Job package build" }).getByText("Đang xem")).toBeVisible();
+    // Queued for ages with no worker: the page says where to look.
+    await expect(page.getByRole("status").filter({ hasText: "Chưa có worker nhận job" })).toBeVisible();
+  });
+
+  test("a succeeded Release build hides its form; only the other package kind stays available", async ({ page }) => {
+    const mock = newMock({ jobList: [job("Succeeded")] });
+    await setup(page, mock);
+    await page.goto(`${base}?tab=build`);
+    await expect(page.getByRole("status").filter({ hasText: "Release package đã dựng xong" })).toBeVisible();
+    await expect(page.getByLabel("Loại package")).toHaveValue("PlaytestPackage");
+    await expect(page.getByLabel("Loại package").getByRole("option")).toHaveCount(1);
+  });
+
+  test("a failed Release build offers the failed job and \"Chạy lại job\", not a new build of the same input", async ({ page }) => {
+    const mock = newMock({ jobSequence: ["Failed"], jobList: [job("Failed")] });
+    await setup(page, mock);
+    await page.goto(`${base}?tab=build`);
+    await expect(page.getByRole("alert").filter({ hasText: "Release package dựng thất bại" })).toBeVisible();
+    await expect(page.getByLabel("Loại package")).toHaveValue("PlaytestPackage");
+    await page.getByRole("button", { name: "Xem job thất bại" }).click();
+    await expect(page.locator("#ver-job-monitor")).toBeInViewport();
+    await expect(page.getByRole("button", { name: "Chạy lại job" })).toBeVisible();
+  });
+
+  test("journey buttons bring the work into view instead of looking dead", async ({ page }) => {
+    const mock = newMock({ jobSequence: ["Queued"], jobList: [job("Queued")] });
+    await setup(page, mock);
+    await page.setViewportSize({ width: 1280, height: 600 });
+    await page.goto(`${base}?tab=build`);
+    const journey = page.getByTestId("journey");
+    await journey.getByRole("button", { name: "Theo dõi job" }).click();
+    await expect(page.locator("#ver-job-monitor")).toBeInViewport();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await journey.getByRole("button", { name: "Mở tab Playtest" }).click();
+    await expect(page).toHaveURL(/tab=playtest/);
+    await expect(page.getByRole("heading", { name: "Playtest trên Mobile" })).toBeInViewport();
   });
 
   test("failed package build retries with the same Idempotency-Key", async ({ page }) => {

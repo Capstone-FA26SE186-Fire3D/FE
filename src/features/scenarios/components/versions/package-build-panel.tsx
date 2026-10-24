@@ -1,7 +1,7 @@
 "use client";
 
 import { Hammer, RefreshCw, RotateCcw } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { useIdempotencyKey } from "@/api";
 import { Alert } from "@/components/ui/alert";
@@ -28,6 +28,20 @@ const kindLabel: Record<string, string> = { ReleasePackage: "Release package", P
  * default Android): any other target answers 400 BUILD_TARGET_UNSUPPORTED or is never leased. Add targets here when the BE serves them.
  */
 const BUILD_TARGETS = ["Android"] as const;
+const PACKAGE_KINDS: PackageKind[] = ["ReleasePackage", "PlaytestPackage"];
+/** A queued job with no worker attempt for this long most likely means the build machine is off. */
+const WORKER_WAIT_MS = 10 * 60 * 1000;
+
+/** Scrolls to a section that may only mount after a tab switch (a few short retries), then moves focus there. */
+export function scrollToSection(id: string, attempt = 0) {
+  const element = document.getElementById(id);
+  if (!element) {
+    if (attempt < 20) window.setTimeout(() => scrollToSection(id, attempt + 1), 60);
+    return;
+  }
+  element.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  element.focus({ preventScroll: true });
+}
 
 export function jobTone(status: string | undefined): Tone {
   switch (status?.toLowerCase()) {
@@ -76,16 +90,40 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
   const target = buildTarget.trim();
   const targetError = !target ? "Nhập nền tảng dựng (build target)." : target.length > 100 ? "Tối đa 100 ký tự." : undefined;
 
+  // The build form is only offered while it can do something. The BE runs one job per revision at a time and answers the
+  // same build input with its existing job, so a second click while a job is queued/running, or after it succeeded, would
+  // only queue work behind it (or return the same job). The form therefore hides in those cases, and a failed job offers
+  // "Chạy lại job" instead of a new build.
+  const [startedKind, setStartedKind] = useState<PackageKind | null>(null);
+  // Clock for "has this job waited too long for a worker"; ticking keeps the hint appearing without a reload.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const ordered = [...jobs.jobs].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const jobsOfKind = (value: PackageKind) => ordered.filter((job) => job.kind === value);
+  const activeJob = ordered.find((job) => !isJobTerminal(job.status));
+  const builtKinds = PACKAGE_KINDS.filter((value) => jobsOfKind(value).some((job) => isJobSucceeded(job.status)));
+  const failedKinds = PACKAGE_KINDS.filter((value) => !builtKinds.includes(value) && jobsOfKind(value)[0]?.status.toLowerCase() === "failed");
+  // Just accepted (202) but not in the list yet: treat it as running so the form does not flash back.
+  const justStarted = startedKind !== null && jobsOfKind(startedKind).length === 0;
+  const startable = PACKAGE_KINDS.filter((value) => !builtKinds.includes(value) && !failedKinds.includes(value) && !(justStarted && value === startedKind));
+  const kindNow: PackageKind = startable.includes(kind) ? kind : startable[0] ?? kind;
+  const jobsKnown = !jobs.jobsLoading || jobs.jobs.length > 0 || jobs.jobsError !== undefined;
+  const showForm = jobsKnown && !activeJob && !justStarted && startable.length > 0;
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (busy || targetError || !canAct) return;
     setBusy(true);
     setError(null);
     try {
-      const payload = { kind, buildTarget: target };
+      const payload = { kind: kindNow, buildTarget: target };
       const accepted = await scenarioVersionsApi.startPackageBuild(accessToken, version.id, payload, buildKey.keyFor({ versionId: version.id, ...payload }));
       buildKey.done();
       toast.notify({ tone: "info", title: "Đã xếp hàng package build", description: "202 chỉ xác nhận job đã được nhận, chưa phải kết quả." });
+      setStartedKind(kindNow);
       jobs.reloadJobs();
       onStarted(accepted.jobId);
     } catch (cause) {
@@ -124,12 +162,25 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
 
   return <div className="ops-stack">
     <Panel title="Chạy package build" description="Dựng gói Unity từ snapshot đã đóng băng. Cần revision IFC đã xác minh upload." bodyClassName="ops-stack">
-      <form className="ops-stack" onSubmit={submit} noValidate>
+      {!jobsKnown && <SkeletonRows rows={2} label="Đang kiểm tra job đang chạy…" />}
+
+      {(activeJob || justStarted) && <Alert tone="info" title={`Đang dựng ${kindLabel[activeJob?.kind ?? startedKind ?? ""] ?? "package"}: ${activeJob ? jobStatusText(activeJob.status) : "Đang chờ"}`} action={activeJob ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => { jobs.selectJob(activeJob.id); scrollToSection("ver-job-monitor"); }}>Xem job</Button> : undefined}>
+        Mỗi revision chỉ chạy một job tại một thời điểm nên nút chạy build ẩn cho tới khi job kết thúc. Job thất bại sẽ có nút chạy lại.
+      </Alert>}
+
+      {!activeJob && !justStarted && builtKinds.length > 0 && <Alert tone="success" title={`${builtKinds.map((value) => kindLabel[value]).join(" và ")} đã dựng xong`}>
+        Mỗi phiên bản chỉ cần một package cho mỗi loại. Job Succeeded chưa phải QA Passed: xem tab &quot;Kết quả kỹ thuật&quot;. Muốn dựng lại từ nội dung khác, hãy tạo phiên bản mới.
+      </Alert>}
+
+      {!activeJob && !justStarted && failedKinds.length > 0 && <Alert tone="danger" title={`${failedKinds.map((value) => kindLabel[value]).join(" và ")} dựng thất bại`} action={canAct ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => { const job = jobsOfKind(failedKinds[0])[0]; jobs.selectJob(job.id); scrollToSection("ver-job-monitor"); }}>Xem job thất bại</Button> : undefined}>
+        Chạy lại dùng job cũ với đầu vào cũ: mở job thất bại và bấm &quot;Chạy lại job&quot; kèm lý do.
+      </Alert>}
+
+      {showForm && <form className="ops-stack" onSubmit={submit} noValidate>
         <div className="ops-form-grid">
-          <Field label="Loại package" required hint={kind === "ReleasePackage" ? "Dùng để tạo release." : "Chạy thử, không dùng để phát hành."}>
-            {(p) => <Select {...p} value={kind} onChange={(event) => setKind(event.target.value as PackageKind)}>
-              <option value="ReleasePackage">Release package</option>
-              <option value="PlaytestPackage">Playtest package</option>
+          <Field label="Loại package" required hint={kindNow === "ReleasePackage" ? "Dùng để tạo release." : "Chạy thử, không dùng để phát hành."}>
+            {(p) => <Select {...p} value={kindNow} onChange={(event) => setKind(event.target.value as PackageKind)}>
+              {startable.map((value) => <option key={value} value={value}>{kindLabel[value]}</option>)}
             </Select>}
           </Field>
           <Field label="Nền tảng dựng" required error={targetError} hint="Chỉ hỗ trợ Android: gói chạy trong ứng dụng Android.">
@@ -147,7 +198,7 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
           <Button type="submit" disabled={busy || Boolean(targetError) || !canAct}><Hammer size={16} aria-hidden="true" />{busy ? "Đang gửi…" : "Chạy package build"}</Button>
           {!canAct && <span className="ver-note">Tài khoản của bạn chỉ có quyền xem.</span>}
         </div>
-      </form>
+      </form>}
       <p className="ver-note">Phản hồi 202 chỉ nghĩa là job đã vào hàng đợi. Job Succeeded cũng chưa phải QA Passed: xem tab &quot;Kết quả kỹ thuật&quot;.</p>
     </Panel>
 
@@ -166,7 +217,9 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
             <td className="ops-cell-primary">{kindLabel[job.kind] ?? job.kind}</td>
             <td><StatusBadge tone={jobTone(job.status)}>{jobStatusText(job.status)}</StatusBadge></td>
             <td>{formatDateTime(job.createdAt)}</td>
-            <td className="ops-cell-actions"><Button size="sm" variant="quiet" aria-pressed={job.id === jobs.selectedJobId} onClick={() => jobs.selectJob(job.id)}>{job.id === jobs.selectedJobId ? "Đang xem" : "Theo dõi"}</Button></td>
+            <td className="ops-cell-actions">{job.id === jobs.selectedJobId
+              ? <StatusBadge tone="info">Đang xem</StatusBadge>
+              : <Button size="sm" variant="quiet" onClick={() => { jobs.selectJob(job.id); scrollToSection("ver-job-monitor"); }}>Theo dõi</Button>}</td>
           </tr>)}
           {!jobs.jobsLoading && jobs.jobsError === undefined && jobs.jobs.length === 0 && <TableMessage colSpan={4}><EmptyState icon={Hammer} title="Chưa có job package build" description="Chạy package build ở trên để có kết quả kỹ thuật cho phiên bản này." /></TableMessage>}
         </tbody>
@@ -174,6 +227,8 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
     </Panel>
 
     {jobs.selectedJobId && <Panel
+      id="ver-job-monitor"
+      tabIndex={-1}
       title="Theo dõi job"
       description={jobs.watching ? "Đang cập nhật mỗi 3 giây; tự giãn khi lỗi và dừng khi job kết thúc." : "Đã dừng theo dõi vì job đã kết thúc."}
       actions={<Button size="sm" variant="quiet" onClick={jobs.refresh}><RefreshCw size={14} aria-hidden="true" />Làm mới</Button>}
@@ -198,6 +253,9 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
           <dt>Output hash</dt><dd className="ver-hash">{shortHash(attempt?.outputHash, 20)}</dd>
         </dl>
         {!isJobTerminal(detail.job.status) && <Alert tone="info" title="Đang chờ kết quả">Chưa có kết quả QA. Trang sẽ tự cập nhật khi job kết thúc.</Alert>}
+        {detail.job.status.toLowerCase() === "queued" && !attempt && now - Date.parse(detail.job.createdAt) > WORKER_WAIT_MS && <Alert tone="warning" title="Chưa có worker nhận job">
+          Job đã chờ hơn {Math.round(WORKER_WAIT_MS / 60000)} phút mà chưa có máy dựng nào nhận. Máy dựng Unity (worker) có thể đang tắt: bật máy rồi trang sẽ tự cập nhật.
+        </Alert>}
         {isJobSucceeded(detail.job.status) && <Alert tone="warning" title="Job Succeeded chưa phải QA Passed">Hãy mở tab &quot;Kết quả kỹ thuật&quot; để xem validation run và issue Error/Critical trước khi tiếp tục.</Alert>}
         {failedJob && <Alert tone="danger" title="Job thất bại" action={canAct ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => { setRetryError(null); setRetrying(true); }}><RotateCcw size={14} aria-hidden="true" />Chạy lại job</Button> : undefined}>
           BE không trả log lỗi chi tiết. Chạy lại tạo một lần thử mới cho job này; mỗi lần cần một lý do.

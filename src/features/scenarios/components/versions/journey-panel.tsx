@@ -24,7 +24,8 @@ function Mark({ state }: { state: JourneyStep["state"] }) {
 export function JourneyPanel({ input, editorHref, onTab, onSnapshot, canAct }: {
   input: JourneyInput;
   editorHref: string;
-  onTab: (tab: "build" | "readiness" | "review" | "release" | "playtest") => void;
+  /** `focus: "monitor"` asks the page to bring the live job panel into view (the journey card sits far above it). */
+  onTab: (tab: "build" | "readiness" | "review" | "release" | "playtest", focus?: "monitor") => void;
   onSnapshot: () => void;
   canAct: boolean;
 }) {
@@ -37,7 +38,7 @@ export function JourneyPanel({ input, editorHref, onTab, onSnapshot, canAct }: {
     if (item.target.kind === "editor") return <Button asChild size="sm" variant={variant}><Link href={editorHref}>{item.actionLabel}</Link></Button>;
     if (item.target.kind === "snapshot") return <Button size="sm" variant={variant} onClick={onSnapshot} disabled={!canAct}>{item.actionLabel}</Button>;
     const tab = item.target.tab;
-    return <Button size="sm" variant={variant} onClick={() => onTab(tab)}>{item.actionLabel}</Button>;
+    return <Button size="sm" variant={variant} onClick={() => onTab(tab, item.id === "package" && item.state === "active" ? "monitor" : undefined)}>{item.actionLabel}</Button>;
   };
 
   return <section className="ver-journey" aria-labelledby="ver-journey-title" data-testid="journey">

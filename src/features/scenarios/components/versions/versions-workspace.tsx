@@ -27,7 +27,7 @@ import type { ScenarioDetail, ScenarioVersionDetail } from "../../version-types"
 import { scenarioVersionsApi } from "../../versions-api";
 import { GateStepper } from "./gate-stepper";
 import { JourneyPanel } from "./journey-panel";
-import { PackageBuildPanel } from "./package-build-panel";
+import { PackageBuildPanel, scrollToSection } from "./package-build-panel";
 import { ReadinessPanel } from "./readiness-panel";
 import { ReleasePanel } from "./release-panel";
 import { ReviewPanel } from "./review-panel";
@@ -72,6 +72,11 @@ function Workbench({ accessToken, buildingId, scenario, versionCount, editorHref
   const jobs = useVersionJobs({ accessToken, revisionId: version.revisionId, versionId: version.id, preferredJobId: readiness?.packageJob?.jobId });
   const playtestPackage = usePlaytestPackage({ accessToken, revisionId: version.revisionId, versionId: version.id });
   const refreshAll = () => { server.refresh(); onVersionChanged(); };
+  // The journey card sits above the tabs: after switching (or when already on the right tab) bring the work into view.
+  const goToTab = (next: TabId, focus?: "monitor") => {
+    onTab(next);
+    scrollToSection(focus === "monitor" && jobs.selectedJobId ? "ver-job-monitor" : "ver-workbench");
+  };
 
   const technical = technicalGate({ job: jobs.detail, verdict: jobs.verdict, readiness, hasJobs: jobs.jobs.length > 0 || Boolean(readiness?.packageJob) });
 
@@ -89,7 +94,7 @@ function Workbench({ accessToken, buildingId, scenario, versionCount, editorHref
 
   return <>
     <Alert tone="info" title={`Phiên bản v${version.versionNumber} là bản chụp bất biến: chỉ đọc`}>Hash nội dung <span className="ver-hash">#{shortHash(version.scenarioHash, 12)}</span> được ghim khi tạo phiên bản. Muốn sửa, hãy sửa bản nháp rồi tạo phiên bản mới; v{version.versionNumber} giữ nguyên để đối chiếu.</Alert>
-    <JourneyPanel input={journey} editorHref={editorHref} onTab={onTab} onSnapshot={onSnapshot} canAct={canAct} />
+    <JourneyPanel input={journey} editorHref={editorHref} onTab={goToTab} onSnapshot={onSnapshot} canAct={canAct} />
     {server.readiness.error !== undefined && !readiness && <Alert tone="danger" title="Không đọc được readiness từ máy chủ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={server.readiness.reload}>Thử lại</Button>}>{describeError(server.readiness.error).message} Các cổng bên dưới chỉ phản ánh phần đã tải được.</Alert>}
     <section className="org-card org-gates-card" aria-labelledby="ver-gates-title">
       <h2 id="ver-gates-title" className="org-card-title">Chuẩn bị phát hành v{version.versionNumber}</h2>
@@ -99,6 +104,7 @@ function Workbench({ accessToken, buildingId, scenario, versionCount, editorHref
         { id: "release", title: "Release", state: releaseGate(server.releaseView.release) },
       ]} />
     </section>
+    <div id="ver-workbench" tabIndex={-1} style={{ outline: "none", scrollMarginTop: 72 }}>
     <Tabs value={tab} onValueChange={(value) => onTab(value as TabId)}>
       <TabsList aria-label="Các bước của phiên bản">
         {TABS.map((id) => <TabsTrigger key={id} value={id}>{tabLabels[id]}</TabsTrigger>)}
@@ -128,6 +134,7 @@ function Workbench({ accessToken, buildingId, scenario, versionCount, editorHref
         <ReleasePanel accessToken={accessToken} buildingId={buildingId} version={version} readiness={server.readiness} view={server.releaseView} noteRelease={server.noteRelease} canAct={canAct} />
       </TabsContent>
     </Tabs>
+    </div>
   </>;
 }
 
