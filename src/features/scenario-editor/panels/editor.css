@@ -217,3 +217,33 @@
 .se-float-sep-h { width: 22px; height: 1px; margin: 4px 0; }
 @media (max-width: 767px), (pointer: coarse) { .se-float-btn { width: 44px; height: 44px; } .se-float-rail { top: 74px; } }
 @media (max-width: 767px) { .se-stage { flex: none; } }
+
+/* ───────── Figma v3 editor: one top bar, floating tool group and "thêm đối tượng" bar on the viewport ───────── */
+.se-topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.se-title { display: grid; gap: 2px; flex: 1 1 220px; min-width: 0; }
+.se-title h1 { margin: 0; font-size: 17px; font-weight: 600; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.se-title p { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; color: var(--muted); font-size: 12.5px; }
+.se-title .ops-badge { min-height: 20px; padding: 0 8px; font-size: 11px; }
+.se-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.se-actions .ops-badge { min-height: 28px; }
+.se-topbar > a, .se-actions > :is(button, a) { min-height: 40px; font-size: 13px; }
+.se-stage { container-type: inline-size; }
+.se-float-tools { top: 12px; left: 12px; border-radius: 14px; padding: 4px; gap: 4px; }
+.se-float-group { display: flex; gap: 2px; }
+.se-float-tool, .se-float-kind { display: inline-flex; flex: none; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; transition: background-color 120ms ease, color 120ms ease; }
+.se-float-tool:hover, .se-float-kind:hover:not(:disabled) { background: var(--hover); color: var(--text); }
+.se-float-tool[aria-pressed="true"] { background: var(--ember-soft); color: var(--ember); }
+.se-float-tool:focus-visible, .se-float-kind:focus-visible { outline: 2px solid var(--ember); outline-offset: 1px; }
+.se-float-place { left: 12px; right: 12px; bottom: 14px; width: fit-content; max-width: calc(100% - 24px); margin: 0 auto; flex-wrap: wrap; justify-content: center; border-radius: 16px; padding: 6px; gap: 6px; }
+.se-float-kind { color: var(--kind-fg, var(--text)); background: var(--kind-bg, var(--hover)); }
+.se-float-kind[data-tone="info"] { --kind-bg: var(--info-soft); --kind-fg: var(--info); }
+.se-float-kind[data-tone="danger"] { --kind-bg: var(--danger-soft); --kind-fg: var(--danger); }
+.se-float-kind[data-tone="success"] { --kind-bg: var(--success-soft); --kind-fg: var(--success); }
+.se-float-kind[data-tone="ember"] { --kind-bg: var(--ember-soft); --kind-fg: var(--ember); }
+.se-float-kind[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--kind-fg, var(--ember)); }
+.se-float-kind:disabled { opacity: .45; cursor: not-allowed; }
+.se-float-tools .se-tree-toggle { display: none; }
+@media (max-width: 1099px) and (min-width: 768px) { .se-float-tools .se-tree-toggle { display: inline-grid; } }
+/* Narrow viewport: icons only (labels stay as aria-label/title). */
+@container (max-width: 760px) { .se-float-kind span, .se-float-tool span { display: none; } .se-float-kind, .se-float-tool { padding: 0 10px; } }
+@media (max-width: 767px), (pointer: coarse) { .se-float-tool, .se-float-kind { min-height: 44px; } }

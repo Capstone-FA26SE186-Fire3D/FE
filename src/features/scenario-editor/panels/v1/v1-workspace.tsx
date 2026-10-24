@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronLeft } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -47,7 +48,7 @@ import { V1LibraryPanel, initialLibraryUi, type AppliedSample, type LibraryUi } 
 import { V1ObjectForm } from "./v1-object-form";
 import { V1ScenarioForm } from "./v1-scenario-form";
 import { SelectionBar, ViewportPill, ViewportRail } from "../../scene/viewport-controls";
-import { V1Toolbar } from "./v1-toolbar";
+import { V1Actions, V1PlaceFloat, V1ToolFloat } from "./v1-toolbar";
 import { V1Tree } from "./v1-tree";
 
 const EditorViewport = dynamic(() => import("../../scene/editor-viewport"), {
@@ -285,14 +286,15 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const viewportTool = state.tool;
 
   return <div className="se-root" data-mobile-tab={mobileTab} data-testid="scenario-editor" data-draft-mode="v1">
-    <header className="se-header">
-      <Breadcrumbs items={[{ label: "Công trình", href: routes.workspaceBuildings }, { label: "Chi tiết", href: `${routes.workspaceBuildings}/${buildingId}` }, { label: "Kịch bản", href: listHref }, { label: `Bản nháp #${meta.draftNumber}` }]} />
-      <h1>{readString(state.draft, "name") || scenario.data?.name || "Soạn kịch bản"} <StatusBadge tone="info" data-testid="schema-badge">fet3d.editor/1</StatusBadge></h1>
+    <Breadcrumbs items={[{ label: "Công trình", href: routes.workspaceBuildings }, { label: "Chi tiết", href: `${routes.workspaceBuildings}/${buildingId}` }, { label: "Kịch bản", href: listHref }, { label: `Bản nháp #${meta.draftNumber}` }]} />
+    <header className="se-header se-topbar">
+      <Button asChild variant="secondary" size="sm"><Link href={listHref} aria-label="Về danh sách kịch bản"><ChevronLeft size={16} aria-hidden="true" />Kịch bản</Link></Button>
+      <div className="se-title">
+        <h1>{readString(state.draft, "name") || scenario.data?.name || "Soạn kịch bản"}</h1>
+        <p>Bản nháp #{meta.draftNumber} · <StatusBadge tone="info" data-testid="schema-badge">fet3d.editor/1</StatusBadge>{activeFloorV1 ? <> · {activeFloorV1.name}</> : null}</p>
+      </div>
+      <V1Actions status={status} saveBlockedReason={saveBlockedReason} onSave={() => void onSave()} onValidate={() => void onValidate()} validating={editor.validating} versionsHref={versionsHref} />
     </header>
-
-    <V1Toolbar tool={state.tool} placeKind={state.placeKind} onTool={(tool, kind) => dispatch({ type: "tool", tool, placeKind: kind })} gizmoEnabled={gizmoEnabled}
-      status={status} saveBlockedReason={saveBlockedReason} onSave={() => void onSave()} onValidate={() => void onValidate()} validating={editor.validating}
-      versionsHref={versionsHref} onOpenTree={() => setTreeOpen(true)} hasTree={!isDesktop && !isMobile} kindStatus={kindStatus} placeDisabledReason={placeDisabledReason} />
 
     {(previewBanner || saveBanner || pinBanner) && <div className="se-banners">{saveBanner}{pinBanner}{previewBanner}</div>}
 
@@ -310,6 +312,8 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
           model={model} floors={sceneFloors} activeFloor={activeFloor} showModel={modelVisible} layerVisibility={layerVisibility}
           onSelect={(ref) => selectObject(ref && ref.kind === "object" ? ref.index : null)} onPlace={(kind, point) => placeAt(kind as ObjectKind, point)}
           onTransform={onTransform} onModelPick={setPick} onModelStatus={setModelStatus} onUrlExpired={preview.refresh} onSelectionScreen={setSelectionScreen} />
+        <V1ToolFloat tool={state.tool} onTool={(tool) => dispatch({ type: "tool", tool })} gizmoEnabled={gizmoEnabled} onOpenTree={() => setTreeOpen(true)} hasTree={!isDesktop && !isMobile} />
+        <V1PlaceFloat tool={state.tool} placeKind={state.placeKind} onPlace={(kind) => dispatch({ type: "tool", tool: "place", placeKind: kind })} kindStatus={kindStatus} placeDisabledReason={placeDisabledReason} />
         <ViewportPill canUndo={state.history.past.length > 0} canRedo={state.history.future.length > 0} undoLabel={lastPast?.label} redoLabel={nextFuture?.label}
           onUndo={() => dispatch({ type: "undo" })} onRedo={() => dispatch({ type: "redo" })} onValidate={() => void onValidate()} validating={editor.validating} />
         <ViewportRail canFit={modelStatus.phase === "loaded"} hasModel={modelStatus.phase === "loaded"} locked={viewLocked} modelVisible={modelVisible}

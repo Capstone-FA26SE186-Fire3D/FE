@@ -97,6 +97,27 @@ export function ReadinessPanel({ accessToken, version, jobs, readiness, canAct, 
   }
 
   return <div className="ops-stack">
+    <div className="ver-split">
+      <div className="ops-stack">
+    <Panel title="Lịch sử QA theo revision" description="Mọi validation run của revision, mới nhất trước." bodyClassName="ops-stack">
+      {history.error !== undefined && <Alert tone="danger" title="Không tải được lịch sử QA" action={<Button size="sm" variant="secondary" className="mt-3" onClick={history.reload}>Thử lại</Button>}>{describeError(history.error).message}</Alert>}
+      {history.loading && !history.data && <p className="ver-note" role="status">Đang tải lịch sử QA…</p>}
+      {history.data && history.data.items.length === 0 && <p className="ver-note">Revision chưa có validation run nào.</p>}
+      {history.data && history.data.items.length > 0 && <Table caption="Lịch sử validation run">
+        <thead><tr><th>Run</th><th>Loại job</th><th>Kết quả</th><th>Hiện hành</th><th>Tạo lúc</th></tr></thead>
+        <tbody>{history.data.items.map((item) => <tr key={item.id}>
+          <td className="ver-hash">{shortHash(item.id, 13)}</td>
+          <td>{item.jobKind}</td>
+          <td><StatusBadge tone={item.outcome.toLowerCase() === "passed" ? "success" : "danger"}>{item.outcome}</StatusBadge></td>
+          <td>{item.isCurrent ? "Có" : "Lịch sử"}</td>
+          <td>{formatDateTime(item.createdAt)}</td>
+        </tr>)}</tbody>
+      </Table>}
+      {history.data && history.data.totalCount > history.data.items.length && <p className="ver-note">Hiển thị {history.data.items.length}/{history.data.totalCount} run mới nhất.</p>}
+    </Panel>
+
+      </div>
+      <div className="ops-stack">
     <Panel
       title="Job và QA của validation run"
       description="Kết quả kỹ thuật gắn với revision IFC của phiên bản. Không thay thế duyệt nội dung."
@@ -128,6 +149,17 @@ export function ReadinessPanel({ accessToken, version, jobs, readiness, canAct, 
       </Table>}
     </Panel>
 
+    {run && <Panel title="Issue theo mức độ" description="Chỉ tính issue của validation run đang xét. Error và Critical chặn xác nhận kỹ thuật và release." bodyClassName="ops-stack">
+      <div className="ver-actions-row" aria-label="Số issue theo mức độ">
+        {counts.map(({ severity, count }) => <StatusBadge key={severity} tone={count ? severityTone[severity.toLowerCase()] : "neutral"}>{severityLabel[severity.toLowerCase()]}: {count}</StatusBadge>)}
+      </div>
+      {issuesTruncated && <Alert tone="warning" title="Danh sách issue bị cắt">Chỉ hiển thị {jobs.issues?.items.length} trên {jobs.issues?.totalCount} issue của revision. Kết luận cuối cùng do BE quyết định khi xác nhận.</Alert>}
+      {runIssues.length ? <IssueTable issues={runIssues} /> : <p className="ver-note">Validation run này không có issue.</p>}
+    </Panel>}
+
+      </div>
+    </div>
+    <div className="ver-two">
     <Panel title="Điều kiện còn thiếu (máy chủ báo)" description="Chỉ báo cáo; xác nhận kỹ thuật, tạo release và phát hành đều kiểm tra lại từng điều kiện." bodyClassName="ops-stack">
       {readiness.loading && !state && <p className="ver-note" role="status">Đang tải readiness…</p>}
       {readiness.error !== undefined && !state && <Alert tone="danger" title="Không tải được readiness" action={<Button size="sm" variant="secondary" className="mt-3" onClick={readiness.reload}>Thử lại</Button>}>{describeError(readiness.error).message}</Alert>}
@@ -150,32 +182,7 @@ export function ReadinessPanel({ accessToken, version, jobs, readiness, canAct, 
       </>}
     </Panel>
 
-    {run && <Panel title="Issue theo mức độ" description="Chỉ tính issue của validation run đang xét. Error và Critical chặn xác nhận kỹ thuật và release." bodyClassName="ops-stack">
-      <div className="ver-actions-row" aria-label="Số issue theo mức độ">
-        {counts.map(({ severity, count }) => <StatusBadge key={severity} tone={count ? severityTone[severity.toLowerCase()] : "neutral"}>{severityLabel[severity.toLowerCase()]}: {count}</StatusBadge>)}
-      </div>
-      {issuesTruncated && <Alert tone="warning" title="Danh sách issue bị cắt">Chỉ hiển thị {jobs.issues?.items.length} trên {jobs.issues?.totalCount} issue của revision. Kết luận cuối cùng do BE quyết định khi xác nhận.</Alert>}
-      {runIssues.length ? <IssueTable issues={runIssues} /> : <p className="ver-note">Validation run này không có issue.</p>}
-    </Panel>}
-
-    <Panel title="Lịch sử QA của revision" description="Mọi validation run của revision, mới nhất trước; kể cả job và lần thử cũ." bodyClassName="ops-stack">
-      {history.error !== undefined && <Alert tone="danger" title="Không tải được lịch sử QA" action={<Button size="sm" variant="secondary" className="mt-3" onClick={history.reload}>Thử lại</Button>}>{describeError(history.error).message}</Alert>}
-      {history.loading && !history.data && <p className="ver-note" role="status">Đang tải lịch sử QA…</p>}
-      {history.data && history.data.items.length === 0 && <p className="ver-note">Revision chưa có validation run nào.</p>}
-      {history.data && history.data.items.length > 0 && <Table caption="Lịch sử validation run">
-        <thead><tr><th>Run</th><th>Loại job</th><th>Kết quả</th><th>Hiện hành</th><th>Tạo lúc</th></tr></thead>
-        <tbody>{history.data.items.map((item) => <tr key={item.id}>
-          <td className="ver-hash">{shortHash(item.id, 13)}</td>
-          <td>{item.jobKind}</td>
-          <td><StatusBadge tone={item.outcome.toLowerCase() === "passed" ? "success" : "danger"}>{item.outcome}</StatusBadge></td>
-          <td>{item.isCurrent ? "Có" : "Lịch sử"}</td>
-          <td>{formatDateTime(item.createdAt)}</td>
-        </tr>)}</tbody>
-      </Table>}
-      {history.data && history.data.totalCount > history.data.items.length && <p className="ver-note">Hiển thị {history.data.items.length}/{history.data.totalCount} run mới nhất.</p>}
-    </Panel>
-
-    <Panel title="Xác nhận kỹ thuật (confirm-for-training)" description="Ghi nhận rằng đúng revision, version, validation run và artifact đã đạt QA. Không phải duyệt nội dung." bodyClassName="ops-stack">
+    <Panel title="Xác nhận sẵn sàng đào tạo" description="Gắn đúng phiên bản, package và validation run đã đạt QA. Không phải duyệt nội dung." bodyClassName="ops-stack">
       {confirmedId && <Alert tone="success" title="Đã xác nhận kỹ thuật">
         Mã xác nhận: <span className="ver-hash" data-testid="confirm-review-id">{confirmedId}</span>. Máy chủ giữ mã này; tab Release tự dùng khi tạo release.
       </Alert>}
@@ -196,5 +203,6 @@ export function ReadinessPanel({ accessToken, version, jobs, readiness, canAct, 
         {!confirmedId && verdict?.kind !== "passed" && <span className="ver-note">Chỉ bật khi QA Passed và không còn issue Error/Critical.</span>}
       </div>
     </Panel>
+    </div>
   </div>;
 }

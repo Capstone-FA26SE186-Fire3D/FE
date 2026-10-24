@@ -243,7 +243,10 @@ select.ops-input { appearance: none; padding-right: 34px; background-image: line
 /* 44px hit area without taller rows */
 .ops-table a.ops-cell-primary, .ops-table button.ops-cell-primary { padding: 12px 0; margin-block: -12px; }
 /* Long Vietnamese names wrap inside a readable column instead of one word per line; the table scrolls sideways when it must. */
-.ops-table .ops-cell-primary { display: inline-block; min-width: min(18ch, 70vw); max-width: 48ch; overflow-wrap: anywhere; }
+/* A link/button/span inside a cell is an inline-block; a <td> with this class must stay a table cell, or the row tint and
+   borders stop short of it and the table background shows through as a dark patch. */
+.ops-table :not(td).ops-cell-primary { display: inline-block; min-width: min(18ch, 70vw); max-width: 48ch; overflow-wrap: anywhere; }
+.ops-table td.ops-cell-primary { min-width: min(18ch, 70vw); max-width: 48ch; overflow-wrap: anywhere; }
 .ops-table .ops-cell-actions > .ops-actions, .ops-table td > .ops-actions { flex-wrap: nowrap; justify-content: flex-end; }
 .ops-table .ops-cell-sub { display: block; margin-top: 2px; color: var(--dim); font-size: 12px; font-weight: 400; overflow-wrap: anywhere; }
 .ops-table .ops-cell-actions { text-align: right; white-space: nowrap; }
