@@ -20,9 +20,10 @@ import { describeError, isJobSucceeded, isJobTerminal, shortHash, type Described
 import type { PackageKind, ScenarioVersionDetail } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
 import { scrollToSection } from "./scroll";
+import { SupportCode } from "./support-code";
 import { formatDateTime } from "./version-content";
 
-const kindLabel: Record<string, string> = { ReleasePackage: "Release package", PlaytestPackage: "Playtest package" };
+const kindLabel: Record<string, string> = { ReleasePackage: "Gói phát hành", PlaytestPackage: "Gói chạy thử" };
 
 /**
  * The Unity package runs in the Android app and the build worker serves `Android` only (`ProcessingWorker:PackageBuildTargets`,
@@ -43,16 +44,16 @@ export function jobTone(status: string | undefined): Tone {
   }
 }
 
-const jobStatusLabel: Record<string, string> = { queued: "Đang chờ", running: "Đang chạy", succeeded: "Job Succeeded", failed: "Thất bại", cancelled: "Đã hủy" };
+const jobStatusLabel: Record<string, string> = { queued: "Đang chờ máy dựng", running: "Đang dựng", succeeded: "Dựng xong", failed: "Dựng lỗi", cancelled: "Đã hủy" };
 export const jobStatusText = (status: string | undefined) => (status ? jobStatusLabel[status.toLowerCase()] ?? status : "—");
 
 function JobTimeline({ status }: { status: string }) {
   const value = status.toLowerCase();
   const failed = value === "failed" || value === "cancelled" || value === "canceled";
   const steps = [
-    { id: "queued", label: "Xếp hàng", state: value === "queued" ? "current" : "done" },
-    { id: "running", label: "Đang chạy", state: value === "queued" ? "todo" : value === "running" ? "current" : "done" },
-    { id: "final", label: failed ? (value === "failed" ? "Thất bại" : "Đã hủy") : "Job Succeeded", state: value === "succeeded" ? "done" : failed ? "failed" : "todo" },
+    { id: "queued", label: "Chờ máy dựng", state: value === "queued" ? "current" : "done" },
+    { id: "running", label: "Đang dựng", state: value === "queued" ? "todo" : value === "running" ? "current" : "done" },
+    { id: "final", label: failed ? (value === "failed" ? "Dựng lỗi" : "Đã hủy") : "Dựng xong", state: value === "succeeded" ? "done" : failed ? "failed" : "todo" },
   ];
   return <ol className="ver-timeline" aria-label="Tiến trình job">{steps.map((step) => <li key={step.id} data-state={step.state}>{step.label}</li>)}</ol>;
 }
@@ -78,7 +79,7 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
   const [retryError, setRetryError] = useState<DescribedError | null>(null);
 
   const target = buildTarget.trim();
-  const targetError = !target ? "Nhập nền tảng dựng (build target)." : target.length > 100 ? "Tối đa 100 ký tự." : undefined;
+  const targetError = !target ? "Chọn nền tảng." : target.length > 100 ? "Tối đa 100 ký tự." : undefined;
 
   // The build form is only offered while it can do something. The BE runs one job per revision at a time and answers the
   // same build input with its existing job, so a second click while a job is queued/running, or after it succeeded, would
@@ -112,12 +113,12 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
       const payload = { kind: kindNow, buildTarget: target };
       const accepted = await scenarioVersionsApi.startPackageBuild(accessToken, version.id, payload, buildKey.keyFor({ versionId: version.id, ...payload }));
       buildKey.done();
-      toast.notify({ tone: "info", title: "Đã xếp hàng package build", description: "202 chỉ xác nhận job đã được nhận, chưa phải kết quả." });
+      toast.notify({ tone: "info", title: "Đã gửi yêu cầu dựng gói", description: "Máy dựng sẽ nhận và xử lý; trang tự cập nhật." });
       setStartedKind(kindNow);
       jobs.reloadJobs();
       onStarted(accepted.jobId);
     } catch (cause) {
-      setError(describeError(cause, "Không gửi được yêu cầu package build."));
+      setError(describeError(cause, "Không gửi được yêu cầu dựng gói."));
     } finally {
       setBusy(false);
     }
@@ -137,11 +138,11 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
       retryKey.done();
       setRetrying(false);
       setRetryReason("");
-      toast.notify({ tone: "info", title: "Đã xếp hàng chạy lại job", description: `Kết quả: ${result.outcome}` });
+      toast.notify({ tone: "info", title: "Đã gửi yêu cầu dựng lại", description: "Máy dựng sẽ chạy lại lượt dựng này." }); void result;
       jobs.reloadJobs();
       jobs.selectJob(result.jobId);
     } catch (cause) {
-      setRetryError(describeError(cause, "Không chạy lại được job."));
+      setRetryError(describeError(cause, "Không dựng lại được."));
     } finally {
       setRetryBusy(false);
     }
@@ -151,58 +152,59 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
   const attempt = detail?.currentAttempt;
 
   return <div className="ops-stack">
-    <Panel title="Chạy package build" description="Dựng gói Unity từ snapshot đã đóng băng. Cần revision IFC đã xác minh upload." bodyClassName="ops-stack">
-      {!jobsKnown && <SkeletonRows rows={2} label="Đang kiểm tra job đang chạy…" />}
+    <Panel title="Dựng gói" description="Hệ thống dựng gói mô phỏng từ phiên bản này để ứng dụng Android tải về, rồi tự kiểm tra gói." bodyClassName="ops-stack">
+      {!jobsKnown && <SkeletonRows rows={2} label="Đang kiểm tra lượt dựng…" />}
 
-      {(activeJob || justStarted) && <Alert tone="info" title={`Đang dựng ${kindLabel[activeJob?.kind ?? startedKind ?? ""] ?? "package"}: ${activeJob ? jobStatusText(activeJob.status) : "Đang chờ"}`} action={activeJob ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => { jobs.selectJob(activeJob.id); scrollToSection("ver-job-monitor"); }}>Xem job</Button> : undefined}>
-        Mỗi revision chỉ chạy một job tại một thời điểm nên nút chạy build ẩn cho tới khi job kết thúc. Job thất bại sẽ có nút chạy lại.
+      {(activeJob || justStarted) && <Alert tone="info" title={`${kindLabel[activeJob?.kind ?? startedKind ?? ""] ?? "Gói"}: ${activeJob ? jobStatusText(activeJob.status) : "Đang chờ máy dựng"}`} action={activeJob ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => { jobs.selectJob(activeJob.id); scrollToSection("ver-job-monitor"); }}>Xem tiến trình</Button> : undefined}>
+        Mỗi lần chỉ dựng một gói, nên nút dựng ẩn cho tới khi xong. Nếu dựng lỗi sẽ có nút dựng lại.
       </Alert>}
 
       {!activeJob && !justStarted && builtKinds.length > 0 && <Alert tone="success" title={`${builtKinds.map((value) => kindLabel[value]).join(" và ")} đã dựng xong`}>
-        Mỗi phiên bản chỉ cần một package cho mỗi loại. Job Succeeded chưa phải QA Passed: xem tab &quot;Kết quả kỹ thuật&quot;. Muốn dựng lại từ nội dung khác, hãy tạo phiên bản mới.
+        Mỗi phiên bản chỉ cần dựng một lần cho mỗi loại gói. Dựng xong chưa có nghĩa là gói dùng được: xem kết quả kiểm tra ở tab &quot;Kiểm tra&quot;. Muốn dựng từ nội dung khác, hãy tạo phiên bản mới.
       </Alert>}
 
-      {!activeJob && !justStarted && failedKinds.length > 0 && <Alert tone="danger" title={`${failedKinds.map((value) => kindLabel[value]).join(" và ")} dựng thất bại`} action={canAct ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => { const job = jobsOfKind(failedKinds[0])[0]; jobs.selectJob(job.id); scrollToSection("ver-job-monitor"); }}>Xem job thất bại</Button> : undefined}>
-        Chạy lại dùng job cũ với đầu vào cũ: mở job thất bại và bấm &quot;Chạy lại job&quot; kèm lý do.
+      {!activeJob && !justStarted && failedKinds.length > 0 && <Alert tone="danger" title={`${failedKinds.map((value) => kindLabel[value]).join(" và ")} dựng bị lỗi`} action={canAct ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => { const job = jobsOfKind(failedKinds[0])[0]; jobs.selectJob(job.id); scrollToSection("ver-job-monitor"); }}>Xem lượt dựng lỗi</Button> : undefined}>
+        Mở lượt dựng lỗi và bấm &quot;Dựng lại&quot;, ghi ngắn lý do.
       </Alert>}
 
       {showForm && <form className="ops-stack" onSubmit={submit} noValidate>
         <div className="ops-form-grid">
-          <Field label="Loại package" required hint={kindNow === "ReleasePackage" ? "Dùng để tạo release." : "Chạy thử, không dùng để phát hành."}>
+          <Field label="Loại gói" required hint={kindNow === "ReleasePackage" ? "Gói dùng để phát hành cho học viên." : "Gói để tự chạy thử trên điện thoại, không phát hành."}>
             {(p) => <Select {...p} value={kindNow} onChange={(event) => setKind(event.target.value as PackageKind)}>
               {startable.map((value) => <option key={value} value={value}>{kindLabel[value]}</option>)}
             </Select>}
           </Field>
-          <Field label="Nền tảng dựng" required error={targetError} hint="Chỉ hỗ trợ Android: gói chạy trong ứng dụng Android.">
+          <Field label="Nền tảng" required error={targetError} hint="Hiện chỉ có ứng dụng Android.">
             {(p) => <Select {...p} value={buildTarget} onChange={(event) => setBuildTarget(event.target.value)}>
               {BUILD_TARGETS.map((value) => <option key={value} value={value}>{value}</option>)}
             </Select>}
           </Field>
         </div>
         {error && <Alert tone="danger" title={error.message} action={<div className="ver-actions-row" style={{ marginTop: 10 }}>
-          <Button size="sm" variant="secondary" type="submit" disabled={busy}><RefreshCw size={14} aria-hidden="true" />Thử lại (cùng khóa)</Button>
+          <Button size="sm" variant="secondary" type="submit" disabled={busy}><RefreshCw size={14} aria-hidden="true" />Thử lại</Button>
         </div>}>
-          {error.code && <>Mã lỗi: {error.code}. </>}Thử lại dùng cùng Idempotency-Key nên không tạo job trùng.
+          Bấm thử lại an toàn: hệ thống không tạo thêm lượt dựng trùng.
+          <SupportCode code={error.code} />
         </Alert>}
         <div className="ver-actions-row">
-          <Button type="submit" disabled={busy || Boolean(targetError) || !canAct}><Hammer size={16} aria-hidden="true" />{busy ? "Đang gửi…" : "Chạy package build"}</Button>
+          <Button type="submit" disabled={busy || Boolean(targetError) || !canAct}><Hammer size={16} aria-hidden="true" />{busy ? "Đang gửi…" : "Dựng gói"}</Button>
           {!canAct && <span className="ver-note">Tài khoản của bạn chỉ có quyền xem.</span>}
         </div>
       </form>}
-      <p className="ver-note">Phản hồi 202 chỉ nghĩa là job đã vào hàng đợi. Job Succeeded cũng chưa phải QA Passed: xem tab &quot;Kết quả kỹ thuật&quot;.</p>
+      <p className="ver-note">Dựng xong, hệ thống tự kiểm tra gói. Kết quả xem ở tab &quot;Kiểm tra&quot;.</p>
     </Panel>
 
     <Panel
-      title="Các job của phiên bản này"
-      description="Lấy từ danh sách job của revision, nên vẫn thấy sau khi tải lại trang."
+      title="Các lượt dựng của phiên bản này"
+      description="Vẫn còn khi bạn tải lại trang hoặc mở ở máy khác."
       actions={<Button size="sm" variant="quiet" onClick={jobs.reloadJobs} disabled={jobs.jobsLoading}><RefreshCw size={14} aria-hidden="true" />Tải lại</Button>}
       bodyClassName="ops-stack"
     >
-      {jobs.jobsError !== undefined && <Alert tone="danger" title="Không tải được danh sách job" action={<Button size="sm" variant="secondary" className="mt-3" onClick={jobs.reloadJobs}>Thử lại</Button>}>{describeError(jobs.jobsError).message}</Alert>}
-      <Table caption="Job package build">
+      {jobs.jobsError !== undefined && <Alert tone="danger" title="Không tải được danh sách lượt dựng" action={<Button size="sm" variant="secondary" className="mt-3" onClick={jobs.reloadJobs}>Thử lại</Button>}>{describeError(jobs.jobsError).message}</Alert>}
+      <Table caption="Các lượt dựng gói">
         <thead><tr><th>Loại</th><th>Trạng thái</th><th>Tạo lúc</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
         <tbody>
-          {jobs.jobsLoading && jobs.jobs.length === 0 && <TableMessage colSpan={4}><SkeletonRows rows={3} label="Đang tải job…" /></TableMessage>}
+          {jobs.jobsLoading && jobs.jobs.length === 0 && <TableMessage colSpan={4}><SkeletonRows rows={3} label="Đang tải lượt dựng…" /></TableMessage>}
           {jobs.jobs.map((job) => <tr key={job.id} className={job.id === jobs.selectedJobId ? "ver-row-selected" : undefined}>
             <td className="ops-cell-primary">{kindLabel[job.kind] ?? job.kind}</td>
             <td><StatusBadge tone={jobTone(job.status)}>{jobStatusText(job.status)}</StatusBadge></td>
@@ -211,7 +213,7 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
               ? <StatusBadge tone="info">Đang xem</StatusBadge>
               : <Button size="sm" variant="quiet" onClick={() => { jobs.selectJob(job.id); scrollToSection("ver-job-monitor"); }}>Theo dõi</Button>}</td>
           </tr>)}
-          {!jobs.jobsLoading && jobs.jobsError === undefined && jobs.jobs.length === 0 && <TableMessage colSpan={4}><EmptyState icon={Hammer} title="Chưa có job package build" description="Chạy package build ở trên để có kết quả kỹ thuật cho phiên bản này." /></TableMessage>}
+          {!jobs.jobsLoading && jobs.jobsError === undefined && jobs.jobs.length === 0 && <TableMessage colSpan={4}><EmptyState icon={Hammer} title="Chưa dựng gói nào" description="Bấm Dựng gói ở trên; xong sẽ có kết quả kiểm tra cho phiên bản này." /></TableMessage>}
         </tbody>
       </Table>
     </Panel>
@@ -219,13 +221,13 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
     {jobs.selectedJobId && <Panel
       id="ver-job-monitor"
       tabIndex={-1}
-      title="Theo dõi job"
-      description={jobs.watching ? "Đang cập nhật mỗi 3 giây; tự giãn khi lỗi và dừng khi job kết thúc." : "Đã dừng theo dõi vì job đã kết thúc."}
+      title="Tiến trình dựng"
+      description={jobs.watching ? "Tự cập nhật vài giây một lần cho tới khi xong." : "Lượt dựng đã kết thúc."}
       actions={<Button size="sm" variant="quiet" onClick={jobs.refresh}><RefreshCw size={14} aria-hidden="true" />Làm mới</Button>}
       bodyClassName="ops-stack"
     >
-      {!detail && jobs.watchError === undefined && <SkeletonRows rows={2} label="Đang tải trạng thái job…" />}
-      {jobs.watchError !== undefined && <Alert tone={detail ? "warning" : "danger"} title={detail ? "Chưa cập nhật được trạng thái mới" : "Không tải được job"}>
+      {!detail && jobs.watchError === undefined && <SkeletonRows rows={2} label="Đang tải tiến trình…" />}
+      {jobs.watchError !== undefined && <Alert tone={detail ? "warning" : "danger"} title={detail ? "Chưa cập nhật được trạng thái mới" : "Không tải được tiến trình"}>
         {describeError(jobs.watchError).message} Sẽ tự thử lại{describeError(jobs.watchError).retryAfterSeconds ? ` sau ${describeError(jobs.watchError).retryAfterSeconds} giây` : " với khoảng chờ tăng dần"}.
       </Alert>}
       {detail && <>
@@ -235,20 +237,24 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
         </div>
         <JobTimeline status={detail.job.status} />
         <dl className="ver-dl">
-          <dt>Mã job</dt><dd className="ver-hash">{detail.job.id}</dd>
-          <dt>Input hash</dt><dd className="ver-hash">{shortHash(detail.inputHash, 20)}</dd>
-          <dt>Lần chạy</dt><dd>{attempt ? `#${attempt.attemptNumber} · ${attempt.status} · ${attempt.toolchainVersion}` : "Chưa có worker nhận job"}</dd>
+          <dt>Máy dựng</dt><dd>{attempt ? `Đã nhận (lần ${attempt.attemptNumber})` : "Chưa có máy dựng nhận"}</dd>
           <dt>Bắt đầu</dt><dd>{formatDateTime(attempt?.startedAt)}</dd>
           <dt>Kết thúc</dt><dd>{formatDateTime(attempt?.finishedAt)}</dd>
-          <dt>Output hash</dt><dd className="ver-hash">{shortHash(attempt?.outputHash, 20)}</dd>
         </dl>
-        {!isJobTerminal(detail.job.status) && <Alert tone="info" title="Đang chờ kết quả">Chưa có kết quả QA. Trang sẽ tự cập nhật khi job kết thúc.</Alert>}
-        {detail.job.status.toLowerCase() === "queued" && !attempt && now - Date.parse(detail.job.createdAt) > WORKER_WAIT_MS && <Alert tone="warning" title="Chưa có worker nhận job">
-          Job đã chờ hơn {Math.round(WORKER_WAIT_MS / 60000)} phút mà chưa có máy dựng nào nhận. Máy dựng Unity (worker) có thể đang tắt: bật máy rồi trang sẽ tự cập nhật.
+        <details className="ver-support">
+          <summary>Thông tin cho bộ phận hỗ trợ</summary>
+          <span>Lượt dựng: <code className="ver-hash">{detail.job.id}</code></span>
+          <span>Đầu vào: <code className="ver-hash">{shortHash(detail.inputHash, 20)}</code></span>
+          {attempt && <span>Máy dựng: <code className="ver-hash">{attempt.toolchainVersion} · {attempt.status}</code></span>}
+          {attempt?.outputHash && <span>Đầu ra: <code className="ver-hash">{shortHash(attempt.outputHash, 20)}</code></span>}
+        </details>
+        {!isJobTerminal(detail.job.status) && <Alert tone="info" title="Đang chờ kết quả">Gói chưa dựng xong. Trang tự cập nhật khi xong.</Alert>}
+        {detail.job.status.toLowerCase() === "queued" && !attempt && now - Date.parse(detail.job.createdAt) > WORKER_WAIT_MS && <Alert tone="warning" title="Chưa có máy dựng nhận">
+          Đã chờ hơn {Math.round(WORKER_WAIT_MS / 60000)} phút mà chưa có máy dựng nào nhận. Máy dựng có thể đang tắt: bật máy rồi trang sẽ tự cập nhật.
         </Alert>}
-        {isJobSucceeded(detail.job.status) && <Alert tone="warning" title="Job Succeeded chưa phải QA Passed">Hãy mở tab &quot;Kết quả kỹ thuật&quot; để xem validation run và issue Error/Critical trước khi tiếp tục.</Alert>}
-        {failedJob && <Alert tone="danger" title="Job thất bại" action={canAct ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => { setRetryError(null); setRetrying(true); }}><RotateCcw size={14} aria-hidden="true" />Chạy lại job</Button> : undefined}>
-          BE không trả log lỗi chi tiết. Chạy lại tạo một lần thử mới cho job này; mỗi lần cần một lý do.
+        {isJobSucceeded(detail.job.status) && <Alert tone="info" title="Gói đã dựng xong">Hệ thống tự kiểm tra gói. Xem kết quả và chốt gói ở tab &quot;Kiểm tra&quot;.</Alert>}
+        {failedJob && <Alert tone="danger" title="Dựng gói bị lỗi" action={canAct ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => { setRetryError(null); setRetrying(true); }}><RotateCcw size={14} aria-hidden="true" />Dựng lại</Button> : undefined}>
+          Máy dựng chưa gửi lý do chi tiết. Bấm Dựng lại để thử một lần mới; nếu vẫn lỗi, gửi phần &quot;Thông tin cho bộ phận hỗ trợ&quot; cho đội kỹ thuật.
         </Alert>}
       </>}
     </Panel>}
@@ -256,15 +262,15 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
     <Modal
       open={retrying}
       onOpenChange={(open) => { if (!retryBusy) setRetrying(open); }}
-      title="Chạy lại job thất bại?"
-      description="Job được xếp hàng lại cho worker. Gửi lại đúng yêu cầu này khi mạng lỗi sẽ không tạo lần chạy trùng."
-      footer={<><Button variant="quiet" onClick={() => setRetrying(false)} disabled={retryBusy}>Hủy</Button><Button onClick={() => void retryFailed()} disabled={retryBusy || !retryReason.trim()}>{retryBusy ? "Đang gửi…" : "Chạy lại"}</Button></>}
+      title="Dựng lại gói?"
+      description="Máy dựng sẽ chạy lại lượt dựng này. Bấm lại khi mạng lỗi không tạo lần dựng trùng."
+      footer={<><Button variant="quiet" onClick={() => setRetrying(false)} disabled={retryBusy}>Hủy</Button><Button onClick={() => void retryFailed()} disabled={retryBusy || !retryReason.trim()}>{retryBusy ? "Đang gửi…" : "Xác nhận dựng lại"}</Button></>}
     >
       <div className="ops-stack">
-        <Field label="Lý do" required hint="1–1000 ký tự." error={retryReason.length > 1000 ? "Tối đa 1000 ký tự." : undefined}>
+        <Field label="Lý do dựng lại" required hint="Ví dụ: đã bật lại máy dựng. Tối đa 1000 ký tự." error={retryReason.length > 1000 ? "Tối đa 1000 ký tự." : undefined}>
           {(p) => <Textarea {...p} rows={3} maxLength={1100} value={retryReason} onChange={(event) => setRetryReason(event.target.value)} />}
         </Field>
-        {retryError && <Alert tone="danger" title={retryError.message}>{retryError.code && <>Mã lỗi: {retryError.code}.</>}</Alert>}
+        {retryError && <Alert tone="danger" title={retryError.message}><SupportCode code={retryError.code} /></Alert>}
       </div>
     </Modal>
   </div>;

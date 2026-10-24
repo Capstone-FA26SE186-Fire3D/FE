@@ -1,5 +1,6 @@
 "use client";
 
+import { SupportCode } from "@/features/scenarios/components/versions/support-code";
 import { Ban, FlaskConical, Play, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -34,7 +35,7 @@ function ErrorLine({ error }: { error: PlaytestErrorView }) {
   return <>
     {error.message}{error.retryAfterSeconds ? ` Thử lại sau ${error.retryAfterSeconds} giây.` : ""}
     {error.fieldErrors.length > 0 && <ul className="ver-list">{error.fieldErrors.map((field, index) => <li key={`${field.path}-${index}`}>{field.path ? `${field.path}: ` : ""}{field.message}</li>)}</ul>}
-    {error.code && <span className="pt-code-tag"> Mã lỗi: {error.code}</span>}
+    <SupportCode code={error.code} />
   </>;
 }
 
@@ -46,8 +47,8 @@ function packageLabel(state: PlaytestPackageState) {
     case "error": return "Không đọc được";
     case "none": return "Chưa dựng";
     case "building": return "Đang dựng";
-    case "failed": return "Dựng thất bại";
-    case "succeeded": return state.qa === "passed" ? "Job xong, QA đạt" : state.qa === "failed" ? "QA không đạt" : state.qa === "checking" ? "Job xong, đang chờ QA" : "Job xong, chưa có QA";
+    case "failed": return "Dựng lỗi";
+    case "succeeded": return state.qa === "passed" ? "Sẵn sàng" : state.qa === "failed" ? "Kiểm tra không đạt" : state.qa === "checking" ? "Đã dựng, đang kiểm tra" : "Đã dựng, chờ kiểm tra";
   }
 }
 
@@ -57,17 +58,17 @@ function PackageChecklist({ watch, buildHref }: { watch: PlaytestPackageWatch; b
   return <section className="pt-card" aria-labelledby="pt-pkg-title" data-testid="playtest-package">
     <h3 id="pt-pkg-title" className="ver-section-title">Điều kiện trước khi chạy thử</h3>
     <div className="ver-actions-row">
-      <span className="ver-note">PlaytestPackage của phiên bản này:</span>
+      <span className="ver-note">Gói chạy thử của phiên bản này:</span>
       <StatusBadge tone={packageTone[state.kind]}>{packageLabel(state)}</StatusBadge>
     </div>
-    {state.kind === "loading" && <SkeletonRows rows={1} label="Đang đọc trạng thái package…" />}
-    {state.kind === "error" && <Alert tone="warning" title="Không đọc được trạng thái package" action={<Button size="sm" variant="secondary" className="mt-3" onClick={watch.reload}>Thử lại</Button>}>Máy chủ vẫn kiểm tra điều kiện khi bạn tạo playtest.</Alert>}
+    {state.kind === "loading" && <SkeletonRows rows={1} label="Đang đọc trạng thái gói…" />}
+    {state.kind === "error" && <Alert tone="warning" title="Không đọc được trạng thái gói" action={<Button size="sm" variant="secondary" className="mt-3" onClick={watch.reload}>Thử lại</Button>}>Hệ thống vẫn kiểm tra lại khi bạn bắt đầu chạy thử.</Alert>}
     {missing.length > 0 && <>
       <p className="ver-note" style={{ marginTop: 8 }}>Còn thiếu:</p>
       <ul className="ver-list" data-testid="playtest-missing">{missing.map((line) => <li key={line}>{line}</li>)}</ul>
-      {buildHref && <Link href={buildHref} className="pt-link">Mở tab Package build</Link>}
+      {buildHref && <Link href={buildHref} className="pt-link">Mở tab Dựng gói</Link>}
     </>}
-    <p className="ver-note" style={{ marginTop: 8 }}>Quyền dịch vụ của công trình, lượt dùng thử và runtime tương thích do máy chủ kiểm tra khi bạn tạo playtest và khi Mobile bắt đầu. Web không trừ lượt dùng thử.</p>
+    <p className="ver-note" style={{ marginTop: 8 }}>Dịch vụ của công trình và lượt dùng thử được kiểm tra khi bạn bắt đầu chạy thử và khi ứng dụng điện thoại mở bài. Trang web không trừ lượt dùng thử.</p>
   </section>;
 }
 
@@ -124,15 +125,15 @@ function CancelModal({ open, onOpenChange, playtest, accessToken, onCancelled, o
     open={open}
     onOpenChange={(next) => { if (!busy) { onOpenChange(next); if (!next) setError(null); } }}
     title="Hủy playtest này?"
-    description="Playtest sẽ kết thúc ở trạng thái Đã hủy và không thể mở lại."
+    description="Lượt chạy thử sẽ dừng và không mở lại được."
     footer={<>
       <Button variant="quiet" onClick={() => onOpenChange(false)} disabled={busy}>Giữ lại</Button>
       <Button variant="danger" onClick={() => void confirm()} disabled={busy}>{busy ? "Đang hủy…" : "Hủy playtest"}</Button>
     </>}
   >
     <p className="ver-note">{started
-      ? "Playtest đã bắt đầu nên lượt dùng thử (nếu đã trừ khi Mobile bắt đầu) không được hoàn lại tự động. Mã chuyển đang mở sẽ bị thu hồi."
-      : "Playtest chưa bắt đầu nên chưa trừ lượt dùng thử. Mã chuyển đang mở sẽ bị thu hồi."}</p>
+      ? "Lượt chạy thử đã bắt đầu nên lượt dùng thử (nếu đã trừ) không được hoàn lại tự động. Mã QR đang mở sẽ bị thu hồi."
+      : "Chưa bắt đầu chơi nên chưa trừ lượt dùng thử. Mã QR đang mở sẽ bị thu hồi."}</p>
     {error && <Alert tone="danger" title={error.title} className="pt-error"><ErrorLine error={error} /></Alert>}
   </Modal>;
 }
@@ -169,7 +170,7 @@ function PlaytestSession({ accessToken, playtestId, canAct, versionId, onForget,
     {failure && <Alert tone={watch.fatal ? "danger" : "warning"} title={watch.fatal ? failure.title : "Dữ liệu có thể đã cũ"} action={<Button size="sm" variant="secondary" className="mt-3" onClick={watch.refresh}>Tải lại</Button>}>
       {watch.fatal ? <ErrorLine error={failure} /> : <>Không làm mới được trạng thái playtest; đang hiển thị lần đọc gần nhất và sẽ thử lại. <ErrorLine error={failure} /></>}
     </Alert>}
-    {foreign && <Alert tone="warning" title="Playtest này thuộc phiên bản khác" action={onOpenVersion ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => onOpenVersion(playtest.scenarioVersionId)}>Mở phiên bản đó</Button> : undefined}>Playtest {shortHash(playtest.id, 8)} ghim package của một phiên bản khác với phiên bản đang xem.</Alert>}
+    {foreign && <Alert tone="warning" title="Lượt chạy thử này thuộc phiên bản khác" action={onOpenVersion ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => onOpenVersion(playtest.scenarioVersionId)}>Mở phiên bản đó</Button> : undefined}>Playtest {shortHash(playtest.id, 8)} ghim package của một phiên bản khác với phiên bản đang xem.</Alert>}
 
     <div className="pt-status" data-testid="playtest-status" data-status={playtest.status}>
       <div className="ver-actions-row">
@@ -180,7 +181,7 @@ function PlaytestSession({ accessToken, playtestId, canAct, versionId, onForget,
     </div>
 
     {playtest.status.toLowerCase() === "completed" && <section className="pt-card" aria-labelledby="pt-result-title">
-      <h3 id="pt-result-title" className="ver-section-title">Kết quả do Mobile gửi</h3>
+      <h3 id="pt-result-title" className="ver-section-title">Kết quả từ ứng dụng điện thoại</h3>
       <CompletionView completion={playtest.completion} />
     </section>}
 
@@ -201,7 +202,7 @@ function PlaytestSession({ accessToken, playtestId, canAct, versionId, onForget,
       playtest={playtest}
       accessToken={accessToken}
       onCancelled={(status) => { watch.apply(status); toast.notify({ tone: "info", title: "Đã hủy playtest" }); }}
-      onTerminal={() => { watch.refresh(); toast.notify({ tone: "warning", title: "Playtest đã kết thúc", description: "Đã tải lại trạng thái mới nhất." }); }}
+      onTerminal={() => { watch.refresh(); toast.notify({ tone: "warning", title: "Lượt chạy thử đã kết thúc", description: "Đã tải lại trạng thái mới nhất." }); }}
     />
   </div>;
 }
@@ -256,13 +257,13 @@ export function PlaytestPanel({ accessToken, version, packageWatch, canPlaytest,
   const retryLeft = blockedUntil > now;
 
   return <Panel
-    title="Playtest trên Mobile"
-    description="Chạy thử phiên bản này trên điện thoại của bạn. Web chuẩn bị, hiển thị mã chuyển và theo dõi; bắt đầu, khởi chạy và kết quả do ứng dụng Mobile thực hiện."
+    title="Chạy thử trên điện thoại"
+    description="Tự chơi thử phiên bản này trên điện thoại trước khi phát hành. Trang web chuẩn bị và hiện mã QR; việc chơi và kết quả nằm trên ứng dụng điện thoại."
   >
     <div className="ops-stack">
-      {!canPlaytest && <Alert tone="info" title="Chỉ OrganizationUser chạy thử được">PlatformAdmin không phải người chạy thử nên không tạo hay xem playtest ở đây.</Alert>}
+      {!canPlaytest && <Alert tone="info" title="Chỉ tài khoản tổ chức chạy thử được">Tài khoản quản trị FET3D không tạo hay xem lượt chạy thử ở đây.</Alert>}
 
-      {canPlaytest && playtestId && !validId && <Alert tone="warning" title="Mã playtest trên đường dẫn không hợp lệ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={() => onPlaytestIdChange("")}>Bỏ mã này</Button>}>Tham số ?playtest phải là UUID do máy chủ cấp.</Alert>}
+      {canPlaytest && playtestId && !validId && <Alert tone="warning" title="Đường dẫn chạy thử không hợp lệ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={() => onPlaytestIdChange("")}>Bỏ mã này</Button>}>Đường dẫn bị sai hoặc thiếu. Bấm &quot;Bỏ mã này&quot; rồi tạo lượt chạy thử mới.</Alert>}
 
       {canPlaytest && playtestId && validId
         ? <PlaytestSession key={playtestId} accessToken={accessToken} playtestId={playtestId} canAct={canPlaytest} versionId={version.id} onForget={() => onPlaytestIdChange("")} onOpenVersion={onOpenVersion} />
@@ -271,11 +272,11 @@ export function PlaytestPanel({ accessToken, version, packageWatch, canPlaytest,
           {error && <Alert tone="danger" title={error.title} className="pt-error"><ErrorLine error={error} /></Alert>}
           <div className="ver-actions-row">
             <Button onClick={() => void create()} disabled={busy || missing.length > 0 || retryLeft} data-testid="playtest-create">
-              <FlaskConical size={16} aria-hidden="true" />{busy ? "Đang chuẩn bị…" : "Tạo playtest"}
+              <FlaskConical size={16} aria-hidden="true" />{busy ? "Đang chuẩn bị…" : "Bắt đầu chạy thử"}
             </Button>
             {retryLeft && <StatusBadge tone="warning">Chờ rồi thử lại</StatusBadge>}
           </div>
-          <p className="ver-caption">Tạo playtest chỉ ghim package đã dựng của phiên bản này; chưa trừ lượt dùng thử, chưa cấp mã khởi chạy.</p>
+          <p className="ver-caption">Bắt đầu chỉ chuẩn bị gói của phiên bản này; chưa trừ lượt dùng thử.</p>
         </>}
     </div>
   </Panel>;

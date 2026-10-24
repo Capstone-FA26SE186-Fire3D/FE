@@ -1,5 +1,6 @@
 "use client";
 
+import { SupportCode } from "@/features/scenarios/components/versions/support-code";
 import { Copy, QrCode as QrIcon, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
@@ -83,19 +84,19 @@ export function HandoffCard({ accessToken, playtest, canAct, onIssued }: {
 
   if (terminal) return null;
 
-  const label = held || serverOpen ? "Cấp lại mã" : "Tạo mã chuyển sang Mobile";
+  const label = held || serverOpen ? "Cấp lại mã" : "Tạo mã QR mở trên điện thoại";
 
   return <section className="pt-card" aria-labelledby="pt-handoff-title" data-testid="handoff-card">
-    <h3 id="pt-handoff-title" className="ver-section-title"><QrIcon size={16} aria-hidden="true" style={{ verticalAlign: "-3px", marginRight: 6 }} />Chuyển sang Mobile</h3>
+    <h3 id="pt-handoff-title" className="ver-section-title"><QrIcon size={16} aria-hidden="true" style={{ verticalAlign: "-3px", marginRight: 6 }} />Mở trên điện thoại</h3>
 
     {!issuable && <p className="ver-note">{playtest.boundToMobile
-      ? "Một phiên Mobile đã nhận mã và giữ playtest này. Web không cấp thêm mã và không bắt đầu thay Mobile."
-      : "Playtest đã bắt đầu trên thiết bị: mã chuyển chỉ cấp được trước khi bắt đầu."}</p>}
+      ? "Điện thoại đã nhận mã và đang giữ lượt chạy thử này."
+      : "Đã bắt đầu chơi trên điện thoại: mã QR chỉ cấp được trước khi bắt đầu."}</p>}
 
     {issuable && codeLive && held && <div className="pt-qr-row">
-      <div className="pt-qr-frame"><QrCode value={held.deepLink} size={192} label="Mã QR chuyển playtest sang Mobile" /></div>
+      <div className="pt-qr-frame"><QrCode value={held.deepLink} size={192} label="Mã QR mở lượt chạy thử trên điện thoại" /></div>
       <div className="pt-qr-meta">
-        <p className="ver-note"><strong>Quét bằng ứng dụng Mobile</strong> đã đăng nhập cùng tài khoản. Mã dùng một lần, không chứa quyền truy cập.</p>
+        <p className="ver-note"><strong>Quét bằng ứng dụng FET3D</strong> đã đăng nhập cùng tài khoản. Mã dùng một lần.</p>
         <div className="pt-countdown" data-testid="handoff-countdown"><span>Hết hạn sau</span><strong>{formatCountdown(codeLeft ?? 0)}</strong></div>
         <p className="ver-note">Mã dự phòng</p>
         <code className="ver-hash pt-code" data-testid="handoff-code">{held.code}</code>
@@ -108,11 +109,11 @@ export function HandoffCard({ accessToken, playtest, canAct, onIssued }: {
 
     {issuable && !codeLive && held && <Alert tone="warning" title="Mã đã hết hạn">Mã chỉ có hiệu lực 5 phút. Cấp lại mã để có QR mới; mã cũ không dùng được nữa.</Alert>}
     {issuable && !held && serverOpenLive && <Alert tone="info" title="Đang có một mã mở">Máy chủ báo có mã còn hiệu lực đến {new Date(serverOpen as string).toLocaleTimeString("vi-VN")}, nhưng mã chỉ hiển thị một lần lúc tạo nên không thể xem lại. Cấp lại mã sẽ thay mã đó.</Alert>}
-    {issuable && !held && !serverOpenLive && <p className="ver-note">Chưa có mã đang mở. Tạo mã để hiện QR cho ứng dụng Mobile. Tạo mã không trừ lượt dùng thử.</p>}
+    {issuable && !held && !serverOpenLive && <p className="ver-note">Chưa có mã đang mở. Tạo mã để hiện QR cho ứng dụng điện thoại. Tạo mã không trừ lượt dùng thử.</p>}
 
     {error && <Alert tone="danger" title={error.title} className="pt-error">
       {error.message}{error.retryAfterSeconds ? ` Thử lại sau ${error.retryAfterSeconds} giây.` : ""}
-      {error.code && <span className="pt-code-tag"> Mã lỗi: {error.code}</span>}
+      <SupportCode code={error.code} />
     </Alert>}
 
     {issuable && <div className="ver-actions-row" style={{ marginTop: 12 }}>

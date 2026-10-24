@@ -217,10 +217,10 @@ test.describe("snapshot", () => {
     await page.goto(`${base}?draft=${IDS.draft}`);
     await expect(page.getByRole("heading", { name: "Kịch bản tầng 3", level: 1 })).toBeVisible();
     await page.getByRole("button", { name: "Tạo phiên bản mới" }).first().click();
-    await expect(page.getByLabel("Bản nháp")).toHaveValue(IDS.draft);
+    await expect(page.getByLabel("Bản nháp", { exact: true })).toHaveValue(IDS.draft);
     // The draft loads on its own: no extra "Tải draft" click before "Tạo snapshot" is usable.
-    await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"12"');
-    await page.getByRole("button", { name: "Kiểm tra draft" }).click();
+    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toContainText('"12"');
+    await page.getByRole("button", { name: "Kiểm tra bản nháp" }).click();
     await expect(page.getByText("SPAWN_REQUIRED")).toBeVisible();
     await page.getByRole("button", { name: "Tạo phiên bản", exact: true }).click();
     await expect(page.getByRole("alert").filter({ hasText: "Không tạo được snapshot" }).or(page.getByRole("alert")).first()).toBeVisible();
@@ -243,13 +243,13 @@ test.describe("snapshot", () => {
     await setup(page, mock);
     await page.goto(base);
     await page.getByRole("button", { name: "Tạo phiên bản mới" }).first().click();
-    await expect(page.getByLabel("Bản nháp")).toHaveValue(IDS.draft2);
-    await expect(page.getByLabel("Bản nháp").getByRole("option")).toHaveCount(2);
-    await expect(page.getByLabel("Bản nháp").getByRole("option").first()).toContainText("hiện tại");
-    await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"4"');
-    await page.getByLabel("Bản nháp").selectOption(IDS.draft);
+    await expect(page.getByLabel("Bản nháp", { exact: true })).toHaveValue(IDS.draft2);
+    await expect(page.getByLabel("Bản nháp", { exact: true }).getByRole("option")).toHaveCount(2);
+    await expect(page.getByLabel("Bản nháp", { exact: true }).getByRole("option").first()).toContainText("hiện tại");
+    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toContainText('"4"');
+    await page.getByLabel("Bản nháp", { exact: true }).selectOption(IDS.draft);
     // Picking another draft loads that one (the summary never shows the previous draft's ETag for it).
-    await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"12"');
+    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toContainText('"12"');
   });
 
   test("a scenario without drafts points to the editor instead of asking for an id", async ({ page }) => {
@@ -257,9 +257,9 @@ test.describe("snapshot", () => {
     await setup(page, mock);
     await page.goto(base);
     await page.getByRole("button", { name: "Tạo phiên bản mới" }).first().click();
-    await expect(page.getByText("Kịch bản này chưa có draft")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Mở trình soạn để tạo draft" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Tải draft" })).toBeDisabled();
+    await expect(page.getByText("Kịch bản này chưa có bản nháp")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Mở trình soạn để tạo bản nháp" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Tải bản nháp" })).toBeDisabled();
     // A disabled snapshot button says why.
     await expect(page.getByRole("button", { name: "Tạo phiên bản", exact: true })).toBeDisabled();
     await expect(page.getByRole("status").filter({ hasText: "Chưa có draft để tạo phiên bản." })).toBeVisible();
@@ -270,17 +270,17 @@ test.describe("snapshot", () => {
     await setup(page, mock);
     await page.goto(`${base}?draft=${IDS.draft}`);
     await page.getByRole("button", { name: "Tạo phiên bản mới" }).first().click();
-    await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"12"');
+    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toContainText('"12"');
     await page.getByRole("button", { name: "Tạo phiên bản", exact: true }).click();
-    await expect(page.getByText("Draft đã thay đổi từ lần bạn tải")).toBeVisible();
-    await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"12"');
+    await expect(page.getByText("Bản nháp đã thay đổi từ lần bạn tải")).toBeVisible();
+    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toContainText('"12"');
     await page.getByRole("button", { name: "Tải bản mới để đối chiếu" }).click();
     await expect(page.getByLabel("Bản mới", { exact: true })).toContainText('"13"');
     await expect(page.getByLabel("Bản cũ", { exact: true })).toContainText('"12"');
     await expect(page.getByRole("button", { name: "Tạo phiên bản", exact: true })).toBeDisabled();
-    await expect(page.getByRole("status").filter({ hasText: "Chọn bản draft để dùng ở phần đối chiếu trước." })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Chọn bản nháp để dùng ở phần đối chiếu trước." })).toBeVisible();
     await page.getByRole("button", { name: "Dùng bản mới" }).click();
-    await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"13"');
+    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toContainText('"13"');
     await expect(page.getByRole("button", { name: "Tạo phiên bản", exact: true })).toBeEnabled();
   });
 });
@@ -291,20 +291,20 @@ test.describe("package build and technical readiness", () => {
     await setup(page, mock);
     await page.goto(`${base}?tab=build`);
     // The platform is a select with Android only and preselected (the BE serves no other target by default).
-    await expect(page.getByLabel("Nền tảng dựng")).toHaveValue("Android");
-    await expect(page.getByLabel("Nền tảng dựng").getByRole("option")).toHaveCount(1);
-    await page.getByRole("button", { name: "Chạy package build" }).click();
-    await expect(page.getByText("Đã xếp hàng package build")).toBeVisible();
+    await expect(page.getByLabel("Nền tảng", { exact: true })).toHaveValue("Android");
+    await expect(page.getByLabel("Nền tảng", { exact: true }).getByRole("option")).toHaveCount(1);
+    await page.getByRole("button", { name: "Dựng gói", exact: true }).click();
+    await expect(page.getByText("Đã gửi yêu cầu dựng gói")).toBeVisible();
     expect(mock.buildCalls[0].body).toEqual({ kind: "ReleasePackage", buildTarget: "Android" });
     await expect(page.getByText("Đang chờ kết quả")).toBeVisible();
-    await expect(page.locator("[data-gate=technical]")).toContainText("Đang xử lý");
-    await expect(page.getByText("Job Succeeded chưa phải QA Passed", { exact: true })).toBeVisible({ timeout: 20_000 });
-    await expect(page.locator("[data-gate=technical]")).toContainText("Job xong, chưa có QA");
-    await page.getByRole("tab", { name: "Kết quả kỹ thuật" }).click();
+    await expect(page.locator("[data-gate=technical]")).toContainText("Đang dựng");
+    await expect(page.getByText("Gói đã dựng xong", { exact: true })).toBeVisible({ timeout: 20_000 });
+    await expect(page.locator("[data-gate=technical]")).toContainText("Dựng xong, chờ kiểm tra");
+    await page.getByRole("tab", { name: "Kiểm tra", exact: true }).click();
     await expect(page).toHaveURL(/tab=readiness/);
-    await expect(page.getByText("QA Passed", { exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Xác nhận kỹ thuật" })).toBeDisabled();
-    await expect(page.getByTestId("readiness-missing")).toContainText("PACKAGE_VALIDATION_REQUIRED");
+    await expect(page.getByText("Kiểm tra đạt", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Chốt gói phát hành" })).toBeDisabled();
+    await expect(page.getByTestId("readiness-missing").locator('[data-code="PACKAGE_VALIDATION_REQUIRED"]')).toHaveCount(1);
     expect(mock.jobPolls).toBeGreaterThanOrEqual(3);
   });
 
@@ -312,35 +312,35 @@ test.describe("package build and technical readiness", () => {
     const mock = newMock({ jobSequence: ["Queued"], jobList: [job("Queued")] });
     await setup(page, mock);
     await page.goto(`${base}?tab=build`);
-    await expect(page.getByRole("status").filter({ hasText: "Đang dựng Release package: Đang chờ" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Gói phát hành: Đang chờ máy dựng" })).toBeVisible();
     // No second build can be started while one is queued or running (the BE runs one job per revision at a time).
-    await expect(page.getByRole("button", { name: "Chạy package build" })).toHaveCount(0);
-    await expect(page.getByLabel("Loại package")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Dựng gói", exact: true })).toHaveCount(0);
+    await expect(page.getByLabel("Loại gói")).toHaveCount(0);
     // The job being watched says so; it is not a button that does nothing.
     await expect(page.getByRole("button", { name: "Đang xem" })).toHaveCount(0);
-    await expect(page.getByRole("table", { name: "Job package build" }).getByText("Đang xem")).toBeVisible();
+    await expect(page.getByRole("table", { name: "Các lượt dựng gói" }).getByText("Đang xem")).toBeVisible();
     // Queued for ages with no worker: the page says where to look.
-    await expect(page.getByRole("status").filter({ hasText: "Chưa có worker nhận job" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Chưa có máy dựng nhận" })).toBeVisible();
   });
 
   test("a succeeded Release build hides its form; only the other package kind stays available", async ({ page }) => {
     const mock = newMock({ jobList: [job("Succeeded")] });
     await setup(page, mock);
     await page.goto(`${base}?tab=build`);
-    await expect(page.getByRole("status").filter({ hasText: "Release package đã dựng xong" })).toBeVisible();
-    await expect(page.getByLabel("Loại package")).toHaveValue("PlaytestPackage");
-    await expect(page.getByLabel("Loại package").getByRole("option")).toHaveCount(1);
+    await expect(page.getByRole("status").filter({ hasText: "Gói phát hành đã dựng xong" })).toBeVisible();
+    await expect(page.getByLabel("Loại gói")).toHaveValue("PlaytestPackage");
+    await expect(page.getByLabel("Loại gói").getByRole("option")).toHaveCount(1);
   });
 
   test("a failed Release build offers the failed job and \"Chạy lại job\", not a new build of the same input", async ({ page }) => {
     const mock = newMock({ jobSequence: ["Failed"], jobList: [job("Failed")] });
     await setup(page, mock);
     await page.goto(`${base}?tab=build`);
-    await expect(page.getByRole("alert").filter({ hasText: "Release package dựng thất bại" })).toBeVisible();
-    await expect(page.getByLabel("Loại package")).toHaveValue("PlaytestPackage");
-    await page.getByRole("button", { name: "Xem job thất bại" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "Gói phát hành dựng bị lỗi" })).toBeVisible();
+    await expect(page.getByLabel("Loại gói")).toHaveValue("PlaytestPackage");
+    await page.getByRole("button", { name: "Xem lượt dựng lỗi" }).click();
     await expect(page.locator("#ver-job-monitor")).toBeInViewport();
-    await expect(page.getByRole("button", { name: "Chạy lại job" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Dựng lại", exact: true })).toBeVisible();
   });
 
   test("journey buttons bring the work into view instead of looking dead", async ({ page }) => {
@@ -349,22 +349,22 @@ test.describe("package build and technical readiness", () => {
     await page.setViewportSize({ width: 1280, height: 600 });
     await page.goto(`${base}?tab=build`);
     const journey = page.getByTestId("journey");
-    await journey.getByRole("button", { name: "Theo dõi job" }).click();
+    await journey.getByRole("button", { name: "Xem tiến trình" }).click();
     await expect(page.locator("#ver-job-monitor")).toBeInViewport();
     await page.evaluate(() => window.scrollTo(0, 0));
-    await journey.getByRole("button", { name: "Mở tab Playtest" }).click();
+    await journey.getByRole("button", { name: "Mở Chạy thử" }).click();
     await expect(page).toHaveURL(/tab=playtest/);
-    await expect(page.getByRole("heading", { name: "Playtest trên Mobile" })).toBeInViewport();
+    await expect(page.getByRole("heading", { name: "Chạy thử trên điện thoại" })).toBeInViewport();
   });
 
   test("failed package build retries with the same Idempotency-Key", async ({ page }) => {
     const mock = newMock({ buildResponses: [0, 202] });
     await setup(page, mock);
     await page.goto(`${base}?tab=build`);
-    await page.getByRole("button", { name: "Chạy package build" }).click();
-    await expect(page.getByText("Thử lại dùng cùng Idempotency-Key")).toBeVisible();
-    await page.getByRole("button", { name: /Thử lại \(cùng khóa\)/ }).click();
-    await expect(page.getByText("Đã xếp hàng package build")).toBeVisible();
+    await page.getByRole("button", { name: "Dựng gói", exact: true }).click();
+    await expect(page.getByText("Bấm thử lại an toàn")).toBeVisible();
+    await page.getByRole("button", { name: "Thử lại", exact: true }).click();
+    await expect(page.getByText("Đã gửi yêu cầu dựng gói")).toBeVisible();
     expect(mock.buildCalls).toHaveLength(2);
     expect(mock.buildCalls[1].key).toBe(mock.buildCalls[0].key);
     expect(mock.buildCalls[0].key).toBeTruthy();
@@ -374,13 +374,13 @@ test.describe("package build and technical readiness", () => {
     const mock = newMock({ jobSequence: ["Failed"], retryResponses: [0, 202], jobList: [job("Failed")] });
     await setup(page, mock);
     await page.goto(`${base}?tab=build`);
-    await expect(page.getByRole("alert").filter({ has: page.getByText("Job thất bại", { exact: true }) })).toBeVisible();
-    await page.getByRole("button", { name: "Chạy lại job" }).click();
+    await expect(page.getByRole("alert").filter({ has: page.getByText("Dựng gói bị lỗi", { exact: true }) })).toBeVisible();
+    await page.getByRole("button", { name: "Dựng lại", exact: true }).click();
     await page.getByLabel("Lý do").fill("Worker bị ngắt");
-    await page.getByRole("button", { name: "Chạy lại", exact: true }).click();
+    await page.getByRole("button", { name: "Xác nhận dựng lại" }).click();
     await expect(page.getByRole("dialog").getByRole("alert")).toBeVisible();
-    await page.getByRole("button", { name: "Chạy lại", exact: true }).click();
-    await expect(page.getByText("Đã xếp hàng chạy lại job")).toBeVisible();
+    await page.getByRole("button", { name: "Xác nhận dựng lại" }).click();
+    await expect(page.getByText("Đã gửi yêu cầu dựng lại")).toBeVisible();
     expect(mock.retryCalls).toHaveLength(2);
     expect(mock.retryCalls[1].requestId).toBe(mock.retryCalls[0].requestId);
   });
@@ -392,32 +392,32 @@ test.describe("package build and technical readiness", () => {
     });
     await setup(page, mock);
     await page.goto(`${base}?tab=readiness`);
-    await expect(page.getByText("QA Failed", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Kiểm tra không đạt", { exact: true }).first()).toBeVisible();
     await expect(page.getByText("RUNTIME_CAPABILITY_MISSING").first()).toBeVisible();
-    await expect(page.locator("[data-gate=technical]")).toContainText("QA không đạt");
-    await expect(page.getByRole("button", { name: "Xác nhận kỹ thuật" })).toBeDisabled();
-    await expect(page.getByTestId("readiness-missing")).toContainText("QA_NOT_PASSED");
+    await expect(page.locator("[data-gate=technical]")).toContainText("Kiểm tra không đạt");
+    await expect(page.getByRole("button", { name: "Chốt gói phát hành" })).toBeDisabled();
+    await expect(page.getByTestId("readiness-missing").locator('[data-code="QA_NOT_PASSED"]')).toHaveCount(1);
   });
 
   test("QA Passed confirms exactly the version and validation run; the confirmation comes back from the server after a reload", async ({ page }) => {
     const mock = newMock({ jobList: [job()], qa: { runs: [passedRun], issues: [] } });
     await setup(page, mock);
     await page.goto(`${base}?tab=readiness`);
-    await expect(page.getByText("QA Passed", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Kiểm tra đạt", { exact: true }).first()).toBeVisible();
     await expect(page.locator("[data-gate=approval]")).toContainText("Chưa gửi duyệt");
-    await expect(page.getByTestId("readiness-missing")).toContainText("CONFIRMATION_REQUIRED");
-    await page.getByRole("tabpanel", { name: "Kết quả kỹ thuật" }).getByRole("button", { name: "Xác nhận kỹ thuật" }).click();
+    await expect(page.getByTestId("readiness-missing").locator('[data-code="CONFIRMATION_REQUIRED"]')).toHaveCount(1);
+    await page.getByRole("tabpanel", { name: "Kiểm tra", exact: true }).getByRole("button", { name: "Chốt gói phát hành" }).click();
     await expect(page.getByTestId("confirm-review-id")).toHaveText(IDS.confirm);
     expect(mock.confirmBody).toEqual({ scenarioVersionId: IDS.version, validationRunId: IDS.run });
-    await expect(page.locator("[data-gate=technical]")).toContainText("Đã xác nhận kỹ thuật");
+    await expect(page.locator("[data-gate=technical]")).toContainText("Đã chốt gói");
     await expect(page.locator("[data-gate=approval]")).toContainText("Chưa gửi duyệt");
-    await expect(page.getByRole("button", { name: "Đã xác nhận" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Đã chốt gói" })).toBeDisabled();
     // The QA history is the server's list, not a browser memory.
-    await expect(page.getByRole("table", { name: "Lịch sử validation run" })).toContainText("ReleasePackage");
+    await expect(page.getByRole("table", { name: "Lịch sử kiểm tra" })).toContainText("Gói phát hành");
 
     await page.reload();
     await expect(page.getByTestId("confirm-review-id")).toHaveText(IDS.confirm);
-    await expect(page.locator("[data-gate=technical]")).toContainText("Đã xác nhận kỹ thuật");
+    await expect(page.locator("[data-gate=technical]")).toContainText("Đã chốt gói");
     expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.includes("version-memory")))).toEqual([]);
   });
 });
@@ -427,7 +427,7 @@ test.describe("review and release", () => {
     const mock = newMock();
     await setup(page, mock);
     await page.goto(`${base}?tab=review`);
-    await expect(page.getByText("version mới", { exact: false }).first()).toBeVisible();
+    await expect(page.getByText("phiên bản mới", { exact: false }).first()).toBeVisible();
     await expect(page.getByText("phải được duyệt lại")).toBeVisible();
     await expect(page.locator("[data-gate=approval]")).toContainText("Chưa gửi duyệt");
     await page.getByRole("button", { name: "Gửi duyệt", exact: true }).click();
@@ -466,11 +466,11 @@ test.describe("review and release", () => {
     await page.goto(`${base}?tab=release`);
     await expect(page.getByTestId("release-confirmation")).toHaveText(IDS.confirm);
     await expect(page.getByTestId("release-artifact")).toHaveText(IDS.artifact);
-    await page.getByRole("button", { name: "Tạo release (Built)" }).click();
+    await page.getByRole("button", { name: "Tạo bản phát hành" }).click();
     await expect(page.getByTestId("release-status")).toHaveText("Built");
     expect(mock.releaseCalls[0].body).toEqual({ revisionId: IDS.revision, scenarioVersionId: IDS.version, confirmationReviewId: IDS.confirm, candidateArtifactId: IDS.artifact });
     expect(mock.releaseCalls[0].key).toBeTruthy();
-    await expect(page.locator("[data-gate=release]")).toContainText("Built, chưa phát hành");
+    await expect(page.locator("[data-gate=release]")).toContainText("Đã tạo, chưa phát hành");
     await expect(page.getByTestId("release-entitlement")).toContainText("đã thanh toán");
 
     // Survives a reload: the release is found again from the server list, not from the browser.
@@ -478,12 +478,12 @@ test.describe("review and release", () => {
     await expect(page.getByTestId("release-status")).toHaveText("Built");
 
     await page.getByRole("button", { name: "Phát hành", exact: true }).click();
-    await expect(page.getByText("Cổng phát hành chưa được bật ở môi trường này").first()).toBeVisible();
+    await expect(page.getByText("Hệ thống chưa mở chức năng phát hành").first()).toBeVisible();
     await expect(page.getByTestId("release-status")).toHaveText("Built");
     await expect(page.getByText("Published", { exact: true })).toHaveCount(0);
-    await page.getByRole("button", { name: "Thử lại phát hành (cùng khóa)" }).click();
+    await page.getByRole("button", { name: "Thử lại phát hành" }).click();
     await expect(page.getByTestId("release-status")).toHaveText("Published");
-    await expect(page.locator("[data-gate=release]")).toContainText("Published");
+    await expect(page.locator("[data-gate=release]")).toContainText("Đã phát hành");
     expect(mock.publishCalls).toHaveLength(2);
     expect(mock.publishCalls[0].key).toBeTruthy();
     expect(mock.publishCalls[1].key).toBe(mock.publishCalls[0].key);
@@ -504,8 +504,8 @@ test.describe("review and release", () => {
     await setup(page, mock);
     await page.goto(`${base}?tab=release`);
     await expect(page.getByTestId("release-confirmation")).toContainText("Chưa có");
-    await expect(page.getByTestId("release-missing")).toContainText("PACKAGE_VALIDATION_REQUIRED");
-    await expect(page.getByRole("button", { name: "Tạo release (Built)" })).toBeDisabled();
+    await expect(page.getByTestId("release-missing").locator('[data-code="PACKAGE_VALIDATION_REQUIRED"]')).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Tạo bản phát hành" })).toBeDisabled();
     expect(mock.releaseCalls).toHaveLength(0);
   });
 
@@ -515,9 +515,9 @@ test.describe("review and release", () => {
     await page.goto(`${base}?tab=release`);
     await expect(page.getByTestId("release-id")).toHaveText(IDS.release);
     await expect(page.getByTestId("release-status")).toHaveText("Published");
-    await expect(page.locator("[data-gate=release]")).toContainText("Published");
+    await expect(page.locator("[data-gate=release]")).toContainText("Đã phát hành");
     await expect(page.locator("[data-gate=approval]")).toContainText("Đã duyệt");
-    await expect(page.locator("[data-gate=technical]")).toContainText("Đã xác nhận kỹ thuật");
+    await expect(page.locator("[data-gate=technical]")).toContainText("Đã chốt gói");
     await expect(page.getByRole("button", { name: "Phát hành", exact: true })).toHaveCount(0);
   });
 });
@@ -545,10 +545,10 @@ test.describe("access and deep links", () => {
     await setup(page, newMock());
     await page.goto(`${base}?version=${IDS.version}&tab=review`);
     await expect(page.getByRole("tab", { name: "Gửi duyệt" })).toHaveAttribute("data-state", "active");
-    await page.getByRole("tab", { name: "Release" }).click();
+    await page.getByRole("tab", { name: "Phát hành" }).click();
     await expect(page).toHaveURL(/tab=release/);
     await page.reload();
-    await expect(page.getByRole("tab", { name: "Release" })).toHaveAttribute("data-state", "active");
+    await expect(page.getByRole("tab", { name: "Phát hành" })).toHaveAttribute("data-state", "active");
     expect(safeNext(`${base}?tab=build`)).toBe(`${base}?tab=build`);
     expect(safeNext(`${base}/extra`)).toBe("/learning-hub");
     expect(postLoginRoute({ role: 2 }, base)).toBe("/learning-hub");

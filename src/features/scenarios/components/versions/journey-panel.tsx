@@ -48,10 +48,10 @@ export function JourneyPanel({ input, editorHref, onTab, onSnapshot, canAct, gat
   return <section className="ver-journey" aria-labelledby="ver-journey-title">
     <div className="ver-journey-main" data-testid="journey">
     <div className="ver-journey-head">
-      <h2 id="ver-journey-title" className="ver-card-title">Hành trình từ draft đến phát hành</h2>
-      <p className="ver-card-sub">Mỗi bước đọc trạng thái từ máy chủ. Ba cổng độc lập: kết quả kỹ thuật, duyệt nội dung, release.</p>
+      <h2 id="ver-journey-title" className="ver-card-title">Hành trình từ bản nháp đến phát hành</h2>
+      <p className="ver-card-sub">Ba điều kiện để học viên dùng được: kiểm tra kỹ thuật đạt, nội dung được duyệt, và bấm phát hành.</p>
     </div>
-    <ol className="ver-stepper" aria-label="Các bước từ lưu draft đến phát hành">
+    <ol className="ver-stepper" aria-label="Các bước từ lưu bản nháp đến phát hành">
       {main.map((item, index) => {
         const isNext = next?.id === item.id;
         return <li key={item.id} className="ver-step" data-step={item.id} data-state={item.state} data-next={isNext || undefined} aria-current={isNext ? "step" : undefined} title={item.detail}>
@@ -68,7 +68,7 @@ export function JourneyPanel({ input, editorHref, onTab, onSnapshot, canAct, gat
       </div> : <p className="ver-next-title">Mọi bước chính đã xong theo máy chủ.</p>}
       <div className="ver-next-actions">
         {branch && <ul className="ver-branch-list" aria-label="Nhánh tùy chọn"><li className="ver-branch" data-step="playtest" data-state={branch.state} title={branch.detail}>
-          <FlaskConical size={14} aria-hidden="true" /><span>Playtest (tùy chọn)</span><StatusBadge tone={branch.tone}>{branch.label}</StatusBadge>
+          <FlaskConical size={14} aria-hidden="true" /><span>Chạy thử (tùy chọn)</span><StatusBadge tone={branch.tone}>{branch.label}</StatusBadge>
           {action(branch, false)}
         </li></ul>}
         {next && action(next, true)}

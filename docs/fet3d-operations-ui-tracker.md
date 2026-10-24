@@ -122,6 +122,27 @@ Theo các khung `Org v2 · Phiên bản · …`, `Org v2 · Trình soạn kịch
 - **Hiệu năng**: năm panel tab và modal tạo phiên bản tách thành chunk `next/dynamic` (modal tải trước khi rê chuột/focus vào nút). First-load gzip trang phiên bản 317 → 289 KB; trình soạn 357 KB, chi tiết công trình 367 KB giữ nguyên.
 - Sửa kèm: `<td className="ops-cell-primary">` bị `display: inline-block` nên ô đầu hàng co lại, lộ nền bảng thành mảng tối ở hàng đang chọn; quy tắc inline-block giờ chỉ áp cho phần tử không phải `td`.
 
+### Chữ dễ hiểu cho trang Phiên bản (25/10/2026)
+
+Người dùng tổ chức không hiểu từ ngữ dev ("validation run", "artifact", "annotation set", `PACKAGE_VALIDATION_REQUIRED`). Bộ từ thống nhất trên trang Phiên bản, Chạy thử và thông báo lỗi:
+
+| Thuật ngữ BE | Chữ trên giao diện |
+|---|---|
+| package / package build / job | gói / dựng gói / lượt dựng |
+| ReleasePackage / PlaytestPackage | Gói phát hành / Gói chạy thử |
+| QA, validation run | kiểm tra tự động, lần kiểm tra |
+| confirm-for-training (xác nhận kỹ thuật) | Chốt gói phát hành |
+| release Built / Published / Revoked | Đã tạo, chưa phát hành / Đã phát hành / Đã thu hồi |
+| snapshot, hash | phiên bản (nội dung đã khóa), mã nội dung |
+| PlatformAdmin / OrganizationUser | quản trị FET3D / tài khoản tổ chức |
+| Playtest, Mobile | Chạy thử, điện thoại / ứng dụng FET3D |
+
+- Mã lỗi và định danh nằm trong mục gập "Thông tin cho bộ phận hỗ trợ" (`SupportCode`), không nằm trong câu báo lỗi; câu tiếng Anh của máy chủ không còn hiện ra (lỗi 5xx: "Máy chủ đang gặp lỗi").
+- Tab: Tổng quan, Dựng gói, Kiểm tra, Gửi duyệt, Phát hành, Chạy thử.
+- Bỏ ô "Annotation set": lần kiểm tra của gói dựng không bao giờ gắn annotation set (worker ghi NULL), nên `confirm-for-training` chỉ gửi `scenarioVersionId` + `validationRunId`.
+- "Còn thiếu gì" tự đọc lại readiness khi lượt dựng kết thúc hoặc có kết quả kiểm tra (trước đây còn báo thiếu gói dù kiểm tra đã đạt).
+- Chưa làm i18n VI/EN: người dùng là tổ chức Việt Nam; ưu tiên chữ tiếng Việt dễ hiểu. Các màn khác (tab IFC, admin) còn vài từ kỹ thuật, xử lý ở đợt sau.
+
 ### Tải trang động chậm (25/10/2026)
 
 - **Đo được**: các route động (`/workspace/buildings/[id]`, trình soạn, phiên bản) chạy hàm Vercel ở `iad1` (Mỹ) cho mọi lượt mở, không cache (`X-Vercel-Id: hkg1::iad1`, `X-Vercel-Cache: MISS`); RSC của chi tiết công trình có lượt 9 s, ảnh qua `/_next/image` 12 s; sidebar prefetch ~10 route cùng lúc.
