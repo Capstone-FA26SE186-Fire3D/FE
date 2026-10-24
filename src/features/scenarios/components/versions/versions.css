@@ -26,7 +26,8 @@
 .ver-section-title { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
 .ver-list { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.7; }
 .ver-actions-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.ver-row-selected td { background: var(--ember-soft); }
+/* Opaque: the table wrap paints scroll-edge gradients behind the cells, and a translucent tint shows them as dark patches. */
+.ver-row-selected td { background: color-mix(in srgb, var(--ember) 14%, var(--surface)); }
 .ver-timeline { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .ver-timeline li { display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--dim); font-size: 12px; }
 .ver-timeline li[data-state="done"] { border-color: var(--success); color: var(--success); }
