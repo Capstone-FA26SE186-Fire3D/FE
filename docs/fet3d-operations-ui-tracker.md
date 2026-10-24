@@ -109,6 +109,29 @@ Lỗi tìm ra khi chạy e2e đầy đủ và đã sửa: Dialog dùng `@radix-u
 
 Playwright đặt sẵn `fire3d-org-tour=done` qua `storageState` để tour không che trang; `tour.spec.ts` tự xóa giá trị này để kiểm lần ghé đầu.
 
+### Kích thước bundle v2 và đo tải (24/10/2026)
+
+JS first-load (gzip, KB; `.next/diagnostics/route-bundle-stats.json` của `next build`, ba bản build sạch không `.env`): **trước v2** = `41bd600`, **v2** = `b6b7542`, **sau trim** = nhánh `chore/v2-bundle-trim`.
+
+| Route | Trước v2 | v2 | Sau trim |
+|---|---:|---:|---:|
+| `/`, `/login`, `/learn` | 163 / 165 / 167 | giữ nguyên | giữ nguyên |
+| `/workspace/buildings` | 235 | 330 | 293 |
+| `/workspace/buildings/[id]` | 312 | 392 | 367 |
+| `/workspace/analytics` | 249 | 330 | 297 |
+| `/workspace/billing` | 263 | 349 | 319 |
+| `/workspace/profile` | 229 | 311 | 272 |
+| `/admin/overview` | 257 | 304 | 294 |
+| `/admin/accounts` | 233 | 290 | 283 |
+| `/admin/ai` | 267 | 328 | 321 |
+| Trung bình 24 route `/workspace` + `/admin` | 256 | 325 | 305 |
+
+- v2 làm first-load của khu Organization/Admin tăng 20–40% (+50–95 KB gzip). Nhánh trim đưa cmdk (Combobox, palette), tour spotlight và khung chat AI (kèm hộp "Áp dụng") sang `next/dynamic`: Organization giảm 15–39 KB, Admin chỉ 7–10 KB (không có bong bóng AI). Vẫn cao hơn trước v2 khoảng 19% ở mức trung bình.
+- Phần còn lại phân tán: Radix tooltip/dropdown/popper, `m` của motion và mã mới của từng trang (DataTable, modal, drawer). Hướng tiếp theo nếu cần: bỏ `TooltipProvider` khỏi shell cho đến khi có tooltip đầu tiên, thay `layoutId` của SubTabs bằng CSS, tách `DropdownMenu` của RowMenu theo kiểu cmdk.
+- Đo tải cục bộ (`next start`, API mock, giảm CPU 4×, mạng ~1,6 Mbps/150 ms, trung vị 7 lượt, Chromium của Playwright): LCP `/workspace/buildings` trước 2,97 s, v2 3,69 s, sau trim 3,36 s; `/admin/accounts` 3,00 s, 3,36 s, 3,26 s. FCP 0,64–0,74 s ở cả ba (không phân biệt được). TBT dao động mạnh giữa các lượt nên không dùng để kết luận. Tổng KB script trong lúc tải không so sánh được giữa các bản vì prefetch của các liên kết sidebar chen vào.
+- Lighthouse (mobile, throttle mô phỏng, Chrome 1 tiến trình mới mỗi lượt, production `fet3d.io.vn`, 4–5 lượt, trung vị): `/` perf 59 (TBT ~31 s do WebGL render phần mềm trong headless, không phản ánh GPU thật), `/learn` 91, `/login` 90; accessibility, best practices và SEO đều 100 trên cả ba. Ba trang này không đổi theo v2 (bundle bằng nhau): đây là mốc tham chiếu. Trang Organization/Admin cần đăng nhập nên Lighthouse không đo được; dùng số bundle và đo cục bộ ở trên.
+- Giới hạn: số đo máy cá nhân, mạng và CPU mô phỏng, một lần đo ngày 24/10/2026; Lighthouse chạy lại nhiều lần trên `/login` gặp lỗi `CHROME_INTERSTITIAL_ERROR` khi chung một tiến trình, nên mỗi lượt chạy một tiến trình riêng.
+
 ### Prototype (dev)
 
 Không còn màn hình prototype nào: Duyệt kịch bản (F3), Learn CMS (F6) và Thư viện (F7) đều là màn thật; `src/features/dev-prototype` và `PendingModule` đã bị gỡ. `tests/e2e/ops-no-prototype.spec.ts` kiểm tra bản production: không banner/dữ liệu mẫu/khối "Chưa thể mở tính năng này" và bundle client không chứa chuỗi mẫu.
