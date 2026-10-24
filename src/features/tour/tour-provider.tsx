@@ -1,11 +1,14 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { useLocalPreference } from "@/utils/local-preference";
-import { findTourTarget, TourSpotlight } from "./tour-spotlight";
-import { BUILDING_ROUTE, isTourPreference, TOUR_STORAGE_KEY, tourSteps, type TourPreference } from "./tour-steps";
+import { BUILDING_ROUTE, findTourTarget, isTourPreference, TOUR_STORAGE_KEY, tourSteps, type TourPreference } from "./tour-steps";
+
+// The spotlight (SVG dim, popover, motion) loads only once a tour starts; returning users never download it.
+const TourSpotlight = dynamic(() => import("./tour-spotlight").then((module) => module.TourSpotlight), { ssr: false });
 
 type TourApi = { active: boolean; start: () => void; stop: () => void };
 const TourContext = createContext<TourApi>({ active: false, start: () => undefined, stop: () => undefined });

@@ -1,6 +1,7 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
+import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 
@@ -9,12 +10,15 @@ import { AnimatePresence, m, presets } from "@/components/ui/motion";
 import { routes } from "@/configs/routes";
 import { useMediaQuery } from "@/utils/use-media-query";
 
-import { AI_PROPOSAL_PARAM, ApplyTargetDialog } from "../components/apply-target-dialog";
+import { AI_PROPOSAL_PARAM } from "../proposal-param";
 import type { AiRequest } from "../types";
 import { useAiBubble } from "./ai-bubble-context";
-import { AiChatPanel } from "./ai-chat-panel";
 import { usePageContext } from "./use-page-context";
 import "./ai-bubble.css";
+
+// The conversation UI and the apply dialog load when the panel first opens; the page only ships the launcher.
+const AiChatPanel = dynamic(() => import("./ai-chat-panel").then((module) => module.AiChatPanel), { ssr: false });
+const ApplyTargetDialog = dynamic(() => import("../components/apply-target-dialog").then((module) => module.ApplyTargetDialog), { ssr: false });
 
 export { useAiBubble } from "./ai-bubble-context";
 
@@ -84,6 +88,6 @@ export function AiBubble() {
       <AiChatPanel context={context} variant="drawer" onClose={closePanel} onToggleExpand={toggleExpand} onApply={onApply} focusToken={showDrawer ? focusToken : null} onFocused={consumeFocus} />
     </Drawer>
 
-    <ApplyTargetDialog accessToken={accessToken} request={applying} onClose={() => setApplying(null)} />
+    {applying && <ApplyTargetDialog accessToken={accessToken} request={applying} onClose={() => setApplying(null)} />}
   </>;
 }

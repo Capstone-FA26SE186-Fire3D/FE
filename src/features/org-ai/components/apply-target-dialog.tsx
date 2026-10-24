@@ -16,9 +16,10 @@ import { buildingsApi } from "@/features/buildings/api";
 import { aiErrorText } from "../labels";
 import type { AiRequest } from "../types";
 import styles from "../org-ai.module.css";
+import { AI_PROPOSAL_PARAM } from "../proposal-param";
 
 /** Query parameter the scenario editor reads to offer a stored AI proposal (the id, never the content). */
-export const AI_PROPOSAL_PARAM = "aiRequest";
+export { AI_PROPOSAL_PARAM };
 
 /**
  * Step 1 of "Áp dụng vào bản nháp": pick the Building and scenario whose editor will open. Nothing is written here and the

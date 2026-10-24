@@ -1,27 +1,21 @@
 "use client";
 
-import { Command } from "cmdk";
-import { Check, ChevronDown, Search, X } from "lucide-react";
+import { ChevronDown, X } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useId, useMemo, useState, type ReactNode } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/utils/cn";
+import { stripAccents } from "@/utils/strip-accents";
+import type { ComboboxGroup } from "./combobox-list";
+
+export { stripAccents };
 
 export type ComboboxOption = { value: string; label: string; hint?: string; group?: string; disabled?: boolean; keywords?: string[] };
 
-/** Accent-insensitive match ("truong" finds "Trường học") so a Vietnamese list is searchable without diacritics. */
-export function stripAccents(text: string) {
-  return text.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLowerCase();
-}
-
-function score(value: string, search: string, keywords?: string[]) {
-  const needle = stripAccents(search.trim());
-  if (!needle) return 1;
-  const hay = stripAccents([value, ...(keywords ?? [])].join(" "));
-  if (hay.startsWith(needle)) return 1;
-  if (hay.includes(needle)) return 0.7;
-  const words = needle.split(/\s+/);
-  return words.every((word) => hay.includes(word)) ? 0.4 : 0;
-}
+// cmdk loads when a list is first opened (see combobox-list.tsx), not with every page that has a combobox trigger.
+const listLoading = () => <div className="ops-combobox-empty" role="status">Đang tải…</div>;
+const ComboboxSingleList = dynamic(() => import("./combobox-list").then((module) => module.ComboboxSingleList), { ssr: false, loading: listLoading });
+const ComboboxMultiList = dynamic(() => import("./combobox-list").then((module) => module.ComboboxMultiList), { ssr: false, loading: listLoading });
 
 type Shared = {
   id?: string;
@@ -68,22 +62,8 @@ export function Combobox({ id, value, onChange, options, placeholder = "Chọn�
         {clearable && value && !disabled ? <span role="button" tabIndex={0} aria-label="Xóa lựa chọn" className="ops-combobox-clear" onClick={(event) => { event.stopPropagation(); onChange(""); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); onChange(""); } }}><X size={14} aria-hidden="true" /></span> : <ChevronDown size={16} aria-hidden="true" className="ops-combobox-chevron" />}
       </button>
     </PopoverTrigger>
-    <PopoverContent className="ops-combobox-pop" style={{ width: "var(--radix-popover-trigger-width)" }} onOpenAutoFocus={(event) => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.querySelector<HTMLInputElement>("[cmdk-input]")?.focus(); }}>
-      <Command label={searchPlaceholder} filter={(itemValue, searchText, keywords) => score(itemValue, searchText, keywords)} loop>
-        <div className="ops-combobox-search"><Search size={16} aria-hidden="true" /><Command.Input value={search} onValueChange={setSearch} placeholder={searchPlaceholder} /></div>
-        <Command.List id={listId} className="ops-combobox-list">
-          {loading ? <div className="ops-combobox-empty" role="status">Đang tải…</div> : <Command.Empty className="ops-combobox-empty">{emptyText}</Command.Empty>}
-          {groups.map((group) => <Command.Group key={group.name} heading={group.name} className="ops-combobox-group">
-            {group.items.map((option) => <Command.Item key={option.value} value={option.label} keywords={option.keywords} disabled={option.disabled} data-value={option.value} data-selected={option.value === value || undefined} className="ops-combobox-item" onSelect={() => pick(option.value)}>
-              <span className="ops-combobox-item-text"><span>{option.label}</span>{option.hint && <small>{option.hint}</small>}</span>
-              {option.value === value && <Check size={16} aria-hidden="true" />}
-            </Command.Item>)}
-          </Command.Group>)}
-          {showCustom && <Command.Group heading="Khác" className="ops-combobox-group">
-            <Command.Item value={`__custom__ ${search}`} forceMount className="ops-combobox-item ops-combobox-custom" onSelect={() => pick(search.trim())}>{customLabel} “{search.trim()}”</Command.Item>
-          </Command.Group>}
-        </Command.List>
-      </Command>
+    <PopoverContent className="ops-combobox-pop" style={{ width: "var(--radix-popover-trigger-width)" }} onOpenAutoFocus={(event) => event.preventDefault()}>
+      <ComboboxSingleList label={searchPlaceholder} listId={listId} groups={groups} search={search} onSearch={setSearch} searchPlaceholder={searchPlaceholder} loading={loading} emptyText={emptyText} value={value} showCustom={Boolean(showCustom)} customLabel={customLabel} onPick={pick} />
     </PopoverContent>
   </Popover>;
 }
@@ -113,28 +93,13 @@ export function MultiCombobox({ id, values, onChange, options, placeholder = "Ch
         <ChevronDown size={16} aria-hidden="true" className="ops-combobox-chevron" />
       </button>
     </PopoverTrigger>
-    <PopoverContent className="ops-combobox-pop" style={{ width: "var(--radix-popover-trigger-width)" }} onOpenAutoFocus={(event) => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.querySelector<HTMLInputElement>("[cmdk-input]")?.focus(); }}>
-      <Command label={searchPlaceholder} filter={(itemValue, searchText, keywords) => score(itemValue, searchText, keywords)} loop>
-        <div className="ops-combobox-search"><Search size={16} aria-hidden="true" /><Command.Input value={search} onValueChange={setSearch} placeholder={searchPlaceholder} /></div>
-        <Command.List id={listId} className="ops-combobox-list">
-          {loading ? <div className="ops-combobox-empty" role="status">Đang tải…</div> : <Command.Empty className="ops-combobox-empty">{emptyText}</Command.Empty>}
-          {groups.map((group) => <Command.Group key={group.name} heading={group.name} className="ops-combobox-group">
-            {group.items.map((option) => {
-              const active = values.includes(option.value);
-              return <Command.Item key={option.value} value={option.label} keywords={option.keywords} disabled={option.disabled} data-value={option.value} data-selected={active || undefined} className="ops-combobox-item" onSelect={() => toggle(option.value)}>
-                <span className={cn("ops-combobox-check", active && "is-on")} aria-hidden="true">{active && <Check size={12} />}</span>
-                <span className="ops-combobox-item-text"><span>{option.label}</span>{option.hint && <small>{option.hint}</small>}</span>
-              </Command.Item>;
-            })}
-          </Command.Group>)}
-        </Command.List>
-        {values.length > 0 && <div className="ops-combobox-foot"><button type="button" onClick={() => onChange([])}>Bỏ chọn tất cả</button></div>}
-      </Command>
+    <PopoverContent className="ops-combobox-pop" style={{ width: "var(--radix-popover-trigger-width)" }} onOpenAutoFocus={(event) => event.preventDefault()}>
+      <ComboboxMultiList label={searchPlaceholder} listId={listId} groups={groups} search={search} onSearch={setSearch} searchPlaceholder={searchPlaceholder} loading={loading} emptyText={emptyText} values={values} onToggle={toggle} onClear={() => onChange([])} />
     </PopoverContent>
   </Popover>;
 }
 
-function groupOptions(options: ComboboxOption[], fallback: string): Array<{ name: string; items: ComboboxOption[] }> {
+function groupOptions(options: ComboboxOption[], fallback: string): ComboboxGroup[] {
   const map = new Map<string, ComboboxOption[]>();
   for (const option of options) {
     const name = option.group ?? fallback;
