@@ -86,12 +86,12 @@ export function usePlaytestPackage({ accessToken, revisionId, versionId, enabled
 /** Lines naming what is still missing before a playtest can be prepared, from what the server reported. Empty = nothing known missing. */
 export function packageMissing(state: PlaytestPackageState): string[] {
   switch (state.kind) {
-    case "none": return ["Chưa có job dựng PlaytestPackage cho phiên bản này."];
-    case "building": return ["PlaytestPackage đang được dựng (chưa có kết quả)."];
-    case "failed": return ["Job dựng PlaytestPackage đã thất bại; chạy lại ở tab Package build."];
+    case "none": return ["Chưa dựng gói chạy thử cho phiên bản này."];
+    case "building": return ["Gói chạy thử đang được dựng."];
+    case "failed": return ["Dựng gói chạy thử bị lỗi; dựng lại ở tab Dựng gói."];
     case "succeeded":
-      if (state.qa === "failed") return [`QA của PlaytestPackage không đạt${state.blockers ? ` (${state.blockers} issue Error/Critical)` : ""}.`];
-      if (state.qa === "none") return ["Job xong nhưng chưa có validation run: Succeeded chưa phải QA Passed."];
+      if (state.qa === "failed") return [`Gói chạy thử kiểm tra không đạt${state.blockers ? ` (${state.blockers} lỗi chặn)` : ""}.`];
+      if (state.qa === "none") return ["Gói chạy thử đã dựng xong, đang chờ kết quả kiểm tra."];
       return [];
     default: return [];
   }

@@ -45,7 +45,7 @@ export type JourneyInput = {
   playtestPackage?: PlaytestPackageState;
 };
 
-const NO_DATA_DETAIL = "Máy chủ chưa trả dữ liệu cho bước này. Tải lại trang; nếu vẫn thiếu, kiểm tra phiên bản triển khai của BE.";
+const NO_DATA_DETAIL = "Chưa đọc được trạng thái bước này. Tải lại trang; nếu vẫn thiếu, liên hệ hỗ trợ.";
 
 const stateTone: Record<JourneyState, Tone> = { done: "success", active: "info", todo: "neutral", blocked: "danger", unknown: "pending" };
 
@@ -57,21 +57,21 @@ const unknown = (id: JourneyStep["id"], title: string, target: JourneyTarget, ac
   step(id, title, target, actionLabel, "unknown", NO_DATA_TEXT, detail, advisory);
 
 function needsVersion(id: JourneyStep["id"], title: string, target: JourneyTarget, actionLabel: string, input: JourneyInput) {
-  return unknown(id, title, target, actionLabel, input.versionsLoaded && input.versionCount === 0 ? "Cần có phiên bản (snapshot) để máy chủ có dữ liệu cho bước này." : NO_DATA_DETAIL);
+  return unknown(id, title, target, actionLabel, input.versionsLoaded && input.versionCount === 0 ? "Cần tạo phiên bản trước." : NO_DATA_DETAIL);
 }
 
 function playtestBranch(input: JourneyInput): JourneyStep {
   const target: JourneyTarget = { kind: "tab", tab: "playtest" };
   const state = input.playtestPackage;
-  const make = (s: JourneyState, label: string, detail: string) => step("playtest", "Playtest (tùy chọn)", target, "Mở tab Playtest", s, label, detail, true);
+  const make = (s: JourneyState, label: string, detail: string) => step("playtest", "Chạy thử (tùy chọn)", target, "Mở Chạy thử", s, label, detail, true);
   if (!input.version || !state || state.kind === "loading" || state.kind === "error") {
-    return make("unknown", NO_DATA_TEXT, "Chưa đọc được trạng thái PlaytestPackage. Chạy thử trên Mobile là tùy chọn và không thay QA hay duyệt nội dung.");
+    return make("unknown", NO_DATA_TEXT, "Chưa đọc được trạng thái gói chạy thử. Chạy thử trên điện thoại là tùy chọn.");
   }
-  if (state.kind === "succeeded" && state.qa === "passed") return make("done", "PlaytestPackage sẵn sàng", "Có thể tạo playtest và chuyển sang Mobile. Không thay QA hay duyệt nội dung.");
+  if (state.kind === "succeeded" && state.qa === "passed") return make("done", "Gói chạy thử sẵn sàng", "Có thể mở chạy thử trên điện thoại. Việc này không thay kiểm tra hay duyệt nội dung.");
   const missing = packageMissing(state);
-  if (state.kind === "none") return make("todo", "Chưa dựng PlaytestPackage", missing[0] ?? "Dựng package loại PlaytestPackage để chạy thử.");
-  if (state.kind === "building" || (state.kind === "succeeded" && (state.qa === "checking" || state.qa === "none"))) return make("active", "Chờ package", missing[0] ?? "Đang chờ kết quả package.");
-  return make("blocked", "Package chưa dùng được", missing[0] ?? "Xem tab Package build.");
+  if (state.kind === "none") return make("todo", "Chưa dựng gói chạy thử", missing[0] ?? "Dựng loại gói chạy thử ở tab Dựng gói.");
+  if (state.kind === "building" || (state.kind === "succeeded" && (state.qa === "checking" || state.qa === "none"))) return make("active", "Đang chờ gói", missing[0] ?? "Đang chờ gói chạy thử.");
+  return make("blocked", "Gói chưa dùng được", missing[0] ?? "Xem tab Dựng gói.");
 }
 
 /** Builds the eight journey steps plus the optional playtest branch (placed right after "Build package"). */
@@ -81,43 +81,43 @@ export function buildJourney(input: JourneyInput): JourneyStep[] {
 
   // 1. Draft: scenario detail (draftCount) is the only server record.
   let draft: JourneyStep;
-  if (!scenario || scenario.draftCount === undefined) draft = unknown("draft", "Lưu draft", editor, "Mở trình soạn", "Máy chủ chưa báo số draft của kịch bản. Mở trình soạn để lưu hoặc xem draft.");
-  else if (scenario.draftCount > 0) draft = step("draft", "Lưu draft", editor, "Mở trình soạn", "done", "Đã có draft", `${scenario.draftCount} draft${scenario.currentDraftVersion != null ? `, bản lưu mới nhất ở phiên bản draft ${scenario.currentDraftVersion}` : ""}.`);
-  else draft = step("draft", "Lưu draft", editor, "Mở trình soạn", "todo", "Chưa có draft", "Mở trình soạn kịch bản, đặt điểm xuất phát, mối nguy hiểm và rubric rồi lưu draft.");
+  if (!scenario || scenario.draftCount === undefined) draft = unknown("draft", "Lưu bản nháp", editor, "Mở trình soạn", "Chưa đọc được số bản nháp. Mở trình soạn để lưu hoặc xem.");
+  else if (scenario.draftCount > 0) draft = step("draft", "Lưu bản nháp", editor, "Mở trình soạn", "done", "Đã có bản nháp", `${scenario.draftCount} bản nháp đã lưu.`);
+  else draft = step("draft", "Lưu bản nháp", editor, "Mở trình soạn", "todo", "Chưa có bản nháp", "Mở trình soạn, đặt điểm xuất phát, nguy cơ, tiêu chí chấm rồi lưu.");
 
   // 2. Validate: the server never stores a draft validation result, so this is explicitly "no data".
-  const validate = unknown("validate", "Kiểm tra", editor, "Kiểm tra trong trình soạn", "Máy chủ không lưu kết quả kiểm tra draft. Chạy kiểm tra trong trình soạn hoặc khi tạo snapshot; kết quả không được đọc lại từ đây.", true);
+  const validate = unknown("validate", "Kiểm tra bản nháp", editor, "Kiểm tra trong trình soạn", "Kết quả kiểm tra bản nháp không được lưu lại. Bấm Kiểm tra trong trình soạn trước khi tạo phiên bản.", true);
 
   // 3. Snapshot: the version list.
   let snapshot: JourneyStep;
   const snapshotTarget: JourneyTarget = { kind: "snapshot" };
-  if (!input.versionsLoaded) snapshot = unknown("snapshot", "Snapshot", snapshotTarget, "Tạo snapshot");
-  else if (version) snapshot = step("snapshot", "Snapshot", snapshotTarget, "Tạo snapshot mới", "done", `Đã có v${version.versionNumber}`, `Phiên bản bất biến #${shortHash(version.scenarioHash, 10)}. Sửa nội dung sẽ tạo phiên bản mới.`);
-  else if (input.versionCount > 0) snapshot = step("snapshot", "Snapshot", snapshotTarget, "Tạo snapshot mới", "done", `Có ${input.versionCount} phiên bản`, "Chọn một phiên bản ở danh sách để xem các bước còn lại.");
-  else snapshot = step("snapshot", "Snapshot", snapshotTarget, "Tạo snapshot", "todo", "Chưa có phiên bản", "Tạo snapshot từ draft để có phiên bản bất biến đầu tiên.");
+  if (!input.versionsLoaded) snapshot = unknown("snapshot", "Tạo phiên bản", snapshotTarget, "Tạo phiên bản");
+  else if (version) snapshot = step("snapshot", "Tạo phiên bản", snapshotTarget, "Tạo phiên bản mới", "done", `Đã có v${version.versionNumber}`, `Nội dung v${version.versionNumber} đã khóa (mã #${shortHash(version.scenarioHash, 8)}). Sửa nội dung sẽ tạo phiên bản mới.`);
+  else if (input.versionCount > 0) snapshot = step("snapshot", "Tạo phiên bản", snapshotTarget, "Tạo phiên bản mới", "done", `Có ${input.versionCount} phiên bản`, "Chọn một phiên bản ở danh sách để xem các bước còn lại.");
+  else snapshot = step("snapshot", "Tạo phiên bản", snapshotTarget, "Tạo phiên bản", "todo", "Chưa có phiên bản", "Tạo phiên bản từ bản nháp để khóa nội dung lần đầu.");
 
   // 4. Package build: the package job the server reports for this version.
   const pkgTarget: JourneyTarget = { kind: "tab", tab: "build" };
   let pkg: JourneyStep;
-  if (!version) pkg = needsVersion("package", "Build package", pkgTarget, "Mở Package build", input);
-  else if (!readiness) pkg = unknown("package", "Build package", pkgTarget, "Mở Package build");
-  else if (!readiness.packageJob) pkg = step("package", "Build package", pkgTarget, "Mở Package build", "todo", "Chưa dựng package", "Chạy package build để có kết quả QA kỹ thuật.");
+  if (!version) pkg = needsVersion("package", "Dựng gói", pkgTarget, "Mở Dựng gói", input);
+  else if (!readiness) pkg = unknown("package", "Dựng gói", pkgTarget, "Mở Dựng gói");
+  else if (!readiness.packageJob) pkg = step("package", "Dựng gói", pkgTarget, "Mở Dựng gói", "todo", "Chưa dựng gói", "Dựng gói để ứng dụng Android tải về; hệ thống sẽ tự kiểm tra gói.");
   else {
     const status = readiness.packageJob.status.toLowerCase();
-    if (status === "succeeded") pkg = step("package", "Build package", pkgTarget, "Mở Package build", "done", "Job Succeeded", "Job xong chưa phải QA Passed: xem bước Readiness kỹ thuật.");
-    else if (status === "failed" || status === "cancelled" || status === "canceled") pkg = step("package", "Build package", pkgTarget, "Xem job và chạy lại", "blocked", status === "failed" ? "Job thất bại" : "Job đã hủy", "Xem nguyên nhân ở tab Package build rồi chạy lại.");
-    else pkg = step("package", "Build package", pkgTarget, "Theo dõi job", "active", status === "queued" ? "Đang chờ" : "Đang chạy", "Job đang xử lý; chưa có kết quả QA.");
+    if (status === "succeeded") pkg = step("package", "Dựng gói", pkgTarget, "Mở Dựng gói", "done", "Dựng xong", "Gói đã dựng; xem kết quả kiểm tra ở bước sau.");
+    else if (status === "failed" || status === "cancelled" || status === "canceled") pkg = step("package", "Dựng gói", pkgTarget, "Xem và dựng lại", "blocked", status === "failed" ? "Dựng lỗi" : "Đã hủy", "Xem ở tab Dựng gói rồi dựng lại.");
+    else pkg = step("package", "Dựng gói", pkgTarget, "Xem tiến trình", "active", status === "queued" ? "Chờ máy dựng" : "Đang dựng", "Máy dựng đang xử lý; chưa có kết quả kiểm tra.");
   }
 
   // 5. Technical readiness: only what the readiness endpoint says.
   const readyTarget: JourneyTarget = { kind: "tab", tab: "readiness" };
   let ready: JourneyStep;
-  if (!version) ready = needsVersion("readiness", "Readiness kỹ thuật", readyTarget, "Mở Kết quả kỹ thuật", input);
-  else if (!readiness) ready = unknown("readiness", "Readiness kỹ thuật", readyTarget, "Mở Kết quả kỹ thuật");
-  else if (readiness.technicalReady) ready = step("readiness", "Readiness kỹ thuật", readyTarget, "Mở Kết quả kỹ thuật", "done", "Sẵn sàng kỹ thuật", "QA đạt và đã xác nhận kỹ thuật. Không thay duyệt nội dung.");
-  else if (readiness.outcome && (readiness.outcome.toLowerCase() !== "passed" || readiness.blockerCount > 0)) ready = step("readiness", "Readiness kỹ thuật", readyTarget, "Xem lỗi QA", "blocked", "QA không đạt", readiness.blockerCount > 0 ? `${readiness.blockerCount} issue Error/Critical đang chặn.` : "Validation run không Passed.");
-  else if (readiness.outcome) ready = step("readiness", "Readiness kỹ thuật", readyTarget, "Xác nhận kỹ thuật", "active", "QA đạt, chờ xác nhận", readiness.missing.length ? readiness.missing.map(missingText).join(" ") : "Cần xác nhận kỹ thuật.");
-  else ready = step("readiness", "Readiness kỹ thuật", readyTarget, "Mở Kết quả kỹ thuật", "todo", "Chưa có kết quả QA", readiness.missing.length ? readiness.missing.map(missingText).join(" ") : "Chưa có validation run.");
+  if (!version) ready = needsVersion("readiness", "Kiểm tra và chốt gói", readyTarget, "Mở Kiểm tra", input);
+  else if (!readiness) ready = unknown("readiness", "Kiểm tra và chốt gói", readyTarget, "Mở Kiểm tra");
+  else if (readiness.technicalReady) ready = step("readiness", "Kiểm tra và chốt gói", readyTarget, "Mở Kiểm tra", "done", "Đã chốt gói", "Kiểm tra đạt và gói đã chốt để phát hành.");
+  else if (readiness.outcome && (readiness.outcome.toLowerCase() !== "passed" || readiness.blockerCount > 0)) ready = step("readiness", "Kiểm tra và chốt gói", readyTarget, "Xem lỗi", "blocked", "Kiểm tra không đạt", readiness.blockerCount > 0 ? `Có ${readiness.blockerCount} lỗi chặn.` : "Lần kiểm tra mới nhất không đạt.");
+  else if (readiness.outcome) ready = step("readiness", "Kiểm tra và chốt gói", readyTarget, "Chốt gói phát hành", "active", "Kiểm tra đạt, chờ chốt", readiness.missing.length ? readiness.missing.map(missingText).join(" ") : "Bấm Chốt gói phát hành ở tab Kiểm tra.");
+  else ready = step("readiness", "Kiểm tra và chốt gói", readyTarget, "Mở Kiểm tra", "todo", "Chưa có kết quả kiểm tra", readiness.missing.length ? readiness.missing.map(missingText).join(" ") : "Chưa có lần kiểm tra nào.");
 
   // 6. Content review: the version's own reviewStatus.
   const reviewTarget: JourneyTarget = { kind: "tab", tab: "review" };
@@ -126,11 +126,11 @@ export function buildJourney(input: JourneyInput): JourneyStep[] {
   else if (!version.reviewStatus) review = unknown("review", "Gửi duyệt", reviewTarget, "Mở Gửi duyệt");
   else {
     const status = version.reviewStatus.toLowerCase();
-    if (status === "approved") review = step("review", "Gửi duyệt", reviewTarget, "Xem duyệt", "done", "Đã duyệt", "PlatformAdmin đã duyệt đúng hash nội dung và rubric.");
-    else if (status === "submitted") review = step("review", "Gửi duyệt", reviewTarget, "Xem duyệt", "active", "Chờ duyệt", "Đã gửi, đang chờ PlatformAdmin.");
+    if (status === "approved") review = step("review", "Gửi duyệt", reviewTarget, "Xem duyệt", "done", "Đã duyệt", "Quản trị FET3D đã duyệt nội dung và tiêu chí chấm.");
+    else if (status === "submitted") review = step("review", "Gửi duyệt", reviewTarget, "Xem duyệt", "active", "Chờ duyệt", "Đã gửi, đang chờ quản trị FET3D.");
     else if (status === "rejected") review = step("review", "Gửi duyệt", reviewTarget, "Xem lý do", "blocked", "Bị từ chối", version.rejectReason ? `Lý do: ${version.rejectReason}` : "Sửa nội dung sẽ tạo phiên bản mới.");
-    else if (status === "notsubmitted") review = step("review", "Gửi duyệt", reviewTarget, "Gửi duyệt", "todo", "Chưa gửi duyệt", "Gửi duyệt để PlatformAdmin duyệt nội dung và rubric.");
-    else review = step("review", "Gửi duyệt", reviewTarget, "Mở Gửi duyệt", "active", version.reviewStatus, "Trạng thái duyệt do máy chủ báo.");
+    else if (status === "notsubmitted") review = step("review", "Gửi duyệt", reviewTarget, "Gửi duyệt", "todo", "Chưa gửi duyệt", "Gửi để quản trị FET3D duyệt nội dung và tiêu chí chấm.");
+    else review = step("review", "Gửi duyệt", reviewTarget, "Mở Gửi duyệt", "active", version.reviewStatus, "Trạng thái duyệt do hệ thống báo.");
   }
 
   // 7 and 8. Release: the release the server lists/returns for this version.
@@ -139,19 +139,19 @@ export function buildJourney(input: JourneyInput): JourneyStep[] {
   let create: JourneyStep;
   let publish: JourneyStep;
   if (!version) {
-    create = needsVersion("release", "Tạo release", releaseTarget, "Mở Release", input);
-    publish = needsVersion("publish", "Phát hành", releaseTarget, "Mở Release", input);
+    create = needsVersion("release", "Tạo bản phát hành", releaseTarget, "Mở Phát hành", input);
+    publish = needsVersion("publish", "Phát hành", releaseTarget, "Mở Phát hành", input);
   } else if (!input.releaseKnown) {
-    create = unknown("release", "Tạo release", releaseTarget, "Mở Release");
-    publish = unknown("publish", "Phát hành", releaseTarget, "Mở Release");
+    create = unknown("release", "Tạo bản phát hành", releaseTarget, "Mở Phát hành");
+    publish = unknown("publish", "Phát hành", releaseTarget, "Mở Phát hành");
   } else if (!input.release) {
-    create = step("release", "Tạo release", releaseTarget, "Mở Release", "todo", "Chưa có release", "Release cần nội dung đã duyệt và xác nhận kỹ thuật.");
-    publish = step("publish", "Phát hành", releaseTarget, "Mở Release", "todo", "Chưa phát hành", "Phát hành chỉ làm được với release ở trạng thái Built.");
+    create = step("release", "Tạo bản phát hành", releaseTarget, "Mở Phát hành", "todo", "Chưa có bản phát hành", "Cần nội dung đã duyệt và gói đã chốt.");
+    publish = step("publish", "Phát hành", releaseTarget, "Mở Phát hành", "todo", "Chưa phát hành", "Phát hành sau khi đã tạo bản phát hành.");
   } else {
-    create = step("release", "Tạo release", releaseTarget, "Mở Release", "done", `Release ${input.release.status}`, "Đã có release cho phiên bản này.");
-    if (releaseStatus === "published") publish = step("publish", "Phát hành", releaseTarget, "Mở Release", "done", "Đã phát hành", "Release Published.");
-    else if (releaseStatus === "revoked") publish = step("publish", "Phát hành", releaseTarget, "Mở Release", "blocked", "Đã thu hồi", input.release.revokedReason ? `Lý do: ${input.release.revokedReason}` : "Release đã bị thu hồi.");
-    else publish = step("publish", "Phát hành", releaseTarget, "Mở Release", "todo", "Built, chưa phát hành", "Built chỉ là gói đã dựng; phát hành còn qua cổng kiểm tra duyệt, readiness và quyền dịch vụ.");
+    create = step("release", "Tạo bản phát hành", releaseTarget, "Mở Phát hành", "done", "Đã tạo", "Đã có bản phát hành cho phiên bản này.");
+    if (releaseStatus === "published") publish = step("publish", "Phát hành", releaseTarget, "Mở Phát hành", "done", "Đã phát hành", "Học viên đã dùng được.");
+    else if (releaseStatus === "revoked") publish = step("publish", "Phát hành", releaseTarget, "Mở Phát hành", "blocked", "Đã thu hồi", input.release.revokedReason ? `Lý do: ${input.release.revokedReason}` : "Bản phát hành đã bị thu hồi.");
+    else publish = step("publish", "Phát hành", releaseTarget, "Mở Phát hành", "todo", "Đã tạo, chưa phát hành", "Học viên chưa dùng được. Bấm Phát hành; hệ thống kiểm tra lại duyệt, gói và dịch vụ của công trình.");
   }
 
   return [draft, validate, snapshot, pkg, playtestBranch(input), ready, review, create, publish].sort((a, b) => order(a) - order(b));

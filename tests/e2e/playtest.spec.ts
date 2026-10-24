@@ -219,7 +219,7 @@ async function setup(page: Page, mock: Mock) {
 
 async function openTab(page: Page, query = "") {
   await page.goto(`${base}?tab=playtest${query}`);
-  await expect(page.getByRole("heading", { name: "Playtest trên Mobile" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Chạy thử trên điện thoại" })).toBeVisible();
 }
 
 const create = (page: Page) => page.getByTestId("playtest-create");
@@ -261,9 +261,9 @@ test.describe("prepare and follow", () => {
     await openTab(page, `&playtest=${IDS.playtest}`);
     await expect(statusBox(page)).toContainText("Đã chuẩn bị");
     await expect(page.getByTestId("qr-code")).toHaveCount(0);
-    await page.getByRole("button", { name: "Tạo mã chuyển sang Mobile" }).click();
+    await page.getByRole("button", { name: "Tạo mã QR mở trên điện thoại" }).click();
     await expect(page.getByRole("alert").filter({ hasText: "Không kết nối được máy chủ" })).toBeVisible();
-    await page.getByRole("button", { name: "Tạo mã chuyển sang Mobile" }).click();
+    await page.getByRole("button", { name: "Tạo mã QR mở trên điện thoại" }).click();
     const qr = page.getByTestId("qr-code");
     await expect(qr).toBeVisible();
     expect(mock.handoffCalls).toHaveLength(2);
@@ -285,7 +285,7 @@ test.describe("prepare and follow", () => {
     const mock = newMock({ playtest: newRow(), handoffTtlMs: 2500 });
     await setup(page, mock);
     await openTab(page, `&playtest=${IDS.playtest}`);
-    await page.getByRole("button", { name: "Tạo mã chuyển sang Mobile" }).click();
+    await page.getByRole("button", { name: "Tạo mã QR mở trên điện thoại" }).click();
     await expect(page.getByTestId("qr-code")).toBeVisible();
     await expect(page.getByRole("status").filter({ hasText: "Mã đã hết hạn" })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId("qr-code")).toHaveCount(0);
@@ -321,13 +321,13 @@ test.describe("prepare and follow", () => {
     const mock = newMock({ playtest: newRow(), progress: [] });
     await setup(page, mock);
     await openTab(page, `&playtest=${IDS.playtest}`);
-    await page.getByRole("button", { name: "Tạo mã chuyển sang Mobile" }).click();
+    await page.getByRole("button", { name: "Tạo mã QR mở trên điện thoại" }).click();
     await expect(page.getByTestId("qr-code")).toBeVisible();
     mock.playtest = { ...(mock.playtest as PlaytestRow), boundToMobile: true, openHandoffExpiresAt: null };
-    await expect(statusBox(page)).toContainText("Đã gắn với Mobile", { timeout: 10_000 });
+    await expect(statusBox(page)).toContainText("Điện thoại đã nhận mã", { timeout: 10_000 });
     await expect(page.getByTestId("qr-code")).toHaveCount(0);
     await expect(page.getByRole("button", { name: /Cấp lại mã|Tạo mã/ })).toHaveCount(0);
-    await expect(page.getByTestId("handoff-card")).toContainText("Web không cấp thêm mã");
+    await expect(page.getByTestId("handoff-card")).toContainText("đang giữ lượt chạy thử");
   });
 });
 
@@ -404,7 +404,7 @@ test.describe("reload", () => {
     await openTab(page);
     await create(page).click();
     await expect(statusBox(page)).toContainText("Đã chuẩn bị");
-    await page.getByRole("button", { name: "Tạo mã chuyển sang Mobile" }).click();
+    await page.getByRole("button", { name: "Tạo mã QR mở trên điện thoại" }).click();
     await expect(page.getByTestId("qr-code")).toBeVisible();
 
     await page.reload();
@@ -423,7 +423,7 @@ test.describe("reload", () => {
     await setup(page, mock);
     await openTab(page, `&playtest=${IDS.playtest}`);
     await expect(statusBox(page)).toContainText("Đang chạy trên thiết bị");
-    await expect(page.getByTestId("handoff-card")).toContainText("Playtest đã bắt đầu");
+    await expect(page.getByTestId("handoff-card")).toContainText("Đã bắt đầu chơi trên điện thoại");
     await page.reload();
     await expect(statusBox(page)).toContainText("Đang chạy trên thiết bị");
     expect(mock.prepareCalls).toHaveLength(0);
@@ -448,14 +448,14 @@ test.describe("reload", () => {
 });
 
 const prepareErrors: Array<{ name: string; reply: Reply; text: RegExp }> = [
-  { name: "package not ready", reply: { status: 409, code: "PLAYTEST_PACKAGE_REQUIRED" }, text: /chưa có PlaytestPackage đã dựng/ },
-  { name: "snapshot required", reply: { status: 409, code: "DRAFT_SNAPSHOT_REQUIRED" }, text: /snapshot/ },
-  { name: "runtime incompatible", reply: { status: 409, code: "RUNTIME_INCOMPATIBLE" }, text: /không tương thích runtime/ },
+  { name: "package not ready", reply: { status: 409, code: "PLAYTEST_PACKAGE_REQUIRED" }, text: /chưa có gói chạy thử đã dựng/ },
+  { name: "snapshot required", reply: { status: 409, code: "DRAFT_SNAPSHOT_REQUIRED" }, text: /Tạo phiên bản mới/ },
+  { name: "runtime incompatible", reply: { status: 409, code: "RUNTIME_INCOMPATIBLE" }, text: /không tương thích với phiên bản ứng dụng/ },
   { name: "entitlement or Trial exhausted", reply: { status: 409, code: "PLAYTEST_ENTITLEMENT_REQUIRED" }, text: /dịch vụ trả phí còn hiệu lực hoặc gói dùng thử đã hết/ },
-  { name: "rollout not enabled", reply: { status: 503, code: "PLAYTEST_LAUNCH_UNAVAILABLE" }, text: /chưa được bật ở môi trường này/ },
-  { name: "cross tenant 404", reply: { status: 404, code: "NOT_FOUND" }, text: /không thuộc tài khoản\/tổ chức của bạn/ },
-  { name: "forbidden 403", reply: { status: 403, code: "FORBIDDEN" }, text: /Chỉ tài khoản OrganizationUser/ },
-  { name: "idempotency conflict", reply: { status: 409, code: "IDEMPOTENCY_KEY_CONFLICT" }, text: /cùng khóa nhưng nội dung khác/ },
+  { name: "rollout not enabled", reply: { status: 503, code: "PLAYTEST_LAUNCH_UNAVAILABLE" }, text: /chưa được bật/ },
+  { name: "cross tenant 404", reply: { status: 404, code: "NOT_FOUND" }, text: /không thuộc tổ chức của bạn/ },
+  { name: "forbidden 403", reply: { status: 403, code: "FORBIDDEN" }, text: /Chỉ tài khoản tổ chức/ },
+  { name: "idempotency conflict", reply: { status: 409, code: "IDEMPOTENCY_KEY_CONFLICT" }, text: /trùng với một yêu cầu trước nhưng nội dung khác/ },
 ];
 
 test.describe("errors", () => {
@@ -492,23 +492,23 @@ test.describe("errors", () => {
   });
 
   const handoffErrors: Array<{ name: string; reply: Reply; text: RegExp }> = [
-    { name: "handoff not configured (503)", reply: { status: 503, code: "PLAYTEST_HANDOFF_UNAVAILABLE" }, text: /Chuyển sang Mobile chưa được bật/ },
-    { name: "already started (409)", reply: { status: 409, code: "PLAYTEST_ALREADY_STARTED" }, text: /đã bắt đầu/ },
+    { name: "handoff not configured (503)", reply: { status: 503, code: "PLAYTEST_HANDOFF_UNAVAILABLE" }, text: /mở trên điện thoại chưa được bật/ },
+    { name: "already started (409)", reply: { status: 409, code: "PLAYTEST_ALREADY_STARTED" }, text: /[Đđ]ã bắt đầu/ },
     { name: "code expired (409)", reply: { status: 409, code: "PLAYTEST_HANDOFF_EXPIRED" }, text: /hết hạn/ },
-    { name: "code already used (409)", reply: { status: 409, code: "PLAYTEST_HANDOFF_USED" }, text: /đã được một phiên Mobile khác dùng/ },
+    { name: "code already used (409)", reply: { status: 409, code: "PLAYTEST_HANDOFF_USED" }, text: /đã được một điện thoại khác dùng/ },
     { name: "not recoverable (409)", reply: { status: 409, code: "PLAYTEST_HANDOFF_NOT_RECOVERABLE" }, text: /Hãy tạo mã mới/ },
-    { name: "wrong tenant (404)", reply: { status: 404, code: "NOT_FOUND" }, text: /không thuộc tài khoản\/tổ chức/ },
+    { name: "wrong tenant (404)", reply: { status: 404, code: "NOT_FOUND" }, text: /không thuộc tổ chức/ },
   ];
   for (const item of handoffErrors) {
     test(`handoff: ${item.name}`, async ({ page }) => {
       const mock = newMock({ playtest: newRow(), handoffReplies: [item.reply, 201] });
       await setup(page, mock);
       await openTab(page, `&playtest=${IDS.playtest}`);
-      await page.getByRole("button", { name: "Tạo mã chuyển sang Mobile" }).click();
+      await page.getByRole("button", { name: "Tạo mã QR mở trên điện thoại" }).click();
       const alert = page.getByTestId("handoff-card").getByRole("alert");
       await expect(alert).toContainText(item.text);
       await expect(page.getByTestId("qr-code")).toHaveCount(0);
-      await page.getByRole("button", { name: "Tạo mã chuyển sang Mobile" }).click();
+      await page.getByRole("button", { name: "Tạo mã QR mở trên điện thoại" }).click();
       await expect(page.getByTestId("qr-code")).toBeVisible();
       const unknownOutcome = typeof item.reply === "object" && item.reply.status >= 500;
       if (unknownOutcome) expect(mock.handoffCalls[1].key).toBe(mock.handoffCalls[0].key);
@@ -566,11 +566,11 @@ test.describe("errors", () => {
 
 test.describe("package preconditions come from the server", () => {
   const cases: Array<{ name: string; patch: Partial<Mock>; missing?: RegExp; enabled: boolean }> = [
-    { name: "no PlaytestPackage job", patch: { jobs: [] }, missing: /Chưa có job dựng PlaytestPackage/, enabled: false },
-    { name: "only a ReleasePackage job", patch: { jobs: [{ id: IDS.job, status: "Succeeded", kind: "ReleasePackage" }] }, missing: /Chưa có job dựng PlaytestPackage/, enabled: false },
+    { name: "no PlaytestPackage job", patch: { jobs: [] }, missing: /Chưa dựng gói chạy thử/, enabled: false },
+    { name: "only a ReleasePackage job", patch: { jobs: [{ id: IDS.job, status: "Succeeded", kind: "ReleasePackage" }] }, missing: /Chưa dựng gói chạy thử/, enabled: false },
     { name: "job still running", patch: { jobs: [{ id: IDS.job, status: "Running", kind: "PlaytestPackage" }] }, missing: /đang được dựng/, enabled: false },
-    { name: "job failed", patch: { jobs: [{ id: IDS.job, status: "Failed", kind: "PlaytestPackage" }] }, missing: /đã thất bại/, enabled: false },
-    { name: "job succeeded but QA failed", patch: { qa: "failed" }, missing: /QA của PlaytestPackage không đạt/, enabled: false },
+    { name: "job failed", patch: { jobs: [{ id: IDS.job, status: "Failed", kind: "PlaytestPackage" }] }, missing: /bị lỗi/, enabled: false },
+    { name: "job succeeded but QA failed", patch: { qa: "failed" }, missing: /Gói chạy thử kiểm tra không đạt/, enabled: false },
     { name: "job succeeded, QA passed", patch: {}, enabled: true },
   ];
   for (const item of cases) {
@@ -580,12 +580,12 @@ test.describe("package preconditions come from the server", () => {
       await openTab(page);
       if (item.enabled) {
         await expect(create(page)).toBeEnabled();
-        await expect(page.getByTestId("playtest-package")).toContainText("Job xong, QA đạt");
+        await expect(page.getByTestId("playtest-package")).toContainText("Sẵn sàng");
         await expect(page.getByTestId("playtest-missing")).toHaveCount(0);
       } else {
         await expect(page.getByTestId("playtest-missing")).toContainText(item.missing as RegExp);
         await expect(create(page)).toBeDisabled();
-        await expect(page.getByRole("link", { name: "Mở tab Package build" })).toBeVisible();
+        await expect(page.getByRole("link", { name: "Mở tab Dựng gói" })).toBeVisible();
       }
       expect(mock.prepareCalls).toHaveLength(0);
     });
@@ -597,7 +597,7 @@ test.describe("roles and boundary", () => {
     const mock = newMock({ role: 0, playtest: newRow() });
     await setup(page, mock);
     await openTab(page, `&playtest=${IDS.playtest}`);
-    await expect(page.getByRole("status").filter({ hasText: "Chỉ OrganizationUser chạy thử được" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Chỉ tài khoản tổ chức chạy thử được" })).toBeVisible();
     await expect(create(page)).toHaveCount(0);
     await expect(statusBox(page)).toHaveCount(0);
     expect(mock.getCalls).toBe(0);
@@ -611,7 +611,7 @@ test.describe("roles and boundary", () => {
     await setup(page, mock);
     await openTab(page);
     await create(page).click();
-    await page.getByRole("button", { name: "Tạo mã chuyển sang Mobile" }).click();
+    await page.getByRole("button", { name: "Tạo mã QR mở trên điện thoại" }).click();
     await expect(page.getByTestId("qr-code")).toBeVisible();
     mock.progress = ["Launching", "Running", "Completed"]; // the Mobile app now takes over
     await expect(statusBox(page)).toContainText("Đã hoàn tất", { timeout: 25_000 });
@@ -648,13 +648,13 @@ const journeyCases: JourneyCase[] = [
     name: "no version yet: snapshot is next, later steps have no data",
     patch: { versions: false, draftCount: 1 },
     next: "snapshot",
-    steps: { draft: { state: "done", text: /1 draft/ }, validate: { state: "unknown", text: /Chưa có dữ liệu/ }, snapshot: { state: "todo", text: /Chưa có phiên bản/ }, package: { state: "unknown", text: /Chưa có dữ liệu/ }, readiness: { state: "unknown", text: /Chưa có dữ liệu/ }, review: { state: "unknown", text: /Chưa có dữ liệu/ }, release: { state: "unknown", text: /Chưa có dữ liệu/ }, publish: { state: "unknown", text: /Chưa có dữ liệu/ } },
+    steps: { draft: { state: "done", text: /1 bản nháp/ }, validate: { state: "unknown", text: /Chưa có dữ liệu/ }, snapshot: { state: "todo", text: /Chưa có phiên bản/ }, package: { state: "unknown", text: /Chưa có dữ liệu/ }, readiness: { state: "unknown", text: /Chưa có dữ liệu/ }, review: { state: "unknown", text: /Chưa có dữ liệu/ }, release: { state: "unknown", text: /Chưa có dữ liệu/ }, publish: { state: "unknown", text: /Chưa có dữ liệu/ } },
   },
   {
     name: "no draft: the draft step is next",
     patch: { versions: false, draftCount: 0 },
     next: "draft",
-    steps: { draft: { state: "todo", text: /Chưa có draft/ } },
+    steps: { draft: { state: "todo", text: /Chưa có bản nháp/ } },
   },
   {
     name: "scenario without draft counts: draft step has no data and is next",
@@ -666,55 +666,55 @@ const journeyCases: JourneyCase[] = [
     name: "version without package job: build package is next",
     patch: { readiness: { packageJob: null, outcome: null, blockerCount: 0, confirmationReviewId: null, technicalReady: false, missing: ["PACKAGE_VALIDATION_REQUIRED"] }, jobs: [] },
     next: "package",
-    steps: { snapshot: { state: "done", text: /Đã có v1/ }, package: { state: "todo", text: /Chưa dựng package/ }, readiness: { state: "todo", text: /Chưa có kết quả QA/ }, review: { state: "todo", text: /Chưa gửi duyệt/ }, release: { state: "todo", text: /Chưa có release/ } },
+    steps: { snapshot: { state: "done", text: /Đã có v1/ }, package: { state: "todo", text: /Chưa dựng gói/ }, readiness: { state: "todo", text: /Chưa có kết quả kiểm tra/ }, review: { state: "todo", text: /Chưa gửi duyệt/ }, release: { state: "todo", text: /Chưa có bản phát hành/ } },
   },
   {
     name: "job running: package is active and still next",
     patch: { readiness: { packageJob: { jobId: IDS.job, status: "Running", currentAttemptId: "att-1" }, outcome: null, blockerCount: 0, confirmationReviewId: null, technicalReady: false, missing: ["PACKAGE_VALIDATION_REQUIRED"] }, jobs: [{ id: IDS.job, status: "Running", kind: "ReleasePackage" }] },
     next: "package",
-    steps: { package: { state: "active", text: /Đang chạy/ } },
+    steps: { package: { state: "active", text: /Đang dựng/ } },
   },
   {
     name: "job Succeeded is not QA Passed: package done, readiness still open",
     patch: { readiness: { packageJob: { jobId: IDS.job, status: "Succeeded", currentAttemptId: "att-1" }, outcome: null, blockerCount: 0, confirmationReviewId: null, technicalReady: false, missing: ["PACKAGE_VALIDATION_REQUIRED"] } },
     next: "readiness",
-    steps: { package: { state: "done", text: /Job Succeeded/ }, readiness: { state: "todo", text: /Chưa có kết quả QA/ } },
+    steps: { package: { state: "done", text: /Dựng xong/ }, readiness: { state: "todo", text: /Chưa có kết quả kiểm tra/ } },
   },
   {
     name: "QA passed without confirmation: readiness is active",
     patch: {},
     next: "readiness",
-    steps: { package: { state: "done", text: /Job Succeeded/ }, readiness: { state: "active", text: /QA đạt, chờ xác nhận/ } },
+    steps: { package: { state: "done", text: /Dựng xong/ }, readiness: { state: "active", text: /Kiểm tra đạt, chờ chốt/ } },
   },
   {
     name: "QA failed: readiness blocked",
     patch: { readiness: { packageJob: { jobId: IDS.job, status: "Succeeded", currentAttemptId: "att-1" }, outcome: "Failed", blockerCount: 2, confirmationReviewId: null, technicalReady: false, missing: ["QA_NOT_PASSED"] } },
     next: "readiness",
-    steps: { readiness: { state: "blocked", text: /QA không đạt/ } },
+    steps: { readiness: { state: "blocked", text: /Kiểm tra không đạt/ } },
   },
   {
     name: "technically ready and not submitted: review is next",
     patch: { readiness: { packageJob: { jobId: IDS.job, status: "Succeeded", currentAttemptId: "att-1" }, outcome: "Passed", blockerCount: 0, confirmationReviewId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", technicalReady: true, missing: [] } },
     next: "review",
-    steps: { readiness: { state: "done", text: /Sẵn sàng kỹ thuật/ }, review: { state: "todo", text: /Chưa gửi duyệt/ } },
+    steps: { readiness: { state: "done", text: /Đã chốt gói/ }, review: { state: "todo", text: /Chưa gửi duyệt/ } },
   },
   {
     name: "submitted: review is active; approval stays independent of technical state",
     patch: { reviewStatus: "Submitted" },
     next: "readiness",
-    steps: { readiness: { state: "active", text: /chờ xác nhận/ }, review: { state: "active", text: /Chờ duyệt/ } },
+    steps: { readiness: { state: "active", text: /chờ chốt/ }, review: { state: "active", text: /Chờ duyệt/ } },
   },
   {
     name: "approved and ready, no release: create release is next",
     patch: { reviewStatus: "Approved", readiness: { packageJob: { jobId: IDS.job, status: "Succeeded", currentAttemptId: "att-1" }, outcome: "Passed", blockerCount: 0, confirmationReviewId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", technicalReady: true, missing: [] } },
     next: "release",
-    steps: { review: { state: "done", text: /Đã duyệt/ }, release: { state: "todo", text: /Chưa có release/ }, publish: { state: "todo", text: /Chưa phát hành/ } },
+    steps: { review: { state: "done", text: /Đã duyệt/ }, release: { state: "todo", text: /Chưa có bản phát hành/ }, publish: { state: "todo", text: /Chưa phát hành/ } },
   },
   {
     name: "Built release: publish is next, Built is not Published",
     patch: { reviewStatus: "Approved", release: "Built", readiness: { packageJob: { jobId: IDS.job, status: "Succeeded", currentAttemptId: "att-1" }, outcome: "Passed", blockerCount: 0, confirmationReviewId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", technicalReady: true, missing: [] } },
     next: "publish",
-    steps: { release: { state: "done", text: /Release Built/ }, publish: { state: "todo", text: /Built, chưa phát hành/ } },
+    steps: { release: { state: "done", text: /Đã tạo/ }, publish: { state: "todo", text: /Đã tạo, chưa phát hành/ } },
   },
   {
     name: "Published: every main step is done",
@@ -773,7 +773,7 @@ test.describe("journey", () => {
       await expect(journey.locator("[data-step='validate']")).toHaveAttribute("data-state", "unknown");
       await expect(journey.locator("[data-step='validate'][data-next='true']")).toHaveCount(0);
       // The three independent gates are still there once a version is selected.
-      if (item.patch.versions !== false) await expect(page.getByRole("list", { name: /Ba cổng độc lập/ })).toBeVisible();
+      if (item.patch.versions !== false) await expect(page.getByRole("list", { name: /Ba điều kiện độc lập/ })).toBeVisible();
     });
   }
 
@@ -783,13 +783,13 @@ test.describe("journey", () => {
     await page.goto(base);
     const journey = page.getByTestId("journey");
     await expect(journey.locator("[data-step='package']")).toHaveAttribute("data-state", "todo");
-    await expect(journey.locator("[data-step='playtest']")).toContainText("Chưa dựng PlaytestPackage");
+    await expect(journey.locator("[data-step='playtest']")).toContainText("Chưa dựng gói chạy thử");
     await expect(journey.locator("[data-step='playtest'][data-next='true']")).toHaveCount(0);
-    await journey.getByRole("button", { name: "Mở Package build" }).click();
+    await journey.getByRole("button", { name: "Mở Dựng gói" }).click();
     await expect(page).toHaveURL(/tab=build/);
-    await journey.getByRole("button", { name: "Mở tab Playtest" }).click();
+    await journey.getByRole("button", { name: "Mở Chạy thử" }).click();
     await expect(page).toHaveURL(/tab=playtest/);
-    await expect(page.getByRole("heading", { name: "Playtest trên Mobile" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Chạy thử trên điện thoại" })).toBeVisible();
   });
 });
 
@@ -802,7 +802,7 @@ test.describe("layout", () => {
         const mock = newMock({ playtest: newRow() });
         await setup(page, mock);
         await openTab(page, `&playtest=${IDS.playtest}`);
-        await page.getByRole("button", { name: "Tạo mã chuyển sang Mobile" }).click();
+        await page.getByRole("button", { name: "Tạo mã QR mở trên điện thoại" }).click();
         await expect(page.getByTestId("qr-code")).toBeVisible();
         await expect(page.getByTestId("journey")).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);

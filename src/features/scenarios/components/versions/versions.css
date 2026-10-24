@@ -157,3 +157,11 @@
 @media (max-width: 1279px) { .ver-split { grid-template-columns: minmax(0, 1fr); } }
 .ver-version-btn .ops-badge { justify-self: start; }
 .ver-overview-main details > summary { min-height: 32px; }
+
+/* Plain-language pass: ids and codes are folded away for support, never part of the message. */
+.ver-support { margin-top: 6px; color: var(--dim); font-size: 12px; }
+.ver-support > summary { width: fit-content; cursor: pointer; }
+.ver-support > summary:hover { color: var(--muted); }
+.ver-support[open] { display: grid; gap: 4px; }
+.ver-support code { user-select: all; }
+.ver-code-hint { display: block; margin-top: 2px; color: var(--dim); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; overflow-wrap: anywhere; }
