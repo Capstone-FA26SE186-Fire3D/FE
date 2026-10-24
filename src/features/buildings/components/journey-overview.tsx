@@ -31,6 +31,16 @@ function StepMarker({ step }: { step: JourneyStepModel }) {
 
 const STATE_TEXT = { done: "Hoàn tất", current: "Đang làm", locked: "Khoá" } as const;
 
+/**
+ * "Hoàn tất" must be true. The scenario step is "done" as soon as a draft is saved, but the server does not keep draft
+ * validation, so the draft may still miss required fields (runtime, time limit, objectives, rubric, spawn, goal). That
+ * step therefore says what is known: a draft exists.
+ */
+function stateText(step: JourneyStepModel) {
+  if (step.state === "done" && step.key === "scenario") return "Đã có bản nháp";
+  return STATE_TEXT[step.state];
+}
+
 type NextCard = { eyebrow: string; title: string; detail: string; label: string; icon: ReactNode; href?: string; onClick?: () => void; passive?: boolean };
 
 /**
@@ -115,9 +125,9 @@ export function JourneyOverview({ accessToken, building, etag, revision, pipelin
     <section className="org-card jr-journey" aria-label="Hành trình công trình">
       <ol className="jr-steps" aria-label="Các bước của công trình">
         {steps.map((step) => <li key={step.key} className="jr-step" data-state={step.state} aria-current={step.state === "current" ? "step" : undefined}>
-          <Tooltip content={step.detail}><span className="jr-step-dot" tabIndex={0} role="img" aria-label={`${step.title}: ${STATE_TEXT[step.state]}`}><StepMarker step={step} /></span></Tooltip>
+          <Tooltip content={step.detail}><span className="jr-step-dot" tabIndex={0} role="img" aria-label={`${step.title}: ${stateText(step)}`}><StepMarker step={step} /></span></Tooltip>
           <span className="jr-step-title">{step.title}</span>
-          <span className="jr-step-state" data-state={step.state}>{step.state === "current" ? "Đang làm" : step.state === "done" ? "Hoàn tất" : step.lockReason ?? "Khoá"}</span>
+          <span className="jr-step-state" data-state={step.state}>{step.state === "locked" ? step.lockReason ?? STATE_TEXT.locked : stateText(step)}</span>
         </li>)}
       </ol>
     </section>
