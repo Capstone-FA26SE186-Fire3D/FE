@@ -13,6 +13,7 @@ import { isKind } from "@/features/library/types";
 import { ItemDetail } from "./item-detail";
 import { ItemsList } from "./items-list";
 import { NewItemModal } from "./new-item-modal";
+import { LoadingBlock } from "@/components/ui/spinner";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -30,7 +31,7 @@ export function LibraryAdmin() {
   const version = get("version");
   const kind = get("kind");
 
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (user?.role !== 0 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin có thể quản lý thư viện tổ chức.</Alert>;
 
   const closeItem = () => setParams({ item: null, version: null });

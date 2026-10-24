@@ -23,6 +23,7 @@ import { AdminQuotaSection } from "./admin-quota";
 import { QuotationsSection } from "./admin-sales";
 import "../billing.css";
 import "@/assets/styles/ops-v2.css";
+import { LoadingBlock } from "@/components/ui/spinner";
 
 /** Start of the 30-day window, read when a request runs (not during render). */
 const since30 = () => new Date(Date.now() - 30 * 86_400_000).toISOString();
@@ -73,7 +74,7 @@ export function CommerceAdmin() {
   const stuck = useAsyncData("commerce:total:reconcile", (signal) => billingApi.listLedger(token, "checkouts", { status: "NeedsReconcile", page: 1, pageSize: 1 }, signal), enabled);
   const stuckCount = stuck.data?.totalCount ?? 0;
 
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (user?.role !== 0 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin có thể quản lý thương mại.</Alert>;
 
   const clearTabParams = () => Object.fromEntries(TAB_PARAMS.map((key) => [key, null]));

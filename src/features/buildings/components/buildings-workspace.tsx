@@ -18,7 +18,7 @@ import { FilterChip } from "@/components/ui/filter-chip";
 import { PageHeader, type Crumb } from "@/components/ui/page-header";
 import { RetryButton } from "@/components/ui/retry-button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SubmitButton } from "@/components/ui/spinner";
+import { SubmitButton, LoadingBlock } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
@@ -254,7 +254,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
     }
   };
 
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   const crumbs: Crumb[] | undefined = isAdmin ? [
     { label: "Quản trị", href: routes.adminOverview },
     { label: "Tổ chức", href: routes.adminOrganizations },

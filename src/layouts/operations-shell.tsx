@@ -10,6 +10,7 @@ import { FET3DLogo } from "@/components/brand/fet3d-logo";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/dialog";
 import { m, MotionProvider } from "@/components/ui/motion";
+import { LoadingBlock } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ToastProvider } from "@/components/ui/toast";
@@ -84,8 +85,8 @@ function SidebarContent({ area, pathname, collapsed, onNavigate, onToggleCollaps
   </>;
 }
 
-function AccessScreen({ title, message, action }: { title: string; message: string; action: ReactNode }) {
-  return <main className="ops-access"><div className="ops-panel ops-panel-body"><h1>{title}</h1><p>{message}</p>{action}</div></main>;
+function AccessScreen({ title, message, action, busy }: { title: string; message: string; action: ReactNode; /** Waiting, not refusing: shows the brand spinner (Figma "Loading / Brand spinner") instead of plain text. */ busy?: boolean }) {
+  return <main className="ops-access"><div className="ops-panel ops-panel-body"><h1>{title}</h1>{busy ? <LoadingBlock label={message} /> : <p>{message}</p>}{action}</div></main>;
 }
 
 function Shell({ area, children }: { area: OperationsArea; children: ReactNode }) {
@@ -98,7 +99,7 @@ function Shell({ area, children }: { area: OperationsArea; children: ReactNode }
   const [crumbSlot, setCrumbSlot] = useState<HTMLElement | null>(null);
   const collapsed = sidebar === "collapsed";
 
-  if (!ready) return <AccessScreen title={area.label} message="Đang kiểm tra phiên đăng nhập…" action={null} />;
+  if (!ready) return <AccessScreen title={area.label} message="Đang kiểm tra phiên đăng nhập…" action={null} busy />;
   if (!user) {
     const next = pathname + (params.size ? "?" + params.toString() : "");
     return <AccessScreen title={area.label} message={area.signInPrompt} action={<Button asChild><Link href={`/login?next=${encodeURIComponent(next)}`}>Đăng nhập</Link></Button>} />;

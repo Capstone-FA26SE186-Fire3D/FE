@@ -16,7 +16,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Field, Input } from "@/components/ui/field";
 import { FilterChip, FilterChips } from "@/components/ui/filter-chip";
 import { PageHeader } from "@/components/ui/page-header";
-import { SubmitButton } from "@/components/ui/spinner";
+import { SubmitButton, LoadingBlock } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
 import { RetryButton } from "@/components/ui/retry-button";
@@ -151,7 +151,7 @@ export function OrganizationsAdmin() {
     }
   };
 
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (user?.role !== 0) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin có thể quản lý tổ chức.</Alert>;
 
   const listed = items.find((organization) => organization.id === selectedId);

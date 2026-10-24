@@ -23,6 +23,7 @@ import { describeLibraryError } from "../errors";
 import { LIBRARY_KINDS, isKind, kindLabel, type LibraryItem } from "../types";
 import { VersionPreview } from "./version-preview";
 import "./library-filters.css";
+import { LoadingBlock } from "@/components/ui/spinner";
 
 // The organization list route has no server-side search (BE: only `kind`, `page`, `pageSize`, max 100), so the page is
 // requested at its largest size and the search / capability filters narrow what is loaded.
@@ -106,7 +107,7 @@ export function LibraryBrowser() {
   ];
 
   const header = <PageHeader title="Thư viện mẫu" description="Kịch bản mẫu, tiêu chí chấm mẫu và thiết bị game đã được runtime hỗ trợ. Chỉ để tham khảo và dùng làm điểm xuất phát; bạn vẫn tự soạn được." eyebrow="Huấn luyện" breadcrumbs={[{ label: "Thư viện mẫu" }]} />;
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
 
   return <div className="org">
     {header}

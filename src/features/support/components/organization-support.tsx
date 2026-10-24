@@ -29,6 +29,7 @@ import type { Feedback, Ticket } from "../types";
 import { errorText, MessageComposer, MessageList, useTicketDetail } from "./ticket-thread";
 import styles from "./support.module.css";
 import "@/assets/styles/ops-v2.css";
+import { LoadingBlock } from "@/components/ui/spinner";
 
 const PAGE_SIZE = 20;
 const TABS = ["tickets", "feedback"] as const;
@@ -282,7 +283,7 @@ export function OrganizationSupport() {
   const { accessToken, ready, user } = useAuthSession();
   const { setParams } = useUrlParams();
 
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (user?.role !== 1 || !accessToken) {
     return <Alert tone="danger" title="Chỉ dành cho tài khoản tổ chức" action={user?.role === 0 ? <Link className="mt-3 inline-block underline" href={routes.adminSupport}>Mở hộp thư hỗ trợ của quản trị</Link> : user?.role === 2 ? <Link className="mt-3 inline-block underline" href={routes.learningHubSupport}>Mở hỗ trợ trong Góc học tập</Link> : undefined}>Yêu cầu và phản hồi thuộc về người tạo; PlatformAdmin xử lý chúng trong khu quản trị.</Alert>;
   }

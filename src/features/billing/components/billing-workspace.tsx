@@ -30,6 +30,7 @@ import { QuotationCreateModal, type CreateMode } from "./quotation-create-modal"
 import { QuotationSnapshot, QuotationStatusBadge } from "./quotation-snapshot";
 import { ServiceCapacity } from "./service-capacity";
 import "../billing.css";
+import { LoadingBlock } from "@/components/ui/spinner";
 
 const PAGE_SIZE = 20;
 const TABS = ["services", "quotes", "ai", "reminders", "enterprise"] as const;
@@ -145,7 +146,7 @@ export function BillingWorkspace() {
   const reloadAll = () => { quotations.reload(); entitlements.reload(); setSettled((value) => value + 1); };
   const openQuotation = (id: string) => { setOverride(null); setParams({ tab: "quotes", quotation: id, payment: null }); };
 
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (!enabled) return <Alert tone="danger" title="Không có quyền truy cập">Khu này dành cho tài khoản tổ chức.</Alert>;
 
   const items = quotations.data?.items ?? [];
