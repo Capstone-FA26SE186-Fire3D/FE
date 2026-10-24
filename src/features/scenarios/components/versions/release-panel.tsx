@@ -127,33 +127,35 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
   const status = release?.status.toLowerCase();
 
   return <div className="ops-stack">
-    <Panel title="Release" description="Release đóng gói bản đã duyệt và đã xác nhận kỹ thuật. Built chưa phải Published." bodyClassName="ops-stack">
+    <Panel title={release ? "Release của phiên bản này" : "Tạo release"} description={release ? "Built chưa phải Published: Trainee chỉ dùng được sau khi phát hành." : "Lấy xác nhận kỹ thuật và package từ máy chủ, không nhập mã tay."} actions={release ? <StatusBadge tone={gate.tone}>{gate.label}</StatusBadge> : undefined} bodyClassName="ops-stack">
       {view.loading && !release && <SkeletonRows rows={2} label="Đang tải release…" />}
       {view.error !== undefined && <Alert tone="danger" title="Không tải được release" action={<Button size="sm" variant="secondary" className="mt-3" onClick={view.reload}>Thử lại</Button>}>{describeError(view.error).message}</Alert>}
 
       {release && <>
-        <div className="ver-actions-row">
-          <StatusBadge tone={gate.tone}>{gate.label}</StatusBadge>
-          <span className="ver-note">{gate.detail}</span>
-        </div>
-        <dl className="ver-dl">
-          <dt>Mã release</dt><dd className="ver-hash" data-testid="release-id">{release.id}</dd>
-          <dt>Trạng thái (BE)</dt><dd data-testid="release-status">{release.status}</dd>
-          <dt>Build target</dt><dd>{release.package.buildTarget}</dd>
-          <dt>Runtime tối thiểu</dt><dd>{release.package.minRuntimeVersion} · schema {release.package.schemaVersion}</dd>
-          <dt>Kích thước</dt><dd>{release.package.packageSizeBytes.toLocaleString("vi-VN")} byte</dd>
-          <dt>SHA-256 package</dt><dd className="ver-hash">{release.package.checksumSha256}</dd>
-          <dt>SHA-256 manifest</dt><dd className="ver-hash">{release.package.manifestSha256}</dd>
-          <dt>Tạo lúc</dt><dd>{formatDateTime(release.createdAt)}</dd>
-          {release.publishedAt && <><dt>Phát hành lúc</dt><dd>{formatDateTime(release.publishedAt)}</dd></>}
-          {release.revokedAt && <><dt>Thu hồi lúc</dt><dd>{formatDateTime(release.revokedAt)} · {release.revokedReason}</dd></>}
-          {release.entitlement !== undefined && <>
-            <dt>Dịch vụ của Building</dt>
-            <dd data-testid="release-entitlement">{release.entitlement
-              ? `${release.entitlement.status} · ${formatDateTime(release.entitlement.startsAt)} → ${formatDateTime(release.entitlement.endsAt)} · ${release.entitlement.paid ? "đã thanh toán" : "chưa thanh toán"}${release.entitlement.learnerLimit != null ? ` · tối đa ${release.entitlement.learnerLimit} học viên` : ""}`
-              : "Không có kỳ dịch vụ nào đang hiệu lực"}</dd>
-          </>}
+        <p className="ver-note">{gate.detail}</p>
+        <dl className="ver-meta">
+          <div><dt>Trạng thái</dt><dd data-testid="release-status">{release.status}</dd></div>
+          <div><dt>Tạo lúc</dt><dd>{formatDateTime(release.createdAt)}</dd></div>
+          <div><dt>Phát hành lúc</dt><dd>{release.publishedAt ? formatDateTime(release.publishedAt) : "Chưa phát hành"}</dd></div>
+          <div><dt>Build target</dt><dd>{release.package.buildTarget}</dd></div>
+          <div><dt>Mã release</dt><dd className="ver-hash" data-testid="release-id">{release.id}</dd></div>
+          <div><dt>Runtime tối thiểu</dt><dd>{release.package.minRuntimeVersion} · schema {release.package.schemaVersion}</dd></div>
+          <div><dt>Kích thước</dt><dd>{release.package.packageSizeBytes.toLocaleString("vi-VN")} byte</dd></div>
+          {release.revokedAt && <div><dt>Thu hồi lúc</dt><dd>{formatDateTime(release.revokedAt)} · {release.revokedReason}</dd></div>}
         </dl>
+        {release.entitlement !== undefined && <div className="ver-service">
+          <span>Dịch vụ của công trình</span>
+          <strong data-testid="release-entitlement">{release.entitlement
+            ? `${release.entitlement.status} · ${formatDateTime(release.entitlement.startsAt)} → ${formatDateTime(release.entitlement.endsAt)} · ${release.entitlement.paid ? "đã thanh toán" : "chưa thanh toán"}${release.entitlement.learnerLimit != null ? ` · tối đa ${release.entitlement.learnerLimit} học viên` : ""}`
+            : "Không có kỳ dịch vụ nào đang hiệu lực"}</strong>
+        </div>}
+        <details className="ver-details">
+          <summary>Mã băm của package</summary>
+          <dl className="ver-dl">
+            <dt>SHA-256 package</dt><dd className="ver-hash">{release.package.checksumSha256}</dd>
+            <dt>SHA-256 manifest</dt><dd className="ver-hash">{release.package.manifestSha256}</dd>
+          </dl>
+        </details>
 
         {status === "built" && <Alert tone="info" title="Release đang ở trạng thái Built">
           Gói đã được dựng và ghim, nhưng Trainee chưa dùng được cho tới khi phát hành. Khi bạn bấm Phát hành, máy chủ kiểm tra lại: nội dung được duyệt đúng hash, readiness kỹ thuật, tương thích runtime và Building còn dịch vụ trả phí hiệu lực.
@@ -168,16 +170,12 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
       {!release && !view.loading && view.error === undefined && <>
         <p className="ver-note">Chưa có release cho phiên bản này. Release chỉ tạo được khi nội dung đã được PlatformAdmin duyệt đúng hash và đã xác nhận kỹ thuật; máy chủ kiểm tra lại các điều kiện đó.</p>
         <form className="ops-stack" onSubmit={build} noValidate>
-          <fieldset className="ops-fieldset">
-            <legend>Tạo release (Built)</legend>
-            <dl className="ver-dl">
-              <dt>Revision</dt><dd className="ver-hash">{version.revisionId}</dd>
-              <dt>Phiên bản</dt><dd>v{version.versionNumber}</dd>
-              <dt>Xác nhận kỹ thuật</dt><dd className="ver-hash" data-testid="release-confirmation">{confirmationId ?? "Chưa có — xác nhận ở tab Kết quả kỹ thuật"}</dd>
-              <dt>Artifact ứng viên</dt><dd className="ver-hash" data-testid="release-artifact">{artifactId ?? "Chưa có — cần job ReleasePackage có QA Passed"}</dd>
-              <dt>Duyệt nội dung</dt><dd>{version.reviewStatus ?? "Chưa có dữ liệu"}</dd>
-            </dl>
-          </fieldset>
+          <dl className="ver-meta">
+            <div><dt>Xác nhận kỹ thuật</dt><dd className="ver-hash" data-testid="release-confirmation">{confirmationId ?? "Chưa có — xác nhận ở tab Kết quả kỹ thuật"}</dd></div>
+            <div><dt>Package đã build</dt><dd className="ver-hash" data-testid="release-artifact">{artifactId ?? "Chưa có — cần job ReleasePackage có QA Passed"}</dd></div>
+            <div><dt>Duyệt nội dung</dt><dd>{version.reviewStatus ?? "Chưa có dữ liệu"}</dd></div>
+            <div><dt>Phiên bản</dt><dd>v{version.versionNumber} · <span className="ver-hash">{shortHash(version.revisionId, 8)}</span></dd></div>
+          </dl>
           {readiness.error !== undefined && !state && <Alert tone="danger" title="Không đọc được readiness" action={<Button type="button" size="sm" variant="secondary" className="mt-3" onClick={readiness.reload}>Thử lại</Button>}>{describeError(readiness.error).message}</Alert>}
           {state && state.missing.length > 0 && <ul className="ver-list" data-testid="release-missing">{state.missing.map((code) => <li key={code}><strong>{code}</strong>: {missingText(code)}</li>)}</ul>}
           {!approved && version.reviewStatus && <p className="ver-note">Phiên bản chưa ở trạng thái Đã duyệt: máy chủ sẽ từ chối với CONTENT_APPROVAL_REQUIRED.</p>}
@@ -186,7 +184,7 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
           </Alert>}
           <div className="ver-actions-row">
             <Button type="submit" disabled={!canBuild}><Package size={16} aria-hidden="true" />{busy ? "Đang tạo…" : "Tạo release (Built)"}</Button>
-            {!canAct && <span className="ver-note">Tài khoản của bạn chỉ có quyền xem.</span>}
+            <span className="ver-note">{canAct ? "Tạo release chưa phát hành: release ở trạng thái Built." : "Tài khoản của bạn chỉ có quyền xem."}</span>
           </div>
         </form>
       </>}

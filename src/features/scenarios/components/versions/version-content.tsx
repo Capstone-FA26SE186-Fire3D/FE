@@ -1,6 +1,3 @@
-import { Lock } from "lucide-react";
-
-import { Alert } from "@/components/ui/alert";
 import { Panel } from "@/components/ui/panel";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table } from "@/components/ui/table";
@@ -28,10 +25,7 @@ export function VersionContent({ version }: { version: ScenarioVersionDetail }) 
   const criteria = rubric?.criteria ?? [];
   const configuration = Object.entries(version.configuration ?? {});
   return <div className="ops-stack">
-    <Alert tone="info" title="Phiên bản đã đóng băng">
-      <Lock size={12} aria-hidden="true" style={{ display: "inline", marginRight: 4 }} />Nội dung bên dưới là snapshot bất biến. Muốn thay đổi, hãy sửa draft rồi tạo version mới; version mới phải gửi duyệt lại.
-    </Alert>
-    <Panel title="Thông tin phiên bản" bodyClassName="ops-stack">
+    <Panel title="Thông tin chi tiết" bodyClassName="ops-stack">
       <dl className="ver-dl">
         <dt>Phiên bản</dt><dd>v{version.versionNumber} · {version.name}</dd>
         <dt>Mã version</dt><dd className="ver-hash">{version.id}</dd>

@@ -1,13 +1,4 @@
 /* Scenario versions & readiness. Uses the operations tokens only (--surface, --line, --muted, ...). */
-.ver-gates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0 0 8px; padding: 0; list-style: none; }
-.ver-gate { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
-.ver-gate[data-known="false"] { border-style: dashed; border-color: var(--line-strong); }
-.ver-gate-index { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--hover); color: var(--muted); font-size: 12px; font-weight: 700; }
-.ver-gate-title { margin: 0 0 6px; font-size: 13px; font-weight: 600; }
-.ver-gate-detail { margin: 8px 0 0; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
-.ver-caption { margin: 0 0 20px; color: var(--dim); font-size: 12.5px; line-height: 1.5; }
-
-.ver-layout { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 16px; align-items: start; }
 .ver-version-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .ver-version-btn { display: grid; gap: 4px; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; text-align: left; cursor: pointer; transition: border-color 150ms ease, background-color 150ms ease; }
 .ver-version-btn:hover { border-color: var(--line-strong); }
@@ -38,39 +29,131 @@
 .ver-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .ver-compare > div { padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-soft); }
 
-/* Journey: eight steps from draft to publish, next step highlighted. */
-.ver-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-/* Journey as the Figma "Chuẩn bị phát hành" checklist: one row per step inside a card, the next step highlighted. */
-.ver-journey { display: grid; gap: 12px; margin: 16px 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
-.ver-journey-head { display: grid; gap: 4px; }
-.ver-journey-list { display: grid; margin: 0; padding: 0; list-style: none; }
-.ver-journey-step { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "top badges" "detail detail" "action action"; align-items: center; gap: 4px 12px; min-width: 0; padding: 12px 0; border-top: 1px solid var(--line); }
-.ver-journey-step:first-child { border-top: 0; }
-.ver-journey-step > .ver-journey-top { grid-area: top; }
-.ver-journey-step > .ver-actions-row { grid-area: badges; justify-content: flex-end; }
-.ver-journey-step > .ver-gate-detail { grid-area: detail; margin: 0; }
-.ver-journey-step > :last-child:not(.ver-gate-detail):not(.ver-actions-row):not(.ver-journey-top) { grid-area: action; justify-self: start; margin-top: 6px; }
-.ver-journey-step[data-state="unknown"] .ver-journey-title, .ver-journey-step[data-state="todo"] .ver-journey-title { color: var(--muted); }
-.ver-journey-step[data-branch="true"] .ver-journey-title { font-style: italic; }
-.ver-journey-step[data-next="true"] { margin: 4px -12px; padding: 12px; border: 1px solid var(--ember); border-radius: 12px; background: var(--ember-soft); }
-.ver-journey-step[data-next="true"] + .ver-journey-step { border-top: 0; }
-.ver-journey-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.ver-journey-index { display: inline-grid; flex: none; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--hover); color: var(--muted); font-size: 12px; font-weight: 700; }
-.ver-journey-step[data-state="done"] .ver-journey-index { background: var(--success-soft, var(--hover)); color: var(--success); }
-.ver-journey-title { margin: 0; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
-@media (max-width: 639px) { .ver-journey-step { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "badges" "detail" "action"; } .ver-journey-step > .ver-actions-row { justify-content: flex-start; } }
 
-@media (max-width: 1279px) {
-  /* With the 248px sidebar a 300px history column leaves the content too narrow to read: stack instead. */
-  .ver-layout { grid-template-columns: minmax(0, 1fr); }
-}
-@media (max-width: 1023px) {
-  .ver-gates { grid-template-columns: minmax(0, 1fr); }
-}
-/* A status label wraps inside its card rather than pushing the page wider. */
-.ver-gate .ops-badge, .ver-gates .ops-badge, .ver-journey-step .ops-badge, .ver-actions-row .ops-badge { max-width: 100%; white-space: normal; }
 @media (max-width: 767px) {
   .ver-compare { grid-template-columns: minmax(0, 1fr); }
   .ver-dl { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .ver-dl dd { margin-bottom: 8px; }
 }
+
+.ver-caption { margin: 0 0 20px; color: var(--dim); font-size: 12.5px; line-height: 1.5; }
+.ver-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ───────── Figma v3 (04b “Phiên bản · …”): header, journey card, tabs, overview ───────── */
+.ver-page { display: grid; gap: 24px; }
+.ver-page > .ops-page-header { margin-bottom: 0; }
+.ver-head-title { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.ver-head-title h1 { margin: 0; }
+.ver-head p { margin-top: 6px; }
+.ver-card { display: grid; gap: 16px; min-width: 0; padding: 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.ver-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.ver-card-title { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.4; }
+.ver-card-sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.ver-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 24px; margin: 0; }
+.ver-meta dt { margin-bottom: 4px; color: var(--dim); font-size: 11px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+.ver-meta dd { min-width: 0; margin: 0; color: var(--text); font-size: 14px; overflow-wrap: anywhere; }
+
+.ver-journey { display: grid; gap: 20px; padding: 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.ver-journey-main { display: grid; gap: 20px; min-width: 0; }
+.ver-journey-head { display: grid; gap: 0; }
+.ver-stepper { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
+.ver-step { position: relative; display: grid; justify-items: center; gap: 6px; min-width: 0; padding: 0 4px; text-align: center; }
+/* Connector: the half-lines left and right of each node; done steps paint theirs green. */
+.ver-step::before, .ver-step::after { content: ""; position: absolute; top: 11px; height: 2px; background: var(--line); }
+.ver-step::before { left: 0; right: 50%; }
+.ver-step::after { left: 50%; right: 0; }
+.ver-step:first-child::before, .ver-step:last-child::after { display: none; }
+.ver-step[data-state="done"]::after, .ver-step[data-state="done"] + .ver-step::before { background: var(--success); }
+.ver-step-node { position: relative; z-index: 1; display: grid; place-items: center; width: 24px; height: 24px; border: 2px solid var(--line-strong); border-radius: 50%; background: var(--surface-raised, var(--surface)); color: var(--muted); font-size: 11px; font-weight: 700; }
+.ver-step[data-state="done"] .ver-step-node { border-color: var(--success); background: var(--success); color: var(--surface); }
+.ver-step[data-state="active"] .ver-step-node, .ver-step[data-next="true"] .ver-step-node { border-color: var(--ember); background: var(--ember); color: var(--ember-foreground, #fff); }
+.ver-step[data-state="blocked"] .ver-step-node { border-color: var(--danger); background: var(--danger); color: var(--surface); }
+.ver-step-title { color: var(--text); font-size: 13.5px; font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
+.ver-step[data-state="todo"] .ver-step-title, .ver-step[data-state="unknown"] .ver-step-title { color: var(--muted); }
+.ver-step-label { color: var(--dim); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+.ver-step[data-state="done"] .ver-step-label { color: var(--success); }
+.ver-step[data-state="active"] .ver-step-label, .ver-step[data-next="true"] .ver-step-label { color: var(--ember); }
+.ver-step[data-state="blocked"] .ver-step-label { color: var(--danger); }
+
+.ver-next { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 16px; padding: 16px; border-radius: 12px; background: var(--bg-soft); }
+.ver-next-text { display: grid; gap: 4px; min-width: 0; flex: 1 1 320px; }
+.ver-next-title { margin: 0; color: var(--text); font-size: 14px; font-weight: 600; }
+.ver-next-detail { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.ver-next-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.ver-branch-list { margin: 0; padding: 0; list-style: none; }
+.ver-branch { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--muted); font-size: 13px; }
+
+.ver-gates { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.ver-gate { display: grid; align-content: start; justify-items: start; gap: 8px; min-width: 0; padding: 12px 14px; border-radius: 12px; background: var(--bg-soft); }
+.ver-gate[data-known="false"] { outline: 1px dashed var(--line-strong); outline-offset: -1px; }
+.ver-gate-title { margin: 0; color: var(--text); font-size: 14px; font-weight: 600; }
+.ver-gate-detail { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
+.ver-gate .ops-badge, .ver-branch .ops-badge, .ver-actions-row .ops-badge { max-width: 100%; white-space: normal; }
+
+.ver-workbench { min-width: 0; outline: none; scroll-margin-top: 72px; }
+.ver-overview { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.ver-overview-main { display: grid; gap: 16px; min-width: 0; }
+.ver-history { gap: 12px; padding: 20px; }
+.ver-version-btn { padding: 14px; border-radius: 12px; background: var(--bg-soft); }
+
+@media (max-width: 1279px) {
+  /* With the 248px sidebar a 340px history column leaves the version too narrow to read: stack instead. */
+  .ver-overview { grid-template-columns: minmax(0, 1fr); }
+  .ver-stepper { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: 20px; }
+  .ver-step:nth-child(4)::after, .ver-step:nth-child(5)::before { display: none; }
+}
+@media (max-width: 1023px) {
+  .ver-gates, .ver-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 639px) {
+  .ver-journey, .ver-card { padding: 16px; }
+  .ver-stepper { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ver-step:nth-child(even)::after, .ver-step:nth-child(odd)::before { display: none; }
+  .ver-gates, .ver-meta { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Review tab (Figma v3 "Gửi duyệt"): three-stage timeline with the submit button in the card footer. */
+.ver-review-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; }
+.ver-review-steps li { position: relative; display: grid; justify-items: center; gap: 6px; padding: 0 8px; text-align: center; }
+.ver-review-steps li::before, .ver-review-steps li::after { content: ""; position: absolute; top: 11px; height: 2px; background: var(--line); }
+.ver-review-steps li::before { left: 0; right: 50%; }
+.ver-review-steps li::after { left: 50%; right: 0; }
+.ver-review-steps li:first-child::before, .ver-review-steps li:last-child::after { display: none; }
+.ver-review-steps li[data-state="done"]::after, .ver-review-steps li[data-state="done"] + li::before { background: var(--success); }
+.ver-review-steps li[data-state="done"] .ver-step-node { border-color: var(--success); background: var(--success); }
+.ver-review-steps li[data-state="current"] .ver-step-node { border-color: var(--ember); background: var(--ember); }
+.ver-review-steps li[data-state="failed"] .ver-step-node { border-color: var(--danger); background: var(--danger); }
+.ver-review-steps strong { font-size: 13.5px; }
+.ver-review-steps span:last-child { color: var(--muted); font-size: 12.5px; }
+.ver-card-foot { display: grid; gap: 12px; padding-top: 16px; border-top: 1px solid var(--line); }
+.ver-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
+.ver-hash-list { display: grid; gap: 4px; margin: 0; }
+.ver-hash-list > div { display: grid; gap: 4px; padding: 12px 14px; border-radius: 8px; }
+.ver-hash-list > div:nth-child(odd) { background: var(--bg-soft); }
+.ver-hash-list dt { color: var(--text); font-size: 13.5px; font-weight: 600; }
+.ver-hash-list dd { margin: 0; }
+.ver-meta--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.ver-meta--3 > div:last-child { grid-column: 1 / -1; }
+.ver-reason { display: grid; gap: 6px; padding: 14px; border: 1px solid var(--danger); border-radius: 12px; background: var(--danger-soft); }
+.ver-reason p { margin: 0; color: var(--text); font-size: 14px; line-height: 1.5; }
+.ver-reason p:first-child { color: var(--danger); font-size: 11px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+@media (max-width: 1023px) { .ver-two { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 639px) {
+  .ver-review-steps { grid-template-columns: minmax(0, 1fr); row-gap: 14px; }
+  .ver-review-steps li::before, .ver-review-steps li::after { display: none; }
+  .ver-meta--3 { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Release tab: the building's service on one line, package hashes folded away. */
+.ver-service { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; padding: 12px 14px; border-radius: 12px; background: var(--bg-soft); font-size: 13.5px; }
+.ver-service span { color: var(--dim); font-size: 11px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; }
+.ver-service strong { min-width: 0; font-weight: 500; overflow-wrap: anywhere; }
+.ver-details summary { min-height: 32px; color: var(--muted); font-size: 13px; cursor: pointer; }
+.ver-details[open] summary { margin-bottom: 8px; }
+
+/* Technical tab: QA history beside the run being read, then what is missing and the confirmation. */
+.ver-split { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 24px; align-items: start; }
+.ver-page .ops-panel { border-radius: 16px; }
+@media (max-width: 1279px) { .ver-split { grid-template-columns: minmax(0, 1fr); } }
+.ver-version-btn .ops-badge { justify-self: start; }
+.ver-overview-main details > summary { min-height: 32px; }

@@ -19,6 +19,7 @@ import type { VersionJobs } from "../../use-version-jobs";
 import { describeError, isJobSucceeded, isJobTerminal, shortHash, type DescribedError } from "../../version-readiness";
 import type { PackageKind, ScenarioVersionDetail } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
+import { scrollToSection } from "./scroll";
 import { formatDateTime } from "./version-content";
 
 const kindLabel: Record<string, string> = { ReleasePackage: "Release package", PlaytestPackage: "Playtest package" };
@@ -31,17 +32,6 @@ const BUILD_TARGETS = ["Android"] as const;
 const PACKAGE_KINDS: PackageKind[] = ["ReleasePackage", "PlaytestPackage"];
 /** A queued job with no worker attempt for this long most likely means the build machine is off. */
 const WORKER_WAIT_MS = 10 * 60 * 1000;
-
-/** Scrolls to a section that may only mount after a tab switch (a few short retries), then moves focus there. */
-export function scrollToSection(id: string, attempt = 0) {
-  const element = document.getElementById(id);
-  if (!element) {
-    if (attempt < 20) window.setTimeout(() => scrollToSection(id, attempt + 1), 60);
-    return;
-  }
-  element.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-  element.focus({ preventScroll: true });
-}
 
 export function jobTone(status: string | undefined): Tone {
   switch (status?.toLowerCase()) {

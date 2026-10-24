@@ -7,7 +7,7 @@ import { useIdempotencyKey } from "@/api";
 import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Drawer } from "@/components/ui/dialog";
+import { Modal } from "@/components/ui/dialog";
 import { Field, Select } from "@/components/ui/field";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
@@ -159,14 +159,15 @@ export function SnapshotDrawer({ open, onOpenChange, accessToken, scenarioId, in
   // Why the primary button is off, shown next to it instead of leaving a dimmed button unexplained.
   const snapshotHint = busy === "load" ? "Đang tải bản nháp…"
     : conflict ? "Chọn bản draft để dùng ở phần đối chiếu trước."
-    : !loaded ? (draftItems.length === 0 && drafts.data ? "Chưa có draft để tạo snapshot." : error ? "Chưa tải được bản nháp: bấm “Tải draft” để thử lại." : "Cần tải bản nháp trước.")
+    : !loaded ? (draftItems.length === 0 && drafts.data ? "Chưa có draft để tạo phiên bản." : error ? "Chưa tải được bản nháp: bấm “Tải draft” để thử lại." : "Cần tải bản nháp trước.")
     : "";
 
-  return <Drawer
+  return <Modal
     open={open}
+    size="lg"
     onOpenChange={(next) => { if (!busy) onOpenChange(next); }}
-    title="Tạo snapshot từ draft"
-    description="Snapshot đóng băng nội dung và rubric thành một phiên bản bất biến. Việc này chưa gửi duyệt."
+    title="Tạo phiên bản mới từ draft"
+    description="Đóng băng nội dung và rubric của bản nháp đã chọn thành một phiên bản bất biến. Việc này chưa gửi duyệt."
   >
     <div className="ops-stack">
       <fieldset className="ops-fieldset">
@@ -205,7 +206,7 @@ export function SnapshotDrawer({ open, onOpenChange, accessToken, scenarioId, in
       </Alert>}
 
       {precondition && !conflict && <Alert tone="warning" title="Draft đã thay đổi từ lần bạn tải" action={<Button size="sm" variant="secondary" className="mt-3" onClick={() => void loadNewer()} disabled={busy !== ""}>Tải bản mới để đối chiếu</Button>}>
-        Chưa có snapshot nào được tạo. Bản bạn đang xem vẫn được giữ nguyên bên dưới; hãy tải bản mới và đối chiếu trước khi tạo snapshot.
+        Chưa có phiên bản nào được tạo. Bản bạn đang xem vẫn được giữ nguyên bên dưới; hãy tải bản mới và đối chiếu trước khi tạo phiên bản.
       </Alert>}
 
       {conflict && <fieldset className="ops-fieldset">
@@ -226,8 +227,8 @@ export function SnapshotDrawer({ open, onOpenChange, accessToken, scenarioId, in
       {snapshotHint && <p className="ver-note" role="status" id="snapshot-hint">{snapshotHint}</p>}
       <div className="ops-actions" style={{ justifyContent: "flex-end" }}>
         <Button variant="quiet" onClick={() => onOpenChange(false)} disabled={busy !== ""}>Hủy</Button>
-        <Button onClick={() => void snapshot()} disabled={!loaded || busy !== "" || Boolean(conflict)} aria-describedby={snapshotHint ? "snapshot-hint" : undefined}><Camera size={16} aria-hidden="true" />{busy === "snapshot" ? "Đang tạo…" : "Tạo snapshot"}</Button>
+        <Button onClick={() => void snapshot()} disabled={!loaded || busy !== "" || Boolean(conflict)} aria-describedby={snapshotHint ? "snapshot-hint" : undefined}><Camera size={16} aria-hidden="true" />{busy === "snapshot" ? "Đang tạo…" : "Tạo phiên bản"}</Button>
       </div>
     </div>
-  </Drawer>;
+  </Modal>;
 }

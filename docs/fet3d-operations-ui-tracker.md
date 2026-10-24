@@ -109,6 +109,19 @@ Lỗi tìm ra khi chạy e2e đầy đủ và đã sửa: Dialog dùng `@radix-u
 
 Playwright đặt sẵn `fire3d-org-tour=done` qua `storageState` để tour không che trang; `tour.spec.ts` tự xóa giá trị này để kiểm lần ghé đầu.
 
+### Kịch bản → Phiên bản theo Figma v3 (24/10/2026)
+
+Theo các khung `Org v2 · Phiên bản · …`, `Org v2 · Trình soạn kịch bản 3D` và hai modal ở trang Figma `04b Organization v2` (cột x ≥ 6240, bản tối và bản sáng):
+
+- **Trang phiên bản**: tiêu đề là tên kịch bản kèm nhãn phiên bản đang xem; thẻ "Hành trình" gồm 8 bước trên một hàng, thanh "Bước tiếp theo" (nhánh Playtest tùy chọn đặt cạnh) và ba cổng độc lập. Tab ngang: Tổng quan (danh sách phiên bản + tóm tắt + nội dung đóng băng), Package build, Kết quả kỹ thuật, Gửi duyệt, Release, Playtest. Ở các tab khác có nút "Đổi phiên bản" (về Tổng quan).
+- **Gửi duyệt**: dòng thời gian 3 mốc (đóng băng → đã gửi → quyết định), nút "Gửi duyệt" nằm ở chân thẻ; "Nội dung đã đóng băng" chỉ có hai hash BE trả (nội dung, rubric); "Quyết định" có lý do từ chối nổi bật.
+- **Release**: thẻ "Tạo release" lấy xác nhận kỹ thuật và package từ readiness; thẻ release hiện trạng thái, dịch vụ của công trình, mã băm package gập lại.
+- **Kết quả kỹ thuật**: lịch sử QA bên trái, job/QA và issue bên phải, rồi điều kiện còn thiếu và xác nhận.
+- **Tạo phiên bản** là modal (trước là drawer); nút "Tạo phiên bản". **Tạo kịch bản** giữ modal chỉ nhập tên vì BE chỉ nhận tên (revision chọn khi tạo bản nháp); khung Figma đã sửa theo.
+- **Trình soạn 3D (fet3d.editor/1)**: một thanh trên (về Kịch bản, tên, bản nháp, trạng thái lưu, Kiểm tra, Lưu, Playtest, Phiên bản); công cụ Chọn/Di chuyển/Xoay là cụm nổi góc trên trái khung nhìn; thanh "thêm đối tượng" nổi ở đáy, có nhãn theo loại, chỉ còn icon khi khung nhìn hẹp hơn 760px (container query).
+- **Hiệu năng**: năm panel tab và modal tạo phiên bản tách thành chunk `next/dynamic` (modal tải trước khi rê chuột/focus vào nút). First-load gzip trang phiên bản 317 → 289 KB; trình soạn 357 KB, chi tiết công trình 367 KB giữ nguyên.
+- Sửa kèm: `<td className="ops-cell-primary">` bị `display: inline-block` nên ô đầu hàng co lại, lộ nền bảng thành mảng tối ở hàng đang chọn; quy tắc inline-block giờ chỉ áp cho phần tử không phải `td`.
+
 ### Kích thước bundle v2 và đo tải (24/10/2026)
 
 JS first-load (gzip, KB; `.next/diagnostics/route-bundle-stats.json` của `next build`, ba bản build sạch không `.env`): **trước v2** = `41bd600`, **v2** = `b6b7542`, **sau trim** = nhánh `chore/v2-bundle-trim`.

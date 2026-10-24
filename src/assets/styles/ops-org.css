@@ -112,23 +112,11 @@
 .org .ops-grid-4 { gap: 16px; }
 
 /* ───────── Versions ───────── */
-.org .ver-layout { grid-template-columns: minmax(0, 380px) minmax(0, 1fr); gap: 24px; }
-@media (max-width: 1279px) { .org .ver-layout { grid-template-columns: minmax(0, 1fr); } }
 .org .ver-version-btn { gap: 6px; padding: 14px 16px; background: var(--bg-soft); }
 .org .ver-version-btn[aria-current="true"] { background: var(--ember-soft); }
 .org .ver-version-btn strong { font-size: 15px; }
-.org .ver-version-btn span { font-size: 13px; color: var(--dim); }
+.org .ver-version-btn > span:not(.ops-badge) { font-size: 13px; color: var(--dim); }
 .org .ver-hash { color: var(--dim); }
-.org .org-gates-card { margin: 16px 0; }
-.org .org-gates-card .org-card-title { margin-bottom: 4px; }
-.org .ver-gates { grid-template-columns: minmax(0, 1fr); gap: 0; margin: 0; }
-.org .ver-gate { grid-template-columns: minmax(0, 1fr); gap: 0; padding: 14px 0; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; }
-.org .ver-gate:first-child { border-top: 0; }
-.org .ver-gate-index { display: none; }
-.org .ver-gate-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
-.org .ver-gate-title { margin: 0; font-size: 15px; font-weight: 600; }
-.org .ver-gate-detail { margin: 2px 0 0; font-size: 13px; }
-.org .ver-caption { margin: 10px 0 0; }
 
 /* ───────── IFC pipeline strip ───────── */
 .org .ops-pipeline { gap: 16px; }
