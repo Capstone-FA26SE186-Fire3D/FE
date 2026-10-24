@@ -374,7 +374,7 @@ test.describe("package build and technical readiness", () => {
     const mock = newMock({ jobSequence: ["Failed"], retryResponses: [0, 202], jobList: [job("Failed")] });
     await setup(page, mock);
     await page.goto(`${base}?tab=build`);
-    await expect(page.getByRole("alert").filter({ hasText: "Job thất bại" })).toBeVisible();
+    await expect(page.getByRole("alert").filter({ has: page.getByText("Job thất bại", { exact: true }) })).toBeVisible();
     await page.getByRole("button", { name: "Chạy lại job" }).click();
     await page.getByLabel("Lý do").fill("Worker bị ngắt");
     await page.getByRole("button", { name: "Chạy lại", exact: true }).click();

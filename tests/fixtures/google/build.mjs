@@ -18,7 +18,7 @@ export async function googleFixtureBundle(entryFile = "entry.tsx") {
       "next/link$": path.join(fixture, "link-stub.tsx"), "next/image$": path.join(fixture, "image-stub.tsx"),
       [path.join(root, "src/features/auth/firebase")]: path.join(fixture, "firebase.ts"),
     } },
-    module: { rules: [{ test: /\.tsx?$/, use: path.join(fixture, "typescript-loader.mjs") }] },
+    module: { rules: [{ test: /\.tsx?$/, use: path.join(fixture, "typescript-loader.mjs") }, { test: /\.css$/, use: path.join(fixture, "css-stub-loader.mjs") }] },
     plugins: [new webpack.DefinePlugin({ "process.env.NODE_ENV": JSON.stringify("development") })],
   };
   await new Promise((resolve, reject) => {
@@ -32,7 +32,6 @@ export async function googleFixtureBundle(entryFile = "entry.tsx") {
   });
   const bundlePath = path.join(output, "fixture.js");
   const bundle = await fs.readFile(bundlePath, "utf8");
-  await fs.unlink(bundlePath);
-  await fs.rmdir(output);
+  await fs.rm(output, { recursive: true, force: true });
   return bundle;
 }

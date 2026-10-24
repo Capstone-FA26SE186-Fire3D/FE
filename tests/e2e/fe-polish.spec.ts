@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { storedSession } from "./session";
 
 import { accessTokenExpiry } from "../../src/features/auth/token-expiry";
 import { installTrainingBackend, signInAs, TrainingBackend } from "./training-history-mock";
@@ -58,9 +59,11 @@ test.describe("access token refresh during the session", () => {
     });
     await page.goto("/workspace/buildings");
     await expect(page.getByRole("heading", { level: 1, name: "Công trình" })).toBeVisible();
-    await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem("fire3d-auth-tokens") ?? "{}").accessToken), { timeout: 10_000 }).toBe(second);
+    await expect.poll(() => storedSession(page).then((raw) => JSON.parse(raw ?? "{}").accessToken), { timeout: 10_000 }).toBe(second);
     expect(refreshCalls).toBe(1);
-    await page.getByRole("button", { name: "Tải lại" }).click();
+    // The next request after a full reload is made with the renewed token read back from the stored session.
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1, name: "Công trình" })).toBeVisible();
     await expect.poll(() => headers.at(-1)).toBe(`Bearer ${second}`);
   });
 
@@ -70,7 +73,7 @@ test.describe("access token refresh during the session", () => {
     await mockOrg(page, emptyPage);
     await page.route("**/api/auth/refresh", (route) => route.fulfill({ status: 401, json: { title: "Unauthorized", code: "REFRESH_TOKEN_INVALID" } }));
     await page.goto("/workspace/buildings");
-    await expect.poll(() => page.evaluate(() => sessionStorage.getItem("fire3d-auth-tokens")), { timeout: 10_000 }).toBeNull();
+    await expect.poll(() => storedSession(page), { timeout: 10_000 }).toBeNull();
     await expect(page.getByRole("link", { name: "Đăng nhập", exact: true }).first()).toBeVisible();
   });
 
@@ -83,7 +86,7 @@ test.describe("access token refresh during the session", () => {
     await page.route("**/api/auth/refresh", (route) => { calls += 1; return route.fulfill({ status: 503, json: { title: "Unavailable" } }); });
     await page.goto("/workspace/buildings");
     await expect.poll(() => calls, { timeout: 10_000 }).toBeGreaterThan(0);
-    expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem("fire3d-auth-tokens") ?? "{}").accessToken)).toBe(token);
+    expect(await storedSession(page).then((raw) => JSON.parse(raw ?? "{}").accessToken)).toBe(token);
     await expect(page.getByRole("heading", { level: 1, name: "Công trình" })).toBeVisible();
   });
 });

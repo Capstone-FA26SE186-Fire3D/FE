@@ -2,7 +2,7 @@
 
 import { FileX2, ShieldAlert } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,6 @@ import { V1Workspace } from "./v1/v1-workspace";
 export function ScenarioEditor({ buildingId, scenarioId }: { buildingId: string; scenarioId: string }) {
   const { accessToken } = useAuthSession();
   const params = useSearchParams();
-  const router = useRouter();
   const pathname = usePathname();
   const draftId = params.get("draft");
   // A stored AI proposal chosen on /workspace/ai follows the author to the draft they open; it is only a request id.
@@ -36,7 +35,7 @@ export function ScenarioEditor({ buildingId, scenarioId }: { buildingId: string;
 
   if (!accessToken) return <EditorSkeleton />;
   if (!draftId) {
-    return <DraftStart accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} onOpen={(id) => router.replace(`${pathname}?draft=${encodeURIComponent(id)}${aiRequest ? `&${AI_PROPOSAL_PARAM}=${encodeURIComponent(aiRequest)}` : ""}`)} />;
+    return <DraftStart accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} onOpen={(id) => window.history.replaceState(null, "", `${pathname}?draft=${encodeURIComponent(id)}${aiRequest ? `&${AI_PROPOSAL_PARAM}=${encodeURIComponent(aiRequest)}` : ""}`)} />;
   }
   const state = probe.state;
   if (state.phase === "loading") return <EditorSkeleton />;
