@@ -52,7 +52,7 @@ export function PlaytestLauncher({ scenarioId, versionId }: { scenarioId: string
 
   return <>
     <Button type="button" variant="quiet" onClick={() => setOpen(true)} disabled={!ready || !accessToken} data-testid="playtest-launcher"><FlaskConical size={16} aria-hidden="true" />Playtest</Button>
-    <Drawer open={open} onOpenChange={setOpen} title="Playtest trên Mobile" description="Chuẩn bị, chuyển sang Mobile và theo dõi kết quả.">
+    <Drawer open={open} onOpenChange={setOpen} title="Chạy thử trên điện thoại" description="Chuẩn bị, mở trên điện thoại và theo dõi kết quả.">
       {accessToken && <LauncherBody accessToken={accessToken} scenarioId={scenarioId} versionId={versionId} canPlaytest={canPlaytest} />}
     </Drawer>
   </>;

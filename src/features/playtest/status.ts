@@ -39,13 +39,13 @@ export function describeStatus(playtest: PlaytestStatus): StatusView {
   switch (playtest.status.toLowerCase()) {
     case "created":
       return playtest.boundToMobile
-        ? { label: "Đã gắn với Mobile", tone: "info", detail: "Một phiên Mobile đã nhận mã. Chờ bắt đầu trên thiết bị." }
-        : { label: "Đã chuẩn bị", tone: "pending", detail: "Package đã được ghim. Tạo mã chuyển sang Mobile; chưa trừ lượt dùng thử và chưa bắt đầu." };
-    case "launching": return { label: "Đang khởi chạy", tone: "info", detail: "Mobile đã bắt đầu và nhận mã khởi chạy. Chờ runtime xác nhận." };
-    case "running": return { label: "Đang chạy trên thiết bị", tone: "info", detail: "Runtime đã xác nhận khởi chạy. Kết quả sẽ hiện khi Mobile hoàn tất." };
-    case "completed": return { label: "Đã hoàn tất", tone: "success", detail: "Mobile đã gửi kết quả. Playtest không vào thống kê học viên." };
-    case "cancelled": case "canceled": return { label: "Đã hủy", tone: "neutral", detail: "Playtest đã kết thúc. Lượt dùng thử (nếu đã trừ) không được hoàn tự động." };
-    default: return { label: playtest.status, tone: "neutral", detail: "Trạng thái do máy chủ báo." };
+        ? { label: "Điện thoại đã nhận mã", tone: "info", detail: "Chờ bắt đầu chơi trên điện thoại." }
+        : { label: "Đã chuẩn bị", tone: "pending", detail: "Đã chuẩn bị gói. Tạo mã QR để mở trên điện thoại; chưa trừ lượt dùng thử." };
+    case "launching": return { label: "Đang khởi chạy", tone: "info", detail: "Điện thoại đang mở bài chạy thử." };
+    case "running": return { label: "Đang chạy trên thiết bị", tone: "info", detail: "Đang chơi trên điện thoại. Kết quả hiện khi chơi xong." };
+    case "completed": return { label: "Đã hoàn tất", tone: "success", detail: "Điện thoại đã gửi kết quả. Lượt chạy thử không tính vào thống kê học viên." };
+    case "cancelled": case "canceled": return { label: "Đã hủy", tone: "neutral", detail: "Lượt chạy thử đã dừng. Lượt dùng thử (nếu đã trừ) không được hoàn tự động." };
+    default: return { label: playtest.status, tone: "neutral", detail: "Trạng thái do hệ thống báo." };
   }
 }
 

@@ -2,7 +2,7 @@
 
 import { Camera, GitCommitVertical, RefreshCw } from "lucide-react";
 import dynamic from "next/dynamic";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
@@ -23,7 +23,7 @@ import "./versions.css";
 import type { JourneyInput } from "../../journey";
 import { useVersionJobs } from "../../use-version-jobs";
 import { useVersionServerState } from "../../use-version-server-state";
-import { approvalGate, describeError, releaseGate, shortHash, technicalGate } from "../../version-readiness";
+import { approvalGate, describeError, isJobTerminal, releaseGate, shortHash, technicalGate } from "../../version-readiness";
 import type { ScenarioDetail, ScenarioVersionDetail, ScenarioVersionSummary } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
 import { GateStepper } from "./gate-stepper";
@@ -46,11 +46,11 @@ const TABS = ["content", "build", "readiness", "review", "release", "playtest"] 
 type TabId = (typeof TABS)[number];
 const tabLabels: Record<TabId, string> = {
   content: "Tổng quan",
-  build: "Package build",
-  readiness: "Kết quả kỹ thuật",
+  build: "Dựng gói",
+  readiness: "Kiểm tra",
   review: "Gửi duyệt",
-  release: "Release",
-  playtest: "Playtest",
+  release: "Phát hành",
+  playtest: "Chạy thử",
 };
 
 function VersionSummary({ version }: { version: ScenarioVersionDetail }) {
@@ -60,17 +60,17 @@ function VersionSummary({ version }: { version: ScenarioVersionDetail }) {
     <div className="ver-card-head">
       <div>
         <h2 id="ver-summary-title" className="ver-card-title">v{version.versionNumber} · {version.name}</h2>
-        <p className="ver-card-sub">Bản chụp bất biến của nội dung kịch bản</p>
+        <p className="ver-card-sub">Nội dung đã khóa, không sửa được</p>
       </div>
       <StatusBadge tone={gate.tone}>{gate.label}</StatusBadge>
     </div>
     <dl className="ver-meta">
       <div><dt>Tạo lúc</dt><dd>{formatDateTime(version.createdAt)}</dd></div>
-      <div><dt>Hash nội dung</dt><dd className="ver-hash">#{shortHash(version.scenarioHash, 12)}</dd></div>
-      <div><dt>Revision IFC</dt><dd className="ver-hash">{shortHash(version.revisionId, 8)}</dd></div>
-      <div><dt>Rubric</dt><dd>{version.rubric ? `Ngưỡng ${version.rubric.pass_threshold ?? "—"} · ${criteria} tiêu chí` : "Chưa có"}</dd></div>
+      <div><dt>Mã nội dung</dt><dd className="ver-hash" title="Dùng để đối chiếu khi duyệt">#{shortHash(version.scenarioHash, 8)}</dd></div>
+      <div><dt>Thời gian làm bài</dt><dd>{version.timeLimitSeconds} giây</dd></div>
+      <div><dt>Tiêu chí chấm</dt><dd>{version.rubric ? `${criteria} tiêu chí · đạt từ ${version.rubric.pass_threshold ?? "—"}` : "Chưa có"}</dd></div>
     </dl>
-    <Alert tone="info" title={`Phiên bản v${version.versionNumber} là bản chụp bất biến: chỉ đọc`}>Hash nội dung <span className="ver-hash">#{shortHash(version.scenarioHash, 12)}</span> được ghim khi tạo phiên bản. Muốn sửa, hãy sửa bản nháp rồi tạo phiên bản mới; v{version.versionNumber} giữ nguyên để đối chiếu.</Alert>
+    <Alert tone="info" title={`Phiên bản v${version.versionNumber} chỉ đọc`}>Nội dung đã khóa khi tạo phiên bản. Muốn sửa, hãy sửa bản nháp rồi tạo phiên bản mới; v{version.versionNumber} giữ nguyên để đối chiếu.</Alert>
   </section>;
 }
 
@@ -101,6 +101,17 @@ function Workbench({ accessToken, buildingId, scenario, versionCount, editorHref
   const jobs = useVersionJobs({ accessToken, revisionId: version.revisionId, versionId: version.id, preferredJobId: readiness?.packageJob?.jobId });
   const playtestPackage = usePlaytestPackage({ accessToken, revisionId: version.revisionId, versionId: version.id });
   const refreshAll = () => { server.refresh(); onVersionChanged(); };
+  // When the watched build finishes (or its check result arrives) the server's readiness and the playtest package change:
+  // read them again so "Còn thiếu gì" never keeps saying the package is missing after it passed.
+  const outcomeKey = `${jobs.detail?.job.status ?? ""}:${jobs.verdict?.kind ?? ""}`;
+  const lastOutcome = useRef(outcomeKey);
+  const { reload: reloadReadiness } = server.readiness;
+  const { reload: reloadPlaytestPackage } = playtestPackage;
+  useEffect(() => {
+    if (lastOutcome.current === outcomeKey) return;
+    lastOutcome.current = outcomeKey;
+    if (isJobTerminal(jobs.detail?.job.status)) { reloadReadiness(); reloadPlaytestPackage(); }
+  }, [outcomeKey, jobs.detail?.job.status, reloadReadiness, reloadPlaytestPackage]);
   // The journey sits above the tabs: after switching (or when already on the right tab) bring the work into view.
   const goToTab = (next: TabId, focus?: "monitor") => {
     onTab(next);
@@ -123,9 +134,9 @@ function Workbench({ accessToken, buildingId, scenario, versionCount, editorHref
 
   return <>
     <JourneyPanel input={journey} editorHref={editorHref} onTab={goToTab} onSnapshot={onSnapshot} canAct={canAct} gates={<GateStepper gates={[
-      { id: "technical", title: "Kết quả kỹ thuật", state: technical },
+      { id: "technical", title: "Kiểm tra kỹ thuật", state: technical },
       { id: "approval", title: "Duyệt nội dung", state: approvalGate(version.reviewStatus, version.rejectReason) },
-      { id: "release", title: "Release", state: releaseGate(server.releaseView.release) },
+      { id: "release", title: "Phát hành", state: releaseGate(server.releaseView.release) },
     ]} />} />
     {server.readiness.error !== undefined && !readiness && <Alert tone="danger" title="Không đọc được readiness từ máy chủ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={server.readiness.reload}>Thử lại</Button>}>{describeError(server.readiness.error).message} Các cổng ở trên chỉ phản ánh phần đã tải được.</Alert>}
     <div id="ver-workbench" className="ver-workbench" tabIndex={-1}>
@@ -223,7 +234,7 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
           <button type="button" className="ver-version-btn" aria-current={item.id === selectedId} onClick={() => setParams({ version: item.id, playtest: "" })}>
             <strong>v{item.versionNumber} · {item.name}</strong>
             <span>{formatDateTime(item.createdAt)}</span>
-            <span className="ver-hash">#{shortHash(item.scenarioHash, 12)}</span>
+            
             {gate && <StatusBadge tone={gate.tone}>{gate.label}</StatusBadge>}
           </button>
         </li>;
@@ -241,7 +252,7 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
           <h1>{scenario.data?.name ?? "Phiên bản và phát hành"}</h1>
           {selected && selectedGate && <StatusBadge tone={selectedGate.tone}>v{selected.versionNumber} · {selectedGate.label}</StatusBadge>}
         </div>
-        <p>{selected ? <>Bản chụp bất biến · <span className="ver-hash">#{shortHash(selected.scenarioHash, 12)}</span> · tạo {formatDateTime(selected.createdAt)}</> : "Mỗi phiên bản được đóng băng khi tạo. Sửa nội dung sẽ tạo phiên bản mới và duyệt lại."}</p>
+        <p>{selected ? <>Nội dung đã khóa · tạo {formatDateTime(selected.createdAt)}</> : "Mỗi phiên bản được đóng băng khi tạo. Sửa nội dung sẽ tạo phiên bản mới và duyệt lại."}</p>
       </div>
       <div className="ops-actions">
         <Button variant="secondary" size="icon" onClick={reloadAll} disabled={versions.loading} aria-label="Tải lại" title="Tải lại"><RefreshCw size={16} aria-hidden="true" /></Button>
@@ -266,7 +277,7 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
       <div className="ver-overview">
         {versionList}
         <div className="ver-overview-main">
-          <Alert tone="info" title="Chọn hoặc tạo một phiên bản">Các bước package build, kết quả kỹ thuật, gửi duyệt và release hoạt động trên một phiên bản cụ thể.</Alert>
+          <Alert tone="info" title="Chọn hoặc tạo một phiên bản">Dựng gói, kiểm tra, gửi duyệt và phát hành đều làm trên một phiên bản cụ thể.</Alert>
         </div>
       </div>
     </>}

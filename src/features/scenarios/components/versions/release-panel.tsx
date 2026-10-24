@@ -17,16 +17,18 @@ import { Table, TableMessage } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 
 import type { ReleaseView } from "../../use-version-server-state";
-import { describeError, missingText, releaseGate, shortHash, type DescribedError } from "../../version-readiness";
+import { approvalGate, describeError, missingText, releaseGate, shortHash, type DescribedError } from "../../version-readiness";
 import type { ScenarioVersionDetail, VersionReadiness } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
+import { SupportCode } from "./support-code";
 import { formatDateTime } from "./version-content";
 
 /** A publish that did not happen is a gate decision, not a failure of the release: it stays Built. */
 function PublishBlocked({ error }: { error: DescribedError }) {
   return <Alert tone="warning" title={error.message}>
-    Release vẫn ở trạng thái <strong>Built</strong>, chưa Published.{error.code && <> Mã: {error.code}.</>}
-    {error.status === 503 && " Cổng phát hành chưa được bật ở môi trường này; không phải lỗi của release."}
+    Bản phát hành vẫn giữ nguyên và học viên chưa dùng được.
+    {error.status === 503 && " Chức năng phát hành chưa được bật; đây không phải lỗi của bản phát hành."}
+    <SupportCode code={error.code} />
     {error.retryAfterSeconds ? ` Thử lại sau ${error.retryAfterSeconds} giây.` : ""}
   </Alert>;
 }
@@ -80,9 +82,9 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
       noteRelease(created.id);
       view.reload();
       trainings.reload();
-      toast.notify({ tone: "success", title: "Đã tạo release (Built)", description: "Release chưa được phát hành." });
+      toast.notify({ tone: "success", title: "Đã tạo bản phát hành", description: "Học viên chưa dùng được cho tới khi bạn bấm Phát hành." });
     } catch (cause) {
-      setError(describeError(cause, "Không tạo được release."));
+      setError(describeError(cause, "Không tạo được bản phát hành."));
     } finally {
       setBusy(false);
     }
@@ -98,7 +100,7 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
       view.reload(); // Status comes from the server, never assumed.
       trainings.reload();
       if (result?.status?.toLowerCase() === "published") toast.notify({ tone: "success", title: "Đã phát hành", description: "Trạng thái được tải lại từ máy chủ." });
-      else toast.notify({ tone: "warning", title: "Máy chủ chưa báo Published", description: "Trạng thái hiện tại: " + (result?.status ?? "không rõ") + "." });
+      else toast.notify({ tone: "warning", title: "Chưa phát hành được", description: "Hệ thống chưa xác nhận phát hành. Tải lại trang để xem trạng thái mới nhất." });
     } catch (cause) {
       setPublishError(describeError(cause, "Không phát hành được."));
     } finally {
@@ -116,7 +118,7 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
       setRevokeReason("");
       view.reload();
       trainings.reload();
-      toast.notify({ tone: "success", title: "Đã thu hồi release" });
+      toast.notify({ tone: "success", title: "Đã thu hồi bản phát hành" });
     } catch (cause) {
       setRevokeError(describeError(cause, "Không thu hồi được."));
     } finally {
@@ -127,20 +129,20 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
   const status = release?.status.toLowerCase();
 
   return <div className="ops-stack">
-    <Panel title={release ? "Release của phiên bản này" : "Tạo release"} description={release ? "Built chưa phải Published: Trainee chỉ dùng được sau khi phát hành." : "Lấy xác nhận kỹ thuật và package từ máy chủ, không nhập mã tay."} actions={release ? <StatusBadge tone={gate.tone}>{gate.label}</StatusBadge> : undefined} bodyClassName="ops-stack">
-      {view.loading && !release && <SkeletonRows rows={2} label="Đang tải release…" />}
-      {view.error !== undefined && <Alert tone="danger" title="Không tải được release" action={<Button size="sm" variant="secondary" className="mt-3" onClick={view.reload}>Thử lại</Button>}>{describeError(view.error).message}</Alert>}
+    <Panel title={release ? "Bản phát hành của phiên bản này" : "Tạo bản phát hành"} description={release ? "Học viên chỉ dùng được sau khi bạn bấm Phát hành." : "Dùng nội dung đã duyệt và gói đã chốt; không cần nhập gì."} actions={release ? <StatusBadge tone={gate.tone}>{gate.label}</StatusBadge> : undefined} bodyClassName="ops-stack">
+      {view.loading && !release && <SkeletonRows rows={2} label="Đang tải bản phát hành…" />}
+      {view.error !== undefined && <Alert tone="danger" title="Không tải được bản phát hành" action={<Button size="sm" variant="secondary" className="mt-3" onClick={view.reload}>Thử lại</Button>}>{describeError(view.error).message}</Alert>}
 
       {release && <>
         <p className="ver-note">{gate.detail}</p>
         <dl className="ver-meta">
-          <div><dt>Trạng thái</dt><dd data-testid="release-status">{release.status}</dd></div>
+          <div><dt>Trạng thái</dt><dd>{gate.label}<span className="ver-sr" data-testid="release-status">{release.status}</span></dd></div>
           <div><dt>Tạo lúc</dt><dd>{formatDateTime(release.createdAt)}</dd></div>
           <div><dt>Phát hành lúc</dt><dd>{release.publishedAt ? formatDateTime(release.publishedAt) : "Chưa phát hành"}</dd></div>
-          <div><dt>Build target</dt><dd>{release.package.buildTarget}</dd></div>
-          <div><dt>Mã release</dt><dd className="ver-hash" data-testid="release-id">{release.id}</dd></div>
-          <div><dt>Runtime tối thiểu</dt><dd>{release.package.minRuntimeVersion} · schema {release.package.schemaVersion}</dd></div>
-          <div><dt>Kích thước</dt><dd>{release.package.packageSizeBytes.toLocaleString("vi-VN")} byte</dd></div>
+          <div><dt>Nền tảng</dt><dd>{release.package.buildTarget}</dd></div>
+          
+          <div><dt>Ứng dụng tối thiểu</dt><dd>{release.package.minRuntimeVersion}</dd></div>
+          <div><dt>Dung lượng gói</dt><dd>{(release.package.packageSizeBytes / 1048576).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} MB</dd></div>
           {release.revokedAt && <div><dt>Thu hồi lúc</dt><dd>{formatDateTime(release.revokedAt)} · {release.revokedReason}</dd></div>}
         </dl>
         {release.entitlement !== undefined && <div className="ver-service">
@@ -150,41 +152,43 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
             : "Không có kỳ dịch vụ nào đang hiệu lực"}</strong>
         </div>}
         <details className="ver-details">
-          <summary>Mã băm của package</summary>
+          <summary>Thông tin cho bộ phận hỗ trợ</summary>
           <dl className="ver-dl">
-            <dt>SHA-256 package</dt><dd className="ver-hash">{release.package.checksumSha256}</dd>
-            <dt>SHA-256 manifest</dt><dd className="ver-hash">{release.package.manifestSha256}</dd>
+            <dt>Mã bản phát hành</dt><dd className="ver-hash" data-testid="release-id">{release.id}</dd>
+            <dt>Định dạng gói</dt><dd className="ver-hash">{release.package.schemaVersion}</dd>
+            <dt>Mã kiểm tra gói</dt><dd className="ver-hash">{release.package.checksumSha256}</dd>
+            <dt>Mã kiểm tra danh mục</dt><dd className="ver-hash">{release.package.manifestSha256}</dd>
           </dl>
         </details>
 
-        {status === "built" && <Alert tone="info" title="Release đang ở trạng thái Built">
+        {status === "built" && <Alert tone="info" title="Đã tạo, chưa phát hành">
           Gói đã được dựng và ghim, nhưng Trainee chưa dùng được cho tới khi phát hành. Khi bạn bấm Phát hành, máy chủ kiểm tra lại: nội dung được duyệt đúng hash, readiness kỹ thuật, tương thích runtime và Building còn dịch vụ trả phí hiệu lực.
         </Alert>}
-        {publishError && (publishError.status === 503 || publishError.status === 409 ? <PublishBlocked error={publishError} /> : <Alert tone="danger" title={publishError.message}>{publishError.code && <>Mã lỗi: {publishError.code}.</>}</Alert>)}
+        {publishError && (publishError.status === 503 || publishError.status === 409 ? <PublishBlocked error={publishError} /> : <Alert tone="danger" title={publishError.message}><SupportCode code={publishError.code} /></Alert>)}
         <div className="ver-actions-row">
-          {status === "built" && <Button onClick={() => void publish()} disabled={!canAct || publishing}><Rocket size={16} aria-hidden="true" />{publishing ? "Đang gửi…" : publishError ? "Thử lại phát hành (cùng khóa)" : "Phát hành"}</Button>}
+          {status === "built" && <Button onClick={() => void publish()} disabled={!canAct || publishing}><Rocket size={16} aria-hidden="true" />{publishing ? "Đang gửi…" : publishError ? "Thử lại phát hành" : "Phát hành"}</Button>}
           {(status === "built" || status === "published") && <Button variant="quiet" onClick={() => { setRevokeError(null); setRevoking(true); }} disabled={!canAct}><Undo2 size={16} aria-hidden="true" />Thu hồi release</Button>}
         </div>
       </>}
 
       {!release && !view.loading && view.error === undefined && <>
-        <p className="ver-note">Chưa có release cho phiên bản này. Release chỉ tạo được khi nội dung đã được PlatformAdmin duyệt đúng hash và đã xác nhận kỹ thuật; máy chủ kiểm tra lại các điều kiện đó.</p>
+        <p className="ver-note">Phiên bản này chưa có bản phát hành. Cần nội dung đã được quản trị FET3D duyệt và gói đã chốt; hệ thống kiểm tra lại khi tạo.</p>
         <form className="ops-stack" onSubmit={build} noValidate>
           <dl className="ver-meta">
-            <div><dt>Xác nhận kỹ thuật</dt><dd className="ver-hash" data-testid="release-confirmation">{confirmationId ?? "Chưa có — xác nhận ở tab Kết quả kỹ thuật"}</dd></div>
-            <div><dt>Package đã build</dt><dd className="ver-hash" data-testid="release-artifact">{artifactId ?? "Chưa có — cần job ReleasePackage có QA Passed"}</dd></div>
-            <div><dt>Duyệt nội dung</dt><dd>{version.reviewStatus ?? "Chưa có dữ liệu"}</dd></div>
-            <div><dt>Phiên bản</dt><dd>v{version.versionNumber} · <span className="ver-hash">{shortHash(version.revisionId, 8)}</span></dd></div>
+            <div><dt>Gói đã chốt</dt><dd>{confirmationId ? "Đã chốt" : "Chưa chốt (tab Kiểm tra)"}<span className="ver-sr" data-testid="release-confirmation">{confirmationId ?? "Chưa có"}</span></dd></div>
+            <div><dt>Gói phát hành</dt><dd>{artifactId ? "Đã dựng, kiểm tra đạt" : "Chưa có gói kiểm tra đạt"}<span className="ver-sr" data-testid="release-artifact">{artifactId ?? "Chưa có"}</span></dd></div>
+            <div><dt>Duyệt nội dung</dt><dd>{approvalGate(version.reviewStatus, version.rejectReason).label}</dd></div>
+            <div><dt>Phiên bản</dt><dd>v{version.versionNumber}</dd></div>
           </dl>
           {readiness.error !== undefined && !state && <Alert tone="danger" title="Không đọc được readiness" action={<Button type="button" size="sm" variant="secondary" className="mt-3" onClick={readiness.reload}>Thử lại</Button>}>{describeError(readiness.error).message}</Alert>}
-          {state && state.missing.length > 0 && <ul className="ver-list" data-testid="release-missing">{state.missing.map((code) => <li key={code}><strong>{code}</strong>: {missingText(code)}</li>)}</ul>}
+          {state && state.missing.length > 0 && <ul className="ver-list" data-testid="release-missing">{state.missing.map((code) => <li key={code} data-code={code}>{missingText(code)}</li>)}</ul>}
           {!approved && version.reviewStatus && <p className="ver-note">Phiên bản chưa ở trạng thái Đã duyệt: máy chủ sẽ từ chối với CONTENT_APPROVAL_REQUIRED.</p>}
-          {error && <Alert tone="danger" title={error.message} action={<Button size="sm" variant="secondary" type="submit" className="mt-3" disabled={!canBuild}>Thử lại (cùng khóa)</Button>}>
-            {error.code && <>Mã lỗi: {error.code}. </>}Thử lại dùng cùng Idempotency-Key nên không tạo release trùng.
+          {error && <Alert tone="danger" title={error.message} action={<Button size="sm" variant="secondary" type="submit" className="mt-3" disabled={!canBuild}>Thử lại</Button>}>
+            Bấm thử lại an toàn: hệ thống không tạo bản trùng.<SupportCode code={error.code} />
           </Alert>}
           <div className="ver-actions-row">
-            <Button type="submit" disabled={!canBuild}><Package size={16} aria-hidden="true" />{busy ? "Đang tạo…" : "Tạo release (Built)"}</Button>
-            <span className="ver-note">{canAct ? "Tạo release chưa phát hành: release ở trạng thái Built." : "Tài khoản của bạn chỉ có quyền xem."}</span>
+            <Button type="submit" disabled={!canBuild}><Package size={16} aria-hidden="true" />{busy ? "Đang tạo…" : "Tạo bản phát hành"}</Button>
+            <span className="ver-note">{canAct ? "Tạo xong học viên vẫn chưa dùng được; bấm Phát hành ở bước sau." : "Tài khoản của bạn chỉ có quyền xem."}</span>
           </div>
         </form>
       </>}
@@ -193,7 +197,7 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
     <Panel title="Training của công trình" description="Chỉ đọc, không phân trang. Chỉ gồm training đã gắn với nội dung được duyệt." bodyClassName="ops-stack">
       {trainings.error !== undefined && <Alert tone="danger" title="Không tải được danh sách training" action={<Button size="sm" variant="secondary" className="mt-3" onClick={trainings.reload}>Thử lại</Button>}>{describeError(trainings.error).message}</Alert>}
       <Table caption="Training của công trình">
-        <thead><tr><th>Tên</th><th>Trạng thái</th><th>Release</th><th>Phiên bản</th></tr></thead>
+        <thead><tr><th>Tên</th><th>Trạng thái</th><th>Bản phát hành</th><th>Phiên bản</th></tr></thead>
         <tbody>
           {trainings.loading && !trainings.data && <TableMessage colSpan={4}><SkeletonRows rows={2} label="Đang tải training…" /></TableMessage>}
           {(trainings.data ?? []).map((training) => <tr key={training.id}>
@@ -202,7 +206,7 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
             <td><span className="ver-hash">{shortHash(training.releaseId, 13)}</span>{training.releaseStatus && <> · {training.releaseStatus}</>}</td>
             <td>{training.scenarioVersionId === version.id ? "Phiên bản này" : "Phiên bản khác"}</td>
           </tr>)}
-          {trainings.data && trainings.data.length === 0 && <TableMessage colSpan={4}><EmptyState icon={Package} title="Chưa có training" description="Training xuất hiện khi release được tạo và gắn với nội dung đã duyệt." /></TableMessage>}
+          {trainings.data && trainings.data.length === 0 && <TableMessage colSpan={4}><EmptyState icon={Package} title="Chưa có bài huấn luyện" description="Bài huấn luyện xuất hiện khi bản phát hành được tạo và gắn với nội dung đã duyệt." /></TableMessage>}
         </tbody>
       </Table>
     </Panel>
@@ -210,15 +214,15 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
     <Modal
       open={revoking}
       onOpenChange={(open) => { if (!revokeBusy) setRevoking(open); }}
-      title="Thu hồi release?"
-      description="Release bị thu hồi không còn được dùng. Hành động này được ghi vào nhật ký."
+      title="Thu hồi bản phát hành?"
+      description="Học viên sẽ không dùng được bản này nữa. Hành động này được ghi vào nhật ký."
       footer={<><Button variant="quiet" onClick={() => setRevoking(false)} disabled={revokeBusy}>Hủy</Button><Button variant="danger" onClick={() => void revoke()} disabled={revokeBusy || !revokeReason.trim() || revokeReason.length > 1000}>{revokeBusy ? "Đang thu hồi…" : "Thu hồi"}</Button></>}
     >
       <div className="ops-stack">
         <Field label="Lý do thu hồi" required hint="1–1000 ký tự." error={revokeReason.length > 1000 ? "Tối đa 1000 ký tự." : undefined}>
           {(p) => <Textarea {...p} rows={3} value={revokeReason} onChange={(event) => setRevokeReason(event.target.value)} />}
         </Field>
-        {revokeError && <Alert tone="danger" title={revokeError.message}>{revokeError.code && <>Mã lỗi: {revokeError.code}.</>}</Alert>}
+        {revokeError && <Alert tone="danger" title={revokeError.message}><SupportCode code={revokeError.code} /></Alert>}
       </div>
     </Modal>
   </div>;
