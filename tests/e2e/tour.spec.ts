@@ -15,6 +15,9 @@ async function signIn(page: Page, user: typeof owner | typeof admin = owner, tou
   await page.route("**/api/buildings?*", (route) => route.fulfill({ json: { items: buildings, totalCount: 1, page: 1, pageSize: 20 } }));
 }
 
+// First visit: no stored tour state (the config seeds "done" for every other spec).
+test.use({ storageState: { cookies: [], origins: [] } });
+
 const overlay = (page: Page) => page.getByTestId("tour-overlay");
 const tourDialog = (page: Page) => page.getByRole("dialog", { name: /Công trình/ });
 const readTour = (page: Page) => page.evaluate(() => localStorage.getItem("fire3d-org-tour"));

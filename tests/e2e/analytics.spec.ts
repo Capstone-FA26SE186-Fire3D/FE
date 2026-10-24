@@ -84,7 +84,7 @@ test.describe("organization analytics", () => {
       return route.fulfill({ json: url.pathname.endsWith("/training") ? training() : operations() });
     });
     await page.goto("/workspace/analytics?from=2026-09-01&to=2026-09-30");
-    await expect(page.getByRole("heading", { name: "Báo cáo huấn luyện", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Báo cáo", exact: true })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Huấn luyện" })).toHaveAttribute("aria-selected", "true");
     await expect(kpi(page, "kpi-plays")).toHaveText("40");
     await expect(kpi(page, "kpi-trainees")).toHaveText("18");
