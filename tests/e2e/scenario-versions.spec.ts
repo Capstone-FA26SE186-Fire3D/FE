@@ -215,16 +215,16 @@ test.describe("snapshot", () => {
     const mock = newMock({ snapshotResponses: [0, 201] });
     await setup(page, mock);
     await page.goto(`${base}?draft=${IDS.draft}`);
-    await expect(page.getByRole("heading", { name: "Phiên bản và phát hành" })).toBeVisible();
-    await page.getByRole("button", { name: "Tạo phiên bản mới từ draft" }).first().click();
+    await expect(page.getByRole("heading", { name: "Kịch bản tầng 3", level: 1 })).toBeVisible();
+    await page.getByRole("button", { name: "Tạo phiên bản mới" }).first().click();
     await expect(page.getByLabel("Bản nháp")).toHaveValue(IDS.draft);
     // The draft loads on its own: no extra "Tải draft" click before "Tạo snapshot" is usable.
     await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"12"');
     await page.getByRole("button", { name: "Kiểm tra draft" }).click();
     await expect(page.getByText("SPAWN_REQUIRED")).toBeVisible();
-    await page.getByRole("button", { name: "Tạo snapshot", exact: true }).click();
+    await page.getByRole("button", { name: "Tạo phiên bản", exact: true }).click();
     await expect(page.getByRole("alert").filter({ hasText: "Không tạo được snapshot" }).or(page.getByRole("alert")).first()).toBeVisible();
-    await page.getByRole("button", { name: "Tạo snapshot", exact: true }).click();
+    await page.getByRole("button", { name: "Tạo phiên bản", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`version=${IDS.newVersion}`));
     expect(mock.snapshotCalls).toHaveLength(2);
     expect(mock.snapshotCalls[0].key).toBeTruthy();
@@ -242,7 +242,7 @@ test.describe("snapshot", () => {
     });
     await setup(page, mock);
     await page.goto(base);
-    await page.getByRole("button", { name: "Tạo phiên bản mới từ draft" }).first().click();
+    await page.getByRole("button", { name: "Tạo phiên bản mới" }).first().click();
     await expect(page.getByLabel("Bản nháp")).toHaveValue(IDS.draft2);
     await expect(page.getByLabel("Bản nháp").getByRole("option")).toHaveCount(2);
     await expect(page.getByLabel("Bản nháp").getByRole("option").first()).toContainText("hiện tại");
@@ -256,32 +256,32 @@ test.describe("snapshot", () => {
     const mock = newMock({ drafts: [], currentDraftId: null });
     await setup(page, mock);
     await page.goto(base);
-    await page.getByRole("button", { name: "Tạo phiên bản mới từ draft" }).first().click();
+    await page.getByRole("button", { name: "Tạo phiên bản mới" }).first().click();
     await expect(page.getByText("Kịch bản này chưa có draft")).toBeVisible();
     await expect(page.getByRole("link", { name: "Mở trình soạn để tạo draft" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Tải draft" })).toBeDisabled();
     // A disabled snapshot button says why.
-    await expect(page.getByRole("button", { name: "Tạo snapshot", exact: true })).toBeDisabled();
-    await expect(page.getByRole("status").filter({ hasText: "Chưa có draft để tạo snapshot." })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Tạo phiên bản", exact: true })).toBeDisabled();
+    await expect(page.getByRole("status").filter({ hasText: "Chưa có draft để tạo phiên bản." })).toBeVisible();
   });
 
   test("412 keeps the draft the user was viewing and offers the newer one for comparison", async ({ page }) => {
     const mock = newMock({ snapshotResponses: [412], draftEtags: ['"12"', '"13"'] });
     await setup(page, mock);
     await page.goto(`${base}?draft=${IDS.draft}`);
-    await page.getByRole("button", { name: "Tạo phiên bản mới từ draft" }).first().click();
+    await page.getByRole("button", { name: "Tạo phiên bản mới" }).first().click();
     await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"12"');
-    await page.getByRole("button", { name: "Tạo snapshot", exact: true }).click();
+    await page.getByRole("button", { name: "Tạo phiên bản", exact: true }).click();
     await expect(page.getByText("Draft đã thay đổi từ lần bạn tải")).toBeVisible();
     await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"12"');
     await page.getByRole("button", { name: "Tải bản mới để đối chiếu" }).click();
-    await expect(page.getByLabel("Bản mới")).toContainText('"13"');
-    await expect(page.getByLabel("Bản cũ")).toContainText('"12"');
-    await expect(page.getByRole("button", { name: "Tạo snapshot", exact: true })).toBeDisabled();
+    await expect(page.getByLabel("Bản mới", { exact: true })).toContainText('"13"');
+    await expect(page.getByLabel("Bản cũ", { exact: true })).toContainText('"12"');
+    await expect(page.getByRole("button", { name: "Tạo phiên bản", exact: true })).toBeDisabled();
     await expect(page.getByRole("status").filter({ hasText: "Chọn bản draft để dùng ở phần đối chiếu trước." })).toBeVisible();
     await page.getByRole("button", { name: "Dùng bản mới" }).click();
     await expect(page.getByLabel("Tóm tắt draft đang xem")).toContainText('"13"');
-    await expect(page.getByRole("button", { name: "Tạo snapshot", exact: true })).toBeEnabled();
+    await expect(page.getByRole("button", { name: "Tạo phiên bản", exact: true })).toBeEnabled();
   });
 });
 
@@ -454,8 +454,10 @@ test.describe("review and release", () => {
     await expect(page.locator("[data-gate=approval]")).toContainText("Bị từ chối");
     await expect(page.locator("[data-gate=approval]")).toContainText("Rubric thiếu tiêu chí thời gian");
     await expect(page.getByTestId("review-reason")).toHaveText("Rubric thiếu tiêu chí thời gian");
-    await expect(page.getByLabel("Lịch sử phiên bản").getByText("Bị từ chối")).toBeVisible();
     await expect(page.getByRole("button", { name: "Gửi duyệt", exact: true })).toBeDisabled();
+    // The version history lives on the overview tab.
+    await page.getByRole("tab", { name: "Tổng quan" }).click();
+    await expect(page.getByLabel("Lịch sử phiên bản").getByText("Bị từ chối")).toBeVisible();
   });
 
   test("Built is not Published: the release is created from server readiness, a blocked publish keeps it Built and a retry reuses the key", async ({ page }) => {
