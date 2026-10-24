@@ -1,10 +1,12 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { admin, calls, mockAi, newAiMock, owner, seedRequest, signInAs } from "./org-ai-mock";
 
 // Old links keep pre-v7 AI statuses (Queued, Running, SafetyRejected...) in the URL. The FE must ignore values that are not
 // in the current lists instead of sending them (the API answers 400). Route mocks only.
 // The side rail and KPI tiles issue their own small reads (pageSize 5 / 1) on the same endpoints; only the list call counts.
+/** Rows of the history DataTable (table rows, or cards under 640px). */
+const rows = (page: Page) => page.getByTestId("ai-history").locator("tr[data-row-id], li.ops-dt-card");
 const listCalls = (mock: Parameters<typeof calls>[0], method: string, path: string) => calls(mock, method, path).filter((call) => call.search.includes("pageSize=20"));
 
 test.describe("AI filters read from the URL", () => {
@@ -14,7 +16,7 @@ test.describe("AI filters read from the URL", () => {
     await signInAs(page, owner);
     await mockAi(page, mock);
     await page.goto("/workspace/ai?tab=history&status=Queued&resultType=SafetyRejected&operation=Translate");
-    await expect(page.getByTestId("ai-history-row")).toHaveCount(1);
+    await expect(rows(page)).toHaveCount(1);
     const search = listCalls(mock, "GET", "/api/ai/requests").at(-1)?.search ?? "";
     expect(search).not.toContain("status=");
     expect(search).not.toContain("resultType=");
@@ -39,7 +41,7 @@ test.describe("AI filters read from the URL", () => {
     await signInAs(page, admin);
     await mockAi(page, mock);
     await page.goto("/admin/ai?status=Running");
-    await expect(page.getByTestId("admin-ai-row")).toHaveCount(1);
+    await expect(page.getByTestId("ai-requests-table").locator("tbody tr, li.ops-dt-card")).toHaveCount(1);
     expect(listCalls(mock, "GET", "/api/admin/ai/requests").at(-1)?.search ?? "").not.toContain("status=");
   });
 });

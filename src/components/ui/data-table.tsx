@@ -47,7 +47,10 @@ type Props<T> = {
   onSelectedChange?: (next: Set<string>) => void;
   /** Actions for the floating bar shown while rows are ticked. */
   selectionActions?: (ids: string[]) => ReactNode;
+  /** First load: skeleton rows instead of the table body. */
   loading?: boolean;
+  /** Reload with rows already on screen (next page, new filter): rows stay, the table is marked busy and the pager waits. */
+  refreshing?: boolean;
   loadingRows?: number;
   empty: ReactNode;
   error?: ReactNode;
@@ -71,7 +74,7 @@ const ROW_INTERACTIVE = "a, button, input, select, textarea, [role=button], [rol
  * server through the URL; this component only draws. Rows are clickable with a chevron, the "···" menu is mounted on
  * demand, ticking rows raises a floating selection bar, and under `cardBelow` the same rows render as cards.
  */
-export function DataTable<T>({ columns, rows, rowKey, caption, onRowClick, rowHref, rowMenu, rowTone, selectable, selected, onSelectedChange, selectionActions, loading, loadingRows = 6, empty, error, sort, onSortChange, toolbar, pagination, cardBelow = 640, cardRender, stickyFirst = true, className, ...rest }: Props<T>) {
+export function DataTable<T>({ columns, rows, rowKey, caption, onRowClick, rowHref, rowMenu, rowTone, selectable, selected, onSelectedChange, selectionActions, loading, refreshing, loadingRows = 6, empty, error, sort, onSortChange, toolbar, pagination, cardBelow = 640, cardRender, stickyFirst = true, className, ...rest }: Props<T>) {
   const router = useRouter();
   const id = useId();
   const isCards = useMediaQuery(`(max-width: ${cardBelow - 1}px)`) && cardBelow > 0;
@@ -102,7 +105,7 @@ export function DataTable<T>({ columns, rows, rowKey, caption, onRowClick, rowHr
   const viewport = useViewportWidth();
   const visible = columns.filter((column) => !column.hideBelow || viewport >= column.hideBelow);
 
-  return <div className={cn("ops-dt", className)} data-loading={loading || undefined} data-testid={rest["data-testid"]}>
+  return <div className={cn("ops-dt", className)} data-loading={loading || refreshing || undefined} aria-busy={loading || refreshing || undefined} data-testid={rest["data-testid"]}>
     {toolbar && <div className="ops-dt-toolbar">{toolbar}</div>}
     {loading && rows.length === 0 ? <SkeletonTable rows={loadingRows} columns={Math.min(visible.length, 6)} /> : error ? <div className="ops-dt-message">{error}</div> : rows.length === 0 ? <div className="ops-dt-message">{empty}</div> : isCards ? (
       <ul className="ops-dt-cards" aria-label={caption}>
@@ -154,7 +157,7 @@ export function DataTable<T>({ columns, rows, rowKey, caption, onRowClick, rowHr
         </table>
       </div>
     )}
-    {pagination && rows.length > 0 && <Pagination className="ops-dt-pagination" {...pagination} disabled={loading} />}
+    {pagination && rows.length > 0 && <Pagination className="ops-dt-pagination" {...pagination} disabled={loading || refreshing} />}
     <AnimatePresence>
       {selectable && picked.size > 0 && <m.div key="bar" className="ops-dt-selection" role="region" aria-label={`${picked.size} đã chọn`} initial={{ opacity: 0, y: 16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: 0.98 }} transition={presets.softSpring} id={`${id}-selection`}>
         <strong>{picked.size} đã chọn</strong>

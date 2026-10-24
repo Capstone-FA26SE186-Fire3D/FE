@@ -214,7 +214,8 @@ select.ops-input { appearance: none; padding-right: 34px; background-image: line
 .ops-alert { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: start; padding: 12px 14px; border: 1px solid var(--line-strong); border-left-width: 3px; border-radius: 9px; background: var(--bg-soft); color: var(--text); font-size: 13px; line-height: 1.55; }
 .ops-alert > svg { margin-top: 2px; }
 .ops-alert strong { display: block; margin-bottom: 2px; }
-.ops-alert p { margin: 0; color: var(--muted); }
+.ops-alert-text { color: var(--muted); }
+.ops-alert-text p { margin: 0; }
 .ops-alert[data-tone="success"] { border-left-color: var(--success); background: var(--success-soft); }
 .ops-alert[data-tone="success"] > svg { color: var(--success); }
 .ops-alert[data-tone="warning"] { border-left-color: var(--warning); background: var(--warning-soft); }
@@ -327,7 +328,7 @@ select.ops-input { appearance: none; padding-right: 34px; background-image: line
   .ops-table td > .ops-empty, .ops-table td > [role="status"], .ops-table td > [role="alert"] { position: sticky; left: 0; width: calc(100vw - 34px); max-width: 100%; }
 }
 @media (max-width: 767px) {
-  .ops-topbar { padding: 0 16px; }
+  .ops-topbar { gap: 8px; padding: 0 16px; }
   .ops-main { padding: 18px 16px 48px; }
   .ops-grid-2, .ops-grid-3, .ops-grid-4, .ops-form-grid { grid-template-columns: minmax(0, 1fr); }
   .ops-user { max-width: 150px; }
@@ -426,7 +427,7 @@ select.ops-input { appearance: none; padding-right: 34px; background-image: line
 .hub-unavailable a:not([class]) { color: var(--ember); text-decoration: underline; text-underline-offset: 3px; }
 
 /* A link inside a sentence must not rely on color alone */
-.ops-theme :is(.ops-muted, .ops-alert p, .ops-field-hint, .ops-page-header p, .ops-empty p, .ops-dialog-head p, .ops-panel-head p, .ver-note, .ver-caption, .bill-dim) a:not([class*="bg-"]) { color: var(--ember); text-decoration: underline; text-underline-offset: 3px; }
+.ops-theme :is(.ops-muted, .ops-alert-text, .ops-field-hint, .ops-page-header p, .ops-empty p, .ops-dialog-head p, .ops-panel-head p, .ver-note, .ver-caption, .bill-dim) a:not([class*="bg-"]) { color: var(--ember); text-decoration: underline; text-underline-offset: 3px; }
 
 /* ───────── Post-login redesign: topbar breadcrumb, avatar, eyebrow ───────── */
 .ops-topbar-crumbs { display: flex; align-items: center; min-width: 0; flex: 0 1 auto; overflow: hidden; }

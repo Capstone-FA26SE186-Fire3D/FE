@@ -1,7 +1,13 @@
+"use client";
+
+import { useMemo } from "react";
 import type { Building, BuildingInput } from "../types";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { Field, Input } from "@/components/ui/field";
+import { buildingTypes } from "../data/building-types";
+import { districtsOf, provinceNames } from "../data/vn-provinces";
 import { formatDateTime } from "../format";
 
 export type FormState = { name: string; buildingType: string; totalFloors: string; address: string; city: string; district: string };
@@ -50,24 +56,27 @@ export function buildingFormToInput(form: FormState, existing?: Building): Build
   };
 }
 
-export function BuildingForm({ form, errors, onChange }: { form: FormState; errors: ReturnType<typeof validateBuildingForm>; onChange: (patch: Partial<FormState>) => void }) {
-  return <div className="ops-stack">
-    <fieldset className="ops-fieldset">
-      <legend>Thông tin chung</legend>
-      <Field label="Tên công trình" required error={errors.name}>{(p) => <Input {...p} required maxLength={200} value={form.name} onChange={(event) => onChange({ name: event.target.value })} />}</Field>
-      <div className="ops-form-grid">
-        <Field label="Loại công trình">{(p) => <Input {...p} maxLength={200} value={form.buildingType} placeholder="Chung cư, trường học…" onChange={(event) => onChange({ buildingType: event.target.value })} />}</Field>
-        <Field label="Số tầng" required error={errors.totalFloors}>{(p) => <Input {...p} required min="1" inputMode="numeric" type="number" value={form.totalFloors} onChange={(event) => onChange({ totalFloors: event.target.value })} />}</Field>
-      </div>
-    </fieldset>
-    <fieldset className="ops-fieldset">
-      <legend>Vị trí (không bắt buộc)</legend>
-      <Field label="Địa chỉ">{(p) => <Input {...p} maxLength={300} value={form.address} onChange={(event) => onChange({ address: event.target.value })} />}</Field>
-      <div className="ops-form-grid">
-        <Field label="Quận / huyện">{(p) => <Input {...p} maxLength={120} value={form.district} onChange={(event) => onChange({ district: event.target.value })} />}</Field>
-        <Field label="Tỉnh / thành phố">{(p) => <Input {...p} maxLength={120} value={form.city} onChange={(event) => onChange({ city: event.target.value })} />}</Field>
-      </div>
-    </fieldset>
+const typeOptions = buildingTypes.map((type) => ({ value: type, label: type }));
+const cityOptions = provinceNames.map((name) => ({ value: name, label: name }));
+
+/**
+ * Figma "Modal / Create building": name · type (combobox) + floors · province (combobox) + district (combobox that
+ * depends on the province) · street address. Type/city/district are suggestions only — BE stores plain strings, so the
+ * comboboxes accept any typed value ("Khác…").
+ */
+export function BuildingForm({ form, errors, onChange, autoFocus }: { form: FormState; errors: ReturnType<typeof validateBuildingForm>; onChange: (patch: Partial<FormState>) => void; autoFocus?: boolean }) {
+  const districtOptions = useMemo(() => districtsOf(form.city).map((district) => ({ value: district, label: district })), [form.city]);
+  return <div className="ops-stack" data-testid="building-form">
+    <Field label="Tên công trình" required error={errors.name}>{(p) => <Input {...p} required maxLength={200} value={form.name} autoFocus={autoFocus} placeholder="Trường Tiểu học Hòa Bình" onChange={(event) => onChange({ name: event.target.value })} />}</Field>
+    <div className="ops-form-grid">
+      <Field label="Loại công trình">{(p) => <Combobox {...p} value={form.buildingType} options={typeOptions} placeholder="Chọn loại công trình" searchPlaceholder="Tìm loại công trình…" allowCustom clearable aria-label="Loại công trình" onChange={(value) => onChange({ buildingType: value })} />}</Field>
+      <Field label="Số tầng" required error={errors.totalFloors}>{(p) => <Input {...p} required min="1" inputMode="numeric" type="number" value={form.totalFloors} onChange={(event) => onChange({ totalFloors: event.target.value })} />}</Field>
+    </div>
+    <div className="ops-form-grid">
+      <Field label="Tỉnh / Thành phố">{(p) => <Combobox {...p} value={form.city} options={cityOptions} placeholder="Chọn tỉnh / thành phố" searchPlaceholder="Tìm tỉnh / thành phố…" groupLabel="Tỉnh / thành phố" allowCustom clearable aria-label="Tỉnh / Thành phố" onChange={(value) => onChange({ city: value, district: value === form.city ? form.district : "" })} />}</Field>
+      <Field label="Quận / Huyện" hint={districtOptions.length === 0 && form.city ? "Nhập tay quận / huyện (hoặc phường / xã)." : undefined}>{(p) => <Combobox {...p} value={form.district} options={districtOptions} placeholder="Chọn quận / huyện" searchPlaceholder="Tìm quận / huyện…" groupLabel="Gợi ý" emptyText="Nhập tên để dùng giá trị đó" allowCustom clearable aria-label="Quận / Huyện" onChange={(value) => onChange({ district: value })} />}</Field>
+    </div>
+    <Field label="Địa chỉ">{(p) => <Input {...p} maxLength={300} value={form.address} placeholder="Số nhà, đường, phường / xã" onChange={(event) => onChange({ address: event.target.value })} />}</Field>
   </div>;
 }
 

@@ -5,15 +5,15 @@ import { useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { CellTitle, DataTable, type DataColumn } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Panel } from "@/components/ui/panel";
-import { SkeletonRows } from "@/components/ui/skeleton";
+import { NumberPop } from "@/components/ui/number-pop";
+import { SkeletonKpis } from "@/components/ui/skeleton";
 import { StatusBadge, type Tone } from "@/components/ui/status-badge";
-import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { billingApi } from "../api";
 import { billingErrorText } from "../errors";
 import { formatDateTime, formatNumber, formatQuota } from "../format";
-import type { AiQuotaUnitBalance } from "../types";
+import type { AiQuotaGrant, AiQuotaUnitBalance, AiUsageEntry, Quotation } from "../types";
 import { QuotationStatusBadge } from "./quotation-snapshot";
 import "../billing.css";
 
@@ -25,27 +25,50 @@ const usageStatus: Record<string, { label: string; tone: Tone }> = { Reserved: {
 
 const short = (id: string) => id.slice(0, 8);
 
+function Kpi({ label, value, hint, testId }: { label: string; value: number; hint?: string; testId?: string }) {
+  return <div className="ops-kpi"><span className="ops-kpi-label">{label}</span><div className="ops-kpi-row"><strong className="ops-kpi-value" data-testid={testId}><NumberPop value={value} /></strong></div>{hint && <span className="ops-kpi-hint">{hint}</span>}</div>;
+}
+
 function UnitBalance({ unit }: { unit: AiQuotaUnitBalance }) {
   const used = unit.reserved + unit.consumed;
   const percent = unit.granted > 0 ? Math.min(100, Math.round((used / unit.granted) * 100)) : 100;
-  return <div className="ops-stack" data-testid="quota-unit" data-unit={unit.quotaUnit} data-available={unit.available}>
+  return <section className="org-card ops-stack" data-testid="quota-unit" data-unit={unit.quotaUnit} data-available={unit.available} aria-label={`Quota đơn vị ${unit.quotaUnit}`}>
     <div className="bill-row"><span className="ops-field-label"><Gauge size={14} aria-hidden="true" style={{ verticalAlign: "-2px", marginRight: 6 }} />Đơn vị: {unit.quotaUnit}</span><span className="bill-dim">Đơn vị không quy đổi lẫn nhau</span></div>
-    <div className="bill-stats">
-      <div className="ops-stat"><span>Còn dùng được</span><strong data-testid="quota-available">{formatNumber(unit.available)}</strong><small>= đã cấp − giữ chỗ − đã dùng</small></div>
-      <div className="ops-stat"><span>Đã cấp (còn hiệu lực)</span><strong>{formatNumber(unit.granted)}</strong></div>
-      <div className="ops-stat"><span>Đang giữ chỗ</span><strong>{formatNumber(unit.reserved)}</strong></div>
-      <div className="ops-stat"><span>Đã dùng</span><strong>{formatNumber(unit.consumed)}</strong></div>
-      <div className="ops-stat"><span>Đã hết hạn chưa dùng</span><strong>{formatNumber(unit.expired)}</strong><small>Không cộng dồn sang kỳ sau</small></div>
-      <div className="ops-stat"><span>Sắp có hiệu lực</span><strong>{formatNumber(unit.scheduled)}</strong></div>
+    <div className="bill-kpis bill-kpis-6">
+      <Kpi label="Còn dùng được" value={unit.available} hint="= đã cấp − giữ chỗ − đã dùng" testId="quota-available" />
+      <Kpi label="Đã cấp (còn hiệu lực)" value={unit.granted} />
+      <Kpi label="Đang giữ chỗ" value={unit.reserved} />
+      <Kpi label="Đã dùng" value={unit.consumed} />
+      <Kpi label="Đã hết hạn chưa dùng" value={unit.expired} hint="Không cộng dồn sang kỳ sau" />
+      <Kpi label="Sắp có hiệu lực" value={unit.scheduled} />
     </div>
     <div className="bill-meter" role="img" aria-label={`Đã dùng hoặc giữ chỗ ${used} trên ${unit.granted} ${unit.quotaUnit}`}><span style={{ width: `${percent}%` }} /></div>
-  </div>;
+  </section>;
 }
 
+const grantColumns: DataColumn<AiQuotaGrant>[] = [
+  { key: "source", header: "Nguồn", primary: true, render: (grant) => <span data-testid="quota-grant" data-source={grant.sourceKind} style={{ display: "block" }}><CellTitle title={sourceLabel[grant.sourceKind] ?? grant.sourceKind} sub={`${grant.buildingId ? `Công trình ${short(grant.buildingId)}` : "Cấp cho tổ chức"} · thanh toán ${short(grant.paymentTransactionId)}`} /></span> },
+  { key: "granted", header: "Đã cấp", width: 130, align: "right", render: (grant) => <span className="bill-money">{formatQuota(grant.quotaUnits, grant.quotaUnit)}</span> },
+  { key: "reserved", header: "Giữ chỗ", width: 100, align: "right", hideBelow: 1100, render: (grant) => <span className="bill-money">{formatNumber(grant.reserved)}</span> },
+  { key: "consumed", header: "Đã dùng", width: 100, align: "right", hideBelow: 1100, render: (grant) => <span className="bill-money">{formatNumber(grant.consumed)}</span> },
+  { key: "available", header: "Còn lại", width: 100, align: "right", render: (grant) => <span className="bill-money">{formatNumber(grant.available)}</span> },
+  { key: "period", header: "Hiệu lực", width: 190, hideBelow: 900, render: (grant) => <CellTitle title={<span style={{ fontWeight: 400 }}>{formatDateTime(grant.startsAt)}</span>} sub={`đến ${formatDateTime(grant.endsAt)}`} /> },
+  { key: "status", header: "Trạng thái", width: 140, render: (grant) => <StatusBadge tone={(grantStatus[grant.status] ?? { tone: "neutral" as Tone }).tone}>{grantStatus[grant.status]?.label ?? grant.status}</StatusBadge> },
+];
+
+const usageColumns: DataColumn<AiUsageEntry>[] = [
+  { key: "request", header: "Yêu cầu", primary: true, render: (entry) => <CellTitle title={short(entry.requestId)} sub={`đợt cấp ${short(entry.grantId)}`} /> },
+  { key: "reserved", header: "Giữ chỗ", width: 130, align: "right", render: (entry) => <span className="bill-money">{formatQuota(entry.reservedUnits, entry.quotaUnit)}</span> },
+  { key: "consumed", header: "Đã tính", width: 110, align: "right", render: (entry) => <span className="bill-money">{entry.consumedUnits === null ? "—" : formatNumber(entry.consumedUnits)}</span> },
+  { key: "status", header: "Trạng thái", width: 140, render: (entry) => <StatusBadge tone={(usageStatus[entry.status] ?? { tone: "neutral" as Tone }).tone}>{usageStatus[entry.status]?.label ?? entry.status}</StatusBadge> },
+  { key: "time", header: "Thời điểm", width: 170, hideBelow: 900, render: (entry) => formatDateTime(entry.settledAt ?? entry.createdAt) },
+];
+
 /**
- * Prepaid pooled AI quota: balance per unit, grants (service/upgrade/top-up, each with its own expiry) and usage
- * allocations. An organization reads its own tenant; PlatformAdmin passes `organizationId`. When a unit is exhausted
- * (or there is no quota) paid AI requests are blocked: the view says so and offers a prepaid top-up. No overage.
+ * Prepaid pooled AI quota (Figma "Quota AI" tab): balance per unit as KPI tiles, grants (service/upgrade/top-up, each with
+ * its own expiry) and usage allocations as DataTables. An organization reads its own tenant; PlatformAdmin passes
+ * `organizationId`. When a unit is exhausted (or there is no quota) paid AI requests are blocked: the view says so and
+ * offers a prepaid top-up. No overage.
  */
 export function AiQuotaView({ accessToken, organizationId, onTopUp, onOpenQuotation, refreshKey = 0 }: {
   accessToken: string;
@@ -69,6 +92,12 @@ export function AiQuotaView({ accessToken, organizationId, onTopUp, onOpenQuotat
   const blocked = balance.data !== undefined && (units.length === 0 || exhausted.length > 0);
   const topUpButton = onTopUp ? <Button onClick={onTopUp}><Plus size={16} aria-hidden="true" />Mua thêm quota (top-up)</Button> : undefined;
 
+  const topUpColumns: DataColumn<Quotation>[] = [
+    { key: "number", header: "Mã đơn", primary: true, render: (item) => <CellTitle title={<span className="bill-mono">{item.quotationNumber}</span>} sub={`Yêu cầu ${item.topUp?.requestedQuotaUnits != null ? formatNumber(item.topUp.requestedQuotaUnits) : "không nêu"}`} /> },
+    { key: "granted", header: "Được cấp", width: 160, hideBelow: 900, render: (item) => item.topUp?.quotaUnits != null ? formatQuota(item.topUp.quotaUnits, item.topUp.quotaUnit) : "Chờ phát hành" },
+    { key: "status", header: "Trạng thái", width: 210, render: (item) => <QuotationStatusBadge status={item.status} /> },
+  ];
+
   return <div className="ops-stack" data-testid="ai-quota">
     <div className="bill-row">
       <p className="bill-muted">Quota AI trả trước dùng chung cho cả tổ chức: gói công trình, nâng cấp và top-up đều cộng vào cùng một quỹ, mỗi lần cấp có hạn riêng. {balance.data && `Số liệu tại ${formatDateTime(balance.data.asOf)}.`}</p>
@@ -76,7 +105,7 @@ export function AiQuotaView({ accessToken, organizationId, onTopUp, onOpenQuotat
     </div>
 
     {balance.error !== undefined && <Alert tone="danger" title="Không tải được số dư quota AI" action={<Button size="sm" variant="secondary" className="mt-3" onClick={balance.reload}>Thử lại</Button>}>{billingErrorText(balance.error)}</Alert>}
-    {balance.loading && !balance.data && <SkeletonRows rows={3} label="Đang tải số dư quota…" />}
+    {balance.loading && !balance.data && <SkeletonKpis count={3} />}
 
     {blocked && <div data-testid="quota-exhausted"><Alert tone="warning" title={units.length === 0 ? "Chưa có quota AI" : "Quota AI đã hết"}
       action={onTopUp ? <Button size="sm" variant="secondary" className="mt-3" onClick={onTopUp}>Mua thêm quota (top-up)</Button> : undefined}>
@@ -88,53 +117,27 @@ export function AiQuotaView({ accessToken, organizationId, onTopUp, onOpenQuotat
 
     {units.map((unit) => <UnitBalance key={unit.quotaUnit} unit={unit} />)}
 
-    <Panel title="Lịch sử cấp quota" description="Mỗi dòng là một lần cấp có kỳ riêng (gói công trình, nâng cấp hoặc top-up trả trước)." bodyClassName="ops-stack">
+    <section className="ops-stack" aria-labelledby="quota-grants-title">
+      <div><h2 id="quota-grants-title" className="org-card-title" style={{ margin: 0 }}>Lịch sử cấp quota</h2><p className="bill-dim" style={{ margin: "4px 0 0" }}>Mỗi dòng là một lần cấp có kỳ riêng (gói công trình, nâng cấp hoặc top-up trả trước).</p></div>
       {grants.error !== undefined && <Alert tone="danger" title="Không tải được lịch sử cấp quota" action={<Button size="sm" variant="secondary" className="mt-3" onClick={grants.reload}>Thử lại</Button>}>{billingErrorText(grants.error)}</Alert>}
-      <Table className="bill-table" caption="Lịch sử cấp quota AI">
-        <thead><tr><th>Nguồn</th><th className="bill-money">Đã cấp</th><th className="bill-money">Giữ chỗ</th><th className="bill-money">Đã dùng</th><th className="bill-money">Còn lại</th><th>Hiệu lực</th><th>Trạng thái</th></tr></thead>
-        <tbody>
-          {grants.loading && !grants.data && <TableMessage colSpan={7}><SkeletonRows rows={3} label="Đang tải…" /></TableMessage>}
-          {(grants.data?.items ?? []).map((grant) => <tr key={grant.id} data-testid="quota-grant" data-source={grant.sourceKind}>
-            <td>{sourceLabel[grant.sourceKind] ?? grant.sourceKind}<span className="ops-cell-sub">{grant.buildingId ? `Công trình ${short(grant.buildingId)}` : "Cấp cho tổ chức"} · thanh toán {short(grant.paymentTransactionId)}</span></td>
-            <td className="bill-money">{formatQuota(grant.quotaUnits, grant.quotaUnit)}</td>
-            <td className="bill-money">{formatNumber(grant.reserved)}</td>
-            <td className="bill-money">{formatNumber(grant.consumed)}</td>
-            <td className="bill-money">{formatNumber(grant.available)}</td>
-            <td>{formatDateTime(grant.startsAt)}<span className="ops-cell-sub">đến {formatDateTime(grant.endsAt)}</span></td>
-            <td><StatusBadge tone={(grantStatus[grant.status] ?? { tone: "neutral" as Tone }).tone}>{grantStatus[grant.status]?.label ?? grant.status}</StatusBadge></td>
-          </tr>)}
-          {grants.data && grants.data.items.length === 0 && <TableMessage colSpan={7}><EmptyState icon={Sparkles} title="Chưa có lần cấp quota nào" description="Quota xuất hiện sau khi thanh toán gói công trình (có kèm quota) hoặc top-up được kích hoạt." /></TableMessage>}
-        </tbody>
-      </Table>
-      {(grants.data?.totalCount ?? 0) > PAGE_SIZE && <Pagination page={grantPage} pageSize={PAGE_SIZE} totalCount={grants.data?.totalCount ?? 0} onPageChange={setGrantPage} disabled={grants.loading} />}
-    </Panel>
+      <DataTable caption="Lịch sử cấp quota AI" data-testid="quota-grants" columns={grantColumns} rows={grants.data?.items ?? []} rowKey={(grant) => grant.id} loading={grants.loading && !grants.data}
+        empty={<EmptyState icon={Sparkles} title="Chưa có lần cấp quota nào" description="Quota xuất hiện sau khi thanh toán gói công trình (có kèm quota) hoặc top-up được kích hoạt." />}
+        pagination={(grants.data?.totalCount ?? 0) > PAGE_SIZE ? { page: grantPage, pageSize: PAGE_SIZE, totalCount: grants.data?.totalCount ?? 0, onPageChange: setGrantPage } : undefined} />
+    </section>
 
-    {!organizationId && <Panel title="Báo giá top-up" description="Các yêu cầu mua thêm quota trả trước của tổ chức." bodyClassName="ops-stack">
+    {!organizationId && <section className="ops-stack" aria-labelledby="quota-topups-title">
+      <div><h2 id="quota-topups-title" className="org-card-title" style={{ margin: 0 }}>Báo giá top-up</h2><p className="bill-dim" style={{ margin: "4px 0 0" }}>Các yêu cầu mua thêm quota trả trước của tổ chức. Bấm một hàng để mở báo giá.</p></div>
       {topUps.error !== undefined && <Alert tone="danger" title="Không tải được báo giá top-up" action={<Button size="sm" variant="secondary" className="mt-3" onClick={topUps.reload}>Thử lại</Button>}>{billingErrorText(topUps.error)}</Alert>}
-      {topUps.data && topUps.data.length === 0 && <p className="bill-muted">Chưa có báo giá top-up. Bấm “Mua thêm quota (top-up)” để gửi yêu cầu.</p>}
-      <ul className="bill-list">{(topUps.data ?? []).map((item) => <li key={item.id} data-testid="topup-quotation"><div className="bill-row">
-        <span className="bill-wrap"><strong>{item.quotationNumber}</strong><span className="bill-dim"> · yêu cầu {item.topUp?.requestedQuotaUnits != null ? formatNumber(item.topUp.requestedQuotaUnits) : "không nêu"}</span></span>
-        <div className="ops-actions"><QuotationStatusBadge status={item.status} />{onOpenQuotation && <Button size="sm" variant="quiet" onClick={() => onOpenQuotation(item.id)} aria-label={`Xem báo giá ${item.quotationNumber}`}>Xem</Button>}</div>
-      </div></li>)}</ul>
-    </Panel>}
+      <DataTable caption="Báo giá top-up quota AI" data-testid="topup-quotations" columns={topUpColumns} rows={topUps.data ?? []} rowKey={(item) => item.id} loading={topUps.loading && !topUps.data} onRowClick={onOpenQuotation ? (item) => onOpenQuotation(item.id) : undefined}
+        empty={<p className="bill-muted">Chưa có báo giá top-up. Bấm “Mua thêm quota (top-up)” để gửi yêu cầu.</p>} />
+    </section>}
 
-    <Panel title="Lịch sử sử dụng" description="Mỗi yêu cầu AI giữ chỗ trước, rồi tính theo mức dùng thực tế hoặc hoàn lại phần chưa dùng." bodyClassName="ops-stack">
+    <section className="ops-stack" aria-labelledby="quota-usage-title">
+      <div><h2 id="quota-usage-title" className="org-card-title" style={{ margin: 0 }}>Lịch sử sử dụng</h2><p className="bill-dim" style={{ margin: "4px 0 0" }}>Mỗi yêu cầu AI giữ chỗ trước, rồi tính theo mức dùng thực tế hoặc hoàn lại phần chưa dùng.</p></div>
       {usage.error !== undefined && <Alert tone="danger" title="Không tải được lịch sử sử dụng" action={<Button size="sm" variant="secondary" className="mt-3" onClick={usage.reload}>Thử lại</Button>}>{billingErrorText(usage.error)}</Alert>}
-      <Table className="bill-table" caption="Lịch sử sử dụng quota AI">
-        <thead><tr><th>Yêu cầu</th><th className="bill-money">Giữ chỗ</th><th className="bill-money">Đã tính</th><th>Trạng thái</th><th>Thời điểm</th></tr></thead>
-        <tbody>
-          {usage.loading && !usage.data && <TableMessage colSpan={5}><SkeletonRows rows={3} label="Đang tải…" /></TableMessage>}
-          {(usage.data?.items ?? []).map((entry) => <tr key={entry.allocationId} data-testid="quota-usage">
-            <td><span className="ops-cell-primary">{short(entry.requestId)}<span className="ops-cell-sub">đợt cấp {short(entry.grantId)}</span></span></td>
-            <td className="bill-money">{formatQuota(entry.reservedUnits, entry.quotaUnit)}</td>
-            <td className="bill-money">{entry.consumedUnits === null ? "—" : formatNumber(entry.consumedUnits)}</td>
-            <td><StatusBadge tone={(usageStatus[entry.status] ?? { tone: "neutral" as Tone }).tone}>{usageStatus[entry.status]?.label ?? entry.status}</StatusBadge></td>
-            <td>{formatDateTime(entry.settledAt ?? entry.createdAt)}</td>
-          </tr>)}
-          {usage.data && usage.data.items.length === 0 && <TableMessage colSpan={5}><EmptyState icon={Gauge} title="Chưa có lượt dùng AI" description="Mỗi yêu cầu AI tính phí sẽ hiện ở đây sau khi được giữ chỗ hoặc tính quota." /></TableMessage>}
-        </tbody>
-      </Table>
-      {(usage.data?.totalCount ?? 0) > PAGE_SIZE && <Pagination page={usagePage} pageSize={PAGE_SIZE} totalCount={usage.data?.totalCount ?? 0} onPageChange={setUsagePage} disabled={usage.loading} />}
-    </Panel>
+      <DataTable caption="Lịch sử sử dụng quota AI" data-testid="quota-usage" columns={usageColumns} rows={usage.data?.items ?? []} rowKey={(entry) => entry.allocationId} loading={usage.loading && !usage.data}
+        empty={<EmptyState icon={Gauge} title="Chưa có lượt dùng AI" description="Mỗi yêu cầu AI tính phí sẽ hiện ở đây sau khi được giữ chỗ hoặc tính quota." />}
+        pagination={(usage.data?.totalCount ?? 0) > PAGE_SIZE ? { page: usagePage, pageSize: PAGE_SIZE, totalCount: usage.data?.totalCount ?? 0, onPageChange: setUsagePage } : undefined} />
+    </section>
   </div>;
 }

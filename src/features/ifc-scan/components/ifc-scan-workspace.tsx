@@ -6,11 +6,16 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { FloatingButtonGroup, type FloatingButtonItem } from "@/components/ui/floating-button-group";
+import { PageHeader } from "@/components/ui/page-header";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { routes } from "@/configs/routes";
 import type { IfcLoadProgress, LoadedIfcModel } from "../ifc-loader";
 import type { IfcCategory, IfcElementDetails, IfcElementKind, IfcSceneScan, ScenarioAnchorKind } from "../types";
 import { categoryPalette, IfcViewer, type IfcColorMode, type IfcViewerHandle } from "./ifc-viewer";
 import styles from "./ifc-scan.module.css";
+import "@/assets/styles/ops-v2.css";
 
 const inventoryRows: { kind: IfcElementKind; label: string; icon: typeof BrickWall }[] = [
   { kind: "storey", label: "Tầng", icon: Layers3 },
@@ -51,8 +56,21 @@ function formatMetres(value: number) {
   return `${value.toLocaleString("vi-VN", { maximumFractionDigits: 2 })} m`;
 }
 
+function formatBytes(value: number) {
+  if (value >= 1_048_576) return `${(value / 1_048_576).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} MB`;
+  return `${Math.max(1, Math.round(value / 1024)).toLocaleString("vi-VN")} KB`;
+}
+
 function hex(color: number) {
   return `#${color.toString(16).padStart(6, "0")}`;
+}
+
+/** Short tag for the floating storey rail ("T3", "L1", "Tầng 2" → "T2"); the full name stays in the tooltip. */
+function storeyTag(name: string, index: number) {
+  const match = name.match(/(-?\d+)/);
+  if (match) return `T${match[1]}`;
+  const compact = name.replace(/\s+/g, "");
+  return compact.length <= 4 ? compact : `T${index + 1}`;
 }
 
 type IfcScanWorkspaceProps = {
@@ -62,14 +80,20 @@ type IfcScanWorkspaceProps = {
   description?: string;
 };
 
+/**
+ * Local IFC reader (Figma 62:5869 / 62:6378, mobile 66:3169): header with the file button, the viewer as the drop zone with a
+ * floating storey rail and a floating button group, the section slider under it, layer chips, and a summary column (scan
+ * result, selected element, next step). The file never leaves the browser; web-ifc is loaded on demand.
+ */
 export function IfcScanWorkspace({
   embedded = false,
   eyebrow = "IFC / local prototype",
   title = "Quét mô hình IFC",
-  description = "Đọc mô hình thực ngay trên máy của bạn, nhận diện các điểm neo và kiểm tra mức sẵn sàng cho kịch bản thoát nạn mẫu.",
+  description = "Xem nhanh một tệp IFC ngay trên máy bạn. Tệp không được tải lên máy chủ và không tạo revision.",
 }: IfcScanWorkspaceProps) {
   const [model, setModel] = useState<LoadedIfcModel | null>(null);
   const [scan, setScan] = useState<IfcSceneScan | null>(null);
+  const [fileSize, setFileSize] = useState<number | null>(null);
   const [selectedExpressID, setSelectedExpressID] = useState<number | null>(null);
   const [details, setDetails] = useState<IfcElementDetails | null>(null);
   const [progress, setProgress] = useState<IfcLoadProgress | null>(null);
@@ -131,6 +155,7 @@ export function IfcScanWorkspace({
       kindCursor.current = {};
       setModel(loaded);
       setScan(loaded.scan);
+      setFileSize(file.size);
       setProgress(null);
     } catch (loadError) {
       setProgress(null);
@@ -208,144 +233,147 @@ export function IfcScanWorkspace({
     setCopied(true);
   }
 
+  const onToolbarAction = (id: string) => {
+    switch (id) {
+      case "iso": viewerRef.current?.setView("iso"); break;
+      case "top": viewerRef.current?.setView("top"); break;
+      case "front": viewerRef.current?.setView("front"); break;
+      case "section": toggleSection(); break;
+      case "xray": setXray((value) => !value); break;
+      case "edges": setShowEdges((value) => !value); break;
+      case "palette": setColorMode((value) => (value === "category" ? "ifc" : "category")); break;
+      case "reset": viewerRef.current?.resetView(); break;
+      case "fullscreen": void toggleFullscreen(); break;
+      default: break;
+    }
+  };
+
+  const toolbarItems: FloatingButtonItem[] = [
+    { id: "iso", label: "Góc nhìn 3D", icon: Box, disabled: !model },
+    { id: "top", label: "Nhìn từ trên xuống (mặt bằng)", icon: SquareDashed, disabled: !model },
+    { id: "front", label: "Mặt đứng", icon: BoxSelect, disabled: !model },
+    { id: "section", label: "Mặt cắt ngang", icon: Scissors, pressed: sectionHeight !== null, disabled: !model, separator: true },
+    { id: "xray", label: "Chế độ nhìn xuyên", icon: ScanEye, pressed: xray, disabled: !model },
+    { id: "edges", label: "Nét viền", icon: Spline, pressed: showEdges, disabled: !model },
+    { id: "palette", label: colorMode === "category" ? "Đang tô màu theo loại — đổi sang màu trong IFC" : "Đang dùng màu IFC — đổi sang màu theo loại", icon: Palette, pressed: colorMode === "ifc", disabled: !model },
+    { id: "reset", label: "Đặt lại góc nhìn", icon: RotateCcw, disabled: !model, separator: true },
+    { id: "fullscreen", label: fullscreen ? "Thoát toàn màn hình" : "Toàn màn hình", icon: fullscreen ? Minimize2 : Maximize2 },
+  ];
+
   const sectionReference = (storeyID !== null ? model?.storeyLevels.get(storeyID) : undefined) ?? heightRange?.firstLevel ?? 0;
   const percent = progress && progress.total ? Math.round((progress.completed / progress.total) * 100) : 0;
   const activeStorey = model?.storeys.find((storey) => storey.expressID === storeyID) ?? null;
   const visibleCategories = model ? categoryOrder.filter((category) => model.categoryCounts[category] > 0) : [];
 
-  return <section className={`${styles.workspace} ${embedded ? styles.embedded : ""}`}>
-    <header className={styles.hero}>
-      <p className="kicker"><span className="kicker-line" /> {eyebrow}</p>
-      <h1>{title}</h1>
-      <p>{description}</p>
-    </header>
+  const fileButton = <label className={styles.uploadButton} data-primary={embedded || undefined}>
+    <Upload size={17} aria-hidden="true" />
+    <span>Chọn tệp IFC</span>
+    <input aria-label="Chọn tệp IFC" type="file" accept=".ifc" onChange={handleFileChange} />
+  </label>;
 
-    <div className={styles.fileBar}>
-      <label className={styles.uploadButton}>
-        <Upload size={17} />
-        <span>Chọn tệp IFC</span>
-        <input aria-label="Chọn tệp IFC" type="file" accept=".ifc" onChange={handleFileChange} />
-      </label>
-      {scan && model ? <div className={styles.fileMeta}>
-        <strong title={scan.fileName}>{scan.fileName}</strong>
-        <span>Schema {scan.schema} · {model.storeys.length} tầng · {model.meshes.length.toLocaleString("vi-VN")} khối · {Math.round(model.triangleCount).toLocaleString("vi-VN")} tam giác</span>
-      </div> : <p className={styles.localNote}><CheckCircle2 size={15} /> File chỉ được xử lý trong trình duyệt này.</p>}
-      {scan && <p className={`${styles.localNote} ${styles.localNoteInline}`}><CheckCircle2 size={15} /> Chỉ xử lý trong trình duyệt</p>}
-    </div>
+  return <section className={`${styles.workspace} ${embedded ? styles.embedded : ""}`}>
+    {embedded
+      ? <PageHeader eyebrow={eyebrow} title={title} description={description} breadcrumbs={[{ label: "Công cụ" }, { label: title }]} actions={fileButton} />
+      : <header className={styles.hero}>
+        <p className="kicker"><span className="kicker-line" /> {eyebrow}</p>
+        <h1>{title}</h1>
+        <p>{description}</p>
+        <div className={styles.heroActions}>{fileButton}<p className={styles.localNote}><CheckCircle2 size={15} aria-hidden="true" /> File chỉ được xử lý trong trình duyệt này.</p></div>
+      </header>}
 
     <div className={styles.layout}>
-      <aside className={styles.leftRail} aria-label="Tầng và lớp hiển thị">
-        <section className={styles.panel}>
-          <div className={styles.panelHeading}><Layers3 size={17} /><div><p>Tầng</p><h2>{activeStorey ? activeStorey.name : "Toàn bộ công trình"}</h2></div></div>
-          {model?.storeys.length ? <div className={styles.storeyList}>
-            <button type="button" aria-pressed={storeyID === null} onClick={() => setStoreyID(null)}><span>Tất cả tầng</span><small>{model.meshes.length}</small></button>
-            {[...model.storeys].reverse().map((storey) => <button type="button" key={storey.expressID} aria-pressed={storeyID === storey.expressID} onClick={() => setStoreyID(storey.expressID)}>
-              <span>{storey.name}</span><small>{storey.elevation === null ? "—" : formatMetres(storey.elevation)}</small>
-            </button>)}
-          </div> : <p className={styles.empty}>{model ? "Tệp không khai báo IfcBuildingStorey." : "Danh sách tầng hiện khi mở mô hình."}</p>}
-        </section>
+      <div className={styles.main}>
+        <div ref={stageRef} className={`${styles.stage} ${fullscreen ? styles.stageFullscreen : ""} ${dragging ? styles.dragging : ""}`}
+          onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(event) => { event.preventDefault(); setDragging(false); void openFile(event.dataTransfer.files?.[0]); }}>
+          <IfcViewer ref={viewerRef} model={model} selectedExpressID={selectedExpressID} onSelect={select}
+            hiddenCategories={hiddenCategories} storeyID={storeyID} sectionHeight={sectionHeight} xray={xray} colorMode={colorMode} showEdges={showEdges} />
 
-        <section className={styles.panel}>
-          <div className={styles.panelHeading}><Eye size={17} /><div><p>Lớp hiển thị</p><h2>Loại phần tử</h2></div></div>
-          {model ? <div className={styles.categoryList}>
-            {visibleCategories.map((category) => {
-              const hidden = hiddenCategories.has(category);
-              return <button type="button" key={category} aria-pressed={!hidden} onClick={() => toggleCategory(category)} className={hidden ? styles.off : ""}>
-                <i style={{ background: hex(categoryPalette[category].color) }} />
-                <span>{categoryLabels[category]}</span>
-                <small>{model.categoryCounts[category]}</small>
-                {hidden ? <EyeOff size={14} /> : <Eye size={14} />}
-              </button>;
-            })}
-          </div> : <p className={styles.empty}>Bật/tắt tường, sàn, cửa, cầu thang… để nhìn vào bên trong.</p>}
-        </section>
-      </aside>
+          {model && model.storeys.length > 0 && <div className={styles.storeyRail} role="group" aria-label="Tầng">
+            {[...model.storeys].reverse().map((storey, index, all) => <button type="button" key={storey.expressID} aria-pressed={storeyID === storey.expressID} aria-label={`Tầng ${storey.name}`} title={`${storey.name}${storey.elevation === null ? "" : ` · ${formatMetres(storey.elevation)}`}`} onClick={() => setStoreyID(storeyID === storey.expressID ? null : storey.expressID)}>{storeyTag(storey.name, all.length - 1 - index)}</button>)}
+            <button type="button" aria-pressed={storeyID === null} aria-label="Tất cả tầng" title="Tất cả tầng" onClick={() => setStoreyID(null)}><Layers3 size={15} aria-hidden="true" /></button>
+          </div>}
 
-      <div ref={stageRef} className={`${styles.stage} ${fullscreen ? styles.stageFullscreen : ""} ${dragging ? styles.dragging : ""}`}
-        onDragOver={(event) => { event.preventDefault(); setDragging(true); }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(event) => { event.preventDefault(); setDragging(false); void openFile(event.dataTransfer.files?.[0]); }}>
-        <IfcViewer ref={viewerRef} model={model} selectedExpressID={selectedExpressID} onSelect={select}
-          hiddenCategories={hiddenCategories} storeyID={storeyID} sectionHeight={sectionHeight} xray={xray} colorMode={colorMode} showEdges={showEdges} />
+          <TooltipProvider>
+            <FloatingButtonGroup label="Công cụ xem mô hình" items={toolbarItems} onAction={onToolbarAction} placement="bottom" className={styles.toolbar} />
+          </TooltipProvider>
 
-        <div className={styles.toolRail} role="toolbar" aria-label="Công cụ xem mô hình">
-          <button type="button" title="Góc nhìn 3D" aria-label="Góc nhìn 3D" onClick={() => viewerRef.current?.setView("iso")} disabled={!model}><Box size={17} /></button>
-          <button type="button" title="Nhìn từ trên xuống (mặt bằng)" aria-label="Nhìn từ trên xuống" onClick={() => viewerRef.current?.setView("top")} disabled={!model}><SquareDashed size={17} /></button>
-          <button type="button" title="Mặt đứng" aria-label="Mặt đứng" onClick={() => viewerRef.current?.setView("front")} disabled={!model}><BoxSelect size={17} /></button>
-          <span className={styles.toolDivider} />
-          <button type="button" title="Mặt cắt ngang" aria-label="Mặt cắt ngang" aria-pressed={sectionHeight !== null} onClick={toggleSection} disabled={!model}><Scissors size={17} /></button>
-          <button type="button" title="X-quang (nhìn xuyên)" aria-label="Chế độ nhìn xuyên" aria-pressed={xray} onClick={() => setXray((value) => !value)} disabled={!model}><ScanEye size={17} /></button>
-          <button type="button" title="Nét viền" aria-label="Nét viền" aria-pressed={showEdges} onClick={() => setShowEdges((value) => !value)} disabled={!model}><Spline size={17} /></button>
-          <button type="button" title={colorMode === "category" ? "Đang tô màu theo loại — đổi sang màu trong IFC" : "Đang dùng màu IFC — đổi sang màu theo loại"} aria-label="Đổi cách tô màu" aria-pressed={colorMode === "ifc"} onClick={() => setColorMode((value) => value === "category" ? "ifc" : "category")} disabled={!model}><Palette size={17} /></button>
-          <span className={styles.toolDivider} />
-          <button type="button" title="Đặt lại góc nhìn" aria-label="Đặt lại góc nhìn" onClick={() => viewerRef.current?.resetView()} disabled={!model}><RotateCcw size={17} /></button>
-          <button type="button" title={fullscreen ? "Thoát toàn màn hình" : "Toàn màn hình"} aria-label="Toàn màn hình" onClick={() => void toggleFullscreen()}>{fullscreen ? <Minimize2 size={17} /> : <Maximize2 size={17} />}</button>
+          {model && <p className={styles.hint}><MousePointerClick size={14} aria-hidden="true" /> Bấm để chọn · kéo để xoay · chuột phải để di chuyển · cuộn để phóng to · F focus · Esc bỏ chọn</p>}
+
+          {!model && !progress && <div className={styles.dropZone}>
+            <Upload size={28} aria-hidden="true" />
+            <strong>Kéo thả tệp IFC vào đây</strong>
+            <span>hoặc dùng nút “Chọn tệp IFC”. Hỗ trợ IFC2X3 và IFC4. Tệp chỉ được xử lý trong trình duyệt.</span>
+          </div>}
+
+          {progress && <div className={styles.progress} role="status" aria-live="polite">
+            <span>{phaseLabels[progress.phase ?? "geometry"]}</span><strong>{percent}%</strong><i><b style={{ width: `${percent}%` }} /></i>
+          </div>}
+          {error && <p className={styles.error} role="alert"><AlertTriangle size={16} aria-hidden="true" /> {error}</p>}
         </div>
 
-        {model && <p className={styles.hint}><MousePointerClick size={14} /> Bấm để chọn · kéo để xoay · chuột phải để di chuyển · cuộn để phóng to · F focus · Esc bỏ chọn</p>}
-
-        {sectionHeight !== null && heightRange && <label className={styles.sectionBar}>
-          <Scissors size={15} />
-          <span>Cao độ cắt</span>
-          <input type="range" min={heightRange.min} max={heightRange.max} step={0.05} value={sectionHeight} onChange={(event) => setSectionHeight(Number(event.currentTarget.value))} aria-label="Cao độ mặt cắt" />
-          <strong title={activeStorey ? `So với sàn ${activeStorey.name}` : "So với sàn tầng trệt"}>{formatMetres(sectionHeight - sectionReference)}</strong>
-          <button type="button" aria-label="Tắt mặt cắt" onClick={() => setSectionHeight(null)}><X size={14} /></button>
-        </label>}
-
-        {!model && !progress && <div className={styles.dropZone}>
-          <Upload size={28} />
-          <strong>Kéo thả tệp IFC vào đây</strong>
-          <span>hoặc dùng nút “Chọn tệp IFC”. Hỗ trợ IFC2X3 và IFC4.</span>
+        {model && heightRange && <div className={styles.sectionCard} data-active={sectionHeight !== null || undefined}>
+          <div className={styles.sectionHead}>
+            <strong><Scissors size={15} aria-hidden="true" /> Mặt cắt</strong>
+            {sectionHeight === null
+              ? <Button size="sm" variant="quiet" onClick={toggleSection}>Bật mặt cắt</Button>
+              : <span className={styles.sectionValue} title={activeStorey ? `So với sàn ${activeStorey.name}` : "So với sàn tầng trệt"}>Cao {formatMetres(sectionHeight - sectionReference)}<button type="button" aria-label="Tắt mặt cắt" onClick={() => setSectionHeight(null)}><X size={14} aria-hidden="true" /></button></span>}
+          </div>
+          {sectionHeight !== null && <input type="range" min={heightRange.min} max={heightRange.max} step={0.05} value={sectionHeight} onChange={(event) => setSectionHeight(Number(event.currentTarget.value))} aria-label="Cao độ mặt cắt" />}
         </div>}
 
-        {progress && <div className={styles.progress} role="status" aria-live="polite">
-          <span>{phaseLabels[progress.phase ?? "geometry"]}</span><strong>{percent}%</strong><i><b style={{ width: `${percent}%` }} /></i>
-        </div>}
-        {error && <p className={styles.error} role="alert"><AlertTriangle size={16} /> {error}</p>}
+        <div className={styles.chips} role="group" aria-label="Lớp hiển thị">
+          {model ? visibleCategories.map((category) => {
+            const hidden = hiddenCategories.has(category);
+            return <button type="button" key={category} aria-pressed={!hidden} onClick={() => toggleCategory(category)} className={styles.chip}>
+              <i style={{ background: hex(categoryPalette[category].color) }} aria-hidden="true" />
+              <span>{categoryLabels[category]}</span>
+              <small>{model.categoryCounts[category]}</small>
+              {hidden ? <EyeOff size={13} aria-hidden="true" /> : <Eye size={13} aria-hidden="true" />}
+            </button>;
+          }) : <p className={styles.empty} style={{ margin: 0 }}>Bật/tắt tường, sàn, cửa, cầu thang… để nhìn vào bên trong sau khi mở mô hình.</p>}
+        </div>
       </div>
 
-      <aside className={styles.rightRail} aria-live="polite">
-        <section className={styles.panel}>
-          <div className={styles.panelHeading}><Focus size={17} /><div><p>Phần tử đang chọn</p><h2>{details ? details.name ?? categoryLabels[details.category] : "Chưa chọn"}</h2></div></div>
+      <aside className={styles.side} aria-live="polite">
+        <section className={styles.panel} aria-labelledby="ifc-scan-title">
+          <div className={styles.panelHead}><h2 id="ifc-scan-title">Kết quả quét</h2>{scan && model && <p title={scan.fileName}>{scan.fileName}{fileSize !== null ? ` · ${formatBytes(fileSize)}` : ""} · {scan.schema}</p>}</div>
+          {scan ? <>
+            <div className={styles.inventory}>
+              {inventoryRows.map(({ kind, label, icon: Icon }) => <button type="button" key={kind} onClick={() => cycleKind(kind)} disabled={!scan.inventory[kind]} title="Bấm nhiều lần để duyệt từng phần tử">
+                <Icon size={16} aria-hidden="true" /><span>{label}</span><strong>{scan.inventory[kind]}</strong>
+              </button>)}
+            </div>
+            {scan.suggestion.readyForReview
+              ? <p className={styles.ready}><CheckCircle2 size={16} aria-hidden="true" /> Đủ điểm neo (không gian, cầu thang, cửa) để soạn kịch bản. Cửa thoát vẫn phải được xác nhận trong trình soạn.</p>
+              : <p className={styles.warning}><AlertTriangle size={16} aria-hidden="true" /> Cần kiểm tra hoặc chọn bổ sung: {scan.suggestion.missingAnchorKinds.map((kind) => anchorLabels[kind]).join(", ")}.</p>}
+          </> : <p className={styles.empty}>Scenario cần một không gian nguồn cháy, cầu thang và cửa/lối thoát. Số tầng, tường, cửa và cầu thang hiện ở đây sau khi mở mô hình.</p>}
+        </section>
+
+        <section className={styles.panel} aria-labelledby="ifc-selected-title">
+          <div className={styles.panelHead}><h2 id="ifc-selected-title">Cấu kiện đang chọn</h2>{details && <p>{details.typeName}{details.name ? ` · ${details.name}` : ""}</p>}</div>
           {details ? <>
             <dl className={styles.props}>
               <div><dt>Loại</dt><dd>{categoryLabels[details.category]} <code>{details.typeName}</code></dd></div>
               {details.objectType && <div><dt>Kiểu</dt><dd>{details.objectType}</dd></div>}
               <div><dt>Tầng</dt><dd>{details.storeyName ?? "—"}</dd></div>
               <div><dt>Kích thước</dt><dd>{details.size ? details.size.map((value) => value.toLocaleString("vi-VN", { maximumFractionDigits: 2 })).join(" × ") + " m" : "Không có hình học"}</dd></div>
-              <div><dt>GlobalId</dt><dd className={styles.globalId}><code>{details.globalId ?? "—"}</code>{details.globalId && <button type="button" onClick={() => void copyGlobalId()} aria-label="Sao chép GlobalId"><Copy size={13} />{copied ? "Đã chép" : ""}</button>}</dd></div>
+              <div><dt>GlobalId</dt><dd className={styles.globalId}><code>{details.globalId ?? "—"}</code>{details.globalId && <button type="button" onClick={() => void copyGlobalId()} aria-label="Sao chép GlobalId"><Copy size={13} aria-hidden="true" />{copied ? "Đã chép" : ""}</button>}</dd></div>
               <div><dt>Express ID</dt><dd>#{details.expressID}</dd></div>
             </dl>
             <div className={styles.propActions}>
-              <button type="button" onClick={() => viewerRef.current?.focusSelection()}><Focus size={14} /> Focus</button>
-              <button type="button" onClick={() => toggleCategory(details.category)}><EyeOff size={14} /> Ẩn loại này</button>
-              <button type="button" onClick={() => select(null)}><X size={14} /> Bỏ chọn</button>
+              <button type="button" onClick={() => viewerRef.current?.focusSelection()}><Focus size={14} aria-hidden="true" /> Focus</button>
+              <button type="button" onClick={() => toggleCategory(details.category)}><EyeOff size={14} aria-hidden="true" /> Ẩn loại này</button>
+              <button type="button" onClick={() => select(null)}><X size={14} aria-hidden="true" /> Bỏ chọn</button>
             </div>
           </> : <p className={styles.empty}>Bấm vào một phần tử trong mô hình để xem tên, loại, tầng, kích thước và GlobalId.</p>}
         </section>
 
-        <section className={styles.panel}>
-          <div className={styles.panelHeading}><Sparkles size={17} /><div><p>Kết quả quét · gợi ý scenario</p><h2>Thoát nạn cơ bản</h2></div></div>
-          {scan ? <>
-            <div className={styles.inventory}>
-              {inventoryRows.map(({ kind, label, icon: Icon }) => <button type="button" key={kind} onClick={() => cycleKind(kind)} disabled={!scan.inventory[kind]} title="Bấm nhiều lần để duyệt từng phần tử">
-                <Icon size={16} /><span>{label}</span><strong>{scan.inventory[kind]}</strong>
-              </button>)}
-            </div>
-            {scan.suggestion.readyForReview
-              ? <p className={styles.ready}><CheckCircle2 size={16} /> Đủ điểm neo (không gian, cầu thang, cửa) để soạn kịch bản. Cửa thoát vẫn phải được xác nhận trong trình soạn.</p>
-              : <p className={styles.warning}><AlertTriangle size={16} /> Cần kiểm tra hoặc chọn bổ sung: {scan.suggestion.missingAnchorKinds.map((kind) => anchorLabels[kind]).join(", ")}.</p>}
-          </> : <p className={styles.empty}>Scenario cần một không gian nguồn cháy, cầu thang và cửa/lối thoát. Mỗi điểm vẫn phải do người quản lý xác nhận.</p>}
-        </section>
-
-        {embedded && <section className={`${styles.panel} ${styles.nextStep}`}>
-          <div className={styles.panelHeading}><ArrowRight size={17} /><div><p>Bước tiếp theo</p><h2>Đưa vào bài tập huấn</h2></div></div>
-          <ol>
-            <li>Tải IFC lên một công trình để hệ thống dựng hình học và kiểm tra QA.</li>
-            <li>Mở trình soạn kịch bản: xác nhận cửa thoát, đặt điểm xuất phát, nguồn cháy và thiết bị.</li>
-            <li>Chạy thử, gửi duyệt rồi phát hành để học viên quét QR.</li>
-          </ol>
-          <Link className={styles.nextLink} href={routes.workspaceBuildings}>Mở danh sách công trình <ArrowRight size={15} /></Link>
+        {embedded && <section className={`${styles.panel} ${styles.nextStep}`} aria-labelledby="ifc-next-title">
+          <p className={styles.nextKicker} id="ifc-next-title"><Sparkles size={13} aria-hidden="true" /> Bước tiếp theo</p>
+          <p className={styles.nextText}>Muốn dùng mô hình này cho huấn luyện? Tạo công trình rồi tải IFC để worker xử lý và kiểm tra QA, sau đó soạn kịch bản và phát hành.</p>
+          <Button asChild><Link href={routes.workspaceBuildings}>Tới danh sách công trình <ArrowRight size={15} aria-hidden="true" /></Link></Button>
         </section>}
       </aside>
     </div>

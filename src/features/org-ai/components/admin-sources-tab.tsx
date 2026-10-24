@@ -1,7 +1,7 @@
 "use client";
 
-import { BookMarked, Plus, RefreshCw, Search } from "lucide-react";
-import { useRef, useState, type FormEvent } from "react";
+import { Ban, BookMarked, CheckCircle2, Eye, Plus, RefreshCw, Search } from "lucide-react";
+import { useId, useRef, useState, type FormEvent } from "react";
 
 import { ApiError } from "@/api/types/common";
 import { useIdempotencyKey } from "@/api/idempotency";
@@ -9,12 +9,14 @@ import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams, useUrlSearch } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Drawer, Modal } from "@/components/ui/dialog";
+import { Combobox } from "@/components/ui/combobox";
+import { CellTitle, DataTable, TableSearch, type DataColumn } from "@/components/ui/data-table";
+import { ConfirmDialog, Drawer, Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, Input, Select } from "@/components/ui/field";
-import { SkeletonRows } from "@/components/ui/skeleton";
+import { Field, Input } from "@/components/ui/field";
+import { FilterChip, FilterChips } from "@/components/ui/filter-chip";
+import { SkeletonDetail } from "@/components/ui/skeleton";
 import { StatusBadge, type Tone } from "@/components/ui/status-badge";
-import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { accountsApi } from "@/features/accounts/api";
 import { formatDateTime } from "@/features/billing/format";
@@ -29,6 +31,7 @@ const PAGE_SIZE = 20;
 const STATUS: Record<string, { label: string; tone: Tone }> = { Draft: { label: "Bản nháp", tone: "info" }, Approved: { label: "Đã duyệt", tone: "success" }, Retired: { label: "Đã ngừng dùng", tone: "neutral" } };
 const statusOf = (status: string) => STATUS[status] ?? { label: status, tone: "neutral" as Tone };
 const visibilityLabel = (visibility: string) => (visibility === "Common" ? "Dùng chung" : visibility === "Organization" ? "Riêng một tổ chức" : visibility);
+const VISIBILITY_OPTIONS = [{ value: "Common", label: "Dùng chung (mọi tổ chức)" }, { value: "Organization", label: "Riêng một tổ chức" }];
 
 const VERSION_LABEL = /^[A-Za-z0-9._-]{1,100}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -88,9 +91,10 @@ export function validateSource(form: Form): { errors: Errors; input?: CreateKnow
   };
 }
 
-function SourceForm({ accessToken, onCreated, onClose }: { accessToken: string; onCreated: (source: KnowledgeSource) => void; onClose: () => void }) {
+/** Create modal (Figma "Modal / Đăng ký nguồn"): one version of one document, registered as Draft. */
+function SourceModal({ open, accessToken, organizations, onCreated, onClose }: { open: boolean; accessToken: string; organizations: Array<{ value: string; label: string }>; onCreated: (source: KnowledgeSource) => void; onClose: () => void }) {
+  const formId = useId();
   const { keyFor, done } = useIdempotencyKey();
-  const organizations = useAsyncData("admin-ai:orgs", () => accountsApi.organizations(accessToken));
   const [form, setForm] = useState<Form>(EMPTY);
   const [errors, setErrors] = useState<Errors>({});
   const [error, setError] = useState<unknown>();
@@ -98,6 +102,7 @@ function SourceForm({ accessToken, onCreated, onClose }: { accessToken: string; 
   const [hashing, setHashing] = useState<string | null>(null);
   const lock = useRef(false);
   const set = (key: keyof Form) => (event: { target: { value: string } }) => setForm((current) => ({ ...current, [key]: event.target.value }));
+  const pick = (key: keyof Form) => (value: string) => setForm((current) => ({ ...current, [key]: value }));
 
   const hashFile = async (file: File | undefined) => {
     if (!file) return;
@@ -123,6 +128,9 @@ function SourceForm({ accessToken, onCreated, onClose }: { accessToken: string; 
     try {
       const created = await adminAiApi.createKnowledgeSource(accessToken, checked.input, keyFor(checked.input));
       done();
+      setForm(EMPTY);
+      setErrors({});
+      setHashing(null);
       onCreated(created);
     } catch (cause) {
       setError(cause);
@@ -133,35 +141,38 @@ function SourceForm({ accessToken, onCreated, onClose }: { accessToken: string; 
   };
   const show = (path: string, key: keyof Form) => errors[key] ?? fieldIssue(error, path);
 
-  return <form className={styles.stack} onSubmit={submit} aria-label="Đăng ký nguồn tri thức" noValidate>
-    <Alert tone="info" title="Nguồn mới luôn ở trạng thái Bản nháp">Nguồn chỉ được AI trích dẫn sau khi bạn duyệt (Đã duyệt) và còn trong khoảng hiệu lực. Tài liệu gốc không được tải lên đây; hệ thống ghi mã băm SHA-256 và liên kết tham chiếu.</Alert>
-    <Field label="Phạm vi dùng" required error={show("$.visibility", "visibility")}>
-      {(props) => <Select {...props} value={form.visibility} onChange={set("visibility")}><option value="">Chọn…</option><option value="Common">Dùng chung (mọi tổ chức)</option><option value="Organization">Riêng một tổ chức</option></Select>}
-    </Field>
-    {form.visibility === "Organization" && <Field label="Tổ chức" required error={show("$.organizationId", "organizationId")}>
-      {(props) => <Select {...props} value={form.organizationId} onChange={set("organizationId")}><option value="">Chọn tổ chức…</option>{(organizations.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select>}
-    </Field>}
-    <Field label="Tiêu đề" required error={show("$.title", "title")}>{(props) => <Input {...props} value={form.title} onChange={set("title")} maxLength={500} />}</Field>
-    <div className={styles.grid2}>
-      <Field label="Nhãn phiên bản" required hint="Ví dụ năm ban hành hoặc số hiệu." error={show("$.versionLabel", "versionLabel")}>{(props) => <Input {...props} value={form.versionLabel} onChange={set("versionLabel")} autoComplete="off" />}</Field>
-      <Field label="Phạm vi pháp lý/khu vực" error={show("$.jurisdiction", "jurisdiction")}>{(props) => <Input {...props} value={form.jurisdiction} onChange={set("jurisdiction")} maxLength={100} />}</Field>
-    </div>
-    <Field label="SHA-256 của tài liệu" required hint="Dán mã 64 ký tự hex hoặc chọn tệp để tính ngay trong trình duyệt." error={show("$.sourceHash", "sourceHash")}>
-      {(props) => <Input {...props} value={form.sourceHash} onChange={set("sourceHash")} autoComplete="off" spellCheck={false} className="font-mono" />}
-    </Field>
-    <Field label="Tính SHA-256 từ tệp" hint={hashing ?? "Chỉ tính cục bộ; tệp không rời trình duyệt."}>
-      {(props) => <Input {...props} type="file" onChange={(event) => void hashFile(event.target.files?.[0])} />}
-    </Field>
-    <Field label="Liên kết tham chiếu (https)" hint="Không chứa tài khoản/mật khẩu. Tùy chọn." error={show("$.sourceUri", "sourceUri")}>{(props) => <Input {...props} type="url" value={form.sourceUri} onChange={set("sourceUri")} placeholder="https://" autoComplete="off" />}</Field>
-    <div className={styles.grid2}>
-      <Field label="Hiệu lực từ" error={show("$.effectiveFrom", "effectiveFrom")}>{(props) => <Input {...props} type="datetime-local" value={form.effectiveFrom} onChange={set("effectiveFrom")} />}</Field>
-      <Field label="Hiệu lực đến" error={show("$.effectiveUntil", "effectiveUntil")}>{(props) => <Input {...props} type="datetime-local" value={form.effectiveUntil} onChange={set("effectiveUntil")} />}</Field>
-    </div>
-    {error !== undefined && <Alert tone="danger" title="Chưa đăng ký được nguồn">{aiErrorText(error)} Nội dung bạn nhập vẫn được giữ; bấm Đăng ký để thử lại với cùng khóa chống trùng.</Alert>}
-    <div className="ops-actions"><Button type="submit" disabled={busy} data-testid="source-create">{busy ? "Đang đăng ký…" : "Đăng ký nguồn"}</Button><Button type="button" variant="quiet" onClick={onClose} disabled={busy}>Hủy</Button></div>
-  </form>;
+  return <Modal open={open} onOpenChange={(next) => { if (!next && !busy) onClose(); }} size="lg" title="Đăng ký nguồn tri thức" description="Một phiên bản của một tài liệu, ở trạng thái Bản nháp."
+    footer={<><Button type="button" variant="quiet" onClick={onClose} disabled={busy}>Hủy</Button><Button type="submit" form={formId} disabled={busy} data-testid="source-create">{busy ? "Đang đăng ký…" : "Đăng ký nguồn"}</Button></>}>
+    <form id={formId} className={styles.stack} onSubmit={submit} aria-label="Đăng ký nguồn tri thức" noValidate>
+      <Alert tone="info" title="Nguồn mới luôn ở trạng thái Bản nháp">Nguồn chỉ được AI trích dẫn sau khi bạn duyệt (Đã duyệt) và còn trong khoảng hiệu lực. Tài liệu gốc không được tải lên đây; hệ thống ghi mã băm SHA-256 và liên kết tham chiếu.</Alert>
+      <Field label="Phạm vi dùng" required error={show("$.visibility", "visibility")}>
+        {(props) => <Combobox {...props} aria-label="Phạm vi dùng" value={form.visibility} onChange={pick("visibility")} options={VISIBILITY_OPTIONS} placeholder="Chọn…" groupLabel="Phạm vi" />}
+      </Field>
+      {form.visibility === "Organization" && <Field label="Tổ chức" required error={show("$.organizationId", "organizationId")}>
+        {(props) => <Combobox {...props} aria-label="Tổ chức" value={form.organizationId} onChange={pick("organizationId")} options={organizations} placeholder="Chọn tổ chức…" searchPlaceholder="Tìm tổ chức" groupLabel="Tổ chức" />}
+      </Field>}
+      <Field label="Tiêu đề" required error={show("$.title", "title")}>{(props) => <Input {...props} value={form.title} onChange={set("title")} maxLength={500} />}</Field>
+      <div className={styles.grid2}>
+        <Field label="Nhãn phiên bản" required hint="Ví dụ năm ban hành hoặc số hiệu." error={show("$.versionLabel", "versionLabel")}>{(props) => <Input {...props} value={form.versionLabel} onChange={set("versionLabel")} autoComplete="off" />}</Field>
+        <Field label="Phạm vi pháp lý/khu vực" error={show("$.jurisdiction", "jurisdiction")}>{(props) => <Input {...props} value={form.jurisdiction} onChange={set("jurisdiction")} maxLength={100} />}</Field>
+      </div>
+      <Field label="SHA-256 của tài liệu" required hint="Dán mã 64 ký tự hex hoặc chọn tệp để tính ngay trong trình duyệt." error={show("$.sourceHash", "sourceHash")}>
+        {(props) => <Input {...props} value={form.sourceHash} onChange={set("sourceHash")} autoComplete="off" spellCheck={false} className="font-mono" />}
+      </Field>
+      <Field label="Tính SHA-256 từ tệp" hint={hashing ?? "Chỉ tính cục bộ; tệp không rời trình duyệt."}>
+        {(props) => <Input {...props} type="file" onChange={(event) => void hashFile(event.target.files?.[0])} />}
+      </Field>
+      <Field label="Liên kết tham chiếu (https)" hint="Không chứa tài khoản/mật khẩu. Tùy chọn." error={show("$.sourceUri", "sourceUri")}>{(props) => <Input {...props} type="url" value={form.sourceUri} onChange={set("sourceUri")} placeholder="https://" autoComplete="off" />}</Field>
+      <div className={styles.grid2}>
+        <Field label="Hiệu lực từ" error={show("$.effectiveFrom", "effectiveFrom")}>{(props) => <Input {...props} type="datetime-local" value={form.effectiveFrom} onChange={set("effectiveFrom")} />}</Field>
+        <Field label="Hiệu lực đến" error={show("$.effectiveUntil", "effectiveUntil")}>{(props) => <Input {...props} type="datetime-local" value={form.effectiveUntil} onChange={set("effectiveUntil")} />}</Field>
+      </div>
+      {error !== undefined && <Alert tone="danger" title="Chưa đăng ký được nguồn">{aiErrorText(error)} Nội dung bạn nhập vẫn được giữ; bấm Đăng ký để thử lại với cùng khóa chống trùng.</Alert>}
+    </form>
+  </Modal>;
 }
 
+/** Drawer body: the source as the server has it, with approve / retire behind a confirmation (If-Match = revision). */
 function SourceDetail({ accessToken, id, orgName, onChanged }: { accessToken: string; id: string; orgName: (id: string | null | undefined) => string; onChanged: () => void }) {
   const toast = useToast();
   const detail = useAsyncData(`admin-ai:source:${id}`, (signal) => adminAiApi.getKnowledgeSource(accessToken, id, signal));
@@ -194,11 +205,11 @@ function SourceDetail({ accessToken, id, orgName, onChanged }: { accessToken: st
   };
 
   return <div className={styles.stack} data-testid="source-detail">
-    {detail.loading && !current && <SkeletonRows rows={4} label="Đang tải nguồn…" />}
+    {detail.loading && !current && <SkeletonDetail rows={8} />}
     {detail.error !== undefined && !current && <Alert tone="danger" title="Không tải được nguồn" action={<Button size="sm" variant="secondary" className="mt-3" onClick={detail.reload}>Thử lại</Button>}>{aiErrorText(detail.error)}</Alert>}
     {source && <>
       <div className={styles.row}><strong>{source.title}</strong><StatusBadge tone={statusOf(source.approvalStatus).tone} data-testid="source-status">{statusOf(source.approvalStatus).label}</StatusBadge></div>
-      <dl className={styles.meta}>
+      <dl className="ops-kv">
         <dt>Phạm vi dùng</dt><dd>{visibilityLabel(source.visibility)}{source.visibility === "Organization" ? ` · ${orgName(source.organizationId)}` : ""}</dd>
         <dt>Phiên bản</dt><dd>{source.versionLabel}</dd>
         <dt>SHA-256</dt><dd className={styles.mono}>{source.sourceHash}</dd>
@@ -217,20 +228,22 @@ function SourceDetail({ accessToken, id, orgName, onChanged }: { accessToken: st
       {error !== undefined && !stale && <Alert tone="danger" title="Chưa thực hiện được">{aiErrorText(error)}</Alert>}
 
       <div className="ops-actions">
-        {source.approvalStatus === "Draft" && <Button type="button" onClick={() => setConfirm("approve")} disabled={busy || stale} data-testid="source-approve">Duyệt nguồn</Button>}
-        {source.approvalStatus === "Approved" && <Button type="button" variant="danger" onClick={() => setConfirm("retire")} disabled={busy || stale} data-testid="source-retire">Ngừng dùng</Button>}
+        {source.approvalStatus === "Draft" && <Button type="button" onClick={() => setConfirm("approve")} disabled={busy || stale} data-testid="source-approve"><CheckCircle2 size={16} aria-hidden="true" />Duyệt nguồn</Button>}
+        {source.approvalStatus === "Approved" && <Button type="button" variant="danger" onClick={() => setConfirm("retire")} disabled={busy || stale} data-testid="source-retire"><Ban size={16} aria-hidden="true" />Ngừng dùng</Button>}
         {source.approvalStatus === "Retired" && <p className={styles.muted}>Nguồn đã ngừng dùng; không thể duyệt lại. Đăng ký phiên bản mới nếu cần.</p>}
       </div>
     </>}
 
-    <Modal open={confirm !== null} onOpenChange={(open) => { if (!open && !busy) setConfirm(null); }} title={confirm === "approve" ? "Duyệt nguồn tri thức?" : "Ngừng dùng nguồn tri thức?"}
+    <Modal open={confirm !== null} onOpenChange={(open) => { if (!open && !busy) setConfirm(null); }} size="sm" title={confirm === "approve" ? "Duyệt nguồn tri thức?" : "Ngừng dùng nguồn tri thức?"}
       description={confirm === "approve" ? "Sau khi duyệt, AI của tổ chức có thể trích dẫn nguồn trong khoảng hiệu lực." : "AI không còn trích dẫn nguồn này ở yêu cầu mới; bài Learn đã xuất bản không bị sửa."}
+      className={confirm === "retire" ? "ops-dialog--danger" : undefined}
       footer={<><Button type="button" variant="quiet" onClick={() => setConfirm(null)} disabled={busy}>Hủy</Button><Button type="button" variant={confirm === "retire" ? "danger" : "primary"} onClick={() => confirm && void run(confirm)} disabled={busy} data-testid="source-confirm">{busy ? "Đang gửi…" : "Xác nhận"}</Button></>}>
       <p className={styles.muted}>{source?.title} · phiên bản {source?.versionLabel}</p>
     </Modal>
   </div>;
 }
 
+/** Knowledge-source registry: search + chips in the URL; a row opens the drawer, the "···" menu approves/retires with If-Match. */
 export function AdminSourcesTab({ accessToken }: { accessToken: string }) {
   const toast = useToast();
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
@@ -238,54 +251,93 @@ export function AdminSourcesTab({ accessToken }: { accessToken: string }) {
   const status = get("status");
   const search = get("q");
   const sourceId = get("source");
+  const creating = get("create") === "1";
   const [text, setText] = useUrlSearch(search, setParams);
-  const [creating, setCreating] = useState(false);
+  const [quick, setQuick] = useState<{ source: KnowledgeSource; operation: "approve" | "retire" } | null>(null);
+  const [quickBusy, setQuickBusy] = useState(false);
 
   const list = useAsyncData(
     `admin-ai:sources:${page}:${visibility}:${status}:${search}`,
     (signal) => adminAiApi.listKnowledgeSources(accessToken, { page, pageSize: PAGE_SIZE, visibility: visibility || undefined, status: status || undefined, search: search || undefined }, signal),
   );
   const organizations = useAsyncData("admin-ai:orgs", () => accountsApi.organizations(accessToken));
-  const orgName = (id: string | null | undefined) => (id ? (organizations.data?.items ?? []).find((item) => item.id === id)?.name ?? `${id.slice(0, 8)}…` : "—");
+  const organizationOptions = (organizations.data?.items ?? []).map((item) => ({ value: item.id, label: item.name }));
+  const orgName = (id: string | null | undefined) => (id ? organizationOptions.find((item) => item.value === id)?.label ?? `${id.slice(0, 8)}…` : "—");
   const items = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
   const filtering = Boolean(visibility || status || search);
+  const open = (id: string) => setParams({ source: id });
+  const setCreating = (value: boolean) => setParams({ create: value ? "1" : null });
 
-  return <>
-    <div className="ops-toolbar">
-      <div className="ops-toolbar-grow"><Input aria-label="Tìm nguồn" type="search" placeholder="Tìm theo tiêu đề, phiên bản, khu vực" value={text} onChange={(event) => setText(event.target.value)} /></div>
-      <Select aria-label="Phạm vi dùng" style={{ width: 190 }} value={visibility} onChange={(event) => setParams({ visibility: event.target.value })}>
-        <option value="">Mọi phạm vi</option><option value="Common">Dùng chung</option><option value="Organization">Riêng một tổ chức</option>
-      </Select>
-      <Select aria-label="Trạng thái nguồn" style={{ width: 180 }} value={status} onChange={(event) => setParams({ status: event.target.value })}>
-        <option value="">Mọi trạng thái</option>{Object.keys(STATUS).map((value) => <option key={value} value={value}>{STATUS[value].label}</option>)}
-      </Select>
-      {filtering && <Button variant="quiet" onClick={() => { setText(""); setParams({ visibility: null, status: null, q: null }); }}>Xóa bộ lọc</Button>}
-      <Button variant="quiet" onClick={list.reload} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
-      <Button onClick={() => setCreating(true)} data-testid="source-new"><Plus size={16} aria-hidden="true" />Đăng ký nguồn</Button>
-    </div>
-    {list.error !== undefined && <Alert tone="danger" title="Không tải được nguồn tri thức" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{aiErrorText(list.error)}</Alert>}
-    <Table caption="Nguồn tri thức" data-testid="admin-sources">
-      <thead><tr><th>Nguồn</th><th>Phạm vi</th><th>Trạng thái</th><th>Hiệu lực</th><th>Tạo lúc</th></tr></thead>
-      <tbody>
-        {list.loading && !list.data && <TableMessage colSpan={5}><SkeletonRows rows={6} label="Đang tải nguồn tri thức…" /></TableMessage>}
-        {items.map((item) => <tr key={item.id} data-testid="source-row">
-          <td><button type="button" className={styles.rowButton} onClick={() => setParams({ source: item.id })} aria-label={`Mở nguồn ${item.title}`}><span className={styles.clip}>{item.title}</span></button><span className="ops-cell-sub">phiên bản {item.versionLabel}</span></td>
-          <td>{visibilityLabel(item.visibility)}{item.visibility === "Organization" && <span className="ops-cell-sub">{orgName(item.organizationId)}</span>}</td>
-          <td><StatusBadge tone={statusOf(item.approvalStatus).tone}>{statusOf(item.approvalStatus).label}</StatusBadge></td>
-          <td>{item.effectiveFrom ? formatDateTime(item.effectiveFrom) : "Ngay"}<span className="ops-cell-sub">{item.effectiveUntil ? `đến ${formatDateTime(item.effectiveUntil)}` : "không giới hạn"}</span></td>
-          <td>{formatDateTime(item.createdAt)}</td>
-        </tr>)}
-        {list.data && !items.length && <TableMessage colSpan={5}><EmptyState icon={filtering ? Search : BookMarked} title={filtering ? "Không có nguồn phù hợp." : "Chưa có nguồn tri thức nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Chưa có nguồn đã duyệt thì AI không có gì để trích dẫn. Đăng ký nguồn (bản nháp) rồi duyệt."} /></TableMessage>}
-      </tbody>
-    </Table>
-    {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
+  /** Row-menu approve/retire: If-Match from the revision the list showed; a 412 means someone changed it meanwhile. */
+  const runQuick = async () => {
+    if (!quick || quickBusy) return;
+    setQuickBusy(true);
+    try {
+      await adminAiApi.changeKnowledgeSource(accessToken, quick.source.id, quick.operation, knowledgeEtag(quick.source.revision));
+      toast.notify({ tone: "success", title: quick.operation === "approve" ? "Đã duyệt nguồn" : "Đã ngừng dùng nguồn", description: quick.source.title });
+      setQuick(null);
+      list.reload();
+    } catch (cause) {
+      const stale = cause instanceof ApiError && cause.status === 412;
+      toast.notify({ tone: stale ? "warning" : "danger", title: stale ? "Nguồn đã thay đổi ở nơi khác" : "Chưa thực hiện được", description: stale ? "Chưa ghi đè gì. Danh sách được tải lại; mở chi tiết để xem trạng thái hiện tại." : aiErrorText(cause) });
+      setQuick(null);
+      list.reload();
+    } finally {
+      setQuickBusy(false);
+    }
+  };
 
-    <Drawer open={sourceId !== ""} onOpenChange={(open) => { if (!open) setParams({ source: null }); }} title="Chi tiết nguồn tri thức" description="Duyệt hoặc ngừng dùng theo phiên bản bản ghi (If-Match)." className={styles.wideDrawer}>
+  const columns: DataColumn<KnowledgeSource>[] = [
+    { key: "title", header: "Nguồn", primary: true, render: (item) => <CellTitle title={<span className={styles.clip}>{item.title}</span>} sub={`phiên bản ${item.versionLabel}`} /> },
+    { key: "visibility", header: "Phạm vi", width: 190, hideBelow: 900, render: (item) => <CellTitle title={visibilityLabel(item.visibility)} sub={item.visibility === "Organization" ? orgName(item.organizationId) : undefined} /> },
+    { key: "status", header: "Trạng thái", width: 150, render: (item) => <StatusBadge tone={statusOf(item.approvalStatus).tone}>{statusOf(item.approvalStatus).label}</StatusBadge> },
+    { key: "period", header: "Hiệu lực", width: 210, hideBelow: 1100, render: (item) => <CellTitle title={item.effectiveFrom ? formatDateTime(item.effectiveFrom) : "Ngay"} sub={item.effectiveUntil ? `đến ${formatDateTime(item.effectiveUntil)}` : "không giới hạn"} /> },
+    { key: "created", header: "Tạo lúc", width: 170, hideBelow: 1200, render: (item) => formatDateTime(item.createdAt) },
+  ];
+
+  return <div className={styles.stack}>
+    <DataTable<KnowledgeSource>
+      caption="Nguồn tri thức"
+      data-testid="ai-sources-table"
+      columns={columns}
+      rows={items}
+      rowKey={(item) => item.id}
+      loading={list.loading && !list.data}
+      onRowClick={(item) => open(item.id)}
+      rowTone={(item) => (item.approvalStatus === "Retired" ? "muted" : undefined)}
+      rowMenu={(item) => [
+        { label: "Xem chi tiết", icon: Eye, onSelect: () => open(item.id) },
+        ...(item.approvalStatus === "Draft" ? [{ label: "Duyệt nguồn", icon: CheckCircle2, onSelect: () => setQuick({ source: item, operation: "approve" }), separator: true }] : []),
+        ...(item.approvalStatus === "Approved" ? [{ label: "Ngừng dùng", icon: Ban, tone: "danger" as const, onSelect: () => setQuick({ source: item, operation: "retire" }), separator: true }] : []),
+      ]}
+      error={list.error !== undefined ? <Alert tone="danger" title="Không tải được nguồn tri thức" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{aiErrorText(list.error)}</Alert> : undefined}
+      toolbar={<>
+        <TableSearch value={text} onChange={setText} label="Tìm nguồn" placeholder="Tìm theo tiêu đề, phiên bản, khu vực" />
+        <FilterChips label="Bộ lọc nguồn tri thức">
+          <FilterChip label="Phạm vi" value={visibility} onChange={(value) => setParams({ visibility: value })} options={[{ value: "Common", label: "Dùng chung" }, { value: "Organization", label: "Riêng một tổ chức" }]} />
+          <FilterChip label="Trạng thái" value={status} onChange={(value) => setParams({ status: value })} options={Object.keys(STATUS).map((value) => ({ value, label: STATUS[value].label }))} />
+        </FilterChips>
+        {filtering && <Button variant="quiet" onClick={() => { setText(""); setParams({ visibility: null, status: null, q: null }); }}>Xóa bộ lọc</Button>}
+        <Button variant="quiet" onClick={list.reload} disabled={list.loading} aria-label="Tải lại danh sách"><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
+        <Button onClick={() => setCreating(true)} data-testid="source-new"><Plus size={16} aria-hidden="true" />Đăng ký nguồn</Button>
+      </>}
+      empty={<EmptyState icon={filtering ? Search : BookMarked} title={filtering ? "Không có nguồn phù hợp." : "Chưa có nguồn tri thức nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Chưa có nguồn đã duyệt thì AI không có gì để trích dẫn. Đăng ký nguồn (bản nháp) rồi duyệt."} action={!filtering ? <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Đăng ký nguồn</Button> : undefined} />}
+      pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
+    />
+    <p className={styles.hint}>Bấm hàng để xem chi tiết; menu “···” duyệt hoặc ngừng dùng theo phiên bản bản ghi (If-Match).</p>
+
+    <Drawer open={sourceId !== ""} onOpenChange={(open) => { if (!open) setParams({ source: null }); }} size="md" data-testid="ai-source-drawer" title="Chi tiết nguồn tri thức" description="Duyệt hoặc ngừng dùng theo phiên bản bản ghi (If-Match).">
       {sourceId && <SourceDetail key={sourceId} accessToken={accessToken} id={sourceId} orgName={orgName} onChanged={list.reload} />}
     </Drawer>
-    <Drawer open={creating} onOpenChange={setCreating} title="Đăng ký nguồn tri thức" description="Một phiên bản của một tài liệu, ở trạng thái Bản nháp." className={styles.wideDrawer}>
-      {creating && <SourceForm accessToken={accessToken} onClose={() => setCreating(false)} onCreated={(created) => { setCreating(false); list.reload(); setParams({ source: created.id }); toast.notify({ tone: "success", title: "Đã đăng ký nguồn (Bản nháp)" }); }} />}
-    </Drawer>
-  </>;
+
+    <SourceModal open={creating} accessToken={accessToken} organizations={organizationOptions} onClose={() => setCreating(false)} onCreated={(created) => { list.reload(); setParams({ create: null, source: created.id }); toast.notify({ tone: "success", title: "Đã đăng ký nguồn (Bản nháp)" }); }} />
+
+    <ConfirmDialog open={quick !== null} onOpenChange={(open) => { if (!open && !quickBusy) setQuick(null); }} busy={quickBusy}
+      title={quick?.operation === "approve" ? "Duyệt nguồn tri thức?" : "Ngừng dùng nguồn tri thức?"}
+      description={quick?.operation === "approve" ? "Sau khi duyệt, AI của tổ chức có thể trích dẫn nguồn trong khoảng hiệu lực." : "AI không còn trích dẫn nguồn này ở yêu cầu mới; bài Learn đã xuất bản không bị sửa."}
+      tone={quick?.operation === "retire" ? "danger" : "primary"} confirmLabel={quick?.operation === "approve" ? "Duyệt nguồn" : "Ngừng dùng"} onConfirm={runQuick}>
+      <p className={styles.muted}>{quick?.source.title} · phiên bản {quick?.source.versionLabel} · bản ghi {quick?.source.revision}</p>
+    </ConfirmDialog>
+  </div>;
 }

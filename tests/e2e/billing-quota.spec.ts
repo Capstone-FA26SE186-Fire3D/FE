@@ -23,13 +23,13 @@ test.describe("organization AI quota (mock)", () => {
     await expect(page.getByText("665")).toHaveCount(0);
     await expect(units.first()).toContainText("120");
     await expect(units.first()).toContainText("Không cộng dồn sang kỳ sau");
-    const grants = page.getByTestId("quota-grant");
+    const grants = page.getByTestId("quota-grants").locator("tbody tr");
     await expect(grants.nth(0)).toContainText("Gói công trình");
     await expect(grants.nth(1)).toContainText("Top-up trả trước");
     await expect(grants.nth(1)).toContainText("Chưa đến kỳ");
     await expect(grants.nth(2)).toContainText("Nâng cấp");
     await expect(grants.nth(2)).toContainText("Đã hết hạn");
-    const usage = page.getByTestId("quota-usage");
+    const usage = page.getByTestId("quota-usage").locator("tbody tr");
     await expect(usage.nth(0)).toContainText("Đang giữ chỗ");
     await expect(usage.nth(1)).toContainText("Đã tính");
     await expect(usage.nth(1)).toContainText("62");
@@ -114,7 +114,7 @@ test.describe("organization AI quota (mock)", () => {
     await page.keyboard.press("Escape");
     await page.getByRole("tab", { name: "Quota AI" }).click();
     await expect(page.getByTestId("quota-grant").first()).toContainText("Top-up trả trước");
-    await expect(page.getByTestId("topup-quotation").first()).toBeVisible();
+    await expect(page.getByTestId("topup-quotations").locator("tbody tr").first()).toBeVisible();
   });
 
   test("quota endpoints: 500 shows retry per block; 403 shows the denial message", async ({ page }) => {

@@ -87,7 +87,8 @@ test.describe("/workspace/library (read only)", () => {
     await page.getByRole("button", { name: "Xem mẫu BINH-CO2" }).click();
     await expect(page).toHaveURL(/item=/);
     const drawer = page.getByRole("dialog");
-    await expect(drawer.getByTestId("org-item-detail")).toContainText("Bình CO2 5 kg");
+    // v2 drawer: the item name is the drawer title, the body holds the version details.
+    await expect(drawer.getByRole("heading", { name: "Bình CO2 5 kg" })).toBeVisible();
     await expect(drawer.getByTestId("version-preview")).toContainText("Không thêm năng lực cho runtime");
     await expect(drawer).toContainText("Áp dụng là sao chép");
     expect(backend.calls.filter((call) => call.path.startsWith("/api/admin"))).toEqual([]);
@@ -111,11 +112,14 @@ test.describe("/workspace/library (read only)", () => {
 
     await page.getByRole("button", { name: "Xóa bộ lọc" }).click();
     await expect(page).not.toHaveURL(/q=/);
-    await page.getByLabel("Năng lực runtime yêu cầu").selectOption("equipment.extinguisher");
+    const capability = page.getByRole("combobox", { name: "Năng lực runtime yêu cầu" });
+    await capability.click();
+    await page.getByRole("option", { name: "equipment.extinguisher" }).click();
     await expect(page).toHaveURL(/cap=equipment\.extinguisher/);
     await expect(page.getByTestId("org-item-BINH-CO2")).toBeVisible();
     await expect(page.getByTestId("org-item-MAT-NA")).toHaveCount(0);
-    await page.getByLabel("Năng lực runtime yêu cầu").selectOption("none");
+    await capability.click();
+    await page.getByRole("option", { name: "Không yêu cầu năng lực" }).click();
     await expect(page.getByTestId("org-item-TEMPLATE-SO-TAN")).toBeVisible();
     await expect(page.getByTestId("org-item-BINH-CO2")).toHaveCount(0);
 
@@ -123,7 +127,7 @@ test.describe("/workspace/library (read only)", () => {
     await expect(page.getByRole("heading", { name: "Không có mẫu khớp bộ lọc" })).toBeVisible();
     await page.reload();
     await expect(page.getByLabel("Tìm mẫu")).toHaveValue("không-có-gì");
-    await expect(page.getByLabel("Năng lực runtime yêu cầu")).toHaveValue("none");
+    await expect(page.getByRole("combobox", { name: "Năng lực runtime yêu cầu" })).toContainText("Không yêu cầu năng lực");
   });
 
   test("deep link to an item that is not published (or was deactivated) says it is unavailable; the Draft is not leaked", async ({ page }) => {

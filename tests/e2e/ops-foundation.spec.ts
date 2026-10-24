@@ -148,7 +148,8 @@ test.describe("roles and deep links", () => {
     await expect(page).toHaveURL(/page=3/);
     await expect(page.getByText("user3-0@fire3d.test")).toBeVisible();
 
-    await page.getByLabel("Vai trò", { exact: true }).selectOption("1");
+    await page.getByRole("button", { name: /^Vai trò:/ }).click();
+    await page.getByRole("option", { name: "Thành viên tổ chức" }).click();
     await expect(page).toHaveURL(/role=1/);
     await expect(page).not.toHaveURL(/page=/); // changing a filter returns to page 1
     await page.goBack();
@@ -165,7 +166,7 @@ test.describe("layout and accessibility", () => {
         await page.emulateMedia({ colorScheme: scheme });
         await page.setViewportSize({ width, height: width < 768 ? 700 : 860 });
         await page.goto("/workspace/buildings");
-        await expect(page.getByRole("link", { name: "Công trình 1" })).toBeVisible();
+        await expect(page.getByTestId("buildings-table").getByText("Công trình 1", { exact: true }).first()).toBeVisible();
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
         await page.screenshot({ path: testInfo.outputPath(`buildings-${scheme}-${width}.png`), fullPage: true });
 
@@ -184,7 +185,7 @@ test.describe("layout and accessibility", () => {
     await mockBuildings(page);
     await page.setViewportSize({ width: 1440, height: 860 });
     await page.goto("/workspace/buildings");
-    await expect(page.getByRole("link", { name: "Công trình 1" })).toBeVisible();
+    await expect(page.getByTestId("buildings-table").getByText("Công trình 1", { exact: true }).first()).toBeVisible();
     await page.keyboard.press("Tab");
     await expect(page.getByRole("link", { name: "Bỏ qua điều hướng" })).toBeFocused();
 
@@ -205,7 +206,7 @@ test.describe("layout and accessibility", () => {
     await mockBuildings(page);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/workspace/buildings");
-    await expect(page.getByRole("link", { name: "Công trình 1" })).toBeVisible();
+    await expect(page.getByTestId("buildings-table").getByText("Công trình 1", { exact: true }).first()).toBeVisible();
     const durations = await page.locator(".ops-nav-link").first().evaluate((node) => getComputedStyle(node).transitionDuration);
     expect(parseFloat(durations)).toBeLessThan(0.01);
   });

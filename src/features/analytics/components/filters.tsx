@@ -6,15 +6,25 @@ import { buildingsApi } from "@/features/buildings/api";
 import { GROUP_BY, type GroupBy, type TrainingFilters } from "../types";
 import styles from "./analytics.module.css";
 
-export const GROUP_LABELS: Record<GroupBy, string> = { day: "Theo ngày", week: "Theo tuần", month: "Theo tháng", building: "Theo công trình", scenario: "Theo kịch bản" };
+export const GROUP_LABELS: Record<GroupBy, string> = { day: "Ngày", week: "Tuần", month: "Tháng", building: "Công trình", scenario: "Kịch bản" };
 
-/** Filters read from the URL. A scenario only counts while its building is chosen (the scenario list depends on it). */
+/** Grouping used when the URL names none: the "Phiên theo ngày" chart and the KPI sparklines read the daily cohorts. */
+export const DEFAULT_GROUP_BY: GroupBy = "day";
+
+/**
+ * Filters read from the URL. A scenario only counts while its building is chosen (the scenario list depends on it).
+ * `groupBy` is left undefined for the default grouping (no URL param, or `day` written explicitly) so the chip and the
+ * URL stay at their default; `withDefaultGroup` fills it in for the request.
+ */
 export function readTrainingFilters(get: (key: string) => string): TrainingFilters {
   const buildingId = get("building");
   const scenarioId = buildingId ? get("scenario") : "";
   const group = get("groupBy");
-  return { buildingId: buildingId || undefined, scenarioId: scenarioId || undefined, groupBy: (GROUP_BY as readonly string[]).includes(group) ? (group as GroupBy) : undefined };
+  const groupBy = (GROUP_BY as readonly string[]).includes(group) && group !== DEFAULT_GROUP_BY ? (group as GroupBy) : undefined;
+  return { buildingId: buildingId || undefined, scenarioId: scenarioId || undefined, groupBy };
 }
+
+export const withDefaultGroup = (filters: TrainingFilters): TrainingFilters => ({ ...filters, groupBy: filters.groupBy ?? DEFAULT_GROUP_BY });
 
 /**
  * Building / scenario / grouping chips of the training report (rendered inside the report's chip row). Options come from the tenant's own lists (buildings, then the
@@ -36,7 +46,7 @@ export function TrainingFilterBar({ accessToken, filters, onChange }: { accessTo
   return <>
     <FilterChip label="Công trình" value={filters.buildingId ?? ""} options={buildingOptions} onChange={(value) => onChange({ building: value || null, scenario: null })} />
     <FilterChip label="Kịch bản" value={filters.scenarioId ?? ""} options={scenarioOptions} disabled={!filters.buildingId} hint={filters.buildingId ? undefined : "Chọn công trình trước"} onChange={(value) => onChange({ scenario: value || null })} />
-    <FilterChip label="Nhóm theo" allLabel="không nhóm" value={filters.groupBy ?? ""} options={GROUP_BY.map((key) => ({ value: key, label: GROUP_LABELS[key] }))} hint="Thêm bảng nhóm số liệu; cũng áp dụng cho CSV." onChange={(value) => onChange({ groupBy: value || null })} />
+    <FilterChip label="Nhóm theo" allLabel={GROUP_LABELS[DEFAULT_GROUP_BY]} value={filters.groupBy ?? ""} options={GROUP_BY.filter((key) => key !== DEFAULT_GROUP_BY).map((key) => ({ value: key, label: GROUP_LABELS[key] }))} hint="Trục thời gian của biểu đồ và bảng nhóm số liệu; cũng áp dụng cho CSV." onChange={(value) => onChange({ groupBy: value || null })} />
     {errors.length > 0 && <p className={styles.filterError} role="alert">{errors.join(" ")}</p>}
   </>;
 }

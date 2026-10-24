@@ -129,13 +129,13 @@ test("the apply result must still pass the shape check: an invalid proposed valu
   await expect(page.getByTestId("ai-confirm-apply")).toBeEnabled();
 });
 
-test("from the AI page: result -> choose scenario -> draft entry screen -> the preview appears on the chosen draft", async ({ page }) => {
+test("from the AI page (saved proposals): result -> choose scenario -> draft entry screen -> the preview appears on the chosen draft", async ({ page }) => {
   const ai = newAiMock({ pendingPolls: 0 });
   const request = seedRequest(ai, { operation: "ScenarioDraft" });
   const editor = editorMock({ drafts: [{ id: DRAFT_ID, draftNumber: 3, version: 51, updatedAt: "2026-10-02T00:00:00Z", lastEditedByName: null, schemaVersion: "fet3d.editor/1" }], currentDraftId: DRAFT_ID });
   await installEditorMocks(page, editor);
   await mockAi(page, ai);
-  await page.goto(`/workspace/ai?tab=draft&request=${request.requestId}`);
+  await page.goto(`/workspace/ai?tab=saved&request=${request.requestId}`);
   await page.getByTestId("ai-apply").click();
   const chooser = page.getByRole("dialog", { name: "Áp dụng đề xuất vào bản nháp" });
   await expect(chooser.getByRole("combobox", { name: "Công trình" })).toContainText("Tòa nhà A");

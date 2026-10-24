@@ -101,7 +101,8 @@ test.describe("412 on commerce catalog edits (PATCH replaces every field)", () =
     await billingSignIn(page, billingAdmin);
     await mockBilling(page, mock);
     await page.goto("/admin/commerce?tab=packages");
-    await page.getByRole("button", { name: "Sửa gói BLD-12", exact: true }).click();
+    // DataTable v2: a row opens the edit modal.
+    await page.getByRole("row", { name: /BLD-12/ }).first().click();
     await page.getByLabel("Tên gói").fill("Tên gói tôi gõ");
     // Somebody else raises the price and saves first.
     mock.packages[0].revision = 4;
@@ -135,7 +136,7 @@ test.describe("412 on commerce catalog edits (PATCH replaces every field)", () =
       return route.fulfill({ json: rule, headers: { ETag: etagOf(ids.discount, rule.revision) } });
     });
     await page.goto("/admin/commerce?tab=discounts");
-    await page.getByRole("button", { name: /^Sửa quy tắc/ }).first().click();
+    await page.getByTestId("admin-discounts-table").locator("tbody tr").first().click();
     await page.getByLabel("Mã quy tắc").fill("MA-TOI-GO");
     rule.revision = 3; // somebody else changed the minimum number of buildings first
     rule.minimumBuildings = 9;
@@ -178,7 +179,7 @@ test.describe("412 on the PlatformAdmin organization editor", () => {
     await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [server.state.record], totalCount: 1, page: 1, pageSize: 20 } }));
     await page.route("**/api/organizations/org-1", (route) => server.handle(route));
     await page.goto("/admin/organizations?organization=org-1");
-    const drawer = page.getByRole("region", { name: "Thông tin tổ chức" });
+    const drawer = page.getByTestId("organization-drawer");
     await drawer.getByRole("button", { name: "Sửa hồ sơ" }).click();
     await drawer.getByLabel("Tên tổ chức").fill("Tên do admin gõ");
     server.otherEditor({ phoneNumber: "+842369999999" });

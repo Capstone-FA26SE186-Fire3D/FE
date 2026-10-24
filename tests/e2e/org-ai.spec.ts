@@ -1,7 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { admin, calls, ids, mockAi, newAiMock, outcomeFields, owner, requestId, seedRequest, signInAs, type AiMock } from "./org-ai-mock";
+import { admin, calls, mockAi, newAiMock, outcomeFields, owner, requestId, seedRequest, signInAs, type AiMock } from "./org-ai-mock";
 
+// `/workspace/ai` v2: history (DataTable + drawer), saved proposals and quota. The chat itself is covered by org-ai-bubble.spec.ts.
 // Every assertion runs against Playwright route mocks that follow the BE source/OpenAPI: they prove FE behavior, not the real BE.
 
 async function open(page: Page, mock: AiMock, url: string, user: typeof owner | typeof admin = owner, theme?: "light" | "dark") {
@@ -11,229 +12,80 @@ async function open(page: Page, mock: AiMock, url: string, user: typeof owner | 
   await page.goto(url);
 }
 
-const send = (page: Page) => page.getByTestId("ai-send");
+/** Rows of the history DataTable: table rows on wide viewports, cards under 640px. */
+const rows = (page: Page) => page.getByTestId("ai-history").locator("tr[data-row-id], li.ops-dt-card");
+const drawer = (page: Page) => page.getByRole("dialog", { name: "Đọc lại hội thoại" });
 const noOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
 
-test.describe("Organization AI: ask", () => {
-  test("quota is read before the POST, the request is polled from Accepted to the answer with citation and usage, and a reload restores it from the server", async ({ page }) => {
+test.describe("Organization AI page: history", () => {
+  test("defaults to the history tab with KPI tiles, filters and page in the URL; a row opens the drawer from the server and survives reload", async ({ page }) => {
     const mock = newAiMock();
+    for (let index = 0; index < 22; index += 1) { const operation = index % 2 === 0 ? "Answer" : "ScenarioDraft"; seedRequest(mock, { operation, input: { text: `Câu hỏi số ${index}`, buildingName: index % 2 ? "Tòa nhà A" : null }, ...(index % 5 === 0 ? outcomeFields(mock, operation, "InsufficientEvidence") : {}) }); }
+    seedRequest(mock, { status: "NeedsReconcile", failureCode: "AI_OUTCOME_UNKNOWN", result: undefined, consumedUnits: undefined, completedAt: undefined });
     await open(page, mock, "/workspace/ai");
     await expect(page.getByRole("heading", { name: "Trợ lý AI", level: 1 })).toBeVisible();
-    await expect(page.getByTestId("source-picker")).toContainText("Tất cả nguồn đủ điều kiện (4)");
-    await page.getByLabel("Câu hỏi").fill("  Chiều rộng lối thoát nạn tối thiểu là bao nhiêu?  ");
-    await send(page).click();
-
-    // Pending first (polling), then the final state.
-    await expect(page.getByTestId("ai-status")).toHaveText("Đang chờ xử lý");
-    await expect(page.getByTestId("ai-answer")).toContainText("chiều rộng thông thủy", { timeout: 15_000 });
-    await expect(page.getByTestId("ai-status")).toHaveText("Hoàn tất");
-    const citation = page.getByTestId("ai-citation");
-    await expect(citation).toHaveCount(1);
-    await expect(citation).toContainText("QCVN 06:2022/BXD");
-    await expect(citation).toContainText("phiên bản 2022");
-    await expect(citation).toContainText("Điều 3");
-    const usage = page.getByTestId("ai-usage");
-    await expect(usage).toContainText("tokens");
-    await expect(usage).toContainText("Đã giữ chỗ");
-    await expect(usage).toContainText("50 tokens");
-    await expect(usage).toContainText("42 tokens");
-
-    // The limits gate ran right before the POST, then exactly one POST with the stable key and the trimmed question.
-    const order = mock.calls.map((call) => `${call.method} ${call.path}`);
-    const post = order.indexOf("POST /api/ai/organization/answer");
-    expect(order.slice(0, post).lastIndexOf("GET /api/ai/organization/limits")).toBeGreaterThan(-1);
-    const posts = calls(mock, "POST", "/api/ai/organization/answer");
-    expect(posts).toHaveLength(1);
-    expect(posts[0].headers["idempotency-key"]).toMatch(/\S+/);
-    expect(posts[0].body).toEqual({ question: "Chiều rộng lối thoát nạn tối thiểu là bao nhiêu?" });
-    expect(mock.calls.some((call) => /\/(chat|documents)$/.test(call.path))).toBe(false);
-
-    // Reload: the request id is in the URL and the server is the source of truth; nothing is sent again.
-    await expect(page).toHaveURL(new RegExp(`request=${requestId(1)}`));
+    await expect(page.getByRole("tab", { name: "Lịch sử hội thoại" })).toHaveAttribute("data-state", "active");
+    await expect(page.getByTestId("ai-kpi-quota")).toHaveText("900 tokens");
+    await expect(page.getByTestId("ai-kpi-reconcile")).toHaveText("1");
+    await expect(rows(page)).toHaveCount(20);
+    await expect(rows(page).first()).toContainText("Chờ đối soát");
+    await expect(rows(page).nth(1)).toContainText("Tòa nhà A");
+    await page.getByRole("button", { name: "Trang sau" }).click();
+    await expect(page).toHaveURL(/page=2/);
+    await expect(rows(page)).toHaveCount(3);
+    await page.getByLabel("Kết quả").selectOption("InsufficientEvidence");
+    await expect(page).toHaveURL(/resultType=InsufficientEvidence/);
+    await expect(page).not.toHaveURL(/page=2/);
+    await page.getByLabel("Loại yêu cầu").selectOption("Answer");
+    await expect(page).toHaveURL(/operation=Answer/);
+    await page.getByLabel("Chỉ của tôi").click();
+    await expect(page).toHaveURL(/mine=1/);
+    await expect.poll(() => calls(mock, "GET", "/api/ai/requests").filter((call) => call.search.includes("pageSize=20")).at(-1)?.search).toContain("mine=true");
+    const last = calls(mock, "GET", "/api/ai/requests").filter((call) => call.search.includes("pageSize=20")).at(-1)!;
+    expect(last.search).toContain("resultType=InsufficientEvidence");
+    expect(last.search).not.toMatch(/(^|[?&])status=/);
+    expect(last.search).toContain("operation=Answer");
+    await expect(rows(page).first()).toBeVisible();
+    await rows(page).first().click();
+    await expect(drawer(page)).toBeVisible();
+    await expect(page).toHaveURL(/request=/);
     await page.reload();
-    await expect(page.getByTestId("ai-answer")).toContainText("chiều rộng thông thủy");
-    expect(calls(mock, "POST", "/api/ai/organization/answer")).toHaveLength(1);
+    await expect(drawer(page)).toBeVisible();
+    await expect(page.getByTestId("ai-status")).toHaveText("Chưa đủ căn cứ");
+    await expect(page.getByTestId("ai-input")).toContainText("Câu hỏi số");
   });
 
-  test("source scope: all eligible sends no list; a chosen subset sends exactly those refs", async ({ page }) => {
-    const mock = newAiMock({ pendingPolls: 0 });
-    await open(page, mock, "/workspace/ai");
-    await page.getByLabel("Câu hỏi").fill("Câu hỏi 1");
-    await send(page).click();
-    await expect(page.getByTestId("ai-answer")).toBeVisible();
-    expect(calls(mock, "POST", "/api/ai/organization/answer")[0].body).toEqual({ question: "Câu hỏi 1" });
-
-    await page.getByRole("button", { name: "Hỏi câu khác" }).click();
-    await page.getByLabel("Câu hỏi").fill("Câu hỏi 2");
-    await page.getByLabel("Chọn nguồn cụ thể").check();
-    await expect(send(page)).toBeDisabled(); // a chosen scope needs at least one source
-    await page.getByLabel(/QCVN 06:2022\/BXD/).check();
-    await page.getByLabel(/EXT-01 Bình chữa cháy/).check();
-    await send(page).click();
-    await expect(page.getByTestId("ai-answer")).toBeVisible();
-    const posts = calls(mock, "POST", "/api/ai/organization/answer");
-    expect(posts).toHaveLength(2);
-    expect(posts[1].body).toEqual({ question: "Câu hỏi 2", sources: [{ kind: "KnowledgeSource", id: ids.src1 }, { kind: "LibraryVersion", id: ids.lib1 }] });
-    expect(posts[1].headers["idempotency-key"]).not.toBe(posts[0].headers["idempotency-key"]);
-  });
-
-  test("a lost response never creates a second request: look up my recent requests and follow the one that was stored", async ({ page }) => {
-    const mock = newAiMock({ pendingPolls: 0, submitFaults: ["lost-response"] });
-    await open(page, mock, "/workspace/ai");
-    await page.getByLabel("Câu hỏi").fill("Hỏi và mất phản hồi");
-    await send(page).click();
-    await expect(page.getByTestId("ai-unknown")).toBeVisible();
-    await expect(page.getByTestId("ai-unknown")).toContainText("Không gửi một yêu cầu mới");
-    expect(mock.requests).toHaveLength(1); // the server did store it
-    await page.getByRole("button", { name: "Tra yêu cầu gần nhất của tôi" }).click();
-    const candidate = page.getByTestId("ai-candidate");
-    await expect(candidate).toHaveCount(1);
-    await expect(candidate).toContainText(requestId(1));
-    await candidate.getByRole("button", { name: "Theo dõi yêu cầu này" }).click();
-    await expect(page.getByTestId("ai-answer")).toBeVisible();
-    expect(calls(mock, "POST", "/api/ai/organization/answer")).toHaveLength(1);
-    expect(mock.requests).toHaveLength(1);
-  });
-
-  test("retry replays the same Idempotency-Key and the server returns the original request (no second request, no second reservation)", async ({ page }) => {
-    const mock = newAiMock({ pendingPolls: 0, submitFaults: ["lost-response"] });
-    await open(page, mock, "/workspace/ai");
-    await page.getByLabel("Câu hỏi").fill("Hỏi rồi thử lại");
-    await send(page).click();
-    await expect(page.getByTestId("ai-unknown")).toBeVisible();
-    await page.getByTestId("ai-retry-same-key").click();
-    await expect(page.getByTestId("ai-answer")).toBeVisible();
-    const posts = calls(mock, "POST", "/api/ai/organization/answer");
-    expect(posts).toHaveLength(2);
-    expect(posts[1].headers["idempotency-key"]).toBe(posts[0].headers["idempotency-key"]);
-    expect(mock.requests).toHaveLength(1);
-    // The retry skipped the limits gate: it is a replay, not a new reservation.
-    const order = mock.calls.map((call) => `${call.method} ${call.path}`);
-    const first = order.indexOf("POST /api/ai/organization/answer");
-    const second = order.indexOf("POST /api/ai/organization/answer", first + 1);
-    expect(order.slice(first + 1, second)).not.toContain("GET /api/ai/organization/limits");
-  });
-
-  test("when the call never arrived, nothing is found and the same-key retry creates it exactly once", async ({ page }) => {
-    const mock = newAiMock({ pendingPolls: 0, submitFaults: ["never-arrives"] });
-    await open(page, mock, "/workspace/ai");
-    await page.getByLabel("Câu hỏi").fill("Mất mạng trước khi gửi");
-    await send(page).click();
-    await expect(page.getByTestId("ai-unknown")).toBeVisible();
-    await page.getByRole("button", { name: "Tra yêu cầu gần nhất của tôi" }).click();
-    await expect(page.getByTestId("ai-no-candidates")).toBeVisible();
-    expect(mock.requests).toHaveLength(0);
-    await page.getByTestId("ai-retry-same-key").click();
-    await expect(page.getByTestId("ai-answer")).toBeVisible();
-    const posts = calls(mock, "POST", "/api/ai/organization/answer");
-    expect(posts[1].headers["idempotency-key"]).toBe(posts[0].headers["idempotency-key"]);
-    expect(mock.requests).toHaveLength(1);
-  });
-
-  test("a double click sends one POST", async ({ page }) => {
-    const mock = newAiMock({ pendingPolls: 0 });
-    await open(page, mock, "/workspace/ai");
-    await page.getByLabel("Câu hỏi").fill("Nhấp đúp");
-    await send(page).dblclick();
-    await expect(page.getByTestId("ai-answer")).toBeVisible();
-    expect(calls(mock, "POST", "/api/ai/organization/answer")).toHaveLength(1);
-  });
-
-  test("exhausted quota blocks BEFORE any POST and links to the top-up in billing", async ({ page }) => {
-    const mock = newAiMock({ quota: { units: [{ quotaUnit: "tokens", granted: 1000, reserved: 100, consumed: 900, expired: 0, available: 0, scheduled: 0 }] } });
-    await open(page, mock, "/workspace/ai");
-    await page.getByLabel("Câu hỏi").fill("Còn quota không?");
-    await send(page).click();
-    const blocked = page.getByTestId("ai-quota-blocked");
-    await expect(blocked).toContainText("Quota AI đã hết");
-    await expect(blocked).toContainText("50 tokens");
-    await expect(page.getByTestId("ai-limit-hint")).toContainText("Không đủ cho một yêu cầu");
-    await expect(page.getByTestId("ai-topup-link")).toHaveAttribute("href", "/workspace/billing?tab=ai");
-    expect(calls(mock, "POST", "/api/ai/organization/answer")).toHaveLength(0);
-    expect(mock.requests).toHaveLength(0);
-  });
-
-  test("a balance below the estimated reserve blocks before the call", async ({ page }) => {
-    const mock = newAiMock({ quota: { units: [{ quotaUnit: "tokens", granted: 1000, reserved: 0, consumed: 970, expired: 0, available: 30, scheduled: 0 }] } });
-    await open(page, mock, "/workspace/ai");
-    await page.getByLabel("Câu hỏi").fill("Còn 30 tokens");
-    await send(page).click();
-    const blocked = page.getByTestId("ai-quota-blocked");
-    await expect(blocked).toContainText("Quota AI không đủ cho một yêu cầu");
-    await expect(blocked).toContainText("còn 30 tokens");
-    expect(calls(mock, "POST", "/api/ai/organization/answer")).toHaveLength(0);
-  });
-
-  test("no active policy for the operation blocks before the call", async ({ page }) => {
-    const mock = newAiMock({ limits: [{ operation: "Answer", policyActive: false, quotaUnit: null, estimatedReserve: null, maxInputChars: null, maxSources: null, availableUnits: 900, canSubmit: false }] });
-    await open(page, mock, "/workspace/ai");
-    await page.getByLabel("Câu hỏi").fill("Chưa có chính sách");
-    await send(page).click();
-    await expect(page.getByTestId("ai-policy-blocked")).toContainText("Chưa có chính sách AI cho thao tác này");
-    expect(calls(mock, "POST", "/api/ai/organization/answer")).toHaveLength(0);
-  });
-
-  test("the question is limited to the policy maxInputChars before anything is sent", async ({ page }) => {
-    const mock = newAiMock({ limits: [{ operation: "Answer", policyActive: true, quotaUnit: "tokens", estimatedReserve: 50, maxInputChars: 10, maxSources: 20, availableUnits: 900, canSubmit: true }] });
-    await open(page, mock, "/workspace/ai");
-    await page.getByLabel("Câu hỏi").fill("Câu hỏi dài hơn mười ký tự");
-    await expect(page.getByTestId("ai-char-count")).toHaveAttribute("data-over", "true");
-    await expect(send(page)).toBeDisabled();
-    await expect(page.getByText("Dài hơn giới hạn 10 ký tự")).toBeVisible();
-    await page.getByLabel("Câu hỏi").fill("Ngắn gọn");
-    await expect(send(page)).toBeEnabled();
-  });
-
-  test("a quota that cannot be read blocks too, with a retry", async ({ page }) => {
+  test("switching tabs clears the tab-owned parameters; a deep link ?request= opens the drawer on the history tab", async ({ page }) => {
     const mock = newAiMock();
-    await signInAs(page, owner);
-    await mockAi(page, mock);
-    await page.route("**/api/ai/organization/limits", (route) => route.fulfill({ status: 500, contentType: "application/problem+json", body: JSON.stringify({ status: 500, title: "boom" }) }));
-    await page.goto("/workspace/ai");
-    await page.getByLabel("Câu hỏi").fill("Không đọc được quota");
-    await send(page).click();
-    await expect(page.getByText("Chưa kiểm tra được chính sách và quota nên chưa gửi")).toBeVisible();
-    expect(calls(mock, "POST", "/api/ai/organization/answer")).toHaveLength(0);
+    const seeded = seedRequest(mock, { input: { text: "Câu hỏi đã lưu" } });
+    await open(page, mock, `/workspace/ai?request=${seeded.requestId}&status=Succeeded`);
+    await expect(drawer(page)).toBeVisible();
+    await expect(page.getByTestId("ai-answer")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(drawer(page)).toHaveCount(0);
+    await expect(page).not.toHaveURL(/request=/);
+    await page.getByRole("tab", { name: "Quota & giới hạn" }).click();
+    await expect(page).toHaveURL(/tab=quota/);
+    await expect(page).not.toHaveURL(/status=/);
+    await expect(page.getByTestId("ai-rail-quota")).toContainText("900");
+    await expect(page.getByTestId("ai-rail-quota")).toContainText("Đã cấp");
+    await expect(page.getByTestId("ai-limit-row")).toHaveCount(2);
+    await expect(page.getByTestId("ai-limit-row").first()).toContainText("50 tokens");
+    await expect(page.getByRole("link", { name: "Nạp quota AI" })).toHaveAttribute("href", "/workspace/billing?tab=ai");
   });
 
-  test("BE refusals are shown with their meaning: 409 quota, 503 provider, 429 Retry-After, 422 field issues, 403, 401", async ({ page }) => {
-    const mock = newAiMock({
-      submitFaults: [
-        { status: 409, json: { status: 409, title: "Not enough AI quota.", code: "AI_QUOTA_EXHAUSTED" } },
-        "status-503",
-        "status-429",
-        { status: 422, json: { status: 422, title: "Content does not satisfy its schema.", code: "CONTENT_INVALID", issues: [{ code: "MARKUP_NOT_ALLOWED", path: "$.question", message: "Plain text only." }] } },
-        { status: 403, json: { status: 403, title: "Forbidden", code: "FORBIDDEN" } },
-        { status: 401, json: { status: 401, title: "Unauthorized", code: "UNAUTHORIZED" } },
-      ],
-    });
-    await open(page, mock, "/workspace/ai");
-    const question = page.getByLabel("Câu hỏi");
-    await question.fill("Lần 1");
-    await send(page).click();
-    await expect(page.getByText("Máy chủ từ chối yêu cầu, chưa có yêu cầu nào được tạo")).toBeVisible();
-    await expect(page.getByRole("alert").filter({ hasText: "không tính vượt mức" })).toBeVisible();
-    await question.fill("Lần 2");
-    await send(page).click();
-    await expect(page.getByRole("alert").filter({ hasText: "chưa được bật hoặc chưa cấu hình" })).toBeVisible();
-    await question.fill("Lần 3");
-    await send(page).click();
-    await expect(page.getByRole("alert").filter({ hasText: "Thử lại sau 7 giây" })).toBeVisible();
-    await question.fill("Lần 4");
-    await send(page).click();
-    await expect(page.locator(".ops-field-error")).toHaveText("Plain text only.");
-    await question.fill("Lần 5");
-    await send(page).click();
-    await expect(page.getByRole("alert").filter({ hasText: "không có quyền" })).toBeVisible();
-    await question.fill("Lần 6");
-    await send(page).click();
-    await expect(page.getByRole("alert").filter({ hasText: "Phiên đăng nhập đã hết hạn" })).toBeVisible();
-    // Definitive refusals created nothing and none was treated as an unknown outcome.
-    expect(mock.requests).toHaveLength(0);
-    await expect(page.getByTestId("ai-unknown")).toHaveCount(0);
+  test("history empty, filtered-empty and error states", async ({ page }) => {
+    const mock = newAiMock();
+    await open(page, mock, "/workspace/ai?tab=history");
+    await expect(page.getByText("Chưa có yêu cầu AI nào")).toBeVisible();
+    await page.getByLabel("Trạng thái").selectOption("Failed");
+    await expect(page.getByText("Không có yêu cầu phù hợp.")).toBeVisible();
+    await page.route("**/api/ai/requests?*", (route) => route.fulfill({ status: 500, contentType: "application/problem+json", body: JSON.stringify({ status: 500, title: "boom" }) }));
+    await page.getByRole("button", { name: "Xóa bộ lọc" }).click();
+    await expect(page.getByText("Không tải được lịch sử yêu cầu AI")).toBeVisible();
   });
 
-  test("a polling error keeps the last data, honors Retry-After and recovers", async ({ page }) => {
+  test("a polling error in the drawer keeps the last data, honors Retry-After and recovers", async ({ page }) => {
     const mock = newAiMock({ pendingPolls: 0 });
     const seeded = seedRequest(mock, { status: "Processing", result: undefined, consumedUnits: undefined, completedAt: undefined });
     mock.getFaults.push({ status: 429, json: { status: 429, title: "slow down", code: "RATE_LIMITED" }, headers: { "Retry-After": "1" } });
@@ -242,14 +94,14 @@ test.describe("Organization AI: ask", () => {
     await expect(page.getByTestId("ai-answer")).toBeVisible({ timeout: 15_000 });
   });
 
-  test("another organization's or unknown request id is a clear 404, not an empty page", async ({ page }) => {
+  test("another organization's or unknown request id is a clear 404, not an empty drawer", async ({ page }) => {
     const mock = newAiMock();
     await open(page, mock, `/workspace/ai?request=${requestId(99)}`);
     await expect(page.getByText("Không mở được yêu cầu này")).toBeVisible();
   });
 });
 
-test.describe("Organization AI: outcomes", () => {
+test.describe("Organization AI page: outcomes in the drawer", () => {
   test("InsufficientEvidence and RejectedBySafetyGate (Succeeded requests) are shown as such, without citations or answer", async ({ page }) => {
     const mock = newAiMock();
     const insufficient = seedRequest(mock, { ...outcomeFields(mock, "Answer", "InsufficientEvidence"), consumedUnits: 0 });
@@ -279,26 +131,28 @@ test.describe("Organization AI: outcomes", () => {
   });
 });
 
-test.describe("Organization AI: scenario draft and history", () => {
-  test("scenario draft: Building + prompt + sources, then a read-only preview with notes, BIM anchors, citations; nothing is saved", async ({ page }) => {
-    const mock = newAiMock({ pendingPolls: 0 });
-    await open(page, mock, "/workspace/ai?tab=draft");
-    await page.getByRole("combobox", { name: "Công trình" }).selectOption({ label: "Tòa nhà A" });
-    await page.getByLabel("Yêu cầu đề xuất").fill("Sơ tán khi báo cháy ở tầng 2");
-    await send(page).click();
-    const draft = page.getByTestId("ai-draft");
-    await expect(draft).toContainText("Sơ tán do báo cháy tầng 2");
-    await expect(draft).toContainText("Nhận biết tín hiệu báo cháy");
+test.describe("Organization AI page: saved proposals", () => {
+  test("lists only finished scenario drafts; the drawer shows the read-only preview with notes, BIM anchors and citations; apply only opens a chooser", async ({ page }) => {
+    const mock = newAiMock();
+    const draft = seedRequest(mock, { operation: "ScenarioDraft", input: { text: "Sơ tán khi báo cháy ở tầng 2", buildingName: "Tòa nhà A" } });
+    seedRequest(mock, { operation: "Answer" });
+    seedRequest(mock, { operation: "ScenarioDraft", status: "Failed", failureCode: "AI_PROVIDER_REJECTED", result: undefined });
+    await open(page, mock, "/workspace/ai?tab=saved");
+    await expect(rows(page)).toHaveCount(1);
+    await expect(rows(page).first()).toContainText("Sơ tán khi báo cháy ở tầng 2");
+    const search = calls(mock, "GET", "/api/ai/requests").filter((call) => call.search.includes("pageSize=20")).at(-1)!.search;
+    expect(search).toContain("resultType=ScenarioDraft");
+    expect(search).toContain("status=Succeeded");
+    await rows(page).first().click();
+    await expect(page).toHaveURL(new RegExp(`request=${draft.requestId}`));
+    const preview = page.getByTestId("ai-draft");
+    await expect(preview).toContainText("Sơ tán do báo cháy tầng 2");
+    await expect(preview).toContainText("Nhận biết tín hiệu báo cháy");
     await expect(page.getByTestId("ai-draft-notes")).toContainText("Cần kiểm tra lại vị trí");
     await expect(page.getByTestId("ai-draft-objects")).toContainText("Neo BIM (IFC GlobalId) 1hOSvn6df7F8_7GcBWlRGQ");
     await expect(page.getByTestId("ai-status")).toHaveText("Hoàn tất");
     await expect(page.getByText("Cần bạn chỉnh sửa trước khi dùng")).toBeVisible();
     await expect(page.getByTestId("ai-citation")).toContainText("QCVN 06:2022/BXD");
-    const posts = calls(mock, "POST", "/api/ai/organization/scenario-draft");
-    expect(posts).toHaveLength(1);
-    expect(posts[0].body).toMatchObject({ prompt: "Sơ tán khi báo cháy ở tầng 2" });
-    expect((posts[0].body as { buildingId: string }).buildingId).toMatch(/\S+/);
-    // Apply only opens a chooser; no draft/scenario write exists in this flow.
     await page.getByTestId("ai-apply").click();
     await expect(page.getByRole("dialog", { name: "Áp dụng đề xuất vào bản nháp" })).toContainText("Chưa có gì được lưu");
     expect(mock.calls.filter((call) => ["PUT", "PATCH", "DELETE"].includes(call.method))).toHaveLength(0);
@@ -307,52 +161,20 @@ test.describe("Organization AI: scenario draft and history", () => {
   test("a scenario draft whose content is not fet3d.editor/1 cannot be applied", async ({ page }) => {
     const mock = newAiMock();
     const bad = seedRequest(mock, { operation: "ScenarioDraft", citations: [], result: { status: "NeedsUserEdit", draft: { state: { schemaVersion: "other/9" } } } });
-    await open(page, mock, `/workspace/ai?tab=draft&request=${bad.requestId}`);
+    await open(page, mock, `/workspace/ai?tab=saved&request=${bad.requestId}`);
     await expect(page.getByText("Không đọc được đề xuất")).toBeVisible();
     await expect(page.getByTestId("ai-apply")).toHaveCount(0);
   });
 
-  test("history: filters and page live in the URL, detail opens from the server and survives reload", async ({ page }) => {
+  test("the saved tab's empty state points to the bubble", async ({ page }) => {
     const mock = newAiMock();
-    for (let index = 0; index < 22; index += 1) { const operation = index % 2 === 0 ? "Answer" : "ScenarioDraft"; seedRequest(mock, { operation, ...(index % 5 === 0 ? outcomeFields(mock, operation, "InsufficientEvidence") : {}) }); }
-    await open(page, mock, "/workspace/ai?tab=history");
-    await expect(page.getByTestId("ai-history-row")).toHaveCount(20);
-    await page.getByRole("button", { name: "Trang sau" }).click();
-    await expect(page).toHaveURL(/page=2/);
-    await expect(page.getByTestId("ai-history-row")).toHaveCount(2);
-    await page.getByLabel("Kết quả").selectOption("InsufficientEvidence");
-    await expect(page).toHaveURL(/resultType=InsufficientEvidence/);
-    await expect(page).not.toHaveURL(/page=2/);
-    await page.getByLabel("Loại yêu cầu").selectOption("Answer");
-    await expect(page).toHaveURL(/operation=Answer/);
-    await page.getByLabel("Chỉ của tôi").click();
-    await expect(page).toHaveURL(/mine=1/);
-    await expect.poll(() => calls(mock, "GET", "/api/ai/requests").at(-1)?.search).toContain("mine=true");
-    const last = calls(mock, "GET", "/api/ai/requests").at(-1)!;
-    expect(last.search).toContain("resultType=InsufficientEvidence");
-    expect(last.search).not.toMatch(/(^|[?&])status=/);
-    expect(last.search).toContain("operation=Answer");
-    const rows = page.getByTestId("ai-history-row");
-    await expect(rows.first()).toBeVisible();
-    await rows.first().getByRole("button").click();
-    await expect(page.getByRole("dialog", { name: "Chi tiết yêu cầu AI" })).toBeVisible();
-    await expect(page).toHaveURL(/request=/);
-    await page.reload();
-    await expect(page.getByRole("dialog", { name: "Chi tiết yêu cầu AI" })).toBeVisible();
-    await expect(page.getByTestId("ai-status")).toHaveText("Chưa đủ căn cứ");
+    seedRequest(mock, { operation: "Answer" });
+    await open(page, mock, "/workspace/ai?tab=saved");
+    await expect(page.getByText("Chưa có đề xuất kịch bản nào")).toBeVisible();
   });
+});
 
-  test("history empty, filtered-empty and error states", async ({ page }) => {
-    const mock = newAiMock();
-    await open(page, mock, "/workspace/ai?tab=history");
-    await expect(page.getByText("Chưa có yêu cầu AI nào")).toBeVisible();
-    await page.getByLabel("Trạng thái").selectOption("Failed");
-    await expect(page.getByText("Không có yêu cầu phù hợp.")).toBeVisible();
-    await page.route("**/api/ai/requests?*", (route) => route.fulfill({ status: 500, contentType: "application/problem+json", body: JSON.stringify({ status: 500, title: "boom" }) }));
-    await page.getByRole("button", { name: "Xóa bộ lọc" }).click();
-    await expect(page.getByText("Không tải được lịch sử yêu cầu AI")).toBeVisible();
-  });
-
+test.describe("Organization AI page: access and links", () => {
   test("a PlatformAdmin session has no access to the organization AI page", async ({ page }) => {
     const mock = newAiMock();
     await open(page, mock, "/workspace/ai", admin);
@@ -366,25 +188,29 @@ test.describe("Organization AI: scenario draft and history", () => {
     await expect(page.locator('a[href*="/demo/rag"]')).toHaveCount(0);
     const nav = page.getByRole("navigation", { name: /Quản lý tổ chức/ });
     await expect(nav.getByRole("link", { name: "Trợ lý AI" })).toHaveAttribute("href", "/workspace/ai");
+    expect(mock.calls.some((call) => /\/(chat|documents)$/.test(call.path))).toBe(false);
   });
 });
 
-test.describe("Organization AI: layout", () => {
+test.describe("Organization AI page: layout", () => {
   for (const theme of ["light", "dark"] as const) {
     for (const width of [375, 1440]) {
       test(`no horizontal overflow at ${width}px in ${theme}`, async ({ page }) => {
         const mock = newAiMock({ pendingPolls: 0 });
-        const draft = seedRequest(mock, { operation: "ScenarioDraft" });
-        seedRequest(mock, { operation: "Answer" });
+        const draft = seedRequest(mock, { operation: "ScenarioDraft", input: { text: "Sơ tán khi báo cháy ở tầng 2" } });
+        seedRequest(mock, { operation: "Answer", input: { text: "Chiều rộng lối thoát nạn tối thiểu là bao nhiêu khi tòa nhà có hơn một nghìn người sử dụng cùng lúc?" } });
         await page.setViewportSize({ width, height: 900 });
-        await open(page, mock, `/workspace/ai?tab=draft&request=${draft.requestId}`, owner, theme);
+        await open(page, mock, `/workspace/ai?tab=saved&request=${draft.requestId}`, owner, theme);
         await expect(page.getByTestId("ai-draft")).toBeVisible();
         expect(await noOverflow(page)).toBe(true);
         await page.goto("/workspace/ai?tab=history");
-        await expect(page.getByTestId("ai-history-row").first()).toBeVisible();
+        await expect(rows(page).first()).toBeVisible();
         expect(await noOverflow(page)).toBe(true);
-        await page.goto("/workspace/ai");
-        await expect(page.getByTestId("source-picker")).toBeVisible();
+        await page.goto("/workspace/ai?tab=quota");
+        await expect(page.getByTestId("ai-quota-card")).toBeVisible();
+        expect(await noOverflow(page)).toBe(true);
+        await page.getByTestId("ai-bubble-button").click();
+        await expect(page.getByTestId("ai-chat-panel")).toBeVisible();
         expect(await noOverflow(page)).toBe(true);
         await expect(page.locator(".ops-theme")).toHaveAttribute("data-theme", theme);
       });

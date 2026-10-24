@@ -10,6 +10,6 @@ export function Alert({ tone = "info", title, children, className, action }: { t
   const Icon = icons[tone];
   return <div className={cn("ops-alert", className)} data-tone={tone} role={tone === "danger" ? "alert" : "status"}>
     <Icon size={18} aria-hidden="true" />
-    <div>{title && <strong>{title}</strong>}{children && <p>{children}</p>}{action}</div>
+    <div>{title && <strong>{title}</strong>}{children && <div className="ops-alert-text">{children}</div>}{action}</div>
   </div>;
 }

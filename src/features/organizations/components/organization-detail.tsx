@@ -7,8 +7,7 @@ import { ApiError } from "@/api";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
-import { SkeletonRows } from "@/components/ui/skeleton";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { SkeletonDetail } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { Rows } from "@/features/admin-overview/components/admin-kit";
 import { routes } from "@/configs/routes";
@@ -29,16 +28,13 @@ const etagOf = (headers: Headers, organization: OrganizationDetailData) => heade
 const valueOf = (organization: OrganizationDetailData) => ({ name: organization.name, address: organization.address ?? "", phoneNumber: organization.phoneNumber ?? "" });
 const dash = (value: string | null | undefined) => (value?.trim() ? value : "Chưa có");
 
-function statusBadge(organization: Organization) {
-  return <StatusBadge tone={organization.isActive ? "success" : "neutral"}>{organization.isActive ? "Hoạt động" : "Vô hiệu hóa"}</StatusBadge>;
-}
-
 /**
- * Admin view and edit of one organization. Saving sends `PATCH /api/organizations/{id}` with `If-Match` and only the
- * changed fields (the API rejects null/empty). On 412 the typed values stay and the admin loads the newer version to
- * compare; a late load never overwrites what is being typed because drafts live apart from the loaded record.
+ * Admin view and edit of one organization, drawn inside the organization drawer (Figma 52:1416). Saving sends
+ * `PATCH /api/organizations/{id}` with `If-Match` and only the changed fields (the API rejects null/empty). On 412 the
+ * typed values stay and the admin loads the newer version to compare; a late load never overwrites what is being typed
+ * because drafts live apart from the loaded record. `onLoaded` hands the fetched record to the drawer (eyebrow, footer toggle).
  */
-export function OrganizationDetail({ id, accessToken, onToggle, onSaved }: { id: string; accessToken: string; onToggle: (organization: Organization) => void; onSaved: () => void }) {
+export function OrganizationDetail({ id, accessToken, onLoaded, onSaved }: { id: string; accessToken: string; onLoaded?: (organization: Organization) => void; onSaved: () => void }) {
   const toast = useToast();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [loadError, setLoadError] = useState<unknown>();
@@ -50,6 +46,8 @@ export function OrganizationDetail({ id, accessToken, onToggle, onSaved }: { id:
   const [saving, setSaving] = useState(false);
   const [staleEtag, setStaleEtag] = useState<string | null>(null);
   const inFlight = useRef(false);
+  const onLoadedRef = useRef(onLoaded);
+  useEffect(() => { onLoadedRef.current = onLoaded; }, [onLoaded]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -57,7 +55,7 @@ export function OrganizationDetail({ id, accessToken, onToggle, onSaved }: { id:
       setLoading(true);
       setLoadError(undefined);
       organizationsApi.getDetail(accessToken, id, controller.signal)
-        .then((response) => { if (!controller.signal.aborted) setLoaded({ organization: response.data, etag: etagOf(response.headers, response.data) }); })
+        .then((response) => { if (!controller.signal.aborted) { setLoaded({ organization: response.data, etag: etagOf(response.headers, response.data) }); onLoadedRef.current?.(response.data); } })
         .catch((cause: unknown) => { if (!controller.signal.aborted) setLoadError(cause); })
         .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     }, 0);
@@ -70,7 +68,7 @@ export function OrganizationDetail({ id, accessToken, onToggle, onSaved }: { id:
       const missing = loadError instanceof ApiError && loadError.status === 404;
       return <Alert tone="danger" title={missing ? "Không tìm thấy tổ chức" : "Không mở được tổ chức"} action={missing ? undefined : <Button size="sm" variant="secondary" className="mt-3" onClick={reload}>Thử lại</Button>}>{missing ? "Tổ chức có thể đã bị xóa hoặc đường dẫn không đúng." : "Hãy kiểm tra kết nối rồi thử lại."}</Alert>;
     }
-    return <SkeletonRows rows={4} label="Đang tải thông tin tổ chức…" />;
+    return <div role="status" aria-live="polite"><span className="ops-sr-only">Đang tải thông tin tổ chức…</span><SkeletonDetail rows={5} /></div>;
   }
 
   const { organization, etag } = loaded;
@@ -106,6 +104,7 @@ export function OrganizationDetail({ id, accessToken, onToggle, onSaved }: { id:
     try {
       const response = await organizationsApi.update(accessToken, organization.id, etag, pending);
       setLoaded({ organization: response.data, etag: etagOf(response.headers, response.data) });
+      onLoadedRef.current?.(response.data);
       setEdits(null);
       setStaleEtag(null);
       toast.notify({ tone: "success", title: "Đã lưu hồ sơ tổ chức", description: response.data.name });
@@ -130,9 +129,12 @@ export function OrganizationDetail({ id, accessToken, onToggle, onSaved }: { id:
   const hasCounts = [organization.buildingCount, organization.accountCount].some((value) => typeof value === "number");
 
   return <div className="ops-stack">
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-      {statusBadge(organization)}<code style={{ color: "var(--muted)", fontSize: 13 }}>{organization.slug}</code>
-      <Button size="sm" variant="quiet" onClick={reload} disabled={loading} aria-label="Tải lại tổ chức" style={{ marginLeft: "auto" }}><RefreshCw size={14} aria-hidden="true" />{loading ? "Đang tải…" : "Tải lại"}</Button>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
+      <span className="ops-field-hint" style={{ margin: 0 }}>Hồ sơ tổ chức</span>
+      <div className="ops-actions" style={{ flexWrap: "nowrap" }}>
+        {!edits && <Button size="sm" variant="secondary" onClick={startEdit}><Pencil size={14} aria-hidden="true" />Sửa hồ sơ</Button>}
+        <Button size="sm" variant="quiet" onClick={reload} disabled={loading} aria-label="Tải lại tổ chức"><RefreshCw size={14} aria-hidden="true" />{loading ? "Đang tải…" : "Tải lại"}</Button>
+      </div>
     </div>
 
     {!edits && <Rows items={[
@@ -160,12 +162,10 @@ export function OrganizationDetail({ id, accessToken, onToggle, onSaved }: { id:
       </div>
     </form>}
 
-    <div className="ops-actions">
-      <Button asChild variant="secondary"><Link href={buildingsHref(organization.id)}><Building2 size={16} aria-hidden="true" />Xem công trình</Link></Button>
-      {!edits && <Button variant="secondary" onClick={startEdit}><Pencil size={16} aria-hidden="true" />Sửa hồ sơ</Button>}
-      <Button asChild variant="secondary"><Link href={ownersHref(organization.id)}><UserPlus size={16} aria-hidden="true" />Tạo OrganizationUser</Link></Button>
-      <Button asChild variant="secondary"><Link href={`${routes.adminOrganizations}/${organization.id}/analytics`}><BarChart3 size={16} aria-hidden="true" />Xem báo cáo</Link></Button>
-      <Button className={organization.isActive ? "adm-btn-danger-outline" : undefined} variant={organization.isActive ? "secondary" : "primary"} onClick={() => onToggle(organization)}>{organization.isActive ? "Vô hiệu hóa tổ chức…" : "Kích hoạt tổ chức…"}</Button>
+    <div className="ops-actions" aria-label="Liên kết tổ chức">
+      <Button asChild size="sm" variant="secondary"><Link href={buildingsHref(organization.id)}><Building2 size={14} aria-hidden="true" />Xem công trình</Link></Button>
+      <Button asChild size="sm" variant="secondary"><Link href={`${routes.adminOrganizations}/${organization.id}/analytics`}><BarChart3 size={14} aria-hidden="true" />Xem báo cáo</Link></Button>
+      <Button asChild size="sm" variant="secondary"><Link href={ownersHref(organization.id)}><UserPlus size={14} aria-hidden="true" />Tạo OrganizationUser</Link></Button>
     </div>
   </div>;
 }

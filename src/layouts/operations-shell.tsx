@@ -17,6 +17,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { ThemeScope } from "@/features/theme/theme-scope";
 import { TopbarSlotContext } from "@/features/theme/topbar-slot";
+import { CommandPaletteButton, CommandPaletteProvider } from "@/features/command-palette/palette";
+import { HelpTrigger } from "@/features/tour/help-trigger";
+import { TourProvider } from "@/features/tour/tour-provider";
+import { SidebarMiniStepper } from "./sidebar-mini-stepper";
+import { useAdminNavCounts } from "./use-admin-nav-counts";
 import { useLocalPreference } from "@/utils/local-preference";
 import { adminArea, organizationArea, type NavItem, type OperationsArea } from "./nav-config";
 
@@ -32,8 +37,10 @@ function isActive(pathname: string, item: NavItem) {
   return pathname === item.href || pathname.startsWith(item.href + "/");
 }
 
-function SidebarContent({ area, pathname, collapsed, onNavigate, onToggleCollapsed, onLogout, idPrefix }: {
+function SidebarContent({ area, pathname, collapsed, onNavigate, onToggleCollapsed, onLogout, idPrefix, counts = {} }: {
   area: OperationsArea;
+  /** Pending-work badges per nav href (admin: reviews, tickets). */
+  counts?: Record<string, number | undefined>;
   pathname: string;
   collapsed: boolean;
   onNavigate?: () => void;
@@ -57,11 +64,15 @@ function SidebarContent({ area, pathname, collapsed, onNavigate, onToggleCollaps
         {group.items.map((item) => {
           const active = isActive(pathname, item);
           const Icon = item.icon;
-          return <Link key={item.href} className="ops-nav-link" href={item.href} aria-current={active ? "page" : undefined} aria-label={item.label} title={collapsed ? item.label : undefined} onClick={onNavigate}>
-            {active && <m.span layoutId={`${idPrefix}-active`} className="ops-nav-active" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
-            <Icon size={20} strokeWidth={1.75} aria-hidden="true" style={{ position: "relative" }} />
-            <span className="ops-nav-text"><span style={{ position: "relative" }}>{item.label}</span>{item.status === "pending-be" && <StatusBadge tone="warning" style={{ position: "relative" }}>Chờ BE</StatusBadge>}</span>
-          </Link>;
+          const openBuilding = area.id === "organization" && item.href === "/workspace/buildings" ? /^\/workspace\/buildings\/([^/]+)/.exec(pathname)?.[1] : undefined;
+          return <div key={item.href} style={{ display: "contents" }}>
+            <Link className="ops-nav-link" href={item.href} aria-current={active ? "page" : undefined} aria-label={item.label} title={collapsed ? item.label : undefined} onClick={onNavigate} data-tour={item.href === "/workspace/buildings" ? "nav-buildings" : undefined}>
+              {active && <m.span layoutId={`${idPrefix}-active`} className="ops-nav-active" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
+              <Icon size={20} strokeWidth={1.75} aria-hidden="true" style={{ position: "relative" }} />
+              <span className="ops-nav-text"><span style={{ position: "relative" }}>{item.label}</span>{item.status === "pending-be" && <StatusBadge tone="warning" style={{ position: "relative" }}>Chờ BE</StatusBadge>}{counts[item.href] ? <span className="ops-nav-count" aria-label={`${counts[item.href]} việc cần xử lý`}>{counts[item.href]}</span> : null}</span>
+            </Link>
+            {openBuilding && !collapsed && <SidebarMiniStepper buildingId={openBuilding} />}
+          </div>;
         })}
       </div>)}
     </nav>
@@ -80,7 +91,8 @@ function AccessScreen({ title, message, action }: { title: string; message: stri
 function Shell({ area, children }: { area: OperationsArea; children: ReactNode }) {
   const pathname = usePathname();
   const params = useSearchParams();
-  const { ready, user, logout } = useAuthSession();
+  const { ready, user, logout, accessToken } = useAuthSession();
+  const navCounts = useAdminNavCounts(accessToken ?? null, area.id === "admin" && ready && user?.role === 0);
   const [sidebar, setSidebar] = useLocalPreference<"expanded" | "collapsed">("fire3d-ops-sidebar", "expanded", isSidebarState);
   const [menuOpen, setMenuOpen] = useState(false);
   const [crumbSlot, setCrumbSlot] = useState<HTMLElement | null>(null);
@@ -100,7 +112,7 @@ function Shell({ area, children }: { area: OperationsArea; children: ReactNode }
   return <div className="ops-shell" data-collapsed={collapsed}>
     <a className="ops-skip" href="#ops-main">Bỏ qua điều hướng</a>
     <aside className="ops-sidebar">
-      <SidebarContent area={area} pathname={pathname} collapsed={collapsed} idPrefix={`${area.id}-desktop`} onToggleCollapsed={() => setSidebar(collapsed ? "expanded" : "collapsed")} onLogout={() => void logout()} />
+      <SidebarContent area={area} pathname={pathname} collapsed={collapsed} idPrefix={`${area.id}-desktop`} counts={navCounts} onToggleCollapsed={() => setSidebar(collapsed ? "expanded" : "collapsed")} onLogout={() => void logout()} />
     </aside>
     <div className="ops-body">
       <header className="ops-topbar">
@@ -108,6 +120,8 @@ function Shell({ area, children }: { area: OperationsArea; children: ReactNode }
         <div className="ops-topbar-crumbs" ref={setCrumbSlot} />
         <span className="ops-area-label">{current?.label ?? area.label}</span>
         <span className="ops-topbar-spacer" />
+        <CommandPaletteButton />
+        {area.id === "organization" && <HelpTrigger />}
         <ThemeToggle />
         <Link href={area.id === "organization" ? "/workspace/profile" : "/account"} className="ops-user" title={user.email}><span className="ops-avatar" aria-hidden="true">{initials(user.fullName || user.email)}</span><span className="ops-user-name">{user.fullName || user.email}</span></Link>
       </header>
@@ -118,7 +132,7 @@ function Shell({ area, children }: { area: OperationsArea; children: ReactNode }
       </main>
     </div>
     <Drawer open={menuOpen} onOpenChange={setMenuOpen} side="left" title="Điều hướng" hideTitle>
-      <div className="ops-sidebar"><SidebarContent area={area} pathname={pathname} collapsed={false} idPrefix={`${area.id}-mobile`} onNavigate={() => setMenuOpen(false)} onLogout={() => void logout()} /></div>
+      <div className="ops-sidebar"><SidebarContent area={area} pathname={pathname} collapsed={false} idPrefix={`${area.id}-mobile`} counts={navCounts} onNavigate={() => setMenuOpen(false)} onLogout={() => void logout()} /></div>
     </Drawer>
   </div>;
 }
@@ -132,7 +146,7 @@ export function OperationsShell({ areaId, children }: { areaId: OperationsArea["
   const area = areaId === "admin" ? adminArea : organizationArea;
   return <ThemeScope>
     <MotionProvider>
-      <TooltipProvider><ToastProvider><Shell area={area}>{children}</Shell></ToastProvider></TooltipProvider>
+      <TooltipProvider><ToastProvider><CommandPaletteProvider><TourProvider><Shell area={area}>{children}</Shell></TourProvider></CommandPaletteProvider></ToastProvider></TooltipProvider>
     </MotionProvider>
   </ThemeScope>;
 }

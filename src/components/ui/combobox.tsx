@@ -69,7 +69,7 @@ export function Combobox({ id, value, onChange, options, placeholder = "Chọn�
       </button>
     </PopoverTrigger>
     <PopoverContent className="ops-combobox-pop" style={{ width: "var(--radix-popover-trigger-width)" }} onOpenAutoFocus={(event) => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.querySelector<HTMLInputElement>("[cmdk-input]")?.focus(); }}>
-      <Command label={aria["aria-label"] ?? placeholder} filter={(itemValue, searchText, keywords) => score(itemValue, searchText, keywords)} loop>
+      <Command label={searchPlaceholder} filter={(itemValue, searchText, keywords) => score(itemValue, searchText, keywords)} loop>
         <div className="ops-combobox-search"><Search size={16} aria-hidden="true" /><Command.Input value={search} onValueChange={setSearch} placeholder={searchPlaceholder} /></div>
         <Command.List id={listId} className="ops-combobox-list">
           {loading ? <div className="ops-combobox-empty" role="status">Đang tải…</div> : <Command.Empty className="ops-combobox-empty">{emptyText}</Command.Empty>}
@@ -114,7 +114,7 @@ export function MultiCombobox({ id, values, onChange, options, placeholder = "Ch
       </button>
     </PopoverTrigger>
     <PopoverContent className="ops-combobox-pop" style={{ width: "var(--radix-popover-trigger-width)" }} onOpenAutoFocus={(event) => { event.preventDefault(); (event.currentTarget as HTMLElement | null)?.querySelector<HTMLInputElement>("[cmdk-input]")?.focus(); }}>
-      <Command label={aria["aria-label"] ?? placeholder} filter={(itemValue, searchText, keywords) => score(itemValue, searchText, keywords)} loop>
+      <Command label={searchPlaceholder} filter={(itemValue, searchText, keywords) => score(itemValue, searchText, keywords)} loop>
         <div className="ops-combobox-search"><Search size={16} aria-hidden="true" /><Command.Input value={search} onValueChange={setSearch} placeholder={searchPlaceholder} /></div>
         <Command.List id={listId} className="ops-combobox-list">
           {loading ? <div className="ops-combobox-empty" role="status">Đang tải…</div> : <Command.Empty className="ops-combobox-empty">{emptyText}</Command.Empty>}

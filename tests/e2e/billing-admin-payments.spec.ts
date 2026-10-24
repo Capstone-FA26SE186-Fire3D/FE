@@ -1,7 +1,18 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { admin, callsTo, checkoutFixture, ids, ledgerRow, mockBilling, newMock, owner, paymentFixture, quotationFixture, queue, seedCheckout, signIn } from "./billing-mock";
+import { expectChipValue, openChip, pick } from "./chip-helpers";
 
 // Route-mock evidence only (not the real BE).
+
+// DataTable rows: `<tr>` on desktop, cards under 640px.
+const ledgerRows = (page: Page) => page.getByTestId("admin-ledger-table").locator("tbody tr, li.ops-dt-card");
+/** Opens the row's "···" menu, checks whether "Xử lý đối soát" is offered, and closes it again. */
+async function expectReconcileOffered(page: Page, row: Locator, offered: boolean) {
+  await row.getByRole("button", { name: "Thao tác" }).click();
+  await expect(page.getByRole("menuitem", { name: "Xem chi tiết" })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: /Xử lý đối soát/ })).toHaveCount(offered ? 1 : 0);
+  await page.keyboard.press("Escape");
+}
 
 const rows = (count: number) => Array.from({ length: count }, (_, index) => {
   const n = index + 1;
@@ -20,33 +31,35 @@ test.describe("admin payments ledger (mock)", () => {
     await signIn(page, admin);
     await mockBilling(page, mock);
     await page.goto("/admin/commerce?tab=payments");
-    await expect(page.getByTestId("ledger-row")).toHaveCount(20);
+    await expect(ledgerRows(page)).toHaveCount(20);
     await expect(page.getByText("1–20 / 45")).toBeVisible();
     await page.getByRole("button", { name: "Trang sau" }).click();
     await expect(page).toHaveURL(/page=2/);
     await expect(page.getByText("21–40 / 45")).toBeVisible();
     expect(callsTo(mock, "GET", "/api/admin/payments/payos/checkouts").some((call) => call.search.includes("page=2"))).toBe(true);
 
-    await page.getByRole("combobox", { name: "Trạng thái" }).selectOption("NeedsReconcile");
+    await pick(page, "Trạng thái", { value: "NeedsReconcile" });
     await expect(page).toHaveURL(/status=NeedsReconcile/);
-    await expect(page.getByTestId("ledger-row")).toHaveCount(15);
-    await expect(page.getByTestId("ledger-row").first()).toHaveAttribute("data-checkout-status", "NeedsReconcile");
-    await page.getByRole("combobox", { name: "Tổ chức" }).selectOption("org-1");
+    await expect(ledgerRows(page)).toHaveCount(15);
+    await expect(ledgerRows(page).first().getByTestId("payment-states")).toContainText("Checkout: Cần đối soát");
+    await page.getByRole("combobox", { name: "Tổ chức" }).click();
+    await page.getByRole("option", { name: "FET3D Lab" }).click();
     await expect(page).toHaveURL(/org=org-1/);
     const last = callsTo(mock, "GET", "/api/admin/payments/payos/checkouts").at(-1)!;
     expect(last.search).toContain("status=NeedsReconcile");
     expect(last.search).toContain("organizationId=org-1");
     expect(last.search).not.toContain("page=2");
 
+    await openChip(page, "Khoảng ngày");
     await page.getByLabel(/Từ \(giờ địa phương\)/).fill("2026-10-12T00:00");
-    await page.getByRole("button", { name: "Lọc", exact: true }).click();
+    await page.getByRole("button", { name: "Áp dụng", exact: true }).click();
     await expect(page).toHaveURL(/from=2026-10-1/);
     expect(callsTo(mock, "GET", "/api/admin/payments/payos/checkouts").at(-1)!.search).toMatch(/from=2026-10-1\dT\d\d%3A\d\d%3A\d\d\.\d{3}Z/);
 
     // Reload restores the exact view from the URL.
     await page.reload();
-    await expect(page.getByRole("combobox", { name: "Trạng thái" })).toHaveValue("NeedsReconcile");
-    await expect(page.getByTestId("ledger-row").first()).toBeVisible();
+    await expectChipValue(page, "Trạng thái", "NeedsReconcile");
+    await expect(ledgerRows(page).first()).toBeVisible();
   });
 
   test("an invalid quotation filter is refused before any request; clearing filters resets the list", async ({ page }) => {
@@ -55,14 +68,15 @@ test.describe("admin payments ledger (mock)", () => {
     await signIn(page, admin);
     await mockBilling(page, mock);
     await page.goto("/admin/commerce?tab=payments");
-    await page.getByLabel("Mã báo giá").fill("khong-phai-guid");
-    await page.getByRole("button", { name: "Lọc", exact: true }).click();
+    await openChip(page, "Mã báo giá");
+    await page.getByRole("textbox", { name: "Mã báo giá" }).fill("khong-phai-guid");
+    await page.getByRole("button", { name: "Áp dụng", exact: true }).click();
     await expect(page.getByText("Mã báo giá là GUID (36 ký tự).")).toBeVisible();
     const before = callsTo(mock, "GET", "/api/admin/payments/payos/checkouts").length;
-    await page.getByLabel("Mã báo giá").fill(ids.quote);
-    await page.getByRole("button", { name: "Lọc", exact: true }).click();
+    await page.getByRole("textbox", { name: "Mã báo giá" }).fill(ids.quote);
+    await page.getByRole("button", { name: "Áp dụng", exact: true }).click();
     await expect.poll(() => callsTo(mock, "GET", "/api/admin/payments/payos/checkouts").length).toBeGreaterThan(before);
-    await expect(page.getByTestId("ledger-row")).toHaveCount(5);
+    await expect(ledgerRows(page)).toHaveCount(5);
     await page.getByRole("button", { name: "Xóa lọc" }).click();
     await expect(page).not.toHaveURL(/q=/);
   });
@@ -78,24 +92,24 @@ test.describe("admin payments ledger (mock)", () => {
     await signIn(page, admin);
     await mockBilling(page, mock);
     await page.goto("/admin/commerce?tab=payments");
-    const stuck = page.getByTestId("ledger-row").nth(0);
+    const stuck = ledgerRows(page).nth(0);
     await expect(stuck.getByTestId("payment-states")).toContainText("Checkout: Cần đối soát");
     await expect(stuck.getByTestId("payment-states")).toContainText("Thanh toán: Đã nhận tiền");
     await expect(stuck.getByTestId("payment-states")).toContainText("Kích hoạt: Cần đối soát");
-    await expect(stuck.getByRole("button")).toHaveText("Xử lý");
-    const done = page.getByTestId("ledger-row").nth(1);
+    await expectReconcileOffered(page, stuck, true);
+    const done = ledgerRows(page).nth(1);
     await expect(done.getByTestId("payment-states")).toContainText("Kích hoạt: Đã kích hoạt");
-    await expect(done.getByRole("button")).toHaveText("Chi tiết");
+    await expectReconcileOffered(page, done, false);
     // Partial: money received, only some lines activated -> not success, reconcile offered.
-    const partial = page.getByTestId("ledger-row").nth(2);
+    const partial = ledgerRows(page).nth(2);
     await expect(partial.getByTestId("payment-states")).toContainText("Kích hoạt: Kích hoạt một phần");
-    await expect(partial.getByRole("button")).toHaveText("Xử lý");
+    await expectReconcileOffered(page, partial, true);
     await expect(partial).toContainText("kích hoạt 1/2");
     // A link that never bound a payment request: no payment, nothing to reconcile.
-    const failed = page.getByTestId("ledger-row").nth(3);
+    const failed = ledgerRows(page).nth(3);
     await expect(failed.getByTestId("payment-states")).toContainText("Thanh toán: chưa có");
     await expect(failed).toContainText("PayOS phản hồi chậm");
-    await expect(failed.getByRole("button")).toHaveText("Chi tiết");
+    await expectReconcileOffered(page, failed, false);
   });
 
   test("detail + reconcile: enqueues recovery once (double click), never marks anything Paid, and the stuck lines finish after the server retries", async ({ page }) => {
@@ -105,7 +119,7 @@ test.describe("admin payments ledger (mock)", () => {
     await signIn(page, admin);
     await mockBilling(page, mock);
     await page.goto("/admin/commerce?tab=payments");
-    await page.getByRole("button", { name: /Chi tiết thanh toán FET-Q-0001/ }).click();
+    await ledgerRows(page).filter({ hasText: "FET-Q-0001" }).click();
     const detail = page.getByTestId("payment-detail");
     await expect(detail.getByTestId("payment-states")).toContainText("Kích hoạt: Cần đối soát");
     await expect(detail.getByTestId("payment-status")).toHaveAttribute("data-provisioning-status", "NeedsReconcile");
@@ -155,16 +169,18 @@ test.describe("admin payments ledger (mock)", () => {
     await page.goto("/admin/commerce?tab=payments");
     await page.getByRole("radio", { name: "Yêu cầu thanh toán" }).click();
     await expect(page).toHaveURL(/kind=requests/);
-    await expect(page.getByTestId("ledger-row").first()).toBeVisible();
+    await expect(ledgerRows(page).first()).toBeVisible();
     expect(callsTo(mock, "GET", "/api/admin/payments/payos/requests").length).toBeGreaterThan(0);
-    await page.getByRole("combobox", { name: "Trạng thái" }).selectOption("Paid");
+    await pick(page, "Trạng thái", { value: "Paid" });
     await expect.poll(() => callsTo(mock, "GET", "/api/admin/payments/payos/requests").at(-1)!.search).toContain("status=Paid");
 
+    // The lookup lives in the page-header modal ("Tra cứu checkout").
+    await page.getByRole("button", { name: "Tra cứu checkout" }).click();
     await page.getByRole("textbox", { name: "Tra cứu theo mã checkout" }).fill("not-a-guid");
-    await page.getByRole("button", { name: "Tra cứu" }).click();
+    await page.getByRole("button", { name: "Tra cứu", exact: true }).click();
     await expect(page.getByText("Nhập mã checkout dạng GUID")).toBeVisible();
     await page.getByRole("textbox", { name: "Tra cứu theo mã checkout" }).fill(ids.checkout);
-    await page.getByRole("button", { name: "Tra cứu" }).click();
+    await page.getByRole("button", { name: "Tra cứu", exact: true }).click();
     await expect(page.getByTestId("payment-detail")).toBeVisible();
     expect(callsTo(mock, "GET", `/api/payments/payos/checkouts/${ids.checkout}`).length).toBeGreaterThan(0);
   });
@@ -176,10 +192,10 @@ test.describe("admin payments ledger (mock)", () => {
     await signIn(page, admin);
     await mockBilling(page, mock);
     await page.goto("/admin/commerce?tab=payments");
-    await page.getByRole("combobox", { name: "Trạng thái" }).selectOption("NeedsReconcile");
-    await expect(page.getByTestId("ledger-row")).toContainText("NEW-0001");
+    await pick(page, "Trạng thái", { value: "NeedsReconcile" });
+    await expect(ledgerRows(page)).toContainText("NEW-0001");
     await page.waitForTimeout(2500);
-    await expect(page.getByTestId("ledger-row")).toContainText("NEW-0001");
+    await expect(ledgerRows(page)).toContainText("NEW-0001");
     await expect(page.getByText("OLD-STALE")).toHaveCount(0);
   });
 
@@ -230,7 +246,7 @@ for (const theme of ["light", "dark"] as const) {
       await signIn(page, admin);
       await mockBilling(page, mock);
       await page.goto("/admin/commerce?tab=payments");
-      await expect(page.getByTestId("ledger-row").first()).toBeVisible();
+      await expect(ledgerRows(page).first()).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       await page.screenshot({ path: testInfo.outputPath(`ledger-${theme}-${width}.png`), fullPage: true });
       await page.goto(`/admin/commerce?tab=payments&checkout=${ids.checkout}`);

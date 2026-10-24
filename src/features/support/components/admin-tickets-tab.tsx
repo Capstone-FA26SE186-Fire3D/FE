@@ -3,19 +3,20 @@
 import { Inbox, Search } from "lucide-react";
 import { useMemo } from "react";
 import { useAsyncData } from "@/api/use-async-data";
-import { useUrlParams } from "@/api/use-url-params";
+import { useUrlParams, useUrlSearch } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
+import { CellTitle, DataTable, TableSearch, type DataColumn } from "@/components/ui/data-table";
+import { Drawer } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Select } from "@/components/ui/field";
-import { SkeletonRows } from "@/components/ui/skeleton";
+import { FilterChip, FilterChips } from "@/components/ui/filter-chip";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { accountsApi } from "@/features/accounts/api";
-import { DetailPane, Split } from "@/features/admin-overview/components/admin-kit";
 import { formatDateTime } from "@/utils/date-range";
 import { supportApi } from "../api";
 import { organizationName, personName, priorityLabel, priorityOptions, priorityTone, ticketStatusLabel, ticketStatusOptions, ticketStatusTone } from "../labels";
+import type { Ticket } from "../types";
 import { AdminTicketPanel } from "./admin-ticket-panel";
 import { errorText } from "./ticket-thread";
 import { PendingBox } from "./pending-box";
@@ -23,6 +24,11 @@ import styles from "./support.module.css";
 
 const PAGE_SIZE = 20;
 
+/**
+ * Ticket queue (Figma Admin v2 "Hỗ trợ & audit · Ticket"): status / priority / assignee / organization filters live in
+ * the URL and reach the server; the subject search narrows the loaded page (the API has no text search). A row opens the
+ * ticket in a right drawer (`?ticket=`), where assignment, transitions and the thread live.
+ */
 export function AdminTicketsTab({ accessToken, myId }: { accessToken: string; myId: string }) {
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const status = get("status");
@@ -30,6 +36,8 @@ export function AdminTicketsTab({ accessToken, myId }: { accessToken: string; my
   const assignedTo = get("assignedTo");
   const organizationId = get("organizationId");
   const ticketId = get("ticket");
+  const urlSearch = get("q");
+  const [searchText, setSearchText] = useUrlSearch(urlSearch, setParams);
 
   const list = useAsyncData(
     `admin-tickets:${page}:${status}:${priority}:${assignedTo}:${organizationId}`,
@@ -41,68 +49,52 @@ export function AdminTicketsTab({ accessToken, myId }: { accessToken: string; my
 
   const adminOptions = useMemo(() => (admins.data?.items ?? []).map((admin) => ({ id: admin.id, name: admin.fullName || admin.email })), [admins.data]);
   const nameOf = (id: string | null) => (id ? adminOptions.find((admin) => admin.id === id)?.name ?? `${id.slice(0, 8)}…` : "Chưa phân công");
-  const items = list.data?.items ?? [];
+  const loaded = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
-  const filtering = Boolean(status || priority || assignedTo || organizationId);
+  const needle = urlSearch.trim().toLowerCase();
+  const items = needle ? loaded.filter((ticket) => `${ticket.subject} ${ticket.ticketNumber}`.toLowerCase().includes(needle)) : loaded;
+  const filtering = Boolean(status || priority || assignedTo || organizationId || needle);
 
   const open = (id: string) => setParams({ ticket: id, page });
   const close = () => setParams({ ticket: null, page });
 
+  const columns: DataColumn<Ticket>[] = [
+    { key: "subject", header: "Chủ đề", primary: true, render: (ticket) => <CellTitle title={<span className={styles.clip}>{ticket.subject}</span>} sub={<span className={styles.mono}>{ticket.ticketNumber}</span>} /> },
+    { key: "from", header: "Tổ chức / người gửi", width: 220, render: (ticket) => <CellTitle title={personName(ticket.createdBy)} sub={organizationName(ticket.organization)} /> },
+    { key: "priority", header: "Ưu tiên", width: 130, render: (ticket) => <StatusBadge tone={priorityTone(ticket.priority)}>{priorityLabel(ticket.priority)}</StatusBadge> },
+    { key: "status", header: "Trạng thái", width: 150, render: (ticket) => <StatusBadge tone={ticketStatusTone(ticket.status)}>{ticketStatusLabel(ticket.status)}</StatusBadge> },
+    { key: "assignee", header: "Người xử lý", width: 170, hideBelow: 1100, render: (ticket) => ticket.assignedTo ? nameOf(ticket.assignedTo) : <span className="ops-muted">Chưa phân công</span> },
+    { key: "updated", header: "Cập nhật", width: 170, hideBelow: 900, render: (ticket) => formatDateTime(ticket.updatedAt) },
+  ];
+
+  const assigneeOptions = [{ value: myId, label: "Giao cho tôi", group: "Nhanh" }, ...adminOptions.filter((admin) => admin.id !== myId).map((admin) => ({ value: admin.id, label: admin.name, group: "Quản trị viên" }))];
+  const organizationOptions = (organizations.data?.items ?? []).map((organization) => ({ value: organization.id, label: organization.name }));
+
   return <>
-    <div className="adm-filters">
-      <Select aria-label="Trạng thái ticket" style={{ width: 170 }} value={status} onChange={(event) => setParams({ status: event.target.value })}>
-        <option value="">Trạng thái: tất cả</option>{ticketStatusOptions.map((value) => <option key={value} value={value}>{ticketStatusLabel(value)}</option>)}
-      </Select>
-      <Select aria-label="Mức ưu tiên" style={{ width: 170 }} value={priority} onChange={(event) => setParams({ priority: event.target.value })}>
-        <option value="">Mức: tất cả</option>{priorityOptions.map((value) => <option key={value} value={value}>{priorityLabel(value)}</option>)}
-      </Select>
-      <Select aria-label="Người phụ trách" style={{ width: 210 }} value={assignedTo} onChange={(event) => setParams({ assignedTo: event.target.value })}>
-        <option value="">Mọi người phụ trách</option>
-        <option value={myId}>Giao cho tôi</option>
-        {adminOptions.filter((admin) => admin.id !== myId).map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}
-      </Select>
-      <Select aria-label="Tổ chức" style={{ width: 210 }} value={organizationId} onChange={(event) => setParams({ organizationId: event.target.value })}>
-        <option value="">Mọi tổ chức</option>
-        {(organizations.data?.items ?? []).map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
-      </Select>
-      {filtering && <Button variant="quiet" onClick={() => setParams({ status: null, priority: null, assignedTo: null, organizationId: null })}>Xóa bộ lọc</Button>}
-    </div>
-
-    {list.error !== undefined && <Alert tone="danger" title="Không tải được danh sách ticket" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{errorText(list.error, "Hãy kiểm tra kết nối rồi thử lại.")}</Alert>}
-
-    <Split>
-      <div>
-        <Table caption="Danh sách ticket hỗ trợ">
-          <thead><tr><th>Yêu cầu</th><th>Từ</th><th>Mức</th><th>Trạng thái</th></tr></thead>
-          <tbody>
-            {list.loading && !list.data && <TableMessage colSpan={4}><SkeletonRows rows={6} label="Đang tải danh sách ticket…" /></TableMessage>}
-            {items.map((ticket) => <tr key={ticket.id} data-selected={ticketId === ticket.id ? "true" : undefined}>
-              <td>
-                <button type="button" className={styles.rowButton} onClick={() => open(ticket.id)} aria-label={`Mở ticket ${ticket.ticketNumber}: ${ticket.subject}`}>
-                  <span className={styles.clip}>{ticket.subject}</span>
-                  <span className="ops-cell-sub">{ticket.ticketNumber} · {formatDateTime(ticket.updatedAt)}</span>
-                </button>
-              </td>
-              <td><span className={styles.clipSmall}>{personName(ticket.createdBy)}</span><span className="ops-cell-sub">{organizationName(ticket.organization)} · {nameOf(ticket.assignedTo)}</span></td>
-              <td><StatusBadge tone={priorityTone(ticket.priority)}>{priorityLabel(ticket.priority)}</StatusBadge></td>
-              <td><StatusBadge tone={ticketStatusTone(ticket.status)}>{ticketStatusLabel(ticket.status)}</StatusBadge></td>
-            </tr>)}
-            {list.data && !items.length && <TableMessage colSpan={4}><EmptyState icon={filtering ? Search : Inbox} title={filtering ? "Không có ticket phù hợp." : "Chưa có ticket nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Ticket do học viên và tổ chức gửi sẽ xuất hiện ở đây."} /></TableMessage>}
-          </tbody>
-        </Table>
-        {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
-      </div>
-
-      <DetailPane
-        open={Boolean(ticketId)}
-        label="Chi tiết ticket"
-        onClose={close}
-        closeLabel="Đóng chi tiết ticket"
-        placeholder={{ icon: Inbox, title: "Chọn một ticket", text: "Phân công, đổi trạng thái và trao đổi với người gửi hiện ở đây." }}
-      >
-        {ticketId && <AdminTicketPanel key={ticketId} ticketId={ticketId} accessToken={accessToken} myId={myId} admins={adminOptions} onChanged={list.reload} />}
-      </DetailPane>
-    </Split>
+    <DataTable<Ticket>
+      caption="Danh sách ticket hỗ trợ"
+      data-testid="admin-tickets-table"
+      columns={columns}
+      rows={items}
+      rowKey={(ticket) => ticket.id}
+      loading={list.loading && !list.data}
+      onRowClick={(ticket) => open(ticket.id)}
+      rowTone={(ticket) => (ticket.status === "Closed" ? "muted" : ticket.priority === "Urgent" && ticket.status !== "Resolved" ? "warning" : undefined)}
+      error={list.error !== undefined ? <Alert tone="danger" title="Không tải được danh sách ticket" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{errorText(list.error, "Hãy kiểm tra kết nối rồi thử lại.")}</Alert> : undefined}
+      toolbar={<>
+        <TableSearch value={searchText} onChange={setSearchText} label="Tìm ticket" placeholder="Tìm theo chủ đề hoặc mã" />
+        <FilterChips label="Bộ lọc ticket">
+          <FilterChip label="Trạng thái" value={status} onChange={(value) => setParams({ status: value })} options={ticketStatusOptions.map((value) => ({ value, label: ticketStatusLabel(value) }))} />
+          <FilterChip label="Mức" value={priority} onChange={(value) => setParams({ priority: value })} options={priorityOptions.map((value) => ({ value, label: priorityLabel(value) }))} />
+        </FilterChips>
+        <Combobox aria-label="Người phụ trách" value={assignedTo} onChange={(value) => setParams({ assignedTo: value })} options={assigneeOptions} placeholder="Người phụ trách: tất cả" searchPlaceholder="Tìm quản trị viên" loading={admins.loading && !admins.data} clearable className={styles.toolbarPick} />
+        <Combobox aria-label="Tổ chức" value={organizationId} onChange={(value) => setParams({ organizationId: value })} options={organizationOptions} placeholder="Tổ chức: tất cả" searchPlaceholder="Tìm tổ chức" groupLabel="Tổ chức" loading={organizations.loading && !organizations.data} clearable className={styles.toolbarPick} />
+        {filtering && <Button variant="quiet" onClick={() => { setSearchText(""); setParams({ status: null, priority: null, assignedTo: null, organizationId: null, q: null }); }}>Xóa bộ lọc</Button>}
+      </>}
+      empty={<EmptyState icon={filtering ? Search : Inbox} title={filtering ? "Không có ticket phù hợp." : "Chưa có ticket nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Ticket do học viên và tổ chức gửi sẽ xuất hiện ở đây."} />}
+      pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
+    />
+    <p className={styles.hint}>Bấm một hàng để mở ticket: đổi trạng thái, mức, người phụ trách và trả lời.</p>
 
     <PendingBox
       title="Chưa có từ backend"
@@ -111,5 +103,9 @@ export function AdminTicketsTab({ accessToken, myId }: { accessToken: string; my
         "Thông báo email/push khi có phản hồi: API hỗ trợ chưa gửi thông báo.",
       ]}
     />
+
+    <Drawer open={Boolean(ticketId)} onOpenChange={(value) => { if (!value) close(); }} size="lg" data-testid="admin-ticket-drawer" title="Chi tiết ticket" description="Phân công, đổi trạng thái với If-Match và trao đổi với người gửi.">
+      {ticketId && <AdminTicketPanel key={ticketId} ticketId={ticketId} accessToken={accessToken} myId={myId} admins={adminOptions} onChanged={list.reload} />}
+    </Drawer>
   </>;
 }
