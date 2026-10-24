@@ -95,6 +95,25 @@ test.describe("IFC equipment candidates", () => {
     await expect(page.getByTestId("issue-row").filter({ hasText: "IFC_EXIT_UNKNOWN" }).getByTestId("issue-guidance")).toContainText("Chọn một cửa có sẵn làm lối thoát");
   });
 
+  test("a long door list: the unsaved exit choice is saved from the warning itself and the save bar stays in view", async ({ page }) => {
+    const doors = Array.from({ length: 14 }, (_, index) => candidate(`ifc:D${index}`, `0ZBert7zf3GhThbO${String(index).padStart(2, "0")}`, "door.standard", "IfcDoor"));
+    const state: State = { version: 0, status: "NeedsFix", exitRequired: true, items: doors, patches: [] };
+    await setup(page, state, [{ id: "i-1", revisionId: "rev-1", validationRunId: "run-1", processingAttemptId: "att-1", artifactId: null, issueCode: "IFC_EXIT_UNKNOWN", severity: "Warning", status: "Open", message: "No external exit door.", evidence: {}, ifcGlobalIds: [], isCurrentAttempt: true, createdAt: "2026-10-02T00:00:00Z" }]);
+    await page.setViewportSize({ width: 1440, height: 700 });
+    await page.goto(ifcUrl("equipment"));
+    await expect(page.getByTestId("exit-save")).toHaveCount(0); // nothing chosen yet
+    await page.getByTestId("equipment-exit").first().click();
+    await expect(page.getByTestId("exit-step")).toContainText("chưa lưu");
+    // The table is far taller than the viewport, yet the save bar is on screen (it used to sit below the whole list).
+    await expect(page.getByTestId("equipment-save")).toBeInViewport();
+    await expect(page.getByRole("status").filter({ hasText: "1 lựa chọn chưa lưu" })).toBeVisible();
+    await page.getByTestId("exit-save").click();
+    await expect(page.getByText("Đã lưu quyết định thiết bị")).toBeVisible();
+    await expect(page.getByTestId("exit-step")).toHaveCount(0);
+    expect(state.patches).toHaveLength(1);
+    expect(state.patches[0].body).toEqual({ items: [{ candidateId: "ifc:D0", decision: "Retyped", catalogKey: "door.exit" }] });
+  });
+
   test("confirm, retype and reject together; a 412 reloads the server view and keeps the unsaved choices", async ({ page }) => {
     const state: State = { version: 4, status: "ReadyForScenario", exitRequired: false, items: [candidate("ifc:A", DOOR_A, "door.standard", "IfcDoor"), candidate("ifc:E", EXT, "extinguisher.portable", "IfcFlowTerminal", 0.6, { suggestedDecision: { decision: "Rejected", catalogKey: null, fromRevisionId: "rev-0" } })], patches: [], failNext412: true };
     await setup(page, state);

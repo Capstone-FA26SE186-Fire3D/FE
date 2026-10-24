@@ -120,11 +120,11 @@ export function EquipmentPanel({ accessToken, revisionId, onChanged, onHighlight
       {view.error !== undefined && !unavailable && <Alert tone="danger" title="Không tải được thiết bị" action={<Button size="sm" variant="secondary" className="mt-3" onClick={view.reload}>Thử lại</Button>}>{describeApiError(view.error, "Hãy thử lại sau.")}</Alert>}
       {conflict && <Alert tone="warning" title="Danh sách vừa được lưu ở nơi khác">Đã tải bản mới nhất. Các lựa chọn chưa lưu của bạn vẫn được giữ (đánh dấu “Chưa lưu”); xem lại rồi bấm lưu lần nữa.</Alert>}
 
-      {data?.exitConfirmationRequired && <div data-testid="exit-step"><Alert tone="warning" title="Chọn cửa thoát ra ngoài">
+      {data?.exitConfirmationRequired && <div data-testid="exit-step"><Alert tone="warning" title="Chọn cửa thoát ra ngoài" action={exitChosen && pending.length > 0 ? <Button type="button" size="sm" className="mt-3" onClick={() => void save()} disabled={busy} data-testid="exit-save">{busy ? "Đang lưu…" : "Lưu quyết định"}</Button> : undefined}>
         QA không tìm thấy cửa thoát (IFC_EXIT_UNKNOWN) nên revision đang ở trạng thái Cần sửa. Chọn một cửa có sẵn làm lối thoát rồi lưu; không cần tải lại IFC.
         {!exitAllowed && catalog.data && " Runtime hiện hành chưa hỗ trợ loại door.exit, nên chưa chọn được; hãy báo PlatformAdmin."}
         {doors.length === 0 && " Worker không gửi cửa nào trong danh sách thiết bị; cần tải lại IFC có cửa (IfcDoor)."}
-        {exitChosen && " Đã chọn ít nhất một cửa thoát; bấm “Lưu quyết định”."}
+        {exitChosen && " Đã chọn ít nhất một cửa thoát nhưng chưa lưu: bấm “Lưu quyết định” thì cảnh báo này mới hết."}
       </Alert></div>}
 
       {data && !data.metadataAvailable && <EmptyState icon={PackageSearch} title="Worker chưa gửi dữ liệu thiết bị" description="Revision này không có building_metadata. Đặt thiết bị trong trình soạn kịch bản." />}
@@ -170,7 +170,9 @@ export function EquipmentPanel({ accessToken, revisionId, onChanged, onHighlight
       </Table>}
 
       {error !== undefined && <Alert tone="danger" title="Chưa lưu được quyết định">{describeApiError(error, "Hãy thử lại.")} Các lựa chọn vẫn được giữ.</Alert>}
-      {data && data.items.length > 0 && <div className="ops-actions">
+      {/* Sticks to the bottom of the viewport while choices are unsaved: the list can be long and the button sat below it. */}
+      {data && data.items.length > 0 && <div className="ops-actions" data-pending={pending.length > 0 || undefined}>
+        {pending.length > 0 && <span className="ops-sticky-note" role="status">{pending.length} lựa chọn chưa lưu</span>}
         <Button type="button" onClick={() => void save()} disabled={busy || pending.length === 0} data-testid="equipment-save">{busy ? "Đang lưu…" : `Lưu quyết định${pending.length ? ` (${pending.length})` : ""}`}</Button>
         {pending.length > 0 && <Button type="button" variant="quiet" onClick={() => setDrafts({})} disabled={busy}>Bỏ các lựa chọn chưa lưu</Button>}
       </div>}

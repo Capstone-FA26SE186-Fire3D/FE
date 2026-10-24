@@ -398,3 +398,7 @@ kbd { display: inline-block; min-width: 18px; padding: 1px 5px; border: 1px soli
 /* ───────── Sidebar pending-work badge (Admin: Duyệt kịch bản · Hỗ trợ & audit) ───────── */
 .ops-nav-count { position: relative; display: inline-grid; flex: none; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px; background: var(--hover); color: var(--muted); font-size: 11.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
 .ops-nav-link[aria-current="page"] .ops-nav-count { background: var(--ember-soft); color: var(--ember); }
+
+/* Unsaved choices: the save bar follows the viewport so it is never lost below a long list; 92px keeps it above the AI launcher. */
+.ops-actions[data-pending] { position: sticky; bottom: 92px; z-index: 5; align-items: center; padding: 10px 14px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface-raised); box-shadow: var(--shadow-pop); }
+.ops-sticky-note { margin-right: auto; color: var(--warning); font-size: 13px; font-weight: 600; }

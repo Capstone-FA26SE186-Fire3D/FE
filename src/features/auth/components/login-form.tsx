@@ -91,9 +91,19 @@ export function LoginForm() {
     return () => window.clearTimeout(timer);
   }, [googleOnboarding]);
 
+  const redirecting = ready && isAuthenticated;
+  const [redirectStalled, setRedirectStalled] = useState(false);
   useEffect(() => {
     if (ready && isAuthenticated) router.replace(postLoginRoute(user, requestedNext));
   }, [isAuthenticated, requestedNext, ready, router, user]);
+
+  // If the client-side navigation does not happen (a route chunk failed to load, a stale tab after a deploy), offer a
+  // plain link: a full page load works without the client router.
+  useEffect(() => {
+    if (!redirecting) return;
+    const timer = window.setTimeout(() => setRedirectStalled(true), 5000);
+    return () => window.clearTimeout(timer);
+  }, [redirecting]);
 
   const googleWaitUntil = googleWait?.until;
   useEffect(() => {
@@ -116,7 +126,12 @@ export function LoginForm() {
     setGoogleWait(seconds ? { until: Date.now() + seconds * 1000, seconds } : null);
   };
 
-  if (ready && isAuthenticated) return <p className="auth-redirect" role="status">Bạn đã đăng nhập. Đang chuyển hướng…</p>;
+  if (redirecting) {
+    return <div className="auth-redirect" role="status">
+      <p>Bạn đã đăng nhập. Đang chuyển hướng…</p>
+      {redirectStalled && <p>Chưa chuyển được? <a href={postLoginRoute(user, requestedNext)}>Mở trang làm việc</a>. Nếu vẫn dừng ở đây, tải lại trang (Ctrl+F5).</p>}
+    </div>;
+  }
 
   const clearRegistrationProof = () => {
     setOtp("");
