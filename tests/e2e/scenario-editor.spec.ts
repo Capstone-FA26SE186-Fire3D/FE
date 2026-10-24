@@ -256,7 +256,7 @@ test("NotReady preview: editor stays usable, light polling picks the model up, m
   const mock = newMock({ previewQueue: ["not-ready", "ready"] });
   await open(page, mock, { waitModel: false });
   await expect(page.getByText("Mô hình 3D chưa sẵn sàng")).toBeVisible();
-  await expect(page.getByText("Trạng thái revision: Processing")).toBeVisible();
+  await expect(page.getByText("Trạng thái revision: Đang xử lý")).toBeVisible();
   await page.getByTestId("add-spawn").click(); // placing by coordinates needs no model
   await expect(page.getByTestId("spawn-list").getByRole("button")).toHaveCount(2);
   await expect(page.getByTestId("floors-empty")).toBeVisible();

@@ -5,6 +5,7 @@
  * GooglePasswordController. It does not prove Firebase, the deployed API or the provider.
  */
 import { expect, test, type Page } from "@playwright/test";
+import { storedSession } from "./session";
 import { googleFixtureBundle } from "../fixtures/google/build.mjs";
 
 let bundle: string;
@@ -76,7 +77,7 @@ const identity = (page: Page, uid: string) => page.evaluate((value) => { (window
 const popups = (page: Page) => page.evaluate(() => (window as unknown as { googleTestPopups?: number }).googleTestPopups ?? 0);
 const destinations = (page: Page) => page.evaluate(() => (window as unknown as { googleTestDestinations: string[] }).googleTestDestinations);
 const panel = (page: Page) => page.getByTestId("google-link-panel");
-const sessionTokens = (page: Page) => page.evaluate(() => sessionStorage.getItem("fire3d-auth-tokens"));
+const sessionTokens = (page: Page) => storedSession(page);
 
 async function submitLink(page: Page, password = "S3cret-pass") {
   await panel(page).getByLabel("Mật khẩu hiện tại", { exact: true }).fill(password);

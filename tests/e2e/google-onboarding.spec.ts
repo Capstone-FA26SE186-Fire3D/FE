@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { storedSession } from "./session";
 import { googleFixtureBundle } from "../fixtures/google/build.mjs";
 
 let bundle: string;
@@ -17,7 +18,7 @@ async function openFixture(page: Page, result: unknown, query = "", status = 200
 }
 
 async function noSession(page: Page) {
-  expect(await page.evaluate(() => sessionStorage.getItem("fire3d-auth-tokens"))).toBeNull();
+  expect(await storedSession(page)).toBeNull();
 }
 
 test("status-only onboarding renders both account types and blocks completion without a session", async ({ page }) => {
@@ -57,7 +58,7 @@ for (const accountType of ["trainee", "organization"] as const) {
     await expect.poll(() => request).toEqual(accountType === "trainee"
       ? { onboardingToken: "mock-onboarding-proof", accountType, username: "google_user" }
       : { onboardingToken: "mock-onboarding-proof", accountType, organizationName: "FET3D Lab", organizationAddress: "1 Test Street", organizationPhoneNumber: "+84123456789" });
-    await expect.poll(() => page.evaluate(() => sessionStorage.getItem("fire3d-auth-tokens"))).toBe(JSON.stringify({ accessToken: "test-access", refreshToken: "test-refresh" }));
+    await expect.poll(() => storedSession(page)).toBe(JSON.stringify({ accessToken: "test-access", refreshToken: "test-refresh" }));
     expect(await page.evaluate(() => Object.values(sessionStorage).join(" "))).not.toContain("mock-onboarding-proof");
     expect(page.url()).not.toContain("mock-onboarding-proof");
     await expect.poll(() => page.evaluate(() => (window as unknown as { googleTestDestinations: string[] }).googleTestDestinations.at(-1))).toBe(accountType === "trainee" ? "/learning-hub" : "/workspace/buildings");
@@ -165,7 +166,7 @@ for (const failure of ["ONBOARDING_ALREADY_COMPLETED", "IDEMPOTENCY_KEY_CONFLICT
     await noSession(page);
     await page.route("**/api/auth/login-firebase", (route) => route.fulfill({ json: { status: "Authenticated", authentication } }));
     await page.getByRole("button", { name: "Tiếp tục với Google", exact: true }).click();
-    await expect.poll(() => page.evaluate(() => sessionStorage.getItem("fire3d-auth-tokens"))).not.toBeNull();
+    await expect.poll(() => storedSession(page)).not.toBeNull();
     await expect.poll(() => page.evaluate(() => (window as unknown as { googleTestDestinations: string[] }).googleTestDestinations.at(-1))).toBe("/learn/tu-bai-doc-den-luot-tap");
     expect(calls).toBe(1);
   });
