@@ -61,13 +61,25 @@ function newestLog(logs: ProcessingLog[], jobId: string) {
   return logs.filter((log) => log.jobId === jobId).sort((a, b) => b.loggedAt.localeCompare(a.loggedAt))[0] ?? null;
 }
 
-function focusSection(id: string) {
+/**
+ * Scrolls to a section and focuses its first `[data-focus-target]`. A freshly opened sub-tab may still be loading, so
+ * the target is awaited for a short while before falling back to the section itself.
+ */
+function focusSection(id: string, attempt = 0, scrolled = false) {
   const section = document.getElementById(id);
-  if (!section) return;
-  section.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
-  const target = section.querySelector<HTMLElement>("[data-focus-target]:not([disabled])") ?? section;
-  target.focus({ preventScroll: true });
+  if (!section) {
+    if (attempt < FOCUS_POLLS) window.setTimeout(() => focusSection(id, attempt + 1), 100);
+    return;
+  }
+  if (!scrolled) section.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  const target = section.querySelector<HTMLElement>("[data-focus-target]:not([disabled])");
+  if (!target && attempt < FOCUS_POLLS) {
+    window.setTimeout(() => focusSection(id, attempt + 1, true), 100);
+    return;
+  }
+  (target ?? section).focus({ preventScroll: true });
 }
+const FOCUS_POLLS = 20;
 
 function isTab(value: string): value is BuildingTab {
   return (buildingTabs as readonly string[]).includes(value);

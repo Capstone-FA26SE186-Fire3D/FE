@@ -43,7 +43,7 @@ function ItemDrawer({ accessToken, itemId, onClose }: { accessToken: string; ite
       <Button variant="quiet" onClick={onClose}>Đóng</Button>
       <Tooltip content={USE_AS_TEMPLATE_HINT}><span style={{ display: "inline-flex" }}><Button disabled aria-describedby="org-lib-use-hint" style={{ pointerEvents: "none" }}>Dùng làm mẫu</Button></span></Tooltip>
     </>}>
-    {!item && !view && <SkeletonDetail rows={6} />}
+    {!item && !view && <SkeletonDetail rows={6} label="Đang tải mẫu…" />}
     {view && <Alert tone="danger" title={view.kind === "notFound" ? "Mẫu không còn khả dụng" : "Không tải được mẫu"} action={view.kind === "notFound" ? undefined : <Button size="sm" variant="secondary" className="mt-3" onClick={query.reload}>Thử lại</Button>}>{view.kind === "notFound" ? "Mẫu đã ngừng dùng hoặc chưa có phiên bản đã xuất bản." : view.message}</Alert>}
     {version && <div className="ops-stack" data-testid="org-item-detail">
       <VersionPreview version={version} />

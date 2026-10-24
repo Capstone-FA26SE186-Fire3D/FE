@@ -21,7 +21,7 @@ export function SubTabs({ items, value, onValueChange, label, size = "md", class
   children?: ReactNode;
 }) {
   const group = useId();
-  return <TabsPrimitive.Root value={value} onValueChange={onValueChange} className={className} {...rest}>
+  return <TabsPrimitive.Root value={value} onValueChange={onValueChange} className={cn("ops-subtabs-root", className)} {...rest}>
     <TabsPrimitive.List className="ops-subtabs" data-size={size} aria-label={label}>
       {items.map((item) => <TabsPrimitive.Trigger key={item.value} value={item.value} disabled={item.disabled} className="ops-subtab" data-testid={item["data-testid"]}>
         {item.value === value && <m.span layoutId={`${group}-pill`} className="ops-subtab-pill" transition={presets.spring} />}

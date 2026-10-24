@@ -56,7 +56,8 @@ export function RowMenu({ items, label = "Thao tác", className, trigger, align 
         const Icon = item.icon;
         return <div key={item.label} style={{ display: "contents" }}>
           {item.separator && <DropdownMenuSeparator />}
-          <DropdownMenuItem tone={item.tone} disabled={item.disabled} onSelect={item.onSelect}>
+          {/* Runs after the menu has closed and handed focus back to its trigger, so a dialog opened here returns focus there. */}
+          <DropdownMenuItem tone={item.tone} disabled={item.disabled} onSelect={() => { window.setTimeout(item.onSelect, 0); }}>
             {Icon && <Icon size={16} aria-hidden="true" />}
             <span><span>{item.label}</span>{item.hint && <small>{item.hint}</small>}</span>
           </DropdownMenuItem>

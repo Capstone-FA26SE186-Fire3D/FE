@@ -96,6 +96,19 @@ So ảnh chụp 1440px (dark, dữ liệu mock giống production) với Figma `
 
 Khớp bố cục, chỉ lệch chi tiết hoặc theo giới hạn BE (chưa đổi): Danh sách công trình (thiếu thẻ "Tiếp tục" — BE#152), Thư viện mẫu ("Dùng làm mẫu" cần `?libraryItem=`), Duyệt kịch bản, Hỗ trợ & audit, Thương mại, Tổng quan admin, AI & nguồn tri thức (Figma gộp một trang, code giữ tab), thanh theme 3 nút (Figma là một nút). "Phiên theo ngày" vẫn chờ chuỗi theo ngày từ BE.
 
+### Org/Admin v2 theo Figma (24/10/2026)
+
+Theo các trang Figma `02b Components v2`, `04b Organization v2`, `05b Admin v2`:
+
+- **Bộ component v2** (`src/components/ui`): Combobox/MultiCombobox (cmdk, tìm không dấu, "Khác…"), DataTable v2 (bấm hàng để mở, menu "···", cột dính, thẻ dưới 640px, `loading` cho lần tải đầu và `refreshing` khi tải trang sau giữ hàng cũ), Popover/Menu/Tooltip, SubTabs, Modal/Drawer theo cỡ, ConfirmDialog, Skeleton có nhãn `role=status`, NumberPop, bộ biểu đồ recharts tải lười.
+- **Organization**: danh sách công trình là DataTable; chi tiết có 5 tab (Hành trình, IFC, Kịch bản, Truy cập, Dịch vụ); "Tải IFC" là một modal; báo cáo; bong bóng Trợ lý AI ở mọi trang; ⌘K; tour spotlight (thay checklist); mini-stepper ở sidebar.
+- **Admin**: tổng quan dạng ô số; duyệt kịch bản trong drawer 720px; tài khoản, tổ chức, Learn, thư viện, AI, thương mại và hỗ trợ dùng DataTable + Drawer + Modal; sidebar có badge. DetailPane/Split đã gỡ.
+- Cố ý không làm vì BE chưa có dữ liệu: chênh lệch "+12%", histogram thời lượng, tìm trong lịch sử AI, tỉnh/huyện ở hồ sơ tổ chức. Hồ sơ tổ chức xử lý 412 như hồ sơ cá nhân (giữ phần đã sửa, "Tải bản mới").
+
+Lỗi tìm ra khi chạy e2e đầy đủ và đã sửa: Dialog dùng `@radix-ui/react-dismissable-layer` khác bản với Popover/Menu nên dropdown trong modal/drawer không bấm được (nâng `@radix-ui/react-dialog` 1.3.1, giờ chỉ còn một bản); `contain: content` của DataTable cắt popover của chip lọc; thanh trên tràn 3px ở 375px; dải SubTabs đẩy rộng trang; Alert lồng `<p>`; editor phiên bản thư viện giữ bản nháp sau khi xuất bản; focus "Chọn cửa thoát" rơi trước khi danh sách thiết bị tải xong; focus không trả về nút "···" sau hộp xác nhận mở từ menu hàng.
+
+Playwright đặt sẵn `fire3d-org-tour=done` qua `storageState` để tour không che trang; `tour.spec.ts` tự xóa giá trị này để kiểm lần ghé đầu.
+
 ### Prototype (dev)
 
 Không còn màn hình prototype nào: Duyệt kịch bản (F3), Learn CMS (F6) và Thư viện (F7) đều là màn thật; `src/features/dev-prototype` và `PendingModule` đã bị gỡ. `tests/e2e/ops-no-prototype.spec.ts` kiểm tra bản production: không banner/dữ liệu mẫu/khối "Chưa thể mở tính năng này" và bundle client không chứa chuỗi mẫu.

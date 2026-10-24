@@ -47,7 +47,7 @@ function validate(values: FilterValues): FilterErrors {
 
 /** One GUID filter as a chip: the value is staged locally and sent with "Áp dụng bộ lọc". */
 function GuidChip({ label, fieldLabel, value, error, onChange }: { label: string; fieldLabel: string; value: string; error?: string; onChange: (value: string) => void }) {
-  return <ChipPopover label={label} value={value ? short(value) : "tất cả"} active={Boolean(value)} dataValue={value} panelLabel={fieldLabel}>
+  return <ChipPopover label={label} value={value ? short(value) : "tất cả"} active={Boolean(value)} dataValue={value} panelLabel={`Bộ lọc ${label.toLowerCase()}`}>
     {(close) => <div className={styles.chipForm}>
       <Field label={fieldLabel} hint="GUID 36 ký tự." error={error}>{(p) => <Input {...p} value={value} onChange={(event) => onChange(event.target.value.trim())} placeholder="GUID" spellCheck={false} autoComplete="off" className="font-mono" />}</Field>
       <div className={styles.actions}>{value && <Button type="button" size="sm" variant="quiet" onClick={() => onChange("")}>Bỏ</Button>}<Button type="button" size="sm" variant="secondary" onClick={close}>Xong</Button></div>

@@ -86,6 +86,9 @@ export function AiChatPanel({ context, variant, onClose, onToggleExpand, onApply
     if (focusToken === null) return;
     input.current?.focus();
     onFocused();
+    // Collapsing the drawer mounts this panel while the closing drawer still traps focus; once it is gone focus would
+    // sit on <body>, so it is handed to the composer again. Not cleared by `onFocused` resetting the token.
+    window.setTimeout(() => { if (document.activeElement === document.body && input.current?.isConnected) input.current.focus(); }, 250);
   }, [focusToken, onFocused]);
 
   // The limits say no (balance under the reserve, or no policy) → the composer is replaced by the quota-out card (Figma 43:304).

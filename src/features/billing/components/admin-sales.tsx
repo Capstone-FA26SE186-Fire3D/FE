@@ -248,7 +248,7 @@ export function QuotationsSection({ accessToken }: { accessToken: string }) {
 
     <Drawer open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) { setOverride(null); setParams({ quotation: null }); } }} size="lg" data-testid="quotation-drawer" title="Chi tiết báo giá" description="Số liệu là bản chụp do hệ thống trả."
       eyebrow={current ? <><QuotationStatusBadge status={current.data.status} /><StatusBadge tone="neutral">{current.data.quotationNumber}</StatusBadge></> : undefined}>
-      {selectedId && detail.loading && !current && <SkeletonDetail rows={6} />}
+      {selectedId && detail.loading && !current && <SkeletonDetail rows={6} label="Đang tải báo giá…" />}
       {selectedId && detail.error !== undefined && !current && <Alert tone="danger" title="Không tải được báo giá" action={<Button size="sm" variant="secondary" className="mt-3" onClick={detail.reload}>Thử lại</Button>}>{billingErrorText(detail.error)}</Alert>}
       {current && <div className="ops-stack">
         <QuotationSnapshot quotation={current.data} organizationName={orgName[current.data.organizationId]} />

@@ -253,7 +253,7 @@ export function BillingWorkspace() {
     </SubTabs>
 
     <Drawer open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) { setOverride(null); setParams({ quotation: null, payment: null }); } }} size="xl" title="Chi tiết báo giá" description="Số tiền, kỳ và điều khoản là bản chụp do hệ thống phát hành." eyebrow={current ? <><span className="bill-mono">{current.data.quotationNumber}</span><QuotationStatusBadge status={current.data.status} /></> : undefined} data-testid="quotation-drawer">
-      {selectedId && selected.loading && !current && <SkeletonDetail rows={6} />}
+      {selectedId && selected.loading && !current && <SkeletonDetail rows={6} label="Đang tải báo giá…" />}
       {selectedId && selected.error !== undefined && !current && <Alert tone="danger" title={noAccess(selected.error) ? "Không có quyền xem báo giá này" : "Không tải được báo giá"} action={<Button size="sm" variant="secondary" className="mt-3" onClick={selected.reload}>Thử lại</Button>}>{billingErrorText(selected.error)}</Alert>}
       {current && <div className="ops-stack">
         <QuotationSnapshot quotation={current.data} />

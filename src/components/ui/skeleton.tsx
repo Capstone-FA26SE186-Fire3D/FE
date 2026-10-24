@@ -45,9 +45,10 @@ export function SkeletonKpis({ count = 4 }: { count?: number }) {
 }
 
 /** Key/value detail block (drawer body). */
-export function SkeletonDetail({ rows = 5 }: { rows?: number }) {
-  return <div className="ops-skeleton-detail" aria-hidden="true">
-    {Array.from({ length: rows }, (_, index) => <div key={index}><Skeleton style={{ height: 11, width: 90 }} /><Skeleton style={{ height: 13, width: `${55 + ((index * 17) % 35)}%` }} /></div>)}
+export function SkeletonDetail({ rows = 5, label = "Đang tải…" }: { rows?: number; label?: string }) {
+  return <div className="ops-skeleton-detail" role="status" aria-live="polite">
+    <span style={visuallyHidden}>{label}</span>
+    {Array.from({ length: rows }, (_, index) => <div key={index} aria-hidden="true"><Skeleton style={{ height: 11, width: 90 }} /><Skeleton style={{ height: 13, width: `${55 + ((index * 17) % 35)}%` }} /></div>)}
   </div>;
 }
 

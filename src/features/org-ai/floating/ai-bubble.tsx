@@ -71,16 +71,17 @@ export function AiBubble() {
     <AnimatePresence>
       {showPanel && <m.div key={pathname} id="ai-bubble-panel" className="ai-panel-float" role="dialog" aria-modal="false" aria-labelledby="ai-bubble-title" onKeyDown={onPanelKey}
         initial={{ opacity: 0, y: 12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: 0.98 }} transition={presets.softSpring} data-testid="ai-bubble-float">
-        <AiChatPanel context={context} variant="panel" onClose={closePanel} onToggleExpand={toggleExpand} onApply={onApply} focusToken={focusToken} onFocused={consumeFocus} />
+        <AiChatPanel context={context} variant="panel" onClose={closePanel} onToggleExpand={toggleExpand} onApply={onApply} focusToken={showPanel ? focusToken : null} onFocused={consumeFocus} />
       </m.div>}
     </AnimatePresence>
 
     <Drawer open={showSheet} onOpenChange={(value) => { if (!value) closePanel(); }} side="bottom" title="Trợ lý AI" hideTitle flush className="ai-sheet" data-testid="ai-bubble-sheet">
-      <AiChatPanel context={context} variant="sheet" onClose={closePanel} onApply={onApply} focusToken={focusToken} onFocused={consumeFocus} />
+      <AiChatPanel context={context} variant="sheet" onClose={closePanel} onApply={onApply} focusToken={showSheet ? focusToken : null} onFocused={consumeFocus} />
     </Drawer>
 
     <Drawer open={showDrawer} onOpenChange={(value) => { if (!value) closePanel(); }} size="lg" title="Trợ lý AI" hideTitle flush className="ai-sheet ai-sheet--wide" data-testid="ai-bubble-drawer">
-      <AiChatPanel context={context} variant="drawer" onClose={closePanel} onToggleExpand={toggleExpand} onApply={onApply} focusToken={focusToken} onFocused={consumeFocus} />
+      {/* Only the variant on screen takes the focus request: a drawer or sheet that is closing must not keep it. */}
+      <AiChatPanel context={context} variant="drawer" onClose={closePanel} onToggleExpand={toggleExpand} onApply={onApply} focusToken={showDrawer ? focusToken : null} onFocused={consumeFocus} />
     </Drawer>
 
     <ApplyTargetDialog accessToken={accessToken} request={applying} onClose={() => setApplying(null)} />

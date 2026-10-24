@@ -47,7 +47,10 @@ export function ItemDetail({ accessToken, itemId, versionParam, onVersion, onClo
   const [toggleBusy, setToggleBusy] = useState(false);
   const [toggleError, setToggleError] = useState<LibraryErrorView | null>(null);
 
-  const itemQuery = useAsyncData<WithEtag<LibraryItem>>(`library-item:${itemId}:${rev}`, (signal) => libraryAdminApi.getItem(accessToken, itemId, signal), true, { keepPrevious: false });
+  // Keeps the item while it reloads after a save or publish, so the open version editor is not unmounted and rebuilt
+  // from a stale version; a different item is never shown in its place (`current` below).
+  const itemQuery = useAsyncData<WithEtag<LibraryItem>>(`library-item:${itemId}:${rev}`, (signal) => libraryAdminApi.getItem(accessToken, itemId, signal));
+  const current = itemQuery.data?.data.id === itemId ? itemQuery.data : undefined;
   const wantsVersion = UUID.test(versionParam);
   const versionQuery = useAsyncData<WithEtag<LibraryVersion>>(`library-version:${versionParam}:${versionRev}`, (signal) => libraryAdminApi.getVersion(accessToken, versionParam, signal), wantsVersion);
 
@@ -59,16 +62,16 @@ export function ItemDetail({ accessToken, itemId, versionParam, onVersion, onClo
   const shell = (props: { title: string; description?: string; eyebrow?: ReactNode; headerExtra?: ReactNode; footer?: ReactNode; children: ReactNode }) =>
     <Drawer open onOpenChange={(open) => { if (!open && !toggleBusy) onClose(); }} size="lg" data-testid={DRAWER_ID} {...props} />;
 
-  if (itemQuery.error !== undefined && !itemQuery.data) {
+  if (itemQuery.error !== undefined && !current) {
     const view = describeLibraryError(itemQuery.error);
     return shell({ title: "Mục thư viện", footer: <Button variant="quiet" onClick={onClose}>Đóng</Button>, children: view.kind === "notFound"
       ? <EmptyState icon={Library} title="Không tìm thấy mục" description="Mục không tồn tại hoặc đường dẫn không đúng." />
       : <Alert tone="danger" title="Không tải được mục thư viện" action={<Button size="sm" variant="secondary" className="mt-3" onClick={itemQuery.reload}>Thử lại</Button>}>{view.message}</Alert> });
   }
-  if (!itemQuery.data) return shell({ title: "Đang tải mục…", children: <SkeletonDetail rows={6} /> });
+  if (!current) return shell({ title: "Đang tải mục…", children: <SkeletonDetail rows={6} /> });
 
-  const item = itemQuery.data.data;
-  const etag = itemQuery.data.etag;
+  const item = current.data;
+  const etag = current.etag;
   const versions = [...item.versions].sort((a, b) => b.versionNumber - a.versionNumber);
   const draftCount = versions.filter((entry) => entry.status === "Draft").length;
   const publishedId = item.latestPublished?.id ?? null;
@@ -117,7 +120,8 @@ export function ItemDetail({ accessToken, itemId, versionParam, onVersion, onClo
           return <Alert tone="danger" title={view.kind === "notFound" ? "Không tìm thấy phiên bản" : "Không tải được phiên bản"} action={view.kind === "notFound" ? undefined : <Button size="sm" variant="secondary" className="mt-3" onClick={versionQuery.reload}>Thử lại</Button>}>{view.message}</Alert>;
         })()}
         {wantsVersion && !loaded && versionQuery.error === undefined && <SkeletonRows rows={5} label="Đang tải phiên bản…" />}
-        {loaded && loaded.data.itemId === item.id && <VersionEditor key={`${loaded.data.id}:${versionRev}`} accessToken={accessToken} item={item} version={loaded} seed={null} onCreated={(created) => onVersion(created.id)} onChanged={reloadItem} onFork={startNew} onClose={() => onVersion(null)} />}
+        {/* Keyed by ETag: a cached copy shown on reopen is replaced by the server's newer state (e.g. Published). */}
+        {loaded && loaded.data.itemId === item.id && <VersionEditor key={`${loaded.data.id}:${loaded.etag}:${versionRev}`} accessToken={accessToken} item={item} version={loaded} seed={null} onCreated={(created) => onVersion(created.id)} onChanged={reloadItem} onFork={startNew} onClose={() => onVersion(null)} />}
         {loaded && loaded.data.itemId !== item.id && <Alert tone="danger" title="Phiên bản không thuộc mục này">Mở lại từ danh sách phiên bản của mục.</Alert>}
         {reloadNote}
       </div>,

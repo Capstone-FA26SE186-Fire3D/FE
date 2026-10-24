@@ -341,6 +341,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
       ]}
       toolbar={toolbar}
       loading={loading && !data}
+      refreshing={loading && Boolean(data)}
       empty={empty}
       cardBelow={view === "cards" ? 100000 : 640}
       pagination={totalCount > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount, onPageChange: setPage } : undefined}
