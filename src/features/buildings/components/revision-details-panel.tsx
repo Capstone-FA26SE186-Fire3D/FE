@@ -7,11 +7,10 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Select } from "@/components/ui/field";
-import { Panel } from "@/components/ui/panel";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table, TableMessage } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChipTabs } from "@/components/ui/sub-tabs";
 import { buildingsApi } from "../api";
 import { entityLabel, propertyLabel, qualityFlagCodes, qualityFlagLabel, sortFacts } from "../bim-facts";
 import { describeApiError, formatDateTime, shortHash } from "../format";
@@ -43,7 +42,6 @@ function IssuesTab({ issues, onHighlight, onAction }: { issues: IssueState; onHi
   const [currentOnly, setCurrentOnly] = useState(true);
   const all = useMemo(() => issues.data ?? [], [issues.data]);
   const scoped = useMemo(() => (currentOnly ? all.filter((issue) => issue.isCurrentAttempt) : all), [all, currentOnly]);
-  const counts = countBySeverity(scoped);
   const rows = useMemo(
     () => scoped.filter((issue) => severity === "all" || issue.severity === severity).sort((a, b) => severityRank(a.severity) - severityRank(b.severity)),
     [scoped, severity],
@@ -51,10 +49,6 @@ function IssuesTab({ issues, onHighlight, onAction }: { issues: IssueState; onHi
 
   return <div className="ops-stack">
     <div className="ops-toolbar" style={{ marginBottom: 0 }}>
-      {severityOrder.map((level) => {
-        const label = severityLabel(level);
-        return <StatusBadge key={level} tone={label.tone}>{label.label}: {counts[level] ?? 0}</StatusBadge>;
-      })}
       <span className="ops-toolbar-grow" />
       <Select aria-label="Lọc theo mức độ" style={{ width: 190 }} value={severity} onChange={(event) => setSeverity(event.target.value)}>
         <option value="all">Mọi mức độ</option>
@@ -157,7 +151,10 @@ function FactsTab({ accessToken, revisionId, reloadKey }: { accessToken: string;
   </div>;
 }
 
-/** Technical detail of the selected revision: issues (severity filter), processing logs, artifacts, BIM facts. */
+/**
+ * Figma "IFC · Kỹ thuật": one card, third-level navigation as chip tabs (Issue · Nhật ký · Artifact · BIM facts) instead
+ * of a nested tab bar. Issues of the validator, worker logs, artifacts and BIM facts of the selected revision.
+ */
 export function RevisionDetailsPanel({ accessToken, revisionId, issues, reloadKey, onHighlight, onIssueAction, tab, onTabChange }: {
   accessToken: string;
   revisionId: string;
@@ -169,18 +166,23 @@ export function RevisionDetailsPanel({ accessToken, revisionId, issues, reloadKe
   tab: string;
   onTabChange: (tab: string) => void;
 }) {
-  return <Panel id="ifc-details" tabIndex={-1} title="Chi tiết kỹ thuật" description="Issue của validator, nhật ký worker, artifact và dữ liệu BIM của revision đang chọn.">
-    <Tabs value={tab} onValueChange={onTabChange}>
-      <TabsList aria-label="Chi tiết kỹ thuật">
-        <TabsTrigger value="issues">Issue</TabsTrigger>
-        <TabsTrigger value="logs">Nhật ký</TabsTrigger>
-        <TabsTrigger value="artifacts">Artifact</TabsTrigger>
-        <TabsTrigger value="facts">BIM facts</TabsTrigger>
-      </TabsList>
-      <TabsContent value="issues"><IssuesTab issues={issues} onHighlight={onHighlight} onAction={onIssueAction} /></TabsContent>
-      <TabsContent value="logs"><LogsTab accessToken={accessToken} revisionId={revisionId} reloadKey={reloadKey} /></TabsContent>
-      <TabsContent value="artifacts"><ArtifactsTab accessToken={accessToken} revisionId={revisionId} reloadKey={reloadKey} /></TabsContent>
-      <TabsContent value="facts"><FactsTab accessToken={accessToken} revisionId={revisionId} reloadKey={reloadKey} /></TabsContent>
-    </Tabs>
-  </Panel>;
+  const issueCount = issues.data?.filter((issue) => issue.isCurrentAttempt).length;
+  const counts = countBySeverity(issues.data?.filter((issue) => issue.isCurrentAttempt) ?? []);
+  return <section id="ifc-details" tabIndex={-1} className="ops-stack" aria-label="Chi tiết kỹ thuật">
+    <div className="org-row">
+      <ChipTabs label="Chi tiết kỹ thuật" value={tab} onValueChange={onTabChange} items={[
+        { value: "issues", label: "Issue", count: issueCount, "data-testid": "details-tab-issues" },
+        { value: "logs", label: "Nhật ký" },
+        { value: "artifacts", label: "Artifact" },
+        { value: "facts", label: "BIM facts" },
+      ]} />
+      {tab === "issues" && <span className="ops-actions" style={{ gap: 6 }}>{severityOrder.map((level) => { const label = severityLabel(level); return <StatusBadge key={level} tone={counts[level] ? label.tone : "neutral"}>{label.label} {counts[level] ?? 0}</StatusBadge>; })}</span>}
+    </div>
+    <div className="org-card">
+      {tab === "issues" && <IssuesTab issues={issues} onHighlight={onHighlight} onAction={onIssueAction} />}
+      {tab === "logs" && <LogsTab accessToken={accessToken} revisionId={revisionId} reloadKey={reloadKey} />}
+      {tab === "artifacts" && <ArtifactsTab accessToken={accessToken} revisionId={revisionId} reloadKey={reloadKey} />}
+      {tab === "facts" && <FactsTab accessToken={accessToken} revisionId={revisionId} reloadKey={reloadKey} />}
+    </div>
+  </section>;
 }

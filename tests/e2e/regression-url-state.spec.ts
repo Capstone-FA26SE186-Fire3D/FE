@@ -124,7 +124,7 @@ test.describe("tenant switch inside one mounted screen", () => {
     await holdUntil(page, "**/api/buildings?*organizationId=org-b*", beta);
     await holdUntil(page, "**/api/organizations/org-b", beta);
     await pushUrl(page, "/workspace/buildings?org=org-b");
-    await expect(page.getByText("Đang tải danh sách công trình…")).toBeVisible();
+    await expect(page.getByTestId("buildings-table")).toHaveAttribute("data-loading", "true"); // skeleton, no rows of the other tenant
     await expect(page.getByText("Tòa của Alpha")).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Công trình · Tổ chức Alpha", level: 1 })).toHaveCount(0);
     beta.open();
@@ -145,7 +145,9 @@ test.describe("tenant switch inside one mounted screen", () => {
     await page.goto("/workspace/buildings");
     await expect(page.getByText("Tòa trang một")).toBeVisible();
     await pushUrl(page, "/workspace/buildings?page=2");
-    await expect(page.getByRole("button", { name: "Đang tải…" })).toBeVisible();
+    // DataTable v2: the table is marked loading and the pager is disabled while the next page is pending.
+    await expect(page.getByTestId("buildings-table")).toHaveAttribute("data-loading", "true");
+    await expect(page.getByRole("navigation", { name: "Phân trang" }).getByRole("button", { name: "Trang sau" })).toBeDisabled();
     await expect(page.getByText("Tòa trang một")).toBeVisible(); // same tenant: no flash of an empty table
     second.open();
     await expect(page.getByText("Tòa trang hai")).toBeVisible();

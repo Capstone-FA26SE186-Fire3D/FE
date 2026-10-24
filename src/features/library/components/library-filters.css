@@ -1,10 +1,24 @@
-/* Filters inside the Organization library page (search + required capability). Tokens come from ops.css / ops-org.css. */
-.org-lib-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin: 0 0 14px; }
-.org-lib-filters .org-lib-search { position: relative; flex: 1 1 260px; min-width: 0; }
-.org-lib-filters .org-lib-search > svg { position: absolute; left: 12px; bottom: 14px; color: var(--dim); pointer-events: none; }
-.org-lib-filters .org-lib-search .ops-input { padding-left: 36px; }
-.org-lib-filters .org-lib-cap { width: 240px; }
-.org-lib-hint { margin: 0 0 14px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+/* Organization library (Figma 50:1914 / 54:11747): kind sub-tabs + search + capability combobox, card grid. Tokens from ops.css. */
+.org-lib-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin: 0 0 16px; }
+.org-lib-filters { display: flex; flex: 1 1 360px; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0; }
+.org-lib-filters .ops-dt-search { flex: 1 1 240px; background: var(--surface); border-color: var(--line); }
+.org-lib-filters .org-lib-cap { width: auto; min-width: 190px; max-width: 280px; background: var(--surface); border-color: var(--line); }
+.org-lib-hint { margin: -6px 0 14px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.org-lib-note { margin: 20px 0 0; color: var(--dim); font-size: 12.5px; line-height: 1.55; }
+
+/* Cards: icon tile, name + code, capability chips, version line and the detail button */
+.org .org-lib-card { grid-template-rows: auto auto 1fr; gap: 12px; padding: 18px; }
+.org-lib-head { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.org-lib-icon { display: inline-grid; flex: none; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: var(--ember-soft); color: var(--ember); }
+.org-lib-code { color: var(--dim); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+.org-lib-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.org-lib-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 9px; border-radius: 999px; background: var(--hover); color: var(--muted); font-size: 12px; font-weight: 500; max-width: 100%; overflow-wrap: anywhere; }
+.org-lib-chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; }
+.org-lib-chip[data-empty] { color: var(--dim); }
+.org-lib-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; align-self: end; }
+.org-lib-meta { color: var(--dim); font-size: 12.5px; line-height: 1.4; }
+
 @media (max-width: 560px) {
-  .org-lib-filters .org-lib-cap { width: 100%; }
+  .org-lib-filters .org-lib-cap { max-width: none; width: 100%; }
+  .org-lib-foot .ops-actions, .org-lib-foot > button { width: 100%; }
 }

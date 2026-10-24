@@ -1,49 +1,48 @@
 "use client";
 
-import { Archive, Building2, LayoutGrid, List, Pencil, Plus, RefreshCw, Search } from "lucide-react";
+import { Archive, BarChart3, Building2, LayoutGrid, List, PenLine, Pencil, Play, Plus, RefreshCw, Search, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent, type ReactNode } from "react";
 import { useIdempotencyKey } from "@/api/idempotency";
 import { ApiError } from "@/api/types/common";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams, useUrlSearch } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Drawer, Modal } from "@/components/ui/dialog";
+import { Combobox } from "@/components/ui/combobox";
+import { DataTable, CellTitle, TableSearch, ViewToggle, type DataColumn } from "@/components/ui/data-table";
+import { ConfirmDialog, Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Input, Select } from "@/components/ui/field";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { PageHeader, type Crumb } from "@/components/ui/page-header";
-import { SkeletonRows } from "@/components/ui/skeleton";
+import { RetryButton } from "@/components/ui/retry-button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SubmitButton } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
-import { buildingConflict, buildingsApi, sameBuildingVersion } from "../api";
-import { describeApiError, describeBuildingWriteError, formatDate, formatDateTime } from "../format";
 import { organizationsApi } from "@/features/organizations/api";
+import { buildingConflict, buildingsApi, sameBuildingVersion } from "../api";
+import { buildingTypes } from "../data/building-types";
+import { describeApiError, describeBuildingWriteError, formatDateTime } from "../format";
+
+const shortDate = new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
+const formatShortDate = (value: string) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? "—" : shortDate.format(date); };
 import type { Building, BuildingSummary } from "../types";
+import { useBuildingStep, type BuildingStep } from "../use-building-step";
 import { BuildingConflictAlert, BuildingForm, buildingFormToInput, emptyForm, formFromBuilding, validateBuildingForm, type FormState } from "./building-form";
-import { RetryButton } from "@/components/ui/retry-button";
 
 const PAGE_SIZE = 20;
 type StatusFilter = "active" | "archived" | "all";
 
 const statusOptions: Array<{ value: StatusFilter; label: string }> = [
-  { value: "active", label: "Đang hoạt động" },
+  { value: "active", label: "Đang dùng" },
   { value: "archived", label: "Đã lưu trữ" },
   { value: "all", label: "Tất cả" },
 ];
-const orgStatusLabels: Record<StatusFilter, string> = { active: "Trạng thái: đang dùng", archived: "Trạng thái: đã lưu trữ", all: "Trạng thái: tất cả" };
-
-/** Type chips take a stable tone from the type text so the same type always looks the same. */
-const typeTones = ["ember", "warning", "success", "info", "danger"] as const;
-function typeTone(text: string) {
-  let hash = 0;
-  for (const char of text) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return typeTones[hash % typeTones.length];
-}
+const typeOptions = buildingTypes.map((type) => ({ value: type, label: type }));
 
 const loadError = "Không thể tải danh sách công trình. Hãy thử lại sau.";
 
@@ -51,10 +50,39 @@ function statusToFilter(status: StatusFilter) {
   return status === "all" ? undefined : status === "active";
 }
 
+const ACTION_ICONS = { upload: Upload, progress: Play, author: PenLine, open: Building2 } as const;
+
+function detailHref(id: string, step?: BuildingStep["action"]) {
+  if (!step) return `${routes.workspaceBuildings}/${id}`;
+  const query = new URLSearchParams({ tab: step.tab });
+  if (step.sub) query.set("sub", step.sub);
+  if (step.upload) query.set("upload", "1");
+  return `${routes.workspaceBuildings}/${id}?${query}`;
+}
+
+/** "Bước hiện tại" chip: two light reads per row, resolved lazily; the row never waits for them. */
+function StepCell({ accessToken, building, enabled }: { accessToken: string; building: BuildingSummary; enabled: boolean }) {
+  const step = useBuildingStep(accessToken, building.id, enabled);
+  if (!building.isActive) return <StatusBadge tone="neutral">Đã lưu trữ</StatusBadge>;
+  if (!step.data) return step.error !== undefined ? <span className="ops-muted">—</span> : <Skeleton style={{ height: 22, width: 110, borderRadius: 999 }} />;
+  return <StatusBadge tone={step.data.tone} data-testid="building-step">{step.data.label}</StatusBadge>;
+}
+
+/** "Việc tiếp theo" button: the one action that moves this building forward (Figma list column). */
+function NextActionCell({ accessToken, building, enabled }: { accessToken: string; building: BuildingSummary; enabled: boolean }) {
+  const step = useBuildingStep(accessToken, building.id, enabled);
+  if (!building.isActive) return null;
+  const action = step.data?.action ?? (step.error !== undefined ? { label: "Mở công trình", icon: "open" as const, tab: "journey" as const } : null);
+  if (!action) return <Skeleton style={{ height: 36, width: 120 }} />;
+  const Icon = ACTION_ICONS[action.icon];
+  return <Button asChild size="sm" variant="secondary" className="bd-next-action"><Link href={detailHref(building.id, action)} data-row-stop onClick={(event) => event.stopPropagation()}><Icon size={14} aria-hidden="true" />{action.label}</Link></Button>;
+}
+
 /**
- * Building list/create/edit/archive. An OrganizationUser works inside their own tenant (no `organizationId`
- * is ever sent). PlatformAdmin must pick an organization: either through the `organizationId` prop (admin
- * route `/admin/organizations/[id]/buildings`) or the `?org=` picker on `/workspace/buildings`.
+ * Building list (Figma "Danh sách công trình" v2): DataTable with search, status/type chips and a table/cards toggle;
+ * click a row to open it; "Thêm công trình" and "Sửa" are modals; "Lưu trữ" sits in the row menu behind a confirmation
+ * (one-way: BE sets isActive=false and nothing restores it). OrganizationUser works in their own tenant; PlatformAdmin
+ * picks an organization (`organizationId` prop or `?org=`).
  */
 export function BuildingsWorkspace({ organizationId: organizationIdProp }: { organizationId?: string } = {}) {
   const router = useRouter();
@@ -62,11 +90,12 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
   const { accessToken, ready, user } = useAuthSession();
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const status = (["active", "archived", "all"].includes(get("status")) ? get("status") : "active") as StatusFilter;
+  const typeFilter = get("type");
   const view = get("view") === "cards" ? "cards" : "table";
   const urlSearch = get("q");
 
   const [searchText, setSearchText] = useUrlSearch(urlSearch, setParams);
-  const [drawer, setDrawer] = useState<{ mode: "create" } | { mode: "edit"; id: string } | null>(null);
+  const [dialog, setDialog] = useState<{ mode: "create" } | { mode: "edit"; id: string } | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editing, setEditing] = useState<Building | null>(null);
   /** ETag of `editing`; a 412 replaces both with the server's newer version so the next save applies on top of it. */
@@ -107,11 +136,13 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
   );
   const organizationName = organization.data?.name;
 
-  const items = data?.items ?? [];
+  // The type filter is client-side: BE has no type query and the list is one page of ≤20 anyway.
+  const allItems = data?.items ?? [];
+  const items = typeFilter ? allItems.filter((building) => (building.buildingType ?? "").localeCompare(typeFilter, "vi", { sensitivity: "base" }) === 0) : allItems;
   const totalCount = data?.totalCount ?? 0;
-  const filtering = Boolean(urlSearch) || status !== "active";
+  const filtering = Boolean(urlSearch) || status !== "active" || Boolean(typeFilter);
 
-  const openCreate = () => { setForm(emptyForm); setEditing(null); setEditEtag(null); setConflict(null); setFieldErrors({}); setFormError(""); setDrawer({ mode: "create" }); };
+  const openCreate = () => { setForm(emptyForm); setEditing(null); setEditEtag(null); setConflict(null); setFieldErrors({}); setFormError(""); setDialog({ mode: "create" }); };
 
   const openEdit = async (id: string) => {
     if (!accessToken) return;
@@ -123,7 +154,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
       setEditing(building);
       setEditEtag(etag);
       setForm(formFromBuilding(building));
-      setDrawer({ mode: "edit", id });
+      setDialog({ mode: "edit", id });
     } catch {
       toast.notify({ tone: "danger", title: "Không mở được công trình", description: "Hãy tải lại danh sách rồi thử lại." });
     }
@@ -131,7 +162,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!accessToken || !drawer || saving || submitting.current) return;
+    if (!accessToken || !dialog || saving || submitting.current) return;
     const errors = validateBuildingForm(form);
     setFieldErrors(errors);
     if (Object.keys(errors).length) return;
@@ -140,19 +171,18 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
     setSaving(true);
     setFormError("");
     try {
-      if (drawer.mode === "create") {
+      if (dialog.mode === "create") {
         const input = buildingFormToInput(form);
         // Same key while the payload is unchanged, so a retry after a lost response replays the first create instead of a duplicate.
         const created = await buildingsApi.create(accessToken, input, createKey.keyFor({ input, organizationId: scopedOrgId }), scopedOrgId);
         createKey.done();
-        router.push(`${routes.workspaceBuildings}/${created.data.id}`);
+        // Straight to the IFC tab: the next thing to do after creating a building is uploading its model.
+        router.push(`${routes.workspaceBuildings}/${created.data.id}?tab=ifc`);
       } else {
         // No ETag yet (header not readable on the first read): read it now rather than send a PUT the server rejects with 428.
         let etag = editEtag;
         if (!etag) {
-          // The ETag read now belongs to the data read with it: if that data moved on since the drawer opened, show it as a
-          // conflict instead of sending the old fields under the new ETag.
-          const fresh = await buildingsApi.getVersioned(accessToken, drawer.id);
+          const fresh = await buildingsApi.getVersioned(accessToken, dialog.id);
           if (!editing || !sameBuildingVersion(fresh.data, editing)) {
             setEditing(fresh.data);
             setEditEtag(fresh.etag);
@@ -162,8 +192,8 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
           etag = fresh.etag;
         }
         if (!etag) { setFormError("Không đọc được phiên bản công trình (ETag). Hãy tải lại trang rồi thử lại."); return; }
-        await buildingsApi.update(accessToken, drawer.id, buildingFormToInput(form, editing ?? undefined), etag, scopedOrgId);
-        setDrawer(null);
+        await buildingsApi.update(accessToken, dialog.id, buildingFormToInput(form, editing ?? undefined), etag, scopedOrgId);
+        setDialog(null);
         setConflict(null);
         toast.notify({ tone: "success", title: "Đã lưu công trình" });
         reload();
@@ -239,15 +269,12 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
 
   const pageDescription = isAdmin
     ? "Xem và quản lý công trình thay mặt tổ chức. Mọi thao tác đều áp dụng cho tổ chức đã chọn."
-    : "Chọn một công trình để tiếp tục hành trình: IFC, kịch bản, phiên bản, phát hành.";
+    : "Bấm vào một hàng để mở công trình; nút bên phải đưa bạn thẳng tới việc tiếp theo.";
 
   const organizationSelect = orgPicker && <div className="ops-toolbar">
-    <div className="ops-field ops-toolbar-grow">
+    <div className="ops-field ops-toolbar-grow" style={{ maxWidth: 420 }}>
       <label htmlFor="building-org">Tổ chức</label>
-      <Select id="building-org" value={scopedOrgId ?? ""} disabled={organizations.loading && !organizations.data} onChange={(event) => setParams({ org: event.target.value })}>
-        <option value="">Chọn tổ chức…</option>
-        {(organizations.data?.items ?? []).map((item) => <option key={item.id} value={item.id}>{item.name}{item.isActive ? "" : " (đã khóa)"}</option>)}
-      </Select>
+      <Combobox id="building-org" value={scopedOrgId ?? ""} placeholder="Chọn tổ chức…" searchPlaceholder="Tìm tổ chức…" groupLabel="Tổ chức" loading={organizations.loading && !organizations.data} options={(organizations.data?.items ?? []).map((item) => ({ value: item.id, label: item.name, hint: item.isActive ? undefined : "Đã khóa" }))} onChange={(value) => setParams({ org: value })} aria-label="Tổ chức" />
     </div>
   </div>;
 
@@ -260,109 +287,98 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
     </>;
   }
 
-  const rowActions = (building: BuildingSummary) => <span className="ops-actions" style={{ justifyContent: "flex-end" }}>
-    <Button asChild size="sm" variant="secondary"><Link href={`${routes.workspaceBuildings}/${building.id}`} aria-describedby={`building-name-${building.id}`}>Mở</Link></Button>
-    <Button size="sm" variant="quiet" onClick={() => void openEdit(building.id)} aria-label={`Chỉnh sửa ${building.name}`}><Pencil size={14} aria-hidden="true" />Sửa</Button>
-    {building.isActive && <Button size="sm" variant="quiet" onClick={() => openArchive(building)} aria-label={`Lưu trữ ${building.name}`}><Archive size={14} aria-hidden="true" />Lưu trữ</Button>}
-  </span>;
-
-  const statusBadge = (building: BuildingSummary) => <StatusBadge tone={building.isActive ? "success" : "neutral"}>{building.isActive ? (isAdmin ? "Hoạt động" : "Đang dùng") : "Đã lưu trữ"}</StatusBadge>;
-
   const createLabel = isAdmin ? "Tạo công trình" : "Thêm công trình";
-  return <div className={isAdmin ? undefined : "org"}>
+  const token = accessToken ?? "";
+  const stepsEnabled = Boolean(accessToken) && !isAdmin;
+
+  const columns: DataColumn<BuildingSummary>[] = [
+    { key: "name", header: "Công trình", primary: true, width: "34%", render: (building) => <CellTitle title={<span id={`building-name-${building.id}`}>{building.name}</span>} sub={building.buildingType ? undefined : "Chưa phân loại"} /> },
+    { key: "type", header: "Loại", width: 130, render: (building) => building.buildingType || <span className="ops-muted">—</span> },
+    { key: "floors", header: "Tầng", width: 70, align: "center", hideBelow: 900, render: (building) => building.totalFloors },
+    ...(isAdmin
+      ? [{ key: "status", header: "Trạng thái", width: 150, render: (building: BuildingSummary) => <StatusBadge tone={building.isActive ? "success" : "neutral"}>{building.isActive ? "Hoạt động" : "Đã lưu trữ"}</StatusBadge> }]
+      : [{ key: "step", header: "Bước hiện tại", width: 190, render: (building: BuildingSummary) => <StepCell accessToken={token} building={building} enabled={stepsEnabled} /> }]),
+    { key: "updated", header: "Cập nhật", width: 120, hideBelow: 1100, render: (building) => formatShortDate(building.updatedAt) },
+    ...(isAdmin ? [] : [{ key: "next", header: "Việc tiếp theo", width: 170, cardHidden: true, render: (building: BuildingSummary) => <NextActionCell accessToken={token} building={building} enabled={stepsEnabled} /> }]),
+  ];
+
+  const empty: ReactNode = filtering
+    ? <EmptyState icon={Search} title="Chưa có công trình phù hợp." description="Thử đổi từ khóa hoặc bộ lọc." />
+    : <EmptyState icon={Building2} title="Tạo công trình đầu tiên" description="Thêm công trình, tải lên mô hình IFC rồi xây dựng kịch bản sơ tán cho đúng không gian thật." action={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />{createLabel}</Button>} />;
+
+  const toolbar = <>
+    <TableSearch value={searchText} onChange={setSearchText} placeholder="Tìm theo tên công trình" label="Tìm công trình" />
+    <FilterChip label="Trạng thái" value={status === "active" ? "" : status} options={statusOptions.filter((option) => option.value !== "active")} allLabel="Đang dùng" onChange={(value) => setParams({ status: value })} />
+    <FilterChip label="Loại" value={typeFilter} options={typeOptions} onChange={(value) => setParams({ type: value })} />
+    {isAdmin && <Button variant="quiet" size="sm" onClick={reload} disabled={loading}><RefreshCw size={14} aria-hidden="true" />Tải lại</Button>}
+    <ViewToggle value={view} onChange={(value) => setParams({ view: value === "table" ? "" : value })} options={[{ value: "table", label: "Dạng bảng", icon: <List size={16} aria-hidden="true" /> }, { value: "cards", label: "Dạng thẻ", icon: <LayoutGrid size={16} aria-hidden="true" /> }]} />
+  </>;
+
+  return <div className={isAdmin ? undefined : "org"} data-tour="buildings-list">
     <PageHeader
-      eyebrow={isAdmin ? undefined : "Công trình"}
+      eyebrow={isAdmin ? undefined : "Huấn luyện"}
       title={isAdmin && organizationName ? `Công trình · ${organizationName}` : isAdmin ? "Công trình" : "Công trình của tổ chức"}
       description={pageDescription}
       breadcrumbs={crumbs}
-      actions={isAdmin
-        ? <><Button variant="quiet" onClick={reload} disabled={loading}><RefreshCw size={16} aria-hidden="true" />{loading ? "Đang tải…" : "Tải lại"}</Button><Button onClick={openCreate}><Plus size={16} aria-hidden="true" />{createLabel}</Button></>
-        : <><Button variant="secondary" onClick={openCreate}>Nhập từ IFC</Button><Button onClick={openCreate}>{createLabel}</Button></>}
+      actions={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />{createLabel}</Button>}
     />
 
     {organizationSelect}
     {organization.error !== undefined && <Alert tone="danger" title="Không đọc được tổ chức">Tổ chức không tồn tại hoặc bạn không có quyền xem. Hãy chọn lại từ danh sách tổ chức.</Alert>}
-
-    <div className={isAdmin ? "ops-toolbar" : "org-filters"}>
-      <div className={isAdmin ? "ops-field ops-toolbar-grow" : "org-search"} style={isAdmin ? { position: "relative" } : undefined}>
-        <label htmlFor="building-search" className="sr-only" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Tìm công trình</label>
-        <Search size={16} aria-hidden="true" style={isAdmin ? { position: "absolute", left: 12, top: 13, color: "var(--dim)" } : undefined} />
-        <Input id="building-search" style={isAdmin ? { paddingLeft: 36 } : undefined} placeholder={isAdmin ? "Tìm công trình" : "Tìm theo tên công trình"} value={searchText} onChange={(event) => setSearchText(event.target.value)} />
-      </div>
-      <Select aria-label="Trạng thái" style={isAdmin ? { width: 180 } : undefined} value={status} onChange={(event) => setParams({ status: event.target.value === "active" ? "" : event.target.value })}>
-        {statusOptions.map((option) => <option key={option.value} value={option.value}>{isAdmin ? option.label : orgStatusLabels[option.value]}</option>)}
-      </Select>
-      {!isAdmin && <Button variant="quiet" onClick={reload} disabled={loading}><RefreshCw size={16} aria-hidden="true" />{loading ? "Đang tải…" : "Tải lại"}</Button>}
-      <div className="ops-segmented" role="group" aria-label="Kiểu hiển thị">
-        <button type="button" aria-pressed={view === "table"} aria-label="Dạng bảng" title="Dạng bảng" onClick={() => setParams({ view: "" })}><List size={16} aria-hidden="true" /></button>
-        <button type="button" aria-pressed={view === "cards"} aria-label="Dạng thẻ" title="Dạng thẻ" onClick={() => setParams({ view: "cards" })}><LayoutGrid size={16} aria-hidden="true" /></button>
-      </div>
-    </div>
-
     {error !== undefined && <Alert tone="danger" title="Không tải được danh sách" action={<RetryButton error={error} onRetry={reload} />}>{describeApiError(error, loadError)}</Alert>}
 
-    {view === "table"
-      ? <div className={isAdmin ? undefined : "org-list"}><Table caption="Danh sách công trình">
-        <thead><tr><th>Công trình</th><th>{isAdmin ? "Loại" : "Loại công trình"}</th><th>Số tầng</th><th>Trạng thái</th><th>Cập nhật</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
-        <tbody>
-          {loading && !data && <TableMessage colSpan={6}><SkeletonRows rows={5} label="Đang tải danh sách công trình…" /></TableMessage>}
-          {items.map((building) => <tr key={building.id}>
-            <td><Link id={`building-name-${building.id}`} className="ops-cell-primary" href={`${routes.workspaceBuildings}/${building.id}`}>{building.name}</Link></td>
-            <td>{isAdmin || !building.buildingType ? (building.buildingType || "Chưa phân loại") : <StatusBadge tone={typeTone(building.buildingType)}>{building.buildingType}</StatusBadge>}</td>
-            <td>{isAdmin ? building.totalFloors : <StatusBadge>{building.totalFloors} tầng</StatusBadge>}</td>
-            <td>{statusBadge(building)}</td>
-            <td>{formatDate(building.updatedAt)}</td>
-            <td className="ops-cell-actions">{rowActions(building)}</td>
-          </tr>)}
-          {data && !items.length && <TableMessage colSpan={6}>{filtering
-            ? <EmptyState icon={Search} title="Chưa có công trình phù hợp." description="Thử đổi từ khóa hoặc bộ lọc trạng thái." />
-            : <EmptyState icon={Building2} title="Tạo công trình đầu tiên" description="Thêm công trình, tải lên mô hình IFC rồi xây dựng kịch bản sơ tán cho đúng không gian thật." action={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />{createLabel}</Button>} />}</TableMessage>}
-        </tbody>
-      </Table>
-      {!isAdmin && data && items.length > 0 && <p className="org-list-note">Danh sách chỉ gồm tên, loại, số tầng và trạng thái dùng; hành trình chi tiết tải khi mở từng công trình. Hiển thị {items.length} trên {totalCount}.</p>}
-      </div>
-      : <>
-        {loading && !data && <SkeletonRows rows={4} label="Đang tải danh sách công trình…" />}
-        {data && !items.length && (filtering
-          ? <EmptyState icon={Search} title="Chưa có công trình phù hợp." description="Thử đổi từ khóa hoặc bộ lọc trạng thái." />
-          : <EmptyState icon={Building2} title="Tạo công trình đầu tiên" description="Thêm công trình, tải lên mô hình IFC rồi xây dựng kịch bản sơ tán cho đúng không gian thật." action={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />{createLabel}</Button>} />)}
-        <div className="ops-card-grid">
-          {items.map((building) => <article key={building.id} className="ops-item-card">
-            <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}><h3><Link id={`building-name-${building.id}`} href={`${routes.workspaceBuildings}/${building.id}`}>{building.name}</Link></h3>{statusBadge(building)}</div>
-            <dl><dt>Loại</dt><dd>{building.buildingType || "Chưa phân loại"}</dd><dt>Số tầng</dt><dd>{building.totalFloors}</dd></dl>
-            {rowActions(building)}
-          </article>)}
-        </div>
-      </>}
-
-    {totalCount > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={totalCount} onPageChange={setPage} disabled={loading} />}
-
-    <Drawer
-      open={drawer !== null}
-      onOpenChange={(open) => { if (!open && !saving) setDrawer(null); }}
-      title={drawer?.mode === "edit" ? "Chỉnh sửa công trình" : "Tạo công trình"}
-      description={drawer?.mode === "edit" ? "Các thông tin không hiển thị ở đây (tọa độ, liên hệ) được giữ nguyên." : "Sau khi tạo, bạn sẽ chuyển tới trang công trình để tải lên mô hình IFC."}
-    >
-      <form onSubmit={submit} noValidate className="ops-stack">
-        {conflict && <BuildingConflictAlert current={conflict} onUseLatest={() => { setForm(formFromBuilding(conflict)); setConflict(null); }} />}
-        <BuildingForm form={form} errors={fieldErrors} onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} />
-        {formError && <Alert tone="danger">{formError}</Alert>}
-        <div className="ops-actions" style={{ justifyContent: "flex-end" }}>
-          <Button type="button" variant="quiet" onClick={() => setDrawer(null)} disabled={saving}>Hủy</Button>
-          <Button type="submit" disabled={saving}>{saving ? "Đang lưu…" : drawer?.mode === "edit" ? "Lưu thay đổi" : "Tạo và thêm IFC"}</Button>
-        </div>
-      </form>
-    </Drawer>
+    <DataTable<BuildingSummary>
+      data-testid="buildings-table"
+      caption="Danh sách công trình"
+      columns={columns}
+      rows={items}
+      rowKey={(building) => building.id}
+      rowHref={(building) => detailHref(building.id)}
+      rowTone={(building) => (building.isActive ? undefined : "muted")}
+      rowMenu={(building) => [
+        { label: "Sửa thông tin", icon: Pencil, onSelect: () => void openEdit(building.id) },
+        ...(building.isActive ? [{ label: "Lưu trữ", icon: Archive, tone: "danger" as const, separator: true, hint: "Không thể hoàn tác", onSelect: () => openArchive(building) }] : []),
+      ]}
+      toolbar={toolbar}
+      loading={loading && !data}
+      refreshing={loading && Boolean(data)}
+      empty={empty}
+      cardBelow={view === "cards" ? 100000 : 640}
+      pagination={totalCount > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount, onPageChange: setPage } : undefined}
+    />
+    {!isAdmin && data && items.length > 0 && <p className="org-list-note">Hiển thị {items.length} trên {typeFilter ? allItems.length : totalCount} · Lưu trữ nằm trong menu “···” của từng hàng và không thể hoàn tác.</p>}
+    {!isAdmin && data && items.length > 0 && <p className="ops-sr-only"><Link href={routes.workspaceAnalytics}><BarChart3 size={14} aria-hidden="true" />Xem báo cáo</Link></p>}
 
     <Modal
+      open={dialog !== null}
+      onOpenChange={(open) => { if (!open && !saving) setDialog(null); }}
+      size="md"
+      title={dialog?.mode === "edit" ? "Sửa thông tin công trình" : "Tạo công trình"}
+      description={dialog?.mode === "edit" ? "Tọa độ và liên hệ không hiển thị ở đây được giữ nguyên." : "Sau khi tạo, bạn sẽ vào tab IFC để tải mô hình."}
+      footer={<>
+        <Button type="button" variant="ghost" onClick={() => setDialog(null)} disabled={saving}>Hủy</Button>
+        <SubmitButton type="submit" form="building-form" state={saving ? "busy" : "idle"}>{dialog?.mode === "edit" ? "Lưu thay đổi" : "Tạo công trình"}</SubmitButton>
+      </>}
+    >
+      <form id="building-form" onSubmit={submit} noValidate className="ops-stack">
+        {conflict && <BuildingConflictAlert current={conflict} onUseLatest={() => { setForm(formFromBuilding(conflict)); setConflict(null); }} />}
+        <BuildingForm form={form} errors={fieldErrors} autoFocus onChange={(patch) => setForm((current) => ({ ...current, ...patch }))} />
+        {formError && <Alert tone="danger">{formError}</Alert>}
+      </form>
+    </Modal>
+
+    <ConfirmDialog
       open={archiving !== null}
-      onOpenChange={(open) => { if (!open && !archiveBusy) setArchiving(null); }}
+      onOpenChange={(open) => { if (!open) setArchiving(null); }}
+      tone="danger"
       title="Lưu trữ công trình?"
-      description={archiving ? `“${archiving.name}” sẽ chuyển sang trạng thái đã lưu trữ. Dữ liệu IFC và kịch bản không bị xóa.` : undefined}
-      footer={<><Button variant="quiet" onClick={() => setArchiving(null)} disabled={archiveBusy}>Hủy</Button><Button variant="danger" onClick={() => void confirmArchive()} disabled={archiveBusy}>{archiveBusy ? "Đang lưu trữ…" : "Lưu trữ"}</Button></>}
+      description={archiving ? `“${archiving.name}” sẽ rời khỏi danh sách đang dùng. Không thể hoàn tác: BE không có thao tác khôi phục. Dữ liệu IFC và kịch bản không bị xóa.` : undefined}
+      confirmLabel="Lưu trữ"
+      busy={archiveBusy}
+      onConfirm={confirmArchive}
     >
       {archiveNotice && <Alert tone="warning" title="Công trình đã thay đổi">{archiveNotice}</Alert>}
-      <p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>Công trình đã lưu trữ không xuất hiện trong danh sách mặc định; bạn có thể xem lại bằng bộ lọc “Đã lưu trữ”.</p>
-    </Modal>
+      <p className="ops-muted">Công trình đã lưu trữ vẫn xem được bằng bộ lọc “Đã lưu trữ”.</p>
+    </ConfirmDialog>
   </div>;
 }

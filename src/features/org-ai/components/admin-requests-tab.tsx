@@ -1,23 +1,25 @@
 "use client";
 
-import { Inbox, RefreshCw, Search } from "lucide-react";
+import { Eye, Inbox, RefreshCw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { ApiError } from "@/api/types/common";
 import { useIdempotencyKey } from "@/api/idempotency";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
+import { ChartCard } from "@/components/charts/chart-card";
+import { Donut } from "@/components/charts/lazy";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
+import { CellTitle, DataTable, type DataColumn } from "@/components/ui/data-table";
 import { Drawer, Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Select } from "@/components/ui/field";
-import { SkeletonRows } from "@/components/ui/skeleton";
+import { FilterChip, FilterChips } from "@/components/ui/filter-chip";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { accountsApi } from "@/features/accounts/api";
-import { formatDateTime, formatQuota } from "@/features/billing/format";
+import { formatDateTime, formatNumber, formatQuota } from "@/features/billing/format";
 
 import { adminAiApi } from "../api";
 import { aiErrorText, audienceLabel, failureText, operationLabel, statusLabel, statusTone } from "../labels";
@@ -26,6 +28,9 @@ import styles from "../org-ai.module.css";
 import { RequestPanel } from "./request-panel";
 
 const PAGE_SIZE = 20;
+
+/** Request counts by status from the platform training report (`aiUsage.requests`, last 30 days). */
+export type RequestUsage = { data: Record<string, number> | null; loading: boolean; failed: boolean };
 
 /** Admin-only part of one request: tenant, attempts, provider payload and the reconcile command. */
 function AdminDetail({ accessToken, request, refresh, orgName }: { accessToken: string; request: AiRequest; refresh: () => void; orgName: (id: string | undefined) => string }) {
@@ -60,8 +65,8 @@ function AdminDetail({ accessToken, request, refresh, orgName }: { accessToken: 
   return <div className={styles.stack}>
     <section className={styles.section} aria-label="Thông tin quản trị">
       <h3>Thông tin quản trị</h3>
-      <dl className={styles.meta} data-testid="ai-admin-meta">
-        <dt>Tổ chức</dt><dd>{orgName(request.organizationId)}</dd>
+      <dl className="ops-kv" data-testid="ai-admin-meta">
+        <dt>Tổ chức</dt><dd>{request.audience === "trainee" ? "Trainee (không thuộc quota tổ chức)" : orgName(request.organizationId)}</dd>
         <dt>Người gửi</dt><dd className={styles.mono}>{request.actorUserId ?? "—"}</dd>
         <dt>Chính sách</dt><dd className={styles.mono}>{request.policyId ?? "—"}</dd>
         <dt>Số lần gửi</dt><dd>{request.attempts ?? "—"}</dd>
@@ -78,12 +83,12 @@ function AdminDetail({ accessToken, request, refresh, orgName }: { accessToken: 
     {request.status === "NeedsReconcile" && <section className={styles.section} aria-label="Đối soát">
       <h3>Đối soát</h3>
       <p className={styles.muted}>Đối soát chỉ lên lịch cho worker tra cứu yêu cầu này ở nhà cung cấp theo mã ổn định. Nó không sửa số đã dùng và không hoàn quota thủ công: có kết quả hợp lệ thì chốt theo kết quả, nhà cung cấp báo chưa nhận thì giải phóng giữ chỗ, còn lại giữ nguyên Chờ đối soát.</p>
-      {reconcileAt && <Alert tone="info" title="Đã lên lịch tra cứu" >Yêu cầu đối soát lúc {formatDateTime(reconcileAt)}. Trạng thái bên trên tự cập nhật; 202 chưa phải là đã chốt.</Alert>}
+      {reconcileAt && <Alert tone="info" title="Đã lên lịch tra cứu">Yêu cầu đối soát lúc {formatDateTime(reconcileAt)}. Trạng thái bên trên tự cập nhật; 202 chưa phải là đã chốt.</Alert>}
       {error !== undefined && <Alert tone="danger" title="Chưa lên lịch được đối soát" action={<Button size="sm" variant="secondary" className="mt-3" onClick={() => void run()} disabled={busy}>Thử lại (cùng khóa)</Button>}>{aiErrorText(error)}{error instanceof ApiError && error.code === "AI_RECONCILE_NOT_ALLOWED" ? "" : " Nội dung thử lại dùng cùng khóa chống trùng."}</Alert>}
       <div><Button type="button" onClick={() => setConfirm(true)} disabled={!canReconcile || busy} data-testid="ai-reconcile"><RefreshCw size={16} aria-hidden="true" />Đối soát yêu cầu này</Button></div>
     </section>}
 
-    <Modal open={confirm} onOpenChange={(open) => { if (!open && !busy) setConfirm(false); }} title="Đối soát yêu cầu AI?"
+    <Modal open={confirm} onOpenChange={(open) => { if (!open && !busy) setConfirm(false); }} size="sm" title="Đối soát yêu cầu AI?"
       description="Chỉ lên lịch tra cứu ở nhà cung cấp; không tự thay đổi quota hay kết quả."
       footer={<><Button type="button" variant="quiet" onClick={() => setConfirm(false)} disabled={busy}>Hủy</Button><Button type="button" onClick={() => void run()} disabled={busy} data-testid="ai-reconcile-confirm">{busy ? "Đang gửi…" : "Xác nhận đối soát"}</Button></>}>
       <p className={styles.muted}>Yêu cầu <span className={styles.mono}>{request.requestId}</span> đang giữ chỗ quota của {orgName(request.organizationId)}. Gửi lệnh đối soát?</p>
@@ -92,7 +97,35 @@ function AdminDetail({ accessToken, request, refresh, orgName }: { accessToken: 
   </div>;
 }
 
-export function AdminRequestsTab({ accessToken }: { accessToken: string }) {
+/**
+ * Donut "Yêu cầu theo trạng thái" from the platform training report (`aiUsage.requests`): counts the BE already computes
+ * for the last 30 days, never derived from the current page. Shown under the table (Figma places it beside it on 1440).
+ */
+function StatusDonut({ usage }: { usage: RequestUsage }) {
+  const slices = useMemo(() => {
+    const counts = usage.data ?? {};
+    const known = AI_STATUSES.map((status) => ({ key: status, label: statusLabel(status), value: counts[status] ?? 0, color: toneColor(status) }));
+    const extra = Object.entries(counts).filter(([status]) => !(AI_STATUSES as readonly string[]).includes(status)).map(([status, value]) => ({ key: status, label: statusLabel(status), value, color: "var(--dim)" }));
+    return [...known, ...extra];
+  }, [usage.data]);
+  const total = slices.reduce((sum, slice) => sum + slice.value, 0);
+  return <ChartCard title="Yêu cầu theo trạng thái" description="30 ngày gần nhất · từ báo cáo sử dụng AI của máy chủ" height={170} loading={usage.loading} empty={!usage.loading && (usage.failed || !usage.data || total === 0)} emptyText={usage.failed ? "Chưa đọc được báo cáo sử dụng AI" : "Chưa có yêu cầu AI trong 30 ngày"} data-testid="ai-status-chart"
+    table={<table className="ops-table"><caption className="ops-sr-only">Yêu cầu theo trạng thái</caption><thead><tr><th>Trạng thái</th><th>Số yêu cầu</th></tr></thead><tbody>{slices.map((slice) => <tr key={slice.key}><td>{slice.label}</td><td>{formatNumber(slice.value)}</td></tr>)}</tbody></table>}>
+    <Donut slices={slices} center={{ value: formatNumber(total), caption: "yêu cầu" }} />
+  </ChartCard>;
+}
+
+function toneColor(status: string) {
+  switch (status) {
+    case "Succeeded": return "var(--success)";
+    case "Failed": case "Rejected": return "var(--danger)";
+    case "NeedsReconcile": return "var(--warning)";
+    default: return "var(--info)";
+  }
+}
+
+/** Requests of every organization (`GET /api/admin/ai/requests`); filters and page live in the URL; a row opens the drawer. */
+export function AdminRequestsTab({ accessToken, usage }: { accessToken: string; usage: RequestUsage }) {
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const status = urlFilter(get("status"), AI_STATUSES);
   const operation = urlFilter(get("operation"), ADMIN_AI_OPERATIONS);
@@ -110,48 +143,50 @@ export function AdminRequestsTab({ accessToken }: { accessToken: string }) {
   const items = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
   const filtering = Boolean(status || operation || audience || organizationId);
+  const open = (id: string) => setParams({ request: id });
 
-  return <>
-    <div className="ops-toolbar">
-      <Select aria-label="Trạng thái" style={{ width: 220 }} value={status} onChange={(event) => setParams({ status: event.target.value })}>
-        <option value="">Mọi trạng thái</option>{AI_STATUSES.map((value) => <option key={value} value={value}>{statusLabel(value)}</option>)}
-      </Select>
-      <Select aria-label="Loại yêu cầu" style={{ width: 200 }} value={operation} onChange={(event) => setParams({ operation: event.target.value })}>
-        <option value="">Mọi loại</option>{ADMIN_AI_OPERATIONS.map((value) => <option key={value} value={value}>{operationLabel(value)}</option>)}
-      </Select>
-      <Select aria-label="Đối tượng" style={{ width: 170 }} value={audience} onChange={(event) => setParams({ audience: event.target.value })}>
-        <option value="">Mọi đối tượng</option>{AI_AUDIENCES.map((value) => <option key={value} value={value}>{audienceLabel(value)}</option>)}
-      </Select>
-      <Select aria-label="Tổ chức" style={{ width: 240 }} value={organizationId} onChange={(event) => setParams({ organizationId: event.target.value })}>
-        <option value="">Mọi tổ chức</option>
-        {(organizations.data?.items ?? []).map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
-      </Select>
-      {filtering && <Button variant="quiet" onClick={() => setParams({ status: null, operation: null, audience: null, organizationId: null })}>Xóa bộ lọc</Button>}
-      <Button variant="quiet" onClick={list.reload} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
-    </div>
-    {list.error !== undefined && <Alert tone="danger" title="Không tải được yêu cầu AI" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{aiErrorText(list.error)}</Alert>}
-    <Table caption="Yêu cầu AI toàn hệ thống" data-testid="admin-ai-requests">
-      <thead><tr><th>Yêu cầu</th><th>Tổ chức</th><th>Trạng thái</th><th>Sử dụng</th><th>Tạo lúc</th></tr></thead>
-      <tbody>
-        {list.loading && !list.data && <TableMessage colSpan={5}><SkeletonRows rows={6} label="Đang tải yêu cầu AI…" /></TableMessage>}
-        {items.map((item) => <tr key={item.requestId} data-testid="admin-ai-row">
-          <td>
-            <button type="button" className={styles.rowButton} onClick={() => setParams({ request: item.requestId })} aria-label={`Mở yêu cầu ${operationLabel(item.operation)} ${item.requestId.slice(0, 8)}`}>{operationLabel(item.operation)}</button>
-            <span className="ops-cell-sub"><span className={styles.mono}>{item.requestId.slice(0, 8)}…</span></span>
-          </td>
-          <td>{item.audience === "trainee" ? <>Trainee<span className="ops-cell-sub">không thuộc quota tổ chức</span></> : orgName(item.organizationId)}</td>
-          <td><StatusBadge tone={statusTone(item.status, item.resultType)}>{statusLabel(item.status, item.resultType)}</StatusBadge>{item.reconcileRequestedAt && <span className="ops-cell-sub">Đã yêu cầu đối soát</span>}</td>
-          <td>{item.consumedUnits !== undefined ? formatQuota(item.consumedUnits, item.quotaUnit) : item.reservedUnits !== undefined ? `Giữ chỗ ${formatQuota(item.reservedUnits, item.quotaUnit)}` : "—"}</td>
-          <td>{formatDateTime(item.createdAt)}</td>
-        </tr>)}
-        {list.data && !items.length && <TableMessage colSpan={5}><EmptyState icon={filtering ? Search : Inbox} title={filtering ? "Không có yêu cầu phù hợp." : "Chưa có yêu cầu AI nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Yêu cầu của các tổ chức sẽ xuất hiện ở đây."} /></TableMessage>}
-      </tbody>
-    </Table>
-    {total > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
+  const columns: DataColumn<AiRequest>[] = [
+    { key: "request", header: "Yêu cầu", primary: true, render: (item) => <CellTitle title={`${operationLabel(item.operation)} · ${formatDateTime(item.createdAt)}`} sub={<span className={styles.mono}>{item.requestId.slice(0, 8)}…</span>} /> },
+    { key: "organization", header: "Tổ chức", width: 200, render: (item) => item.audience === "trainee" ? <CellTitle title="Trainee" sub="không thuộc quota tổ chức" /> : orgName(item.organizationId) },
+    { key: "status", header: "Trạng thái", width: 190, render: (item) => <CellTitle title={<StatusBadge tone={statusTone(item.status, item.resultType)}>{statusLabel(item.status, item.resultType)}</StatusBadge>} sub={item.reconcileRequestedAt ? "Đã yêu cầu đối soát" : undefined} /> },
+    { key: "usage", header: "Sử dụng", width: 150, hideBelow: 900, render: (item) => (item.consumedUnits !== undefined ? formatQuota(item.consumedUnits, item.quotaUnit) : item.reservedUnits !== undefined ? `Giữ chỗ ${formatQuota(item.reservedUnits, item.quotaUnit)}` : "—") },
+  ];
 
-    <Drawer open={requestId !== ""} onOpenChange={(open) => { if (!open) { setParams({ request: null }); list.reload(); } }} title="Chi tiết yêu cầu AI" description="Số liệu và nội dung do máy chủ trả; tự cập nhật khi còn đang xử lý hoặc đã lên lịch đối soát." className={styles.wideDrawer}>
+  return <div className={styles.stack}>
+    <DataTable<AiRequest>
+      caption="Yêu cầu AI toàn hệ thống"
+      data-testid="ai-requests-table"
+      columns={columns}
+      rows={items}
+      rowKey={(item) => item.requestId}
+      loading={list.loading && !list.data}
+      onRowClick={(item) => open(item.requestId)}
+      rowTone={(item) => (item.status === "NeedsReconcile" ? "warning" : undefined)}
+      rowMenu={(item) => [
+        { label: "Xem chi tiết", icon: Eye, onSelect: () => open(item.requestId) },
+        ...(item.status === "NeedsReconcile" ? [{ label: "Đối soát yêu cầu", icon: RefreshCw, onSelect: () => open(item.requestId), hint: "Xác nhận trong chi tiết", separator: true }] : []),
+      ]}
+      error={list.error !== undefined ? <Alert tone="danger" title="Không tải được yêu cầu AI" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{aiErrorText(list.error)}</Alert> : undefined}
+      toolbar={<>
+        <FilterChips label="Bộ lọc yêu cầu AI">
+          <FilterChip label="Trạng thái" value={status} onChange={(value) => setParams({ status: value })} options={AI_STATUSES.map((value) => ({ value, label: statusLabel(value) }))} />
+          <FilterChip label="Thao tác" value={operation} onChange={(value) => setParams({ operation: value })} options={ADMIN_AI_OPERATIONS.map((value) => ({ value, label: operationLabel(value) }))} />
+          <FilterChip label="Đối tượng" value={audience} onChange={(value) => setParams({ audience: value })} options={AI_AUDIENCES.map((value) => ({ value, label: audienceLabel(value) }))} />
+        </FilterChips>
+        <Combobox aria-label="Tổ chức" value={organizationId} onChange={(value) => setParams({ organizationId: value })} options={(organizations.data?.items ?? []).map((item) => ({ value: item.id, label: item.name }))} placeholder="Tổ chức: tất cả" searchPlaceholder="Tìm tổ chức" groupLabel="Tổ chức" loading={organizations.loading && !organizations.data} clearable className={styles.toolbarPick} />
+        {filtering && <Button variant="quiet" onClick={() => setParams({ status: null, operation: null, audience: null, organizationId: null })}>Xóa bộ lọc</Button>}
+        <Button variant="quiet" onClick={list.reload} disabled={list.loading} aria-label="Tải lại danh sách"><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
+      </>}
+      empty={<EmptyState icon={filtering ? Search : Inbox} title={filtering ? "Không có yêu cầu phù hợp." : "Chưa có yêu cầu AI nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Yêu cầu của các tổ chức sẽ xuất hiện ở đây."} />}
+      pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
+    />
+    <p className={styles.hint}>Bấm hàng để mở chi tiết và đối soát.</p>
+
+    <div className={styles.chartRow}><StatusDonut usage={usage} /></div>
+
+    <Drawer open={requestId !== ""} onOpenChange={(open) => { if (!open) { setParams({ request: null }); list.reload(); } }} size="md" data-testid="ai-request-drawer" title="Chi tiết yêu cầu AI" description="Số liệu và nội dung do máy chủ trả; tự cập nhật khi còn đang xử lý hoặc đã lên lịch đối soát.">
       {requestId && <RequestPanel key={requestId} admin accessToken={accessToken} requestId={requestId}
         renderExtra={(request, refresh) => <AdminDetail accessToken={accessToken} request={request} refresh={refresh} orgName={orgName} />} />}
     </Drawer>
-  </>;
+  </div>;
 }

@@ -18,8 +18,24 @@ type Code = { id: string; buildingId: string; label: string | null; status: "Act
 type Logged = { method: string; path: string; headers: Record<string, string>; body: unknown };
 
 async function signIn(page: Page, user: typeof owner | typeof trainee = owner) {
-  await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" })));
+  await page.addInitScript(() => {
+    sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" }));
+    localStorage.setItem("fire3d-org-tour", "done"); // the spotlight tour must never cover the page under test
+  });
   await page.route("**/api/auth/me", (route) => route.fulfill({ json: user }));
+}
+
+/** Detail v2: the QR panel is the "Mã QR" sub-tab of "Truy cập" (`?tab=qr` still aliases to it); its history is a drawer. */
+const qrSubTab = (page: Page) => page.getByTestId("access-sub-qr");
+async function openHistory(page: Page) {
+  await page.getByTestId("qr-history-open").click();
+  const drawer = page.getByRole("dialog", { name: "Lịch sử mã QR" });
+  await expect(drawer).toBeVisible();
+  return drawer.getByRole("table", { name: "Lịch sử mã QR của công trình" });
+}
+async function closeHistory(page: Page) {
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog", { name: "Lịch sử mã QR" })).toHaveCount(0);
 }
 
 async function useTheme(page: Page, theme: "light" | "dark") {
@@ -173,7 +189,8 @@ test.describe("Building QR management tab", () => {
     await world.install(page);
     await page.goto("/workspace/buildings/building-1?tab=qr");
 
-    await expect(page.getByRole("tab", { name: "QR", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId("building-tab-access")).toHaveAttribute("aria-selected", "true");
+    await expect(qrSubTab(page)).toHaveAttribute("aria-selected", "true");
     await expect(page.getByText("Công trình chưa có mã QR đang hoạt động")).toBeVisible();
     await expect(page.getByTestId("qr-issued")).toHaveCount(0);
 
@@ -200,17 +217,20 @@ test.describe("Building QR management tab", () => {
     expect(await storageHolds(page, token)).toBe(false);
     expect(page.url()).not.toContain(token);
 
-    // Switching tabs keeps it (the tab stays mounted); it is just hidden.
-    await page.getByRole("tab", { name: "Hành trình" }).click();
+    // Switching tabs keeps it (the panel stays mounted); it is just hidden. The header button returns to the QR sub-tab.
+    await page.getByTestId("building-tab-journey").click();
     await expect(page.getByTestId("qr-issued")).toBeHidden();
-    await page.getByRole("tab", { name: "QR", exact: true }).click();
+    await page.getByRole("button", { name: "Mã QR công trình" }).click();
+    await expect(qrSubTab(page)).toHaveAttribute("aria-selected", "true");
     await expect(page.getByTestId("qr-link")).toHaveText(link);
 
-    // History shows the Active code and no token.
-    const history = page.getByRole("table", { name: "Lịch sử mã QR của công trình" });
+    // History (drawer) shows the Active code and no token.
+    const history = await openHistory(page);
     await expect(history.getByRole("row")).toHaveCount(2);
     await expect(history.getByRole("row").nth(1)).toContainText("Đang hoạt động");
     await expect(history.getByRole("row").nth(1)).toContainText("Sảnh chính");
+    expect(await page.getByRole("dialog", { name: "Lịch sử mã QR" }).innerText()).not.toContain(token);
+    await closeHistory(page);
 
     // Reload: only the history is recovered from the server.
     await page.reload();
@@ -262,11 +282,12 @@ test.describe("Building QR management tab", () => {
     expect(rotate?.body).toEqual({ label: null }); // empty label keeps the old one
     expect(rotate?.headers["idempotency-key"]).toBeUndefined();
 
-    const rows = page.getByRole("table", { name: "Lịch sử mã QR của công trình" }).getByRole("row");
+    const rows = (await openHistory(page)).getByRole("row");
     await expect(rows).toHaveCount(3);
     await expect(rows.nth(1)).toContainText("Đang hoạt động");
     await expect(rows.nth(2)).toContainText("Đã thu hồi");
     await expect(rows.nth(2)).toContainText("Đã thay bằng mã mới");
+    await closeHistory(page);
 
     // The old QR is dead on the landing; the new one works.
     await page.goto(`/qr/${first.token}`);
@@ -337,7 +358,7 @@ test.describe("Building QR management tab", () => {
     await dialog(page).getByRole("button", { name: "Tạo mã QR", exact: true }).dblclick();
     await expect(page.getByTestId("qr-link")).toBeVisible();
     expect(world.log.filter((entry) => entry.method === "POST" && entry.path.endsWith("/qr-codes"))).toHaveLength(1);
-    await expect(page.getByRole("table", { name: "Lịch sử mã QR của công trình" }).getByRole("row")).toHaveCount(2);
+    await expect((await openHistory(page)).getByRole("row")).toHaveCount(2);
   });
 
   test("a lost response cannot recover the token: warns and reloads the list", async ({ page }) => {

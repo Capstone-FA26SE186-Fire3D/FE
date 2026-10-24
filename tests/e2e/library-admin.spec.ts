@@ -3,9 +3,9 @@ import { RUBRIC_CATALOG } from "../fixtures/scenario-editor/v1-fixtures";
 import { installLibraryBackend, LibraryBackend, signIn, type Actor } from "./library-mock";
 
 /*
- * PlatformAdmin Organization Library against a STATEFUL MOCK of the real contract (library-mock.ts). Mock evidence only: it shows
- * the UI sends the right routes, headers (If-Match, Idempotency-Key) and payloads and handles the documented responses. It proves
- * nothing about the deployed API.
+ * PlatformAdmin Organization Library (Admin v2: DataTable + item drawer) against a STATEFUL MOCK of the real contract
+ * (library-mock.ts). Mock evidence only: it shows the UI sends the right routes, headers (If-Match, Idempotency-Key) and
+ * payloads and handles the documented responses. It proves nothing about the deployed API.
  */
 
 async function setup(page: Page, seed: (backend: LibraryBackend) => void = () => undefined, who: Actor = "admin") {
@@ -24,11 +24,21 @@ const seedRubricDraft = (backend: LibraryBackend) => {
   return backend.seedVersion("RUBRIC-CO-BAN", { name: "Rubric cơ bản", payload: { rubric: RUBRIC } });
 };
 
+const table = (page: Page) => page.getByTestId("library-items-table");
+const drawer = (page: Page) => page.getByTestId("library-item-drawer");
+/** The item code is printed once per row (as the title, or under the published name), in the table and in the card layout. */
+const rowOf = (page: Page, code: string) => table(page).getByText(code, { exact: true });
+/** Back from the version editor to the item summary inside the same drawer. */
+const backToItem = (page: Page) => drawer(page).getByRole("button", { name: "Về mục" }).click();
+/** A confirmation stacked over the drawer, picked by its question. */
+const confirmDialog = (page: Page, question: string) => page.getByRole("dialog").filter({ hasText: question });
+
 /** Opens the item through the list (a direct goto can be filled before hydration, which then resets the inputs). */
 async function openItem(page: Page, code: string) {
   await page.goto("/admin/library");
-  await page.getByRole("button", { name: `Mở mục ${code}` }).click();
-  await expect(page.getByTestId("item-detail")).toContainText(code);
+  await rowOf(page, code).click();
+  await expect(page).toHaveURL(/item=[0-9a-f-]{36}/);
+  await expect(drawer(page)).toContainText(code);
 }
 
 const uuidFrom = (url: string, key: string) => new URL(url).searchParams.get(key) ?? "";
@@ -43,7 +53,7 @@ test.describe("production Library admin", () => {
     await expect(page.getByTestId("prototype-banner")).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Thư viện chưa có mục nào" })).toBeVisible();
     await expect(page.getByText("Thư viện không có dữ liệu sẵn")).toBeVisible();
-    await expect(page.locator("main tbody tr")).toHaveCount(1); // only the empty-state row
+    await expect(table(page).getByRole("row")).toHaveCount(0); // the empty state replaces the table
     await expect(page.getByRole("navigation", { name: "Quản trị hệ thống" }).getByRole("link", { name: /Thư viện mẫu/ })).not.toContainText("Chờ BE");
     expect(backend.callsTo("GET", /^\/api\/admin\/library\/items$/).length).toBeGreaterThan(0);
     expect(backend.calls.every((call) => /^\/api\/(admin\/library|auth)/.test(call.path))).toBe(true);
@@ -62,7 +72,7 @@ test.describe("production Library admin", () => {
     await setup(page, () => undefined, "guest");
     await page.goto("/admin/library");
     await expect(page.getByRole("link", { name: "Đăng nhập" })).toBeVisible();
-    await expect(page.getByTestId("item-detail")).toHaveCount(0);
+    await expect(drawer(page)).toHaveCount(0);
   });
 
   test("API 403 on the list is shown with its cause and a retry", async ({ page }) => {
@@ -78,7 +88,7 @@ test.describe("production Library admin", () => {
 });
 
 test.describe("list: filters and paging live in the URL", () => {
-  test("kind filter, state filter and pages survive a reload", async ({ page }) => {
+  test("kind sub-tab, state chip and pages survive a reload", async ({ page }) => {
     const backend = await setup(page, (b) => {
       for (let n = 1; n <= 23; n += 1) { b.seedItem("Equipment", `EQ-${String(n).padStart(2, "0")}`, { isActive: n % 5 !== 0 }); }
       b.seedItem("RubricSample", "RB-ONE");
@@ -86,25 +96,28 @@ test.describe("list: filters and paging live in the URL", () => {
       b.seedVersion("RB-ONE", { name: "Rubric một", payload: { rubric: RUBRIC }, publish: true });
     });
     await page.goto("/admin/library");
-    await expect(page.getByRole("button", { name: "Mở mục EQ-01" })).toBeVisible();
+    await expect(rowOf(page, "EQ-01")).toBeVisible();
+    await expect(page.getByTestId("chip-Equipment")).toContainText("23"); // totals per kind
     await page.getByTestId("chip-Equipment").click();
     await expect(page).toHaveURL(/kind=Equipment/);
-    await expect(page.getByRole("button", { name: "Mở mục RB-ONE" })).toHaveCount(0);
+    await expect(rowOf(page, "RB-ONE")).toHaveCount(0);
     expect(backend.callsTo("GET", /items$/).some((call) => call.search.includes("kind=Equipment"))).toBe(true);
     await page.getByRole("button", { name: "Trang sau" }).click();
     await expect(page).toHaveURL(/page=2/);
-    await expect(page.getByRole("button", { name: "Mở mục EQ-21" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Mở mục EQ-01" })).toHaveCount(0);
+    await expect(rowOf(page, "EQ-21")).toBeVisible();
+    await expect(rowOf(page, "EQ-01")).toHaveCount(0);
     await page.reload();
-    await expect(page.getByRole("button", { name: "Mở mục EQ-21" })).toBeVisible();
-    await expect(page.getByTestId("chip-Equipment")).toHaveAttribute("aria-pressed", "true");
+    await expect(rowOf(page, "EQ-21")).toBeVisible();
+    await expect(page.getByTestId("chip-Equipment")).toHaveAttribute("data-state", "active");
 
     // The server has no status filter: this one narrows the loaded page only and says so.
-    await page.getByTestId("filter-state").selectOption("inactive");
+    await page.getByRole("button", { name: /^Trạng thái:/ }).click();
+    await page.getByRole("option", { name: "Ngừng dùng", exact: true }).click();
     await expect(page.getByText("Máy chủ chưa có bộ lọc trạng thái")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Không có mục khớp bộ lọc." })).toBeVisible(); // EQ-21..23 are all active
-    await page.getByTestId("filter-state").selectOption("active");
-    await expect(page.getByRole("button", { name: "Mở mục EQ-21" })).toBeVisible();
+    await page.getByRole("button", { name: /^Trạng thái:/ }).click();
+    await page.getByRole("option", { name: "Đang dùng", exact: true }).click();
+    await expect(rowOf(page, "EQ-21")).toBeVisible();
     await expect(page).toHaveURL(/page=2/); // the state filter never changes the server page
   });
 });
@@ -119,15 +132,16 @@ test.describe("rubric sample lifecycle", () => {
     await dialog.getByTestId("new-item-code").fill("rubric-co-ban");
     await expect(dialog.getByText("Sẽ lưu là: RUBRIC-CO-BAN")).toBeVisible();
     await dialog.getByTestId("create-item").click();
-    await expect(page.getByTestId("item-detail")).toContainText("RUBRIC-CO-BAN");
+    await expect(drawer(page)).toContainText("RUBRIC-CO-BAN");
     const created = backend.callsTo("POST", /items$/);
     expect(created).toHaveLength(1);
     expect(created[0].body).toEqual({ kind: "RubricSample", code: "RUBRIC-CO-BAN" });
     expect(created[0].headers["idempotency-key"]).toBeTruthy();
     await expect(page.getByText("Mục chỉ hiện cho tổ chức khi có ít nhất một phiên bản đã xuất bản")).toBeVisible();
 
-    // new Draft: every field starts blank, nothing is pre-filled except the server's own catalog default schema_version
+    // new Draft (same drawer, back button): every field starts blank, nothing is pre-filled except the server's own catalog default schema_version
     await page.getByTestId("new-version").click();
+    await expect(page).toHaveURL(/version=new/);
     await expect(page.getByTestId("version-editor")).toBeVisible();
     await expect(page.getByTestId("version-name")).toHaveValue("");
     await page.getByTestId("version-name").fill("Rubric cơ bản");
@@ -144,7 +158,6 @@ test.describe("rubric sample lifecycle", () => {
     await page.getByTestId("criterion-0").getByLabel("Tiêu chí bắt buộc").check();
     await page.getByTestId("save-version").click();
     await expect(page).toHaveURL(/version=[0-9a-f-]{36}/);
-    await expect(page.getByTestId("version-row-1")).toContainText("Bản nháp");
     const draft = backend.versions[0];
     expect(draft.status).toBe("Draft");
     expect(draft.payload).toEqual({ rubric: RUBRIC });
@@ -152,6 +165,11 @@ test.describe("rubric sample lifecycle", () => {
     expect(versionCalls).toHaveLength(1);
     expect(versionCalls[0].headers["idempotency-key"]).toBeTruthy();
     expect(versionCalls[0].body).toEqual({ name: "Rubric cơ bản", payload: { rubric: RUBRIC }, requiredCapabilities: [] });
+    await backToItem(page);
+    await expect(page).not.toHaveURL(/version=/);
+    await expect(page.getByTestId("version-row-1")).toContainText("Bản nháp");
+    await page.getByRole("button", { name: "Mở phiên bản 1" }).click();
+    await expect(page).toHaveURL(/version=[0-9a-f-]{36}/);
 
     // reload recovers from the server
     await page.reload();
@@ -191,8 +209,10 @@ test.describe("rubric sample lifecycle", () => {
     await expect(page.getByTestId("version-name")).toHaveCount(0);
     await expect(page.getByTestId("rubric-view")).toContainText("reached-exit");
     await expect(page.getByText("Phiên bản đã xuất bản không sửa được")).toBeVisible();
+    await backToItem(page);
     await expect(page.getByText("Bản tổ chức đang thấy")).toBeVisible();
-    await expect(page.getByTestId("item-detail")).toContainText("v1 · Tên của tôi");
+    await expect(drawer(page)).toContainText("v1 · Tên của tôi");
+    await page.getByRole("button", { name: "Mở phiên bản 1" }).click();
 
     await page.getByTestId("new-from-published").click();
     await expect(page).toHaveURL(/version=new/);
@@ -201,10 +221,14 @@ test.describe("rubric sample lifecycle", () => {
     await page.getByTestId("version-name").fill("Rubric cơ bản (bản 2)");
     await page.getByTestId("rubric-threshold").fill("0.8");
     await page.getByTestId("save-version").click();
-    await expect(page.getByTestId("version-row-2")).toContainText("Bản nháp");
+    await expect(page).toHaveURL(/version=[0-9a-f-]{36}/);
     await page.getByTestId("publish-version").click();
     await page.getByTestId("confirm-publish").click();
-    await expect(page.getByTestId("item-detail")).toContainText("v2 · Rubric cơ bản (bản 2)");
+    // The v1 toast may still be on screen: look for the v2 one.
+    await expect(page.getByRole("status").filter({ hasText: "v2 · bất biến" })).toBeVisible();
+    await backToItem(page);
+    await expect(page.getByTestId("version-row-2")).toContainText("Đã xuất bản");
+    await expect(drawer(page)).toContainText("v2 · Rubric cơ bản (bản 2)");
 
     // v1 never changed
     expect(backend.versions).toHaveLength(2);
@@ -227,6 +251,8 @@ test.describe("rubric sample lifecycle", () => {
     await expect(page).toHaveURL(/version=new/);
     await expect(page.getByTestId("version-name")).toHaveValue("Bản của tôi");
     await page.getByTestId("save-version").click();
+    await expect(page).toHaveURL(/version=[0-9a-f-]{36}/);
+    await backToItem(page);
     await expect(page.getByTestId("version-row-2")).toContainText("Bản nháp");
     expect(backend.versions[0].name).toBe("Rubric cơ bản"); // the published v1 is untouched
     expect(backend.versions[1].name).toBe("Bản của tôi");
@@ -244,7 +270,7 @@ test.describe("rubric sample lifecycle", () => {
     await expect(dialog.getByText("Máy chủ đang bận")).toBeVisible();
     await expect(dialog.getByTestId("create-item")).toHaveText("Thử lại");
     await dialog.getByTestId("create-item").click();
-    await expect(page.getByTestId("item-detail")).toContainText("SMOKE-HOOD");
+    await expect(drawer(page)).toContainText("SMOKE-HOOD");
     const creates = backend.callsTo("POST", /items$/);
     expect(creates).toHaveLength(2);
     expect(creates[1].headers["idempotency-key"]).toBe(creates[0].headers["idempotency-key"]);
@@ -258,7 +284,7 @@ test.describe("rubric sample lifecycle", () => {
     backend.failNext("POST", /\/publish$/, { status: 503, json: { status: 503, title: "Busy" }, headers: { "content-type": "application/problem+json" }, applyFirst: true });
     await page.getByTestId("publish-version").click();
     await page.getByTestId("confirm-publish").click();
-    await expect(page.getByRole("dialog").getByText("Máy chủ đang bận")).toBeVisible();
+    await expect(confirmDialog(page, "Xuất bản phiên bản này?").getByText("Máy chủ đang bận")).toBeVisible();
     await page.getByTestId("confirm-publish").click();
     await expect(page.getByText("Đã xuất bản phiên bản")).toBeVisible();
     const publishes = backend.callsTo("POST", /\/publish$/);
@@ -318,6 +344,7 @@ test.describe("rubric sample lifecycle", () => {
 
     backend.rubricCatalog = null;
     await page.getByTestId("version-editor").getByRole("button", { name: "Đóng" }).first().click();
+    await expect(page).not.toHaveURL(/version=/);
     await page.getByTestId("new-version").click();
     await expect(page.getByRole("alert").filter({ hasText: "Không tải được danh mục rubric" })).toBeVisible();
     backend.rubricCatalog = RUBRIC_CATALOG;
@@ -330,6 +357,7 @@ test.describe("equipment and template payloads", () => {
   test("equipment: description and properties only, says it adds no runtime capability, and never reads the runtime catalog", async ({ page }) => {
     const backend = await setup(page, (b) => { b.seedItem("Equipment", "MAT-NA-LOC-KHOI"); });
     await openItem(page, "MAT-NA-LOC-KHOI");
+    // The row menu also starts a version (`?version=new`).
     await page.getByTestId("new-version").click();
     await expect(page.getByTestId("no-capability-notice")).toContainText("không thêm khả năng cho runtime");
     await page.getByTestId("version-name").fill("Mặt nạ lọc khói");
@@ -344,13 +372,15 @@ test.describe("equipment and template payloads", () => {
     await page.getByTestId("capabilities").getByRole("button", { name: "Thêm năng lực" }).click();
     await page.getByRole("textbox", { name: "Năng lực runtime yêu cầu 1", exact: true }).fill("cover.nose");
     await page.getByTestId("save-version").click();
-    await expect(page.getByTestId("version-row-1")).toContainText("Bản nháp");
+    await expect(page).toHaveURL(/version=[0-9a-f-]{36}/);
     expect(backend.callsTo("POST", /\/versions$/)[0].body).toEqual({ name: "Mặt nạ lọc khói", payload: { description: "Mặt nạ lọc khói dùng một lần.", properties: { "Khối lượng (g)": 120 } }, requiredCapabilities: ["cover.nose"] });
     expect(backend.calls.some((call) => /scenario-interactions|runtime/.test(call.path))).toBe(false);
     await page.getByTestId("publish-version").click();
     await page.getByTestId("confirm-publish").click();
     await expect(page.getByTestId("version-preview")).toContainText("Không thêm năng lực cho runtime");
     await expect(page.getByTestId("version-preview")).toContainText("cover.nose");
+    await backToItem(page);
+    await expect(page.getByTestId("version-row-1")).toContainText("Đã xuất bản");
   });
 
   test("template: only non-spatial fields are offered and sent; positions, objects, geometry and runtime that the API stored are kept untouched", async ({ page }) => {
@@ -380,29 +410,50 @@ test.describe("equipment and template payloads", () => {
 });
 
 test.describe("item activation", () => {
-  test("deactivate asks for confirmation, sends PATCH with If-Match, and 412 keeps the dialog with a reload", async ({ page }) => {
+  test("deactivate (drawer) asks for confirmation, sends PATCH with If-Match, and 412 keeps the dialog with a reload", async ({ page }) => {
     const backend = await setup(page, (b) => {
       b.seedItem("Equipment", "BINH-CHUA-CHAY");
       b.seedVersion("BINH-CHUA-CHAY", { name: "Bình CO2", payload: { description: "Bình CO2 5 kg." }, publish: true });
     });
     await openItem(page, "BINH-CHUA-CHAY");
-    await expect(page.getByTestId("item-detail")).toContainText("v1 · Bình CO2");
+    await expect(drawer(page)).toContainText("v1 · Bình CO2");
     backend.items[0].revision += 1; // another admin touched the item: its revision moved, my If-Match is stale
     await page.getByTestId("toggle-active").click();
-    await page.getByTestId("confirm-toggle").click();
-    await expect(page.getByRole("dialog").getByText("Mục đã đổi ở nơi khác")).toBeVisible();
+    const confirm = confirmDialog(page, "Ngừng dùng mục này?");
+    await confirm.getByRole("button", { name: "Ngừng dùng" }).click();
+    await expect(confirm.getByText("Mục đã đổi ở nơi khác")).toBeVisible();
     expect(backend.callsTo("PATCH", /items\//)[0].headers["if-match"]).toBe('"2"'); // the item had revision 2 after its version was published
-    await page.getByTestId("confirm-toggle").click();
+    await confirm.getByRole("button", { name: "Ngừng dùng" }).click();
     await expect(page.getByText("Đã ngừng dùng mục")).toBeVisible();
     const patches = backend.callsTo("PATCH", /items\//);
     expect(patches).toHaveLength(2);
     expect(patches[1].body).toEqual({ isActive: false });
     expect(patches[1].headers["idempotency-key"]).toBeTruthy();
-    await expect(page.getByTestId("item-detail")).toContainText("Mục đang ngừng dùng");
+    await expect(drawer(page)).toContainText("Mục đang ngừng dùng");
     expect(backend.items[0].isActive).toBe(false);
     expect(backend.versions[0].status).toBe("Published"); // versions survive deactivation
-    await page.getByRole("button", { name: "Về danh sách" }).click();
-    await expect(page.getByTestId("item-row-BINH-CHUA-CHAY")).toContainText("Ngừng dùng");
+    await drawer(page).getByRole("button", { name: "Đóng" }).first().click();
+    await expect(page).not.toHaveURL(/item=/);
+    await expect(table(page).getByRole("row").filter({ hasText: "BINH-CHUA-CHAY" })).toContainText("Ngừng dùng");
+  });
+
+  test("the row menu reactivates with the row's revision as If-Match", async ({ page }) => {
+    const backend = await setup(page, (b) => { b.seedItem("Equipment", "BINH-CU", { isActive: false }); });
+    await page.goto("/admin/library");
+    await table(page).getByRole("row").filter({ hasText: "BINH-CU" }).getByRole("button", { name: "Thao tác" }).click();
+    await page.getByRole("menuitem", { name: "Dùng lại" }).click();
+    await confirmDialog(page, "Dùng lại mục này?").getByRole("button", { name: "Dùng lại" }).click();
+    await expect(page.getByText("Đã dùng lại mục")).toBeVisible();
+    const patch = backend.callsTo("PATCH", /items\//)[0];
+    expect(patch.headers["if-match"]).toBe('"1"');
+    expect(patch.body).toEqual({ isActive: true });
+    expect(backend.items[0].isActive).toBe(true);
+    await expect(table(page).getByRole("row").filter({ hasText: "BINH-CU" })).toContainText("Chưa có phiên bản");
+    // "Tạo phiên bản" from the menu opens the drawer straight on the new-version form.
+    await table(page).getByRole("row").filter({ hasText: "BINH-CU" }).getByRole("button", { name: "Thao tác" }).click();
+    await page.getByRole("menuitem", { name: "Tạo phiên bản" }).click();
+    await expect(page).toHaveURL(/version=new/);
+    await expect(page.getByTestId("version-editor")).toBeVisible();
   });
 });
 
@@ -420,11 +471,11 @@ for (const width of [1440, 375]) {
       });
       const shot = (name: string) => page.screenshot({ path: testInfo.outputPath(`library-${name}-${width}-${theme}.png`), fullPage: true });
       await page.goto("/admin/library");
-      await expect(page.getByRole("button", { name: /Mở mục TEMPLATE-VAN-PHONG/ })).toBeVisible();
+      await expect(rowOf(page, "TEMPLATE-VAN-PHONG")).toBeVisible();
       await noOverflow(page);
       await shot("list");
-      await page.getByRole("button", { name: /Mở mục RUBRIC-CO-BAN/ }).click();
-      await expect(page.getByTestId("item-detail")).toBeVisible();
+      await rowOf(page, "RUBRIC-CO-BAN-RAT-DAI-DE-KIEM-TRA-XUONG-DONG-VA-TRAN-NGANG").click();
+      await expect(drawer(page)).toBeVisible();
       await noOverflow(page);
       await shot("item");
       await page.getByRole("button", { name: "Mở phiên bản 1" }).click();
@@ -452,6 +503,7 @@ test("URL keeps item and version so a deep link and the back button work", async
   expect(id).toBe(backend.versions[0].id);
   await page.goBack();
   await expect(page.getByTestId("version-editor")).toHaveCount(0);
+  await expect(drawer(page)).toBeVisible(); // the item drawer stays
   await page.goForward();
   await expect(page.getByTestId("version-name")).toHaveValue("Rubric cơ bản");
   await page.goto(`/admin/library?item=${backend.items[0].id}&version=00000000-0000-4000-8000-00000000dead`);

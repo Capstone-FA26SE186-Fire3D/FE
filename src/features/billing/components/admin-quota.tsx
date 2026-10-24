@@ -5,9 +5,9 @@ import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, Select } from "@/components/ui/field";
-import { SkeletonRows } from "@/components/ui/skeleton";
+import { Field } from "@/components/ui/field";
 import { organizationsApi } from "@/features/organizations/api";
 import { billingErrorText } from "../errors";
 import { AiQuotaView } from "./ai-quota-view";
@@ -23,8 +23,7 @@ export function AdminQuotaSection({ accessToken }: { accessToken: string }) {
   return <div className="ops-stack">
     <p className="bill-muted">Xem quota AI trả trước dùng chung của một tổ chức: số dư theo đơn vị, các lần cấp và lượt dùng. Chỉ đọc; quota chỉ tăng khi thanh toán gói hoặc top-up được kích hoạt.</p>
     {organizations.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tổ chức" action={<Button size="sm" variant="secondary" className="mt-3" onClick={organizations.reload}>Thử lại</Button>}>{billingErrorText(organizations.error)}</Alert>}
-    {organizations.loading && !organizations.data && <SkeletonRows rows={1} label="Đang tải tổ chức…" />}
-    <Field label="Tổ chức">{(p) => <Select {...p} value={organizationId} onChange={(event) => setParams({ org: event.target.value })}><option value="">Chọn tổ chức</option>{items.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select>}</Field>
+    <Field label="Tổ chức" className="bill-toolbar-pick">{(p) => <Combobox {...p} aria-label="Tổ chức" value={organizationId} onChange={(value) => setParams({ org: value })} options={items.map((item) => ({ value: item.id, label: item.name }))} placeholder="Chọn tổ chức" searchPlaceholder="Tìm tổ chức" groupLabel="Tổ chức" loading={organizations.loading && !organizations.data} clearable />}</Field>
     {!organizationId && <EmptyState icon={Gauge} title="Chọn một tổ chức" description="Số dư, lịch sử cấp và lượt dùng quota AI của tổ chức sẽ hiện ở đây." />}
     {organizationId && <AiQuotaView key={organizationId} accessToken={accessToken} organizationId={organizationId} />}
   </div>;

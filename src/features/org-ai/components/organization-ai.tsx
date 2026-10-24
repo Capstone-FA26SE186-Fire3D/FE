@@ -1,8 +1,8 @@
 "use client";
 
-import { Gauge } from "lucide-react";
+import { Gauge, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { useUrlParams } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
@@ -11,65 +11,61 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthSession } from "@/features/auth/auth-session";
 
+import { useOptionalAiBubble } from "../floating/ai-bubble-context";
 import type { AiRequest } from "../types";
-import { AiSideRail } from "./ai-side-rail";
+import { AiQuotaCard } from "./ai-side-rail";
 import { ApplyTargetDialog } from "./apply-target-dialog";
-import { AskTab } from "./ask-tab";
-import { DraftTab } from "./draft-tab";
 import { HistoryTab } from "./history-tab";
 import { BILLING_AI_HREF } from "./request-view";
 
-const TABS = ["ask", "draft", "history"] as const;
+const TABS = ["history", "saved", "quota"] as const;
 type TabKey = (typeof TABS)[number];
 const isTab = (value: string): value is TabKey => (TABS as readonly string[]).includes(value);
 
 /** Every URL parameter owned by a tab; switching tabs clears them so filters and the open request never leak across tabs. */
 const TAB_PARAMS = ["page", "request", "status", "resultType", "operation", "mine"];
 
-/** `/workspace/ai`: Organization AI through the .NET API (never the FastAPI service). OrganizationUser only. */
+/**
+ * `/workspace/ai` (Figma 48:1988): the chat lives in the floating bubble on every page; this page reads back the history,
+ * the saved scenario proposals and the quota. Organization AI through the .NET API (never the FastAPI service). OrganizationUser only.
+ */
 export function OrganizationAi() {
   const { accessToken, ready, user } = useAuthSession();
   const { get, setParams } = useUrlParams();
-  const setParamsRef = useRef(setParams);
-  useEffect(() => {
-    setParamsRef.current = setParams;
-  });
+  const bubble = useOptionalAiBubble();
   const [applying, setApplying] = useState<AiRequest | null>(null);
-  // Stable on purpose: the submit hook calls it after an await, when `setParams` of the render that started the call is stale.
-  const onRequest = useCallback((requestId: string | null) => setParamsRef.current({ request: requestId }, "replace"), []);
 
   const tabParam = get("tab");
-  const tab: TabKey = isTab(tabParam) ? tabParam : "ask";
-  const requestId = get("request");
+  const tab: TabKey = isTab(tabParam) ? tabParam : "history";
 
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
   if (user?.role !== 1 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Hỏi đáp và đề xuất kịch bản bằng AI dành cho tài khoản tổ chức (OrganizationUser).</Alert>;
 
   const changeTab = (value: string) => {
     if (!isTab(value) || value === tab) return;
-    setParams({ ...Object.fromEntries(TAB_PARAMS.map((key) => [key, null])), tab: value === "ask" ? null : value });
+    setParams({ ...Object.fromEntries(TAB_PARAMS.map((key) => [key, null])), tab: value === "history" ? null : value });
   };
 
   return <div className="org">
     <PageHeader
-      title="Trợ lý AI cho tổ chức"
-      description="Hỏi đáp từ nguồn Learn, thư viện và tri thức đã duyệt, hoặc nhờ AI soạn nháp kịch bản cho một công trình. Chỉ dùng nội dung bạn có quyền xem. AI chỉ đề xuất; không tự sửa kịch bản, không phát hành, không phải chứng nhận an toàn."
+      title="Trợ lý AI"
+      description="Chat nằm ở bong bóng nổi trên mọi trang. Trang này để xem lại lịch sử, bản đề xuất đã lưu và quota. AI chỉ đề xuất; không tự sửa kịch bản, không phát hành, không phải chứng nhận an toàn."
       eyebrow="Huấn luyện" breadcrumbs={[{ label: "Trợ lý AI" }]}
-      actions={<Button asChild variant="quiet"><Link href={BILLING_AI_HREF}><Gauge size={16} aria-hidden="true" />Quota AI & top-up</Link></Button>}
+      actions={<>
+        <Button asChild variant="quiet"><Link href={BILLING_AI_HREF}><Gauge size={16} aria-hidden="true" />Quota AI & top-up</Link></Button>
+        {bubble?.enabled && <Button type="button" onClick={bubble.openPanel} data-testid="ai-open-bubble"><Sparkles size={16} aria-hidden="true" />Mở trợ lý</Button>}
+      </>}
     />
-    <div className="org-cols org-ai-cols">
-    <div style={{ minWidth: 0 }}><Tabs value={tab} onValueChange={changeTab}>
+    <Tabs value={tab} onValueChange={changeTab}>
       <TabsList aria-label="Trợ lý AI">
-        <TabsTrigger value="ask">Hỏi đáp</TabsTrigger>
-        <TabsTrigger value="draft">Đề xuất kịch bản</TabsTrigger>
-        <TabsTrigger value="history">Lịch sử</TabsTrigger>
+        <TabsTrigger value="history">Lịch sử hội thoại</TabsTrigger>
+        <TabsTrigger value="saved">Đề xuất đã lưu</TabsTrigger>
+        <TabsTrigger value="quota">Quota & giới hạn</TabsTrigger>
       </TabsList>
-      <TabsContent value="ask" style={{ marginTop: 16 }}>{tab === "ask" && <AskTab accessToken={accessToken} requestId={requestId} onRequest={onRequest} />}</TabsContent>
-      <TabsContent value="draft" style={{ marginTop: 16 }}>{tab === "draft" && <DraftTab accessToken={accessToken} requestId={requestId} onRequest={onRequest} onApply={setApplying} />}</TabsContent>
-      <TabsContent value="history" style={{ marginTop: 16 }}>{tab === "history" && <HistoryTab accessToken={accessToken} onApply={setApplying} />}</TabsContent>
-    </Tabs></div>
-    <AiSideRail accessToken={accessToken} onOpenRequest={(id) => onRequest(id)} />
-    </div>
+      <TabsContent value="history">{tab === "history" && <HistoryTab accessToken={accessToken} variant="history" onApply={setApplying} />}</TabsContent>
+      <TabsContent value="saved">{tab === "saved" && <HistoryTab accessToken={accessToken} variant="saved" onApply={setApplying} />}</TabsContent>
+      <TabsContent value="quota">{tab === "quota" && <AiQuotaCard accessToken={accessToken} />}</TabsContent>
+    </Tabs>
     <ApplyTargetDialog accessToken={accessToken} request={applying} onClose={() => setApplying(null)} />
   </div>;
 }

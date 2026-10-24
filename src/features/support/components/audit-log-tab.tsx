@@ -1,20 +1,21 @@
 "use client";
 
 import { ScrollText, Search } from "lucide-react";
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { CellTitle, DataTable, type DataColumn } from "@/components/ui/data-table";
 import { Drawer } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, Input, Select } from "@/components/ui/field";
-import { SkeletonRows } from "@/components/ui/skeleton";
+import { Field, Input } from "@/components/ui/field";
+import { ChipPopover, FilterChip } from "@/components/ui/filter-chip";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Pagination, Table, TableMessage } from "@/components/ui/table";
 import { buildRange, formatDateTime, MAX_RANGE_DAYS } from "@/utils/date-range";
 import { supportApi } from "../api";
 import { auditActions, isGuid } from "../labels";
+import type { AuditLog } from "../types";
 import { AuditDetail } from "./audit-detail";
 import { PendingBox } from "./pending-box";
 import { errorText } from "./ticket-thread";
@@ -27,6 +28,7 @@ type FilterValues = Record<FilterKey, string>;
 type FilterErrors = Partial<Record<FilterKey | "range", string>>;
 
 const short = (id: string | null) => (id ? `${id.slice(0, 8)}…` : "—");
+const shortDay = (day: string) => { const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day); return match ? `${match[3]}/${match[2]}` : day; };
 
 function validate(values: FilterValues): FilterErrors {
   const errors: FilterErrors = {};
@@ -43,33 +45,58 @@ function validate(values: FilterValues): FilterErrors {
   return errors;
 }
 
+/** One GUID filter as a chip: the value is staged locally and sent with "Áp dụng bộ lọc". */
+function GuidChip({ label, fieldLabel, value, error, onChange }: { label: string; fieldLabel: string; value: string; error?: string; onChange: (value: string) => void }) {
+  return <ChipPopover label={label} value={value ? short(value) : "tất cả"} active={Boolean(value)} dataValue={value} panelLabel={`Bộ lọc ${label.toLowerCase()}`}>
+    {(close) => <div className={styles.chipForm}>
+      <Field label={fieldLabel} hint="GUID 36 ký tự." error={error}>{(p) => <Input {...p} value={value} onChange={(event) => onChange(event.target.value.trim())} placeholder="GUID" spellCheck={false} autoComplete="off" className="font-mono" />}</Field>
+      <div className={styles.actions}>{value && <Button type="button" size="sm" variant="quiet" onClick={() => onChange("")}>Bỏ</Button>}<Button type="button" size="sm" variant="secondary" onClick={close}>Xong</Button></div>
+    </div>}
+  </ChipPopover>;
+}
+
+/**
+ * The seven audit filters as chips (Figma "Nhật ký audit"). Values are staged in the chips and validated as a whole
+ * (GUIDs, both dates, ≤ 90 days) before one "Áp dụng bộ lọc" writes them to the URL, so the API receives one request.
+ */
 function Filters({ initial, onApply, onClear, busy }: { initial: FilterValues; onApply: (values: FilterValues) => void; onClear: () => void; busy: boolean }) {
   const [values, setValues] = useState(initial);
   const [errors, setErrors] = useState<FilterErrors>(() => validate(initial));
-  const set = (key: FilterKey) => (event: { target: { value: string } }) => setValues((current) => ({ ...current, [key]: event.target.value.trim() }));
+  const set = (key: FilterKey) => (value: string) => setValues((current) => ({ ...current, [key]: value }));
+  const dirty = FILTER_KEYS.some((key) => values[key] !== initial[key]);
+  const filtering = FILTER_KEYS.some((key) => initial[key]);
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
+  const submit = () => {
     const found = validate(values);
     setErrors(found);
     if (Object.keys(found).length === 0) onApply(values);
   };
 
-  return <form className={`ops-panel ${styles.filters}`} onSubmit={submit} noValidate aria-label="Bộ lọc nhật ký audit">
-    <Field label="Từ ngày" hint={`Tối đa ${MAX_RANGE_DAYS} ngày, tính theo UTC.`} error={errors.from}>{(p) => <Input {...p} type="date" value={values.from} onChange={set("from")} />}</Field>
-    <Field label="Đến ngày" error={errors.to}>{(p) => <Input {...p} type="date" value={values.to} onChange={set("to")} />}</Field>
-    <Field label="Hành động" className={styles.wide}>{(p) => <Select {...p} value={values.action} onChange={set("action")}><option value="">Mọi hành động</option>{auditActions.map((action) => <option key={action} value={action}>{action}</option>)}</Select>}</Field>
-    <Field label="Mã người thực hiện" error={errors.actorId} className={styles.wide}>{(p) => <Input {...p} value={values.actorId} onChange={set("actorId")} placeholder="GUID" spellCheck={false} autoComplete="off" />}</Field>
-    <Field label="Mã tổ chức" error={errors.organizationId} className={styles.wide}>{(p) => <Input {...p} value={values.organizationId} onChange={set("organizationId")} placeholder="GUID" spellCheck={false} autoComplete="off" />}</Field>
-    <Field label="Mã đối tượng" error={errors.targetId} className={styles.wide}>{(p) => <Input {...p} value={values.targetId} onChange={set("targetId")} placeholder="GUID" spellCheck={false} autoComplete="off" />}</Field>
-    <Field label="Mã correlation" error={errors.correlationId} className={styles.wide}>{(p) => <Input {...p} value={values.correlationId} onChange={set("correlationId")} placeholder="GUID" spellCheck={false} autoComplete="off" />}</Field>
-    <div className={styles.filterActions}>
-      <Button type="submit" disabled={busy}>Áp dụng bộ lọc</Button>
-      <Button type="button" variant="quiet" onClick={onClear}>Xóa bộ lọc</Button>
+  const rangeValue = values.from && values.to ? `${shortDay(values.from)} – ${shortDay(values.to)}` : values.from || values.to ? "chưa đủ hai ngày" : "30 ngày gần nhất";
+  const messages = Array.from(new Set(Object.values(errors).filter(Boolean))) as string[];
+
+  return <div role="group" aria-label="Bộ lọc nhật ký audit">
+    <div className={styles.auditFilters}>
+      <ChipPopover label="Thời gian" value={rangeValue} active={Boolean(values.from || values.to)} dataValue={values.from && values.to ? `${values.from}..${values.to}` : ""} panelLabel="Khoảng thời gian">
+        {(close) => <div className={styles.chipForm}>
+          <Field label="Từ ngày" hint={`Tối đa ${MAX_RANGE_DAYS} ngày, tính theo UTC.`} error={errors.from}>{(p) => <Input {...p} type="date" value={values.from} onChange={(event) => set("from")(event.target.value)} />}</Field>
+          <Field label="Đến ngày" error={errors.to}>{(p) => <Input {...p} type="date" value={values.to} onChange={(event) => set("to")(event.target.value)} />}</Field>
+          <div className={styles.actions}>{(values.from || values.to) && <Button type="button" size="sm" variant="quiet" onClick={() => setValues((current) => ({ ...current, from: "", to: "" }))}>Bỏ</Button>}<Button type="button" size="sm" variant="secondary" onClick={close}>Xong</Button></div>
+        </div>}
+      </ChipPopover>
+      <FilterChip label="Hành động" value={values.action} onChange={set("action")} options={auditActions.map((action) => ({ value: action, label: action }))} />
+      <GuidChip label="Tổ chức" fieldLabel="Mã tổ chức" value={values.organizationId} error={errors.organizationId} onChange={set("organizationId")} />
+      <GuidChip label="Người thực hiện" fieldLabel="Mã người thực hiện" value={values.actorId} error={errors.actorId} onChange={set("actorId")} />
+      <GuidChip label="Đối tượng" fieldLabel="Mã đối tượng" value={values.targetId} error={errors.targetId} onChange={set("targetId")} />
+      <GuidChip label="Correlation" fieldLabel="Mã correlation" value={values.correlationId} error={errors.correlationId} onChange={set("correlationId")} />
+      <Button type="button" size="sm" variant={dirty ? "primary" : "secondary"} onClick={submit} disabled={busy}>Áp dụng bộ lọc</Button>
+      {(filtering || dirty) && <Button type="button" size="sm" variant="quiet" onClick={onClear}>Xóa bộ lọc</Button>}
     </div>
-  </form>;
+    {messages.length > 0 && <Alert tone="danger" title="Bộ lọc chưa hợp lệ" className="mb-3">{messages.join(" ")}</Alert>}
+  </div>;
 }
 
+/** Audit log (only here): metadata rows from `GET /api/admin/audit-logs`; a row opens the record (`?log=`) in a drawer. */
 export function AuditLogTab({ accessToken }: { accessToken: string }) {
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const values = Object.fromEntries(FILTER_KEYS.map((key) => [key, get(key)])) as FilterValues;
@@ -95,42 +122,49 @@ export function AuditLogTab({ accessToken }: { accessToken: string }) {
     !blocked,
   );
 
-  const items = list.data?.items ?? [];
+  const items = blocked ? [] : list.data?.items ?? [];
   const total = list.data?.total ?? 0;
   const filtering = FILTER_KEYS.some((key) => values[key]);
   const apply = (next: FilterValues) => setParams(Object.fromEntries(FILTER_KEYS.map((key) => [key, next[key]])));
   const clear = () => setParams(Object.fromEntries(FILTER_KEYS.map((key) => [key, null])));
 
+  const columns: DataColumn<AuditLog>[] = [
+    { key: "time", header: "Thời điểm", primary: true, width: 180, render: (log) => formatDateTime(log.createdAt) },
+    { key: "action", header: "Hành động", width: 150, render: (log) => <StatusBadge tone="neutral">{log.action}</StatusBadge> },
+    { key: "target", header: "Đối tượng", render: (log) => <CellTitle title={log.targetEntity ?? "—"} sub={<span className={styles.mono} title={log.targetId ?? undefined}>{short(log.targetId)}</span>} /> },
+    { key: "actor", header: "Người thực hiện", hideBelow: 900, render: (log) => log.actorDisplayName?.trim() ? <CellTitle title={log.actorDisplayName} sub={<span className={styles.mono} title={log.userId ?? undefined}>{short(log.userId)}</span>} /> : <span className={styles.mono} title={log.userId ?? undefined}>{log.userId ? short(log.userId) : "Hệ thống"}</span> },
+    { key: "organization", header: "Tổ chức", hideBelow: 1100, render: (log) => log.organizationName?.trim() ? <CellTitle title={log.organizationName} sub={<span className={styles.mono} title={log.organizationId ?? undefined}>{short(log.organizationId)}</span>} /> : <span className={styles.mono} title={log.organizationId ?? undefined}>{short(log.organizationId)}</span> },
+  ];
+
   return <>
     <Filters key={FILTER_KEYS.map((key) => values[key]).join("|")} initial={values} onApply={apply} onClear={clear} busy={list.loading} />
 
-    {blocked && <Alert tone="danger" title="Bộ lọc chưa hợp lệ nên chưa gửi yêu cầu">Sửa các trường được đánh dấu rồi áp dụng lại.</Alert>}
-    {list.error !== undefined && !blocked && <Alert tone="danger" title="Không tải được nhật ký audit" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{errorText(list.error, "Hãy kiểm tra kết nối rồi thử lại.")}</Alert>}
+    {blocked && <Alert tone="danger" title="Bộ lọc chưa hợp lệ nên chưa gửi yêu cầu" className="mb-3">Sửa các trường được đánh dấu rồi áp dụng lại.</Alert>}
 
-    {list.data && !blocked && <p className={styles.note}>
+    {list.data && !blocked && <p className={styles.note} style={{ marginBottom: 12 }}>
       <span>Khoảng thời gian: <strong>{formatDateTime(list.data.from)}</strong> – <strong>{formatDateTime(list.data.to)}</strong>{values.from ? "" : " (mặc định 30 ngày gần nhất)"}</span>
       <StatusBadge tone="info">Chỉ metadata</StatusBadge>
     </p>}
 
-    <Table caption="Nhật ký audit">
-      <thead><tr><th>Thời điểm</th><th>Hành động</th><th>Đối tượng</th><th>Người thực hiện</th><th>Tổ chức</th></tr></thead>
-      <tbody>
-        {list.loading && !list.data && !blocked && <TableMessage colSpan={5}><SkeletonRows rows={6} label="Đang tải nhật ký audit…" /></TableMessage>}
-        {!blocked && items.map((log) => <tr key={log.id}>
-          <td><button type="button" className={styles.rowButton} onClick={() => setParams({ log: log.id, page })} aria-label={`Xem bản ghi ${log.action} lúc ${formatDateTime(log.createdAt)}`}>{formatDateTime(log.createdAt)}</button></td>
-          <td><StatusBadge tone="neutral">{log.action}</StatusBadge></td>
-          <td>{log.targetEntity ?? "—"}<span className={`ops-cell-sub ${styles.mono}`} title={log.targetId ?? undefined}>{short(log.targetId)}</span></td>
-          <td>{log.actorDisplayName?.trim() ? <><span className={styles.clipSmall}>{log.actorDisplayName}</span><span className={`ops-cell-sub ${styles.mono}`} title={log.userId ?? undefined}>{short(log.userId)}</span></> : <span className={styles.mono} title={log.userId ?? undefined}>{log.userId ? short(log.userId) : "Hệ thống"}</span>}</td>
-          <td>{log.organizationName?.trim() ? <><span className={styles.clipSmall}>{log.organizationName}</span><span className={`ops-cell-sub ${styles.mono}`} title={log.organizationId ?? undefined}>{short(log.organizationId)}</span></> : <span className={styles.mono} title={log.organizationId ?? undefined}>{short(log.organizationId)}</span>}</td>
-        </tr>)}
-        {list.data && !blocked && !items.length && <TableMessage colSpan={5}><EmptyState icon={filtering ? Search : ScrollText} title={filtering ? "Không có bản ghi phù hợp." : "Chưa có bản ghi audit trong khoảng thời gian này"} description={filtering ? "Thử nới bộ lọc hoặc mở rộng khoảng thời gian (tối đa 90 ngày)." : "Chọn khoảng thời gian rộng hơn để xem thêm."} /></TableMessage>}
-      </tbody>
-    </Table>
-    {total > PAGE_SIZE && !blocked && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={total} onPageChange={setPage} disabled={list.loading} />}
+    <DataTable<AuditLog>
+      caption="Nhật ký audit"
+      data-testid="admin-audit-table"
+      columns={columns}
+      rows={items}
+      rowKey={(log) => log.id}
+      loading={!blocked && list.loading && !list.data}
+      onRowClick={(log) => setParams({ log: log.id, page })}
+      error={!blocked && list.error !== undefined ? <Alert tone="danger" title="Không tải được nhật ký audit" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{errorText(list.error, "Hãy kiểm tra kết nối rồi thử lại.")}</Alert> : undefined}
+      empty={blocked
+        ? <EmptyState icon={Search} title="Chưa gửi yêu cầu" description="Sửa bộ lọc rồi áp dụng lại." />
+        : <EmptyState icon={filtering ? Search : ScrollText} title={filtering ? "Không có bản ghi phù hợp." : "Chưa có bản ghi audit trong khoảng thời gian này"} description={filtering ? "Thử nới bộ lọc hoặc mở rộng khoảng thời gian (tối đa 90 ngày)." : "Chọn khoảng thời gian rộng hơn để xem thêm."} />}
+      pagination={total > PAGE_SIZE && !blocked ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
+    />
+    <p className={styles.hint}>Bấm một hàng để mở chi tiết thay đổi theo từng trường.</p>
 
     <PendingBox title="Chưa có từ backend" items={["Xuất nhật ký ra tệp.", "Lý do hành động dạng văn bản tự do: chỉ biết có hay không, không hiển thị nội dung."]} />
 
-    <Drawer open={Boolean(logId)} onOpenChange={(value) => { if (!value) setParams({ log: null, page }); }} title="Chi tiết bản ghi audit" description="Metadata và các trường thay đổi được phép; dùng nút Lọc để lần theo cùng người thực hiện, đối tượng hoặc correlation.">
+    <Drawer open={Boolean(logId)} onOpenChange={(value) => { if (!value) setParams({ log: null, page }); }} size="md" data-testid="audit-drawer" title="Chi tiết bản ghi audit" description="Metadata và các trường thay đổi được phép; dùng nút Lọc để lần theo cùng người thực hiện, đối tượng hoặc correlation.">
       {logId && <AuditDetail key={logId} id={logId} accessToken={accessToken} onFilter={(patch) => { const next = { ...values, ...patch }; setParams({ ...Object.fromEntries(FILTER_KEYS.map((key) => [key, next[key]])), log: null }); }} />}
     </Drawer>
   </>;

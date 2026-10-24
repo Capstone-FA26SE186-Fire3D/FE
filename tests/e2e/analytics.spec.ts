@@ -20,8 +20,13 @@ async function signIn(page: Page, user: object) {
 
 const head = { asOf: "2026-10-12T03:00:00Z", from: "2026-09-12T03:00:00Z", to: "2026-10-12T03:00:00Z", activeWindowSeconds: 120, definitions: { plays: "Contract-7 learner sessions started in UTC [from,to); prepare and playtest are not counted." } };
 const aiUsage = { settledUnits: [{ quotaUnit: "tokens", units: 12000 }], openReservations: [{ quotaUnit: "tokens", units: 500 }], needsReconcile: { requests: 1, reservedUnits: 200 }, requests: { Accepted: 0, Processing: 1, Succeeded: 11, Failed: 1, NeedsReconcile: 1, SafetyRejected: 0 } };
+// Daily cohorts: the report always asks for `groupBy=day` unless the URL names another grouping, and the "Phiên theo ngày" chart and KPI sparklines read them.
+const dayCohorts = [
+  { key: "2026-10-01", label: "2026-10-01", plays: 12, uniqueTrainees: 6, completed: 9, abandoned: 1, awaitingSync: 0, assessed: 6, passed: 4, passRate: 0.6667, averageDurationSeconds: 200 },
+  { key: "2026-10-02", label: "2026-10-02", plays: 28, uniqueTrainees: 12, completed: 21, abandoned: 2, awaitingSync: 0, assessed: 14, passed: 10, passRate: 0.7143, averageDurationSeconds: 230 },
+];
 const training = (over: Record<string, unknown> = {}) => ({
-  ...head, plays: 40, uniqueTrainees: 18, completed: 30, completionRate: 0.75, activeSessions: 3,
+  ...head, plays: 40, uniqueTrainees: 18, completed: 30, completionRate: 0.75, activeSessions: 3, filters: { groupBy: "day" }, cohorts: dayCohorts,
   outcomes: { Passed: 14, NotPassed: 6, Incomplete: 7, NotAssessed: 3 },
   assessment: { assessed: 20, passed: 14, passRate: 0.7 },
   duration: { sessions: 30, averageSeconds: 215.5, medianSeconds: 190 },
@@ -29,7 +34,7 @@ const training = (over: Record<string, unknown> = {}) => ({
   byTraining: [{ trainingId: "11111111-1111-4111-8111-111111111111", plays: 25, completed: 20, passed: 9 }, { trainingId: "22222222-2222-4222-8222-222222222222", plays: 15, completed: 10, passed: 5 }],
   aiUsage, ...over,
 });
-const emptyTraining = () => training({ plays: 0, uniqueTrainees: 0, completed: 0, completionRate: null, activeSessions: 0, outcomes: { Passed: 0, NotPassed: 0, Incomplete: 0, NotAssessed: 0 }, assessment: { assessed: 0, passed: 0, passRate: null }, duration: { sessions: 0, averageSeconds: null, medianSeconds: null }, byMode: [{ mode: "Learn", plays: 0, completed: 0 }, { mode: "Guided", plays: 0, completed: 0 }, { mode: "Assessment", plays: 0, completed: 0 }], byTraining: [], aiUsage: { settledUnits: [], openReservations: [], needsReconcile: { requests: 0, reservedUnits: 0 }, requests: { Queued: 0 } } });
+const emptyTraining = () => training({ plays: 0, uniqueTrainees: 0, completed: 0, completionRate: null, activeSessions: 0, cohorts: [], outcomes: { Passed: 0, NotPassed: 0, Incomplete: 0, NotAssessed: 0 }, assessment: { assessed: 0, passed: 0, passRate: null }, duration: { sessions: 0, averageSeconds: null, medianSeconds: null }, byMode: [{ mode: "Learn", plays: 0, completed: 0 }, { mode: "Guided", plays: 0, completed: 0 }, { mode: "Assessment", plays: 0, completed: 0 }], byTraining: [], aiUsage: { settledUnits: [], openReservations: [], needsReconcile: { requests: 0, reservedUnits: 0 }, requests: { Queued: 0 } } });
 const operations = (extra: Record<string, unknown> = {}) => ({
   ...head, buildings: [{ isActive: true, count: 4 }, { isActive: false, count: 1 }],
   processingJobs: [{ kind: "IfcProcessing", status: "Succeeded", count: 6 }, { kind: "IfcProcessing", status: "Failed", count: 1 }, { kind: "PackageBuild", status: "Running", count: 2 }],
@@ -45,6 +50,9 @@ const revenue = () => ({
 });
 
 const overflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+/** Counted-up number of a KPI tile (`NumberPop` ends on the final value within ~0.7 s; assertions retry). */
+const kpi = (page: Page, id: string) => page.getByTestId(id).locator(".ops-kpi-value");
+const params = (url: string) => new URL(`http://x${url}`).searchParams;
 
 test.describe("parsers", () => {
   test("a rate or average without samples stays null (not 0) and a missing outcome becomes 0", () => {
@@ -76,34 +84,53 @@ test.describe("organization analytics", () => {
       return route.fulfill({ json: url.pathname.endsWith("/training") ? training() : operations() });
     });
     await page.goto("/workspace/analytics?from=2026-09-01&to=2026-09-30");
-    await expect(page.getByRole("heading", { name: "Báo cáo huấn luyện", exact: true })).toBeVisible();
-    await expect(page.locator(".ops-stat", { hasText: "Lượt chơi (trong kỳ)" }).locator("strong")).toHaveText("40");
-    await expect(page.locator(".ops-stat", { hasText: "Học viên khác nhau" }).locator("strong")).toHaveText("18");
-    await expect(page.locator(".ops-stat", { hasText: "Đã có kết quả" })).toContainText("75%");
-    await expect(page.locator(".ops-stat", { hasText: "Đang chơi (hiện tại)" }).locator("strong")).toHaveText("3");
-    await expect(page.getByText(/Không tính.*playtest/)).toBeVisible();
-    await expect(page.getByRole("list", { name: "Chú giải kết quả" })).toContainText("Chưa đạt");
-    await expect(page.getByText("70%").first()).toBeVisible();
-    await expect(page.getByText("3 phút 36 giây")).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Báo cáo", exact: true })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Huấn luyện" })).toHaveAttribute("aria-selected", "true");
+    await expect(kpi(page, "kpi-plays")).toHaveText("40");
+    await expect(kpi(page, "kpi-trainees")).toHaveText("18");
+    await expect(page.getByTestId("kpi-completed")).toContainText("75%");
+    await expect(kpi(page, "kpi-active")).toHaveText("3");
+    await expect(page.getByTestId("kpi-plays").locator("svg.ops-kpi-spark")).toBeVisible(); // trend from the daily cohorts
+    // Sessions per period: legend from the chart kit, numbers in the cohort table under the card.
+    const periods = page.getByTestId("chart-periods");
+    await expect(periods.getByRole("heading", { name: "Phiên theo ngày" })).toBeVisible();
+    await expect(periods.getByRole("list", { name: "Chú giải" }).getByRole("listitem")).toHaveText([/Lượt chơi/, /Có kết quả/, /Đạt/]);
+    await periods.getByText("Xem bảng số liệu").click();
+    await expect(periods.getByRole("table", { name: "Số liệu theo nhóm" }).getByRole("row", { name: /2026-10-02\s*28/ })).toBeVisible();
+    const outcomes = page.getByTestId("chart-outcomes");
+    await expect(outcomes.getByRole("list", { name: "Giá trị" })).toContainText("Chưa đạt");
+    await expect(outcomes).toContainText("70%");
+    await expect(page.getByTestId("chart-duration")).toContainText("3 phút 36 giây");
+    await expect(page.getByTestId("chart-modes").getByRole("list", { name: "Chú giải" }).getByRole("listitem")).toHaveText([/Lượt chơi/, /Có kết quả/]);
     await expect(page.getByText("Sử dụng AI")).toBeVisible();
     const aiStatuses = page.getByRole("list", { name: "Yêu cầu AI theo trạng thái (tạo trong kỳ)" });
     await expect(aiStatuses).toContainText("Đang xử lý");
     await expect(aiStatuses).not.toContainText("Bị chặn an toàn"); // pre-v7 key from the BE aggregate is hidden
-    expect(urls).toEqual(["/api/organizations/me/analytics/training?from=2026-09-01T00%3A00%3A00.000Z&to=2026-10-01T00%3A00%3A00.000Z"]);
+    expect(urls).toHaveLength(1);
+    expect(urls[0]).toMatch(/^\/api\/organizations\/me\/analytics\/training\?/);
+    expect(Object.fromEntries(params(urls[0]))).toEqual({ from: "2026-09-01T00:00:00.000Z", to: "2026-10-01T00:00:00.000Z", groupBy: "day" });
 
     await page.getByRole("tab", { name: "Vận hành" }).click();
     await expect(page).toHaveURL(/tab=operations/);
-    await expect(page.locator(".ops-stat", { hasText: "Công trình (hiện tại)" }).locator("strong")).toHaveText("5");
+    await expect(kpi(page, "kpi-buildings")).toHaveText("5");
+    await expect(page.getByTestId("kpi-accounts")).toHaveCount(0);
     await expect(page.getByText("Tài khoản theo vai trò")).toHaveCount(0);
-    await expect(page.getByRole("list", { name: "Tiến trình PackageBuild theo trạng thái" })).toContainText("Đang chạy");
+    // Processing jobs: one chip per kind found in the report, the chosen kind as a 100 % bar with every status named.
+    const jobs = page.getByTestId("chart-jobs");
+    await expect(jobs.getByRole("group", { name: "Loại tiến trình" }).getByRole("button")).toHaveText([/Geometry/, /Build gói/]);
+    await expect(jobs.getByRole("img", { name: /Tiến trình Geometry theo trạng thái/ })).toHaveAccessibleName(/Hoàn tất 6.*Thất bại 1/);
+    await jobs.getByTestId("jobkind-PackageBuild").click();
+    await expect(jobs.getByRole("img", { name: /Tiến trình Build gói theo trạng thái/ })).toHaveAccessibleName(/Đang chạy 2/);
+    await expect(page.getByTestId("chart-tickets").getByRole("list", { name: "Giá trị" }).getByRole("listitem")).toHaveText([/Mới\s*2/, /Đã giải quyết\s*3/]);
     expect(urls.at(-1)).toContain("/api/organizations/me/analytics/operations?from=");
-    for (const url of urls) expect(Array.from(new URL(`http://x${url}`).searchParams.keys()).sort()).toEqual(["from", "to"]);
+    expect(Array.from(params(urls.at(-1) as string).keys()).sort()).toEqual(["from", "to"]);
+    for (const url of urls) expect(Array.from(params(url).keys()).sort()).toEqual(url.includes("/training") ? ["from", "groupBy", "to"] : ["from", "to"]);
 
     await page.reload();
     await expect(page.getByRole("tab", { name: "Vận hành" })).toHaveAttribute("aria-selected", "true");
     await openChip(page, "Thời gian");
     await expect(page.getByLabel("Từ ngày")).toHaveValue("2026-09-01");
-    await expect(page.locator(".ops-stat", { hasText: "Công trình (hiện tại)" }).locator("strong")).toHaveText("5");
+    await expect(kpi(page, "kpi-buildings")).toHaveText("5");
   });
 
   test("building and scenario filters narrow the report and the CSV, the scenario depends on the building, groupBy adds the cohort table", async ({ page }) => {
@@ -131,9 +158,20 @@ test.describe("organization analytics", () => {
     await page.goto("/workspace/analytics?from=2026-09-01&to=2026-09-30");
     const filters = page.getByRole("group", { name: "Bộ lọc báo cáo" });
     await expect(chip(filters, "Kịch bản")).toBeDisabled();
-    await expect(page.getByRole("table", { name: "Lượt chơi theo kịch bản" })).toContainText("Thoát hiểm tầng 3");
+    await expectChipValue(filters, "Nhóm theo", ""); // default grouping (day) is not written to the URL
+    await expect(chip(filters, "Nhóm theo")).toContainText("Ngày");
+    const scenarios = page.getByTestId("chart-scenarios");
+    await expect(scenarios.getByRole("list", { name: "Lượt chơi theo kịch bản" })).toContainText("Thoát hiểm tầng 3");
     await expect.poll(() => reports.length).toBe(1);
     expect(reports[0].has("buildingId")).toBe(false);
+    expect(reports[0].get("groupBy")).toBe("day");
+
+    // "Xem bảng" opens the full scenario table in a drawer; Escape closes it.
+    await scenarios.getByRole("button", { name: "Xem bảng" }).click();
+    const drawer = page.getByTestId("drawer-scenarios");
+    await expect(drawer.getByRole("table", { name: "Lượt chơi theo kịch bản" }).getByRole("row", { name: /Thoát hiểm tầng 3\s*25\s*9\s*20\s*9/ })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(drawer).toHaveCount(0);
 
     await pick(filters, "Công trình", { value: "b-1" });
     await expect(page).toHaveURL(/building=b-1/);
@@ -142,7 +180,10 @@ test.describe("organization analytics", () => {
     await expect(chipOptions(filters, "Kịch bản")).toHaveText(["tất cả", "Thoát hiểm tầng 3", "Hành lang có khói"]);
     await pick(filters, "Kịch bản", { value: "sc-1" });
     await pick(filters, "Nhóm theo", { value: "week" });
-    await expect(page.getByRole("table", { name: "Số liệu theo nhóm" })).toContainText("2026-09-28");
+    const periods = page.getByTestId("chart-periods");
+    await expect(periods.getByRole("heading", { name: "Phiên theo tuần" })).toBeVisible();
+    await periods.getByText("Xem bảng số liệu").click();
+    await expect(periods.getByRole("table", { name: "Số liệu theo nhóm" })).toContainText("2026-09-28");
     const last = reports.at(-1) as URLSearchParams;
     expect(last.get("buildingId")).toBe("b-1");
     expect(last.get("scenarioId")).toBe("sc-1");
@@ -161,16 +202,26 @@ test.describe("organization analytics", () => {
     await expectChipValue(filters, "Nhóm theo", "week");
   });
 
-  test("every chart has a table with the same numbers", async ({ page }) => {
+  test("every chart has a legend with counts and a table with the same numbers", async ({ page }) => {
     await signIn(page, owner);
     await page.route("**/api/organizations/me/analytics/training*", (route) => route.fulfill({ json: training() }));
     await page.goto("/workspace/analytics");
-    await page.getByText("Xem bảng số liệu").first().click();
-    const table = page.getByRole("table", { name: "Kết quả của phiên" });
-    await expect(table.getByRole("row", { name: /Đạt\s*14/ })).toBeVisible();
-    await expect(table.getByRole("row", { name: /Chưa đạt\s*6/ })).toBeVisible();
-    const chart = page.getByRole("img", { name: /Kết quả của 30 phiên/ });
-    await expect(chart).toHaveAccessibleName(/Đạt 14.*Chưa đạt 6.*Chưa hoàn tất 7.*Không chấm điểm 3/);
+    const outcomes = page.getByTestId("chart-outcomes");
+    // Donut legend names every outcome with its count (zero outcomes stay in the legend), centre shows the total.
+    await expect(outcomes.getByRole("list", { name: "Giá trị" }).getByRole("listitem")).toHaveText([/^Đạt\s*14$/, /^Chưa đạt\s*6$/, /^Chưa hoàn tất\s*7$/, /^Không chấm\s*3$/]);
+    await expect(outcomes.locator(".ops-donut-center")).toContainText("30");
+    await expect(outcomes.getByText("Tỷ lệ đạt = Đạt / (Đạt + Chưa đạt) =")).toContainText("70%");
+    await outcomes.getByText("Xem bảng số liệu").click();
+    const table = outcomes.getByRole("table", { name: "Kết quả của phiên" });
+    await expect(table.getByRole("row", { name: /^Đạt\s*14\s*46,7%/ })).toBeVisible();
+    await expect(table.getByRole("row", { name: /Chưa đạt\s*6\s*20%/ })).toBeVisible();
+
+    const modes = page.getByTestId("chart-modes");
+    await modes.getByText("Xem bảng số liệu").click();
+    await expect(modes.getByRole("table", { name: "Lượt chơi theo chế độ" }).getByRole("row", { name: /Guided Drill\s*12\s*8/ })).toBeVisible();
+    // No duration histogram in the API: the card prints the three figures only.
+    await expect(page.getByTestId("chart-duration")).toContainText("Số phiên đo");
+    await expect(page.getByTestId("chart-duration").getByText("Phân bố theo nhóm thời lượng")).toHaveCount(0);
   });
 
   test("an empty period is explained and shows 'chưa có mẫu' instead of 0 %", async ({ page }) => {
@@ -179,7 +230,9 @@ test.describe("organization analytics", () => {
     await page.goto("/workspace/analytics");
     await expect(page.getByText("Chưa có lượt chơi trong khoảng thời gian này")).toBeVisible();
     await expect(page.getByText("không phải lỗi")).toBeVisible();
-    await expect(page.locator(".ops-stat", { hasText: "Đã có kết quả" })).toContainText("chưa có mẫu");
+    await expect(page.getByTestId("kpi-completed")).toContainText("chưa có mẫu");
+    await expect(kpi(page, "kpi-plays")).toHaveText("0");
+    await expect(page.getByTestId("chart-outcomes")).toHaveCount(0); // charts are not drawn for an empty cohort
     await expect(page.getByText("Không tải được")).toHaveCount(0);
   });
 
@@ -219,9 +272,9 @@ test.describe("organization analytics", () => {
     await page.getByLabel("Từ ngày").fill("2026-09-01");
     await page.getByLabel("Đến ngày").fill("2026-09-30");
     await page.getByRole("button", { name: "Áp dụng" }).click();
-    await expect(page.locator(".ops-stat", { hasText: "Lượt chơi (trong kỳ)" }).locator("strong")).toHaveText("222");
+    await expect(kpi(page, "kpi-plays")).toHaveText("222");
     await page.waitForTimeout(1200);
-    await expect(page.locator(".ops-stat", { hasText: "Lượt chơi (trong kỳ)" }).locator("strong")).toHaveText("222");
+    await expect(kpi(page, "kpi-plays")).toHaveText("222");
   });
 
   test("errors: 500 offers retry, a failed refresh keeps the last numbers with a warning, 403 and 400 are explained", async ({ page }) => {
@@ -237,12 +290,12 @@ test.describe("organization analytics", () => {
     await expect(page.getByText("Không tải được báo cáo huấn luyện")).toBeVisible();
     mode = "ok";
     await page.getByRole("button", { name: "Thử lại" }).click();
-    await expect(page.locator(".ops-stat", { hasText: "Lượt chơi (trong kỳ)" }).locator("strong")).toHaveText("40");
+    await expect(kpi(page, "kpi-plays")).toHaveText("40");
     mode = "403";
     await page.getByRole("button", { name: "Tải lại" }).click();
     await expect(page.getByText("Không làm mới được báo cáo huấn luyện")).toBeVisible();
     await expect(page.getByText("không có quyền xem báo cáo này")).toBeVisible();
-    await expect(page.locator(".ops-stat", { hasText: "Lượt chơi (trong kỳ)" }).locator("strong")).toHaveText("40");
+    await expect(kpi(page, "kpi-plays")).toHaveText("40");
     mode = "400";
     await page.getByRole("button", { name: "Tải lại" }).click();
     await expect(page.getByText(/tối đa 90 ngày/).first()).toBeVisible();
@@ -266,7 +319,7 @@ test.describe("organization analytics", () => {
 });
 
 test.describe("admin analytics", () => {
-  test("overview tabs: training with organization names and links, revenue per currency, revenue is requested only when its tab opens", async ({ page }) => {
+  test("overview tabs: training with organization names and links, revenue per currency; the overview tiles read each default report once", async ({ page }) => {
     const urls: string[] = [];
     await signIn(page, admin);
     await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Trường An Toàn", slug: "an-toan", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }], totalCount: 1, page: 1, pageSize: 100 } }));
@@ -276,31 +329,43 @@ test.describe("admin analytics", () => {
       return route.fulfill({ json: path.endsWith("/operations") ? platformOps() : path.endsWith("/training") ? platformTraining() : revenue() });
     });
     await page.goto("/admin/overview");
-    await expect(page.locator(".ops-stat", { hasText: "Tài khoản (hiện tại)" }).locator("strong")).toHaveText("45");
+    // "kpi-accounts" exists twice: the overview's system tile and the operations report's own tile (same figure).
+    await expect(page.getByRole("group", { name: "Chỉ số vận hành" }).getByTestId("kpi-accounts").locator(".ops-kpi-value")).toHaveText("45");
+    await expect(page.getByRole("group", { name: "Tổng quan hệ thống" }).getByTestId("kpi-accounts").locator(".ops-kpi-value")).toHaveText("45");
+    await expect(kpi(page, "kpi-sessions")).toHaveText("40"); // default training report: plays
+    await expect(kpi(page, "kpi-payments")).toHaveText("7"); // default revenue report: 2 USD + 5 VND transactions
     await expect(page.locator("#ops-main").getByText("Chờ BE")).toHaveCount(0);
-    // The report section asks for operations; the "Phiên 30 ngày" tile reads the default training report. Revenue waits for its tab.
-    expect([...urls].sort()).toEqual(["/api/admin/analytics/operations", "/api/admin/analytics/training"]);
+    // The report section asks for operations; the "Phiên 30 ngày" and "Thanh toán 30 ngày" tiles read the default training and revenue reports once each.
+    expect([...urls].sort()).toEqual(["/api/admin/analytics/operations", "/api/admin/analytics/revenue", "/api/admin/analytics/training"]);
+    // Platform-only cards: accounts by role (bar, one colour per role) and organizations (donut).
+    await expect(page.getByTestId("chart-accounts").getByRole("list", { name: "Chú giải" }).getByRole("listitem")).toHaveText([/Học viên\s*40/, /Tổ chức\s*5/]);
+    await expect(page.getByTestId("chart-organizations").getByRole("list", { name: "Giá trị" }).getByRole("listitem")).toHaveText([/Hoạt động\s*5/, /Vô hiệu\s*1/]);
+    await expect(page.getByTestId("chart-buildings").locator(".ops-donut-center")).toContainText("5");
 
     await page.getByRole("tab", { name: "Huấn luyện" }).click();
     await expect(page.getByRole("link", { name: "Trường An Toàn" })).toHaveAttribute("href", "/admin/organizations/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/analytics");
-    await expect(page.getByText("Tổ chức bbbbbbbb…")).toBeVisible();
+    await expect(page.getByText("Tổ chức bbbbbbbb…").first()).toBeVisible();
     await expect(page.getByText("Sử dụng AI")).toBeVisible();
 
     await page.getByRole("tab", { name: "Doanh thu" }).click();
     await expect(page).toHaveURL(/tab=revenue/);
-    await expect(page.locator(".ops-stat", { hasText: "Đã nhận (VND)" })).toContainText("5 giao dịch");
-    await expect(page.locator(".ops-stat", { hasText: "Đã nhận (USD)" })).toContainText("2 giao dịch");
+    await expect(page.getByTestId("kpi-revenue-VND")).toContainText("5 giao dịch");
+    await expect(page.getByTestId("kpi-revenue-USD")).toContainText("2 giao dịch");
+    await expect(kpi(page, "kpi-paying")).toHaveText("4");
     await expect(page.getByText(/Không tính.*báo giá/)).toBeVisible();
-    await expect(page.getByRole("img", { name: /bằng VND: 2 ngày/ })).toBeVisible();
-    await expect(page.getByRole("img", { name: /bằng USD: 1 ngày/ })).toBeVisible();
+    const vnd = page.getByTestId("chart-revenue-VND");
+    await expect(vnd).toContainText("2 ngày có phát sinh");
+    await expect(page.getByTestId("chart-revenue-USD")).toContainText("1 ngày có phát sinh");
     await expect(page.getByRole("table", { name: "Doanh thu theo mục đích" }).getByRole("row", { name: /Renewal/ })).toBeVisible();
-    await page.getByText("Xem bảng số liệu").first().click();
-    await expect(page.getByRole("table", { name: /Doanh thu theo ngày/ }).first()).toBeVisible();
+    await vnd.getByText("Xem bảng số liệu").click();
+    // Days are sorted ascending inside one currency, so the chart's x-axis and the table read in date order.
+    await expect(vnd.getByRole("table", { name: "Doanh thu theo ngày (VND)" }).getByRole("row").nth(1)).toContainText("2026-10-01");
+    await expect(vnd.getByRole("table", { name: "Doanh thu theo ngày (VND)" }).getByRole("row", { name: /2026-10-03/ })).toContainText("2");
     expect(urls).toContain("/api/admin/analytics/revenue");
 
     await page.reload();
     await expect(page.getByRole("tab", { name: "Doanh thu" })).toHaveAttribute("aria-selected", "true");
-    await expect(page.locator(".ops-stat", { hasText: "Đã nhận (VND)" })).toBeVisible();
+    await expect(page.getByTestId("kpi-revenue-VND")).toBeVisible();
   });
 
   test("an empty revenue period is explained and an organization user cannot open the admin overview", async ({ page }) => {
@@ -348,7 +413,7 @@ test.describe("admin analytics", () => {
     await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [{ id: "org-1", name: "Fire3D Lab", slug: "fire3d-lab", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }], totalCount: 1, page: 1, pageSize: 20 } }));
     await page.route("**/api/organizations/org-1", (route) => route.fulfill({ json: { id: "org-1", name: "Fire3D Lab", slug: "fire3d-lab", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }, headers: { ETag: '"1"' } }));
     await page.goto("/admin/organizations?organization=org-1");
-    await expect(page.getByRole("region", { name: "Thông tin tổ chức" }).getByRole("link", { name: "Xem báo cáo" })).toHaveAttribute("href", "/admin/organizations/org-1/analytics");
+    await expect(page.getByTestId("organization-drawer").getByRole("link", { name: "Xem báo cáo" })).toHaveAttribute("href", "/admin/organizations/org-1/analytics");
   });
 });
 
@@ -361,7 +426,8 @@ test.describe("layout", () => {
         await signIn(page, owner);
         await page.route("**/api/organizations/me/analytics/training*", (route) => route.fulfill({ json: training() }));
         await page.goto("/workspace/analytics");
-        await expect(page.getByRole("list", { name: "Chú giải kết quả" })).toBeVisible();
+        await expect(page.getByTestId("chart-outcomes").getByRole("list", { name: "Giá trị" })).toBeVisible();
+        await expect(page.getByTestId("chart-periods").locator(".recharts-surface")).toBeVisible(); // lazy chart chunk arrived
         expect(await overflow(page)).toBeLessThanOrEqual(0);
         await page.screenshot({ path: testInfo.outputPath(`org-training-${scheme}-${width}.png`), fullPage: true });
 
@@ -372,11 +438,11 @@ test.describe("layout", () => {
         await admins.route("**/api/admin/analytics/revenue*", (route) => route.fulfill({ json: revenue() }));
         await admins.route("**/api/admin/analytics/operations*", (route) => route.fulfill({ json: platformOps() }));
         await admins.goto("/admin/overview?tab=revenue");
-        await expect(admins.getByRole("img", { name: /bằng VND/ })).toBeVisible();
+        await expect(admins.getByTestId("chart-revenue-VND").locator(".recharts-surface")).toBeVisible();
         expect(await overflow(admins)).toBeLessThanOrEqual(0);
         await admins.screenshot({ path: testInfo.outputPath(`admin-revenue-${scheme}-${width}.png`), fullPage: true });
         await admins.goto("/admin/overview");
-        await expect(admins.getByText("Tài khoản theo vai trò")).toBeVisible();
+        await expect(admins.getByTestId("chart-accounts").locator(".recharts-surface")).toBeVisible();
         expect(await overflow(admins)).toBeLessThanOrEqual(0);
         await admins.screenshot({ path: testInfo.outputPath(`admin-ops-${scheme}-${width}.png`), fullPage: true });
       });

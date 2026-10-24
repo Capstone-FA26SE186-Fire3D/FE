@@ -4,7 +4,10 @@ import { safeNext, postLoginRoute } from "../../src/features/auth/redirect";
 const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "Trường học", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: null, contact: null };
 const owner = { id: "owner", email: "owner@fire3d.test", fullName: "Nguyễn Văn A", username: "nguyen.van.a", role: 1, organizationId: "org-1", profileRevision: 1 };
 async function session(page: Page, role = 1) {
-  await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "workspace-access", refreshToken: "workspace-refresh" })));
+  await page.addInitScript(() => {
+    sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "workspace-access", refreshToken: "workspace-refresh" }));
+    localStorage.setItem("fire3d-org-tour", "done"); // the spotlight tour must never cover the page under test
+  });
   await page.route("**/api/auth/me", (route) => route.fulfill({ json: { ...owner, role }, headers: { ETag: '"1"' } }));
   await page.route("**/api/organizations/me", (route) => route.fulfill({ json: { id: "org-1", name: "FET3D Lab", address: "1 Test Street", phoneNumber: "+84123456789", profileRevision: 1 }, headers: { ETag: '"1"' } }));
   await page.route("**/api/buildings?*", (route) => {
@@ -13,25 +16,33 @@ async function session(page: Page, role = 1) {
   });
   await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building }));
   await page.route("**/api/buildings/building-1/revisions?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 20 } }));
+  await page.route("**/api/buildings/building-1/scenarios?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 20 } }));
 }
 
-test("list-first workspace searches, opens create form and creates a building", async ({ page }) => {
+/** The row's primary cell is an aria-hidden link (the row itself opens the building), so rows are found by text. */
+const buildingRow = (page: Page) => page.getByText(building.name, { exact: true });
+
+test("list-first workspace searches, opens the create modal and creates a building", async ({ page }) => {
   await session(page);
   let input: unknown;
   await page.route("**/api/buildings", async (route) => { input = route.request().postDataJSON(); await route.fulfill({ status: 201, json: building }); });
   await page.goto("/workspace/buildings");
   await expect(page.getByLabel("Tên công trình", { exact: true })).toBeHidden();
-  await expect(page.getByRole("link", { name: building.name })).toBeVisible();
+  await expect(buildingRow(page)).toBeVisible();
+  await expect(page.getByTestId("building-step")).toHaveText("Chưa có IFC"); // from the per-row revisions/scenarios reads
   await page.getByLabel("Tìm công trình").fill("không có");
   await expect(page.getByText("Chưa có công trình phù hợp.")).toBeVisible();
   await page.getByLabel("Tìm công trình").clear();
   await page.getByRole("button", { name: "Thêm công trình", exact: true }).click();
-  await page.getByLabel("Tên công trình", { exact: true }).fill("Công trình mới");
-  await page.getByLabel("Loại công trình").fill("Trường học");
-  await page.getByLabel("Số tầng").fill("3");
-  await page.getByRole("button", { name: "Tạo và thêm IFC" }).click();
+  const dialog = page.getByRole("dialog", { name: "Tạo công trình" });
+  await dialog.getByLabel("Tên công trình", { exact: true }).fill("Công trình mới");
+  // "Loại công trình" is a searchable combobox over suggested types (any typed value is also accepted).
+  await dialog.getByRole("combobox", { name: "Loại công trình" }).click();
+  await page.getByRole("option", { name: "Trường học" }).click();
+  await dialog.getByLabel("Số tầng").fill("3");
+  await dialog.getByRole("button", { name: "Tạo công trình", exact: true }).click();
   await expect.poll(() => input).toEqual({ name: "Công trình mới", buildingType: "Trường học", totalFloors: 3, location: null, contact: null });
-  await expect(page).toHaveURL(/\/workspace\/buildings\/building-1$/);
+  await expect(page).toHaveURL(/\/workspace\/buildings\/building-1\?tab=ifc$/); // straight to the IFC tab after creating
   await expect(page.getByRole("navigation", { name: "Quản lý tổ chức" }).getByRole("link", { name: "Công trình", exact: true })).toHaveAttribute("aria-current", "page");
 });
 
@@ -41,7 +52,7 @@ for (const width of [1440, 820, 375]) {
     await page.setViewportSize({ width, height: width === 1440 ? 900 : 667 });
     await page.goto("/dashboard/organization");
     await expect(page).toHaveURL(/\/workspace\/buildings$/);
-    await expect(page.getByRole("link", { name: building.name })).toBeVisible();
+    await expect(buildingRow(page)).toBeVisible(); // table row, or a card under 640px
     await page.screenshot({ path: testInfo.outputPath(`buildings-${width}.png`), fullPage: true });
     if (width < 768) {
       const toggle = page.getByRole("button", { name: "Mở điều hướng" });

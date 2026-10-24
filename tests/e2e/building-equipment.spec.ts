@@ -29,8 +29,14 @@ function view(state: State) {
   return { revisionId: "rev-1", artifactId: "art-1", metadataAvailable: true, version: state.version, items: state.items, revisionStatus: state.status, exitConfirmationRequired: state.exitRequired };
 }
 
+// IFC tab v2: equipment lives on the "Thiết bị" sub-tab, issues/BIM facts on "Kỹ thuật", the viewer on "Preview 3D" (`?sub=`).
+const ifcUrl = (sub: "equipment" | "technical" | "preview") => `/workspace/buildings/building-1?tab=ifc&revision=rev-1&sub=${sub}`;
+
 async function setup(page: Page, state: State, issues: unknown[] = []) {
-  await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" })));
+  await page.addInitScript(() => {
+    sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" }));
+    localStorage.setItem("fire3d-org-tour", "done"); // the spotlight tour must never cover the page under test
+  });
   await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ETag: '"1"' } }));
   await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ETag: '"3"' } }));
   await page.route("**/api/buildings/building-1/revisions?*", (route) => route.fulfill({ json: page1([revision(state.status)]) }));
@@ -67,7 +73,7 @@ test.describe("IFC equipment candidates", () => {
   test("IFC_EXIT_UNKNOWN: choose an existing door as exit, save with If-Match, the revision becomes ready", async ({ page }) => {
     const state: State = { version: 0, status: "NeedsFix", exitRequired: true, items: [candidate("ifc:A", DOOR_A, "door.standard", "IfcDoor"), candidate("ifc:B", DOOR_B, "door.standard", "IfcDoor"), candidate("ifc:E", EXT, "extinguisher.portable", "IfcFlowTerminal", 0.6)], patches: [] };
     await setup(page, state, [{ id: "i-1", revisionId: "rev-1", validationRunId: "run-1", processingAttemptId: "att-1", artifactId: null, issueCode: "IFC_EXIT_UNKNOWN", severity: "Warning", status: "Open", message: "No external exit door.", evidence: {}, ifcGlobalIds: [], isCurrentAttempt: true, createdAt: "2026-10-02T00:00:00Z" }]);
-    await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-1");
+    await page.goto(ifcUrl("equipment"));
     const step = page.getByTestId("exit-step");
     await expect(step).toContainText("Chọn cửa thoát ra ngoài");
     await expect(page.getByTestId("equipment-row")).toHaveCount(3);
@@ -84,14 +90,15 @@ test.describe("IFC equipment candidates", () => {
     expect(state.patches[0].ifMatch).toBe('"0"');
     expect(state.patches[0].body).toEqual({ items: [{ candidateId: "ifc:B", decision: "Retyped", catalogKey: "door.exit" }] });
     await expect(page.getByTestId("equipment-row").nth(1)).toContainText("Đã đổi loại (door.exit)");
-    // QA guidance in Vietnamese points to this step.
+    // QA guidance in Vietnamese (on the "Kỹ thuật" sub-tab) points to this step.
+    await page.getByTestId("ifc-sub-technical").click();
     await expect(page.getByTestId("issue-row").filter({ hasText: "IFC_EXIT_UNKNOWN" }).getByTestId("issue-guidance")).toContainText("Chọn một cửa có sẵn làm lối thoát");
   });
 
   test("confirm, retype and reject together; a 412 reloads the server view and keeps the unsaved choices", async ({ page }) => {
     const state: State = { version: 4, status: "ReadyForScenario", exitRequired: false, items: [candidate("ifc:A", DOOR_A, "door.standard", "IfcDoor"), candidate("ifc:E", EXT, "extinguisher.portable", "IfcFlowTerminal", 0.6, { suggestedDecision: { decision: "Rejected", catalogKey: null, fromRevisionId: "rev-0" } })], patches: [], failNext412: true };
     await setup(page, state);
-    await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-1");
+    await page.goto(ifcUrl("equipment"));
     await expect(page.getByTestId("equipment-suggestion")).toContainText("Gợi ý từ revision trước: Đã loại bỏ");
     await page.getByLabel(`Đổi loại ${DOOR_A}`).selectOption("door.standard");
     await page.getByRole("button", { name: `Loại bỏ ${EXT}` }).click();
@@ -107,14 +114,16 @@ test.describe("IFC equipment candidates", () => {
   test("a QA issue with IFC GlobalIds can be highlighted in the preview, with Vietnamese guidance", async ({ page }) => {
     const state: State = { version: 0, status: "ReadyForScenario", exitRequired: false, items: [], patches: [] };
     await setup(page, state, [{ id: "i-2", revisionId: "rev-1", validationRunId: "run-1", processingAttemptId: "att-1", artifactId: null, issueCode: "IFC_EXCESSIVE_VOIDS", severity: "Warning", status: "Open", message: "Opening could not be cut.", evidence: {}, ifcGlobalIds: [DOOR_A, DOOR_B], isCurrentAttempt: true, createdAt: "2026-10-02T00:00:00Z" }]);
-    await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-1");
+    await page.goto(ifcUrl("technical"));
     const row = page.getByTestId("issue-row").filter({ hasText: "IFC_EXCESSIVE_VOIDS" });
     await expect(row).toContainText("Không cắt được lỗ cửa");
     await expect(row.getByTestId("issue-guidance")).toContainText("Kiểm tra cửa và tường");
     await expect(row).toContainText(DOOR_A);
+    // Highlighting switches to the "Preview 3D" sub-tab; clearing lives in the viewer's floating toolbar.
     await row.getByTestId("issue-highlight").click();
+    await expect(page).toHaveURL(/sub=preview/);
     await expect(page.getByTestId("preview-highlight-ids")).toContainText(`${DOOR_A}, ${DOOR_B}`);
-    await page.getByRole("button", { name: "Bỏ đánh dấu" }).click();
+    await page.getByRole("toolbar", { name: "Thao tác preview" }).getByRole("button", { name: "Bỏ đánh dấu cấu kiện" }).click();
     await expect(page.getByTestId("preview-highlight-ids")).toHaveCount(0);
   });
 
@@ -122,7 +131,7 @@ test.describe("IFC equipment candidates", () => {
     const state: State = { version: 0, status: "Processing", exitRequired: false, items: [], patches: [] };
     await setup(page, state);
     await page.route("**/api/revisions/rev-1/equipment-candidates", (route) => route.fulfill({ status: 409, contentType: "application/problem+json", body: JSON.stringify({ status: 409, title: "x", code: "EQUIPMENT_CANDIDATES_UNAVAILABLE" }) }));
-    await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-1");
+    await page.goto(ifcUrl("equipment"));
     await expect(page.getByTestId("equipment-panel")).toContainText("Chưa có hình học được chấp nhận");
   });
 });
@@ -140,7 +149,7 @@ for (const width of [375, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     const state: State = { version: 0, status: "NeedsFix", exitRequired: true, items: [candidate("ifc:A", DOOR_A, "door.standard", "IfcDoor"), candidate("ifc:E", EXT, "extinguisher.portable", "IfcFlowTerminal", 0.6)], patches: [] };
     await setup(page, state);
-    await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-1");
+    await page.goto(ifcUrl("equipment"));
     await expect(page.getByTestId("exit-step")).toBeVisible();
     await page.getByTestId("equipment-panel").scrollIntoViewIfNeeded();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
@@ -164,8 +173,8 @@ test.describe("BIM facts of spaces", () => {
       fact("f-3", EXT, "Category", null),
     ];
     await page.route("**/api/revisions/rev-1/bim-facts?*", (route) => route.fulfill({ json: { items, totalCount: items.length, page: 1, pageSize: 20 } }));
-    await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-1");
-    await page.getByRole("tab", { name: "BIM facts", exact: true }).click();
+    await page.goto(ifcUrl("technical"));
+    await page.getByRole("button", { name: "BIM facts", exact: true }).click(); // chip tab of the Kỹ thuật sub-tab
     const rows = page.getByTestId("fact-row");
     await expect(rows).toHaveCount(6);
     // Grouped by GlobalId, then Name, LongName, Category.
@@ -189,8 +198,8 @@ test.describe("BIM facts of spaces", () => {
     await setup(page, state);
     const items = [{ id: "f-1", revisionId: "rev-1", ifcGlobalId: DOOR_B, entityType: "IfcDoor", propertyPath: "Dimensions.Height", value: null, sourceHash: "c".repeat(64), qualityFlags: [{ code: "NEW_FLAG", severity: "Info" }, "MissingValue"], createdAt: "2026-10-17T00:00:00Z" }];
     await page.route("**/api/revisions/rev-1/bim-facts?*", (route) => route.fulfill({ json: { items, totalCount: 1, page: 1, pageSize: 20 } }));
-    await page.goto("/workspace/buildings/building-1?tab=ifc&revision=rev-1");
-    await page.getByRole("tab", { name: "BIM facts", exact: true }).click();
+    await page.goto(ifcUrl("technical"));
+    await page.getByRole("button", { name: "BIM facts", exact: true }).click(); // chip tab of the Kỹ thuật sub-tab
     await expect(page.getByTestId("fact-flag")).toHaveText(["NEW_FLAG", "Thiếu giá trị (MissingValue)"]);
     await expect(page.getByTestId("fact-row")).toContainText("IfcDoor");
     await expect(page.getByTestId("facts-unnamed")).toHaveCount(0);

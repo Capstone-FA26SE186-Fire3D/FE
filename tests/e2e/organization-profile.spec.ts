@@ -11,7 +11,7 @@ async function signIn(page: Page, user: object = owner) {
   await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
 }
 
-test("shows name, read-only slug, address and phone only, and saves with If-Match", async ({ page }) => {
+test("shows name, read-only slug, address and phone only (the API has no other field), and saves with If-Match", async ({ page }) => {
   await signIn(page);
   const puts: Array<{ ifMatch: string | undefined; body: unknown }> = [];
   await page.route("**/api/organizations/me", async (route) => {
@@ -24,20 +24,22 @@ test("shows name, read-only slug, address and phone only, and saves with If-Matc
   await page.goto("/workspace/profile");
   await expect(page.getByRole("heading", { level: 1, name: "Hồ sơ tổ chức" })).toBeVisible();
   await expect(page.getByLabel("Tên tổ chức")).toHaveValue("Trường ĐH Bách Khoa");
-  await expect(page.getByLabel("Mã định danh (slug)")).toHaveValue("bach-khoa");
-  await expect(page.getByLabel("Mã định danh (slug)")).toHaveAttribute("readonly", "");
+  await expect(page.getByLabel("Mã tổ chức (chỉ đọc)")).toHaveValue("bach-khoa");
+  await expect(page.getByLabel("Mã tổ chức (chỉ đọc)")).toHaveAttribute("readonly", "");
   await expect(page.getByLabel("Địa chỉ")).toHaveValue("268 Lý Thường Kiệt");
-  await expect(page.getByLabel("Điện thoại")).toHaveValue("028 3864 0000");
-  for (const absent of ["Người liên hệ", "Email", "Mã số thuế", "Thành viên"]) await expect(page.getByLabel(absent)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Lưu thay đổi" })).toBeDisabled();
+  await expect(page.getByLabel("Số điện thoại")).toHaveValue("028 3864 0000");
+  for (const absent of ["Người liên hệ", "Email", "Mã số thuế", "Thành viên", "Tỉnh", "Quận"]) await expect(page.getByLabel(absent)).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Lưu hồ sơ" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Hoàn tác" })).toBeDisabled();
   await page.getByLabel("Tên tổ chức").fill("Trường ĐH Bách Khoa 2");
-  await page.getByRole("button", { name: "Lưu thay đổi" }).click();
+  await expect(page.getByRole("button", { name: "Hoàn tác" })).toBeEnabled();
+  await page.getByRole("button", { name: "Lưu hồ sơ" }).click();
   await expect.poll(() => puts.length).toBe(1);
   expect(puts[0]).toEqual({ ifMatch: '"1"', body: { name: "Trường ĐH Bách Khoa 2", address: "268 Lý Thường Kiệt", phoneNumber: "028 3864 0000" } });
   await expect(page.getByText("Đã lưu hồ sơ tổ chức")).toBeVisible();
 });
 
-test("412 keeps my values and offers overwrite or the latest version", async ({ page }) => {
+test("412 keeps my edits: Tải bản mới refreshes the ETag and the untouched fields, then the save goes through", async ({ page }) => {
   await signIn(page);
   let current = 1;
   const patches: Array<string | undefined> = [];
@@ -48,16 +50,21 @@ test("412 keeps my values and offers overwrite or the latest version", async ({ 
       current += 1;
       return route.fulfill({ json: profile(current, { name: "Giá trị của tôi" }), headers: { ETag: `"${current}"` } });
     }
-    return route.fulfill({ json: profile(current, current > 1 || patches.length ? { name: "Bản của người khác" } : {}), headers: { ETag: `"${current}"` } });
+    return route.fulfill({ json: profile(current, current > 1 || patches.length ? { name: "Bản của người khác", address: "Địa chỉ mới của người khác" } : {}), headers: { ETag: `"${current}"` } });
   });
   await page.goto("/workspace/profile");
   await expect(page.getByLabel("Tên tổ chức")).toHaveValue("Trường ĐH Bách Khoa");
   current = 2; // someone else saved meanwhile
   await page.getByLabel("Tên tổ chức").fill("Giá trị của tôi");
-  await page.getByRole("button", { name: "Lưu thay đổi" }).click();
-  await expect(page.getByText("Dữ liệu đã thay đổi trên máy chủ (412)")).toBeVisible();
+  await page.getByRole("button", { name: "Lưu hồ sơ" }).click();
+  await expect(page.getByText("Hồ sơ đã được cập nhật ở nơi khác")).toBeVisible();
   await expect(page.getByLabel("Tên tổ chức")).toHaveValue("Giá trị của tôi");
-  await page.getByRole("button", { name: "Ghi đè bằng giá trị của tôi" }).click();
+  await page.getByRole("button", { name: "Tải bản mới" }).click();
+  // My edit stays; the field I did not touch follows the newer record.
+  await expect(page.getByLabel("Tên tổ chức")).toHaveValue("Giá trị của tôi");
+  await expect(page.getByLabel("Địa chỉ")).toHaveValue("Địa chỉ mới của người khác");
+  await expect(page.getByText("Hồ sơ đã được cập nhật ở nơi khác")).toHaveCount(0);
+  await page.getByRole("button", { name: "Lưu hồ sơ" }).click();
   await expect(page.getByText("Đã lưu hồ sơ tổ chức")).toBeVisible();
   expect(patches).toEqual(['"1"', '"2"']);
 });

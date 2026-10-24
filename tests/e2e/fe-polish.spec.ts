@@ -115,13 +115,11 @@ test("two URL filters changed before the router settles both survive", async ({ 
   await seed(page, "plain-token");
   await mockOrg(page, emptyPage);
   await page.goto("/workspace/buildings");
-  await expect(page.getByLabel("Trạng thái")).toBeVisible();
-  const second = await page.getByLabel("Trạng thái").locator("option").nth(1).getAttribute("value");
-  // Fire both changes in the same task, before Next has applied the first navigation.
+  // Open the status chip so its options exist, then fire both changes in the same task, before Next applies the first navigation.
+  await page.getByRole("button", { name: /^Trạng thái:/ }).click();
+  const second = "archived";
   await page.evaluate((value) => {
-    const select = document.querySelector<HTMLSelectElement>('select[aria-label="Trạng thái"]')!;
-    select.value = value ?? "";
-    select.dispatchEvent(new Event("change", { bubbles: true }));
+    document.querySelector<HTMLButtonElement>(`[role=listbox][aria-label="Trạng thái"] [role=option][data-value="${value}"]`)!.click();
     document.querySelector<HTMLButtonElement>('button[aria-label="Dạng thẻ"]')!.click();
   }, second);
   await expect(page).toHaveURL(/view=cards/);

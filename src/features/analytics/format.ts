@@ -25,4 +25,13 @@ export function formatMoney(amount: number, currency: string): string {
   }
 }
 
-export const shortId = (id: string) => (id.length > 12 ? `${id.slice(0, 8)}…` : id);
+/** Axis tick for money: "3,5 Tr ₫" instead of the full amount, which would not fit the 40px axis. */
+export function compactMoney(amount: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat("vi-VN", { style: "currency", currency, notation: "compact", maximumFractionDigits: 1 }).format(amount);
+  } catch {
+    return `${amount.toLocaleString("vi-VN", { notation: "compact", maximumFractionDigits: 1 })} ${currency}`;
+  }
+}
+
+export const shortId =(id: string) => (id.length > 12 ? `${id.slice(0, 8)}…` : id);

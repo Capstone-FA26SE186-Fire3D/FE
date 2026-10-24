@@ -1,139 +1,181 @@
 "use client";
 
 import Link from "next/link";
-import { Panel, Stat } from "@/components/ui/panel";
+import { useState } from "react";
+import { ChartCard, legendOf } from "@/components/charts/chart-card";
+import { colorAt, seriesColor, shortDate, type Series } from "@/components/charts/chart-config";
+import { AreaChart, Donut, GroupedBars } from "@/components/charts/lazy";
+import { RankedBars } from "@/components/charts/ranked-bars";
+import { Button } from "@/components/ui/button";
+import { Drawer } from "@/components/ui/dialog";
+import { Panel } from "@/components/ui/panel";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Table } from "@/components/ui/table";
 import { routes } from "@/configs/routes";
 import { fmt, formatRate, formatSeconds, shortId } from "../format";
-import type { AiUsage, TrainingReport } from "../types";
+import { OUTCOMES, type AiUsage, type GroupBy, type TrainingReport } from "../types";
 import { GROUP_LABELS } from "./filters";
-import { DataTable, EmptyReport, outcomeLabels, OutcomeBar, PairBars } from "./charts";
+import { EmptyReport, KpiTile, MiniStat, Num, outcomeLabels, ReportTable } from "./charts";
 import styles from "./analytics.module.css";
 
-const modeLabels: Record<string, string> = { Learn: "Learn", Guided: "Hướng dẫn (Guided Drill)", Assessment: "Đánh giá (Assessment)" };
+/** Mode names as the Figma axis prints them. */
+const modeLabels: Record<string, string> = { Learn: "Learn", Guided: "Guided Drill", Assessment: "Assessment" };
 // v7 request statuses (BE#89). analytics_ai_usage on BE main still keys `requests` by the pre-v7 names, which no row has
 // after the migration (always 0): those keys are hidden rather than shown as statuses that no longer exist.
 const aiStatusLabels: Record<string, string> = { Accepted: "Đang chờ", Processing: "Đang xử lý", Succeeded: "Thành công", Failed: "Thất bại", NeedsReconcile: "Cần đối soát", Rejected: "Bị từ chối" };
 const LEGACY_AI_STATUSES = new Set(["Queued", "Running", "InsufficientEvidence", "SafetyRejected"]);
 
-function AiUsagePanel({ usage }: { usage: AiUsage }) {
+const TIME_GROUPS: ReadonlySet<GroupBy> = new Set<GroupBy>(["day", "week", "month"]);
+const periodSeries: Series[] = [
+  { key: "plays", label: "Lượt chơi", color: seriesColor.plays },
+  { key: "completed", label: "Có kết quả", color: seriesColor.completed },
+  { key: "passed", label: "Đạt", color: seriesColor.passed },
+];
+const modeSeries: Series[] = [{ key: "plays", label: "Lượt chơi", color: seriesColor.plays }, { key: "completed", label: "Có kết quả", color: seriesColor.completed }];
+const outcomeColor = { Passed: seriesColor.passed, NotPassed: seriesColor.notPassed, Incomplete: seriesColor.incomplete, NotAssessed: seriesColor.notAssessed } as const;
+
+function AiUsageCard({ usage }: { usage: AiUsage }) {
   const settled = usage.settledUnits;
   const statuses = Object.entries(usage.requests).filter(([status]) => !LEGACY_AI_STATUSES.has(status));
-  return <Panel title="Sử dụng AI" description="Đơn vị quota đã chốt trong kỳ; đặt trước và cần đối soát là số hiện tại, tính riêng.">
-    <div className="ops-stack">
-      <div className="ops-grid ops-grid-3">
-        <Stat label="Đã chốt (trong kỳ)" value={settled.length ? settled.map((item) => `${fmt(item.units)} ${item.quotaUnit}`).join(" · ") : "0"} hint={settled.length ? undefined : "Chưa dùng quota nào trong kỳ"} />
-        <Stat label="Đang đặt trước (hiện tại)" value={usage.openReservations.length ? usage.openReservations.map((item) => `${fmt(item.units)} ${item.quotaUnit}`).join(" · ") : "0"} />
-        <Stat label="Cần đối soát (hiện tại)" value={fmt(usage.needsReconcile.requests)} hint={`${fmt(usage.needsReconcile.reservedUnits)} đơn vị đang giữ chỗ`} />
-      </div>
-      {statuses.length > 0 && <>
-        <ul className={styles.rows} aria-label="Yêu cầu AI theo trạng thái (tạo trong kỳ)">
-          {statuses.map(([status, count]) => <li key={status} className={styles.row}><span>{aiStatusLabels[status] ?? status}</span><strong>{fmt(count)}</strong></li>)}
-        </ul>
-      </>}
+  const quota = (items: AiUsage["settledUnits"]) => (items.length ? items.map((item) => `${fmt(item.units)} ${item.quotaUnit}`).join(" · ") : "0");
+  return <Panel title="Sử dụng AI" description="Đơn vị quota đã chốt trong kỳ; đặt trước và cần đối soát là số hiện tại, tính riêng." data-testid="card-ai-usage">
+    <div className={styles.miniRow}>
+      <MiniStat label="Đã chốt (trong kỳ)" value={quota(settled)} hint={settled.length ? undefined : "Chưa dùng quota nào trong kỳ"} />
+      <MiniStat label="Đang đặt trước (hiện tại)" value={quota(usage.openReservations)} />
+      <MiniStat label="Cần đối soát (hiện tại)" value={fmt(usage.needsReconcile.requests)} hint={`${fmt(usage.needsReconcile.reservedUnits)} đơn vị đang giữ chỗ`} />
     </div>
+    {statuses.length > 0 && <ul className={styles.statusList} aria-label="Yêu cầu AI theo trạng thái (tạo trong kỳ)">
+      {statuses.map(([status, count]) => <li key={status}><span>{aiStatusLabels[status] ?? status}</span><strong>{fmt(count)}</strong></li>)}
+    </ul>}
   </Panel>;
 }
 
 /**
- * Training report of the cohort of real learner sessions started in the period. Playtests and package preparation are
- * never counted (server definition). Empty periods are an explanation, not an error.
+ * Training report (Figma "Báo cáo · Huấn luyện"): KPI tiles with the period trend, sessions per period beside the
+ * outcome donut, then scenarios / modes / duration. Only real learner sessions started in the period are counted
+ * (server definition); playtests and package preparation never are. An empty period is an explanation, not an error.
  */
-export function TrainingReportView({ data, organizationNames, showOrganizationLinks }: { data: TrainingReport; organizationNames?: Map<string, string>; showOrganizationLinks?: boolean }) {
+export function TrainingReportView({ data, groupBy: requestedGroup, organizationNames, showOrganizationLinks }: { data: TrainingReport; /** Grouping the request asked for, used when the server does not echo `filters.groupBy`. */ groupBy?: GroupBy; organizationNames?: Map<string, string>; showOrganizationLinks?: boolean }) {
+  const [scenarioTable, setScenarioTable] = useState(false);
   const empty = data.plays === 0;
-  const assessmentText = data.assessment.assessed > 0 ? `${fmt(data.assessment.passed)} đạt / ${fmt(data.assessment.assessed)} phiên có chấm điểm` : "Chưa có phiên Đạt/Chưa đạt";
-  return <>
-    <p className={styles.note}>
-      Chỉ tính <strong>phiên học thật</strong> (học viên bắt đầu trong khoảng thời gian). <strong>Không tính</strong> playtest của tổ chức và bước chuẩn bị gói. Hoàn thành tách khỏi đạt/chưa đạt; không phải chứng chỉ.
-    </p>
+  const groupBy = data.groupBy ?? requestedGroup ?? null;
+  const timeSeries = Boolean(groupBy && TIME_GROUPS.has(groupBy));
+  const timeline = data.cohorts && timeSeries ? data.cohorts : null;
+  const periods = timeline?.map((row) => ({ period: row.label, plays: row.plays, completed: row.completed, passed: row.passed })) ?? [];
+  const spark = (pick: (row: NonNullable<typeof timeline>[number]) => number) => timeline?.map(pick);
+  // Figma also shows a "+12%" delta chip on the first tile: the API has no previous-period figure, so no delta is drawn.
 
-    <div className="ops-grid ops-grid-4" style={{ marginBottom: 16 }}>
-      <Stat label="Lượt chơi (trong kỳ)" value={fmt(data.plays)} hint="Phiên bắt đầu trong kỳ" />
-      <Stat label="Học viên khác nhau" value={fmt(data.uniqueTrainees)} hint="Đếm một lần dù chơi nhiều phiên" />
-      <Stat label="Đã có kết quả" value={fmt(data.completed)} hint={`Tỷ lệ ${formatRate(data.completionRate, "chưa có mẫu (0 lượt chơi)")}`} />
-      <Stat label="Đang chơi (hiện tại)" value={fmt(data.activeSessions)} hint={data.activeWindowSeconds ? `Có nhịp trong ${fmt(data.activeWindowSeconds)} giây gần nhất; không theo kỳ` : "Không theo kỳ"} />
+  const outcomeTotal = OUTCOMES.reduce((sum, outcome) => sum + data.outcomes[outcome], 0);
+  const assessmentText = data.assessment.assessed > 0 ? `${fmt(data.assessment.passed)} đạt / ${fmt(data.assessment.assessed)} phiên có chấm điểm` : "Chưa có phiên Đạt/Chưa đạt";
+  const scenarios = [...data.byScenario].sort((a, b) => b.plays - a.plays);
+  const scenarioName = (row: TrainingReport["byScenario"][number]) => row.scenarioName ?? `Kịch bản ${shortId(row.scenarioId)}`;
+  const modes = data.byMode.map((row) => ({ mode: modeLabels[row.mode] ?? row.mode, plays: row.plays, completed: row.completed }));
+  const organizationName = (id: string) => organizationNames?.get(id) ?? `Tổ chức ${shortId(id)}`;
+
+  return <div className={styles.report}>
+    <div className={styles.kpis} role="group" aria-label="Chỉ số huấn luyện">
+      <KpiTile label="Lượt chơi (trong kỳ)" value={data.plays} hint="Phiên bắt đầu trong kỳ" spark={spark((row) => row.plays)} sparkColor={seriesColor.plays} data-testid="kpi-plays" />
+      <KpiTile label="Học viên khác nhau" value={data.uniqueTrainees} hint="Đếm một lần dù chơi nhiều phiên" spark={spark((row) => row.uniqueTrainees)} sparkColor={seriesColor.plays} data-testid="kpi-trainees" />
+      <KpiTile label="Đã có kết quả" value={data.completed} hint={`Tỷ lệ hoàn thành ${formatRate(data.completionRate, "chưa có mẫu (0 lượt chơi)")}`} spark={spark((row) => row.completed)} sparkColor={seriesColor.completed} data-testid="kpi-completed" />
+      <KpiTile label="Đang chơi (hiện tại)" value={data.activeSessions} hint={data.activeWindowSeconds ? `Nhịp trong ${fmt(data.activeWindowSeconds)} giây gần nhất; không theo kỳ` : "Không theo kỳ"} data-testid="kpi-active" />
     </div>
 
-    {empty && <EmptyReport title="Chưa có lượt chơi trong khoảng thời gian này">Đây là kết quả hợp lệ, không phải lỗi. Thử mở rộng khoảng thời gian (tối đa 90 ngày) hoặc kiểm tra Building đã có kịch bản phát hành và học viên đã bắt đầu phiên. Playtest và bước chuẩn bị gói không được tính.</EmptyReport>}
+    {empty && <EmptyReport title="Chưa có lượt chơi trong khoảng thời gian này">Đây là kết quả hợp lệ, không phải lỗi. Thử mở rộng khoảng thời gian (tối đa 90 ngày) hoặc kiểm tra công trình đã có kịch bản phát hành và học viên đã bắt đầu phiên. Playtest và bước chuẩn bị gói không được tính.</EmptyReport>}
 
-    {!empty && <div className={styles.leadGrid}>
-      <Panel title="Kết quả của phiên" description="Kết quả do máy chủ ghi nhận. Phiên chưa có kết quả không nằm trong các nhóm này.">
-        <OutcomeBar outcomes={data.outcomes} total={data.completed} />
-        <p className={styles.note} style={{ marginTop: 12 }}>Tỷ lệ đạt = Đạt / (Đạt + Chưa đạt): <strong>{formatRate(data.assessment.passRate, "chưa có mẫu")}</strong> · {assessmentText}</p>
-        <DataTable caption="Kết quả của phiên">
-          <thead><tr><th>Kết quả</th><th className={styles.num}>Số phiên</th></tr></thead>
-          <tbody>{(Object.keys(outcomeLabels) as Array<keyof typeof outcomeLabels>).map((outcome) => <tr key={outcome}><td>{outcomeLabels[outcome]}</td><td className={styles.num}>{fmt(data.outcomes[outcome])}</td></tr>)}</tbody>
-        </DataTable>
-      </Panel>
+    {!empty && <>
+      <div className={styles.lead}>
+        <ChartCard title={`Phiên theo ${(timeSeries && groupBy ? GROUP_LABELS[groupBy] : GROUP_LABELS.day).toLowerCase()}`} description="Lượt chơi · Có kết quả · Đạt" legend={legendOf(periodSeries, colorAt)} height={190} empty={periods.length === 0}
+          emptyText={groupBy && !timeSeries ? "Nhóm theo công trình/kịch bản không có trục thời gian; xem bảng nhóm bên dưới." : "Chưa có dữ liệu trong khoảng này"} data-testid="chart-periods"
+          table={timeline && <CohortTable rows={timeline} />}>
+          <AreaChart data={periods} xKey="period" series={periodSeries} height={190} formatX={shortDate} />
+        </ChartCard>
 
-      <Panel title="Theo kịch bản" description="Tối đa 100 kịch bản có nhiều lượt chơi nhất.">
-        {data.byScenario.length ? <Table caption="Lượt chơi theo kịch bản">
-          <thead><tr><th>Kịch bản</th><th className={styles.num}>Lượt chơi</th><th className={styles.num}>Có kết quả</th><th className={styles.num}>Đạt</th></tr></thead>
-          <tbody>{data.byScenario.map((row) => <tr key={row.scenarioId}><td>{row.scenarioName ?? `Kịch bản ${shortId(row.scenarioId)}`}</td><td className={styles.num}>{fmt(row.plays)}</td><td className={styles.num}>{fmt(row.completed)}</td><td className={styles.num}><StatusBadge tone={row.passed > 0 ? "success" : "neutral"}>{fmt(row.passed)}</StatusBadge></td></tr>)}</tbody>
-        </Table> : <p className={styles.muted}>Chưa có kịch bản nào có lượt chơi trong kỳ.</p>}
-      </Panel>
-    </div>}
+        <ChartCard title="Kết quả phiên" description="Do máy chủ ghi nhận" empty={outcomeTotal === 0} emptyText="Chưa có phiên nào có kết quả trong khoảng này" data-testid="chart-outcomes"
+          footer={<>Tỷ lệ đạt = Đạt / (Đạt + Chưa đạt) = <strong>{formatRate(data.assessment.passRate, "chưa có mẫu")}</strong> · {assessmentText}{outcomeTotal < data.completed && <> · {fmt(data.completed - outcomeTotal)} phiên chưa có kết quả được máy chủ nhận.</>}</>}
+          table={<ReportTable caption="Kết quả của phiên">
+            <thead><tr><th>Kết quả</th><Num header>Số phiên</Num><Num header>Tỷ lệ</Num></tr></thead>
+            <tbody>{OUTCOMES.map((outcome) => <tr key={outcome}><td>{outcomeLabels[outcome]}</td><Num>{fmt(data.outcomes[outcome])}</Num><Num>{outcomeTotal ? formatRate(data.outcomes[outcome] / outcomeTotal) : "—"}</Num></tr>)}</tbody>
+          </ReportTable>}>
+          <Donut size={140} slices={OUTCOMES.map((outcome) => ({ key: outcome, label: outcomeLabels[outcome], value: data.outcomes[outcome], color: outcomeColor[outcome] }))} center={{ value: fmt(outcomeTotal), caption: "phiên" }} />
+        </ChartCard>
+      </div>
 
-    {!empty && <div className="ops-grid ops-grid-2" style={{ marginTop: 16 }}>
-      <Panel title="Thời lượng" description="Từ lúc khởi chạy đến lúc kết thúc của phiên đã có kết quả (giờ máy chủ).">
-        <div className="ops-grid ops-grid-3">
-          <Stat label="Trung bình" value={formatSeconds(data.duration.averageSeconds)} />
-          <Stat label="Trung vị" value={formatSeconds(data.duration.medianSeconds)} />
-          <Stat label="Số phiên đo được" value={fmt(data.duration.sessions)} />
-        </div>
-      </Panel>
+      <div className={styles.trio}>
+        <ChartCard title="Theo kịch bản" description="Top 8 theo lượt chơi" height={120} empty={scenarios.length === 0} emptyText="Chưa có kịch bản nào có lượt chơi trong kỳ" data-testid="chart-scenarios"
+          actions={scenarios.length > 0 && <Button size="sm" variant="secondary" onClick={() => setScenarioTable(true)}>Xem bảng</Button>}>
+          <RankedBars label="Lượt chơi theo kịch bản" rows={scenarios.slice(0, 8).map((row) => ({ key: row.scenarioId, label: scenarioName(row), value: row.plays, hint: `Có kết quả ${fmt(row.completed)} · Đạt ${fmt(row.passed)}` }))} />
+        </ChartCard>
 
-      <Panel title="Theo chế độ" description="Lượt chơi (thanh xanh) và số phiên đã có kết quả (thanh cam).">
-        <PairBars label="Lượt chơi theo chế độ" rows={data.byMode.map((row) => ({ key: row.mode, label: modeLabels[row.mode] ?? row.mode, plays: row.plays, completed: row.completed }))} />
-        <DataTable caption="Lượt chơi theo chế độ">
-          <thead><tr><th>Chế độ</th><th className={styles.num}>Lượt chơi</th><th className={styles.num}>Có kết quả</th></tr></thead>
-          <tbody>{data.byMode.map((row) => <tr key={row.mode}><td>{modeLabels[row.mode] ?? row.mode}</td><td className={styles.num}>{fmt(row.plays)}</td><td className={styles.num}>{fmt(row.completed)}</td></tr>)}</tbody>
-        </DataTable>
-      </Panel>
+        <ChartCard title="Theo chế độ" description="Lượt chơi và phiên có kết quả" legend={legendOf(modeSeries, colorAt)} height={150} empty={modes.every((row) => row.plays === 0)} data-testid="chart-modes"
+          table={<ReportTable caption="Lượt chơi theo chế độ">
+            <thead><tr><th>Chế độ</th><Num header>Lượt chơi</Num><Num header>Có kết quả</Num></tr></thead>
+            <tbody>{modes.map((row) => <tr key={row.mode}><td>{row.mode}</td><Num>{fmt(row.plays)}</Num><Num>{fmt(row.completed)}</Num></tr>)}</tbody>
+          </ReportTable>}>
+          <GroupedBars data={modes} xKey="mode" series={modeSeries} height={150} />
+        </ChartCard>
 
-      <Panel title="Theo bài huấn luyện" description="Tối đa 100 bài có nhiều lượt chơi nhất.">
-        {data.byTraining.length ? <>
-          <PairBars label="Lượt chơi theo bài huấn luyện" rows={data.byTraining.slice(0, 8).map((row) => ({ key: row.trainingId, label: row.trainingName ?? `Bài ${shortId(row.trainingId)}`, plays: row.plays, completed: row.completed }))} />
-          <DataTable caption="Lượt chơi theo bài huấn luyện" summary={`Xem bảng đầy đủ (${data.byTraining.length} bài)`}>
-            <thead><tr><th>Bài</th><th className={styles.num}>Lượt chơi</th><th className={styles.num}>Có kết quả</th><th className={styles.num}>Đạt</th></tr></thead>
-            <tbody>{data.byTraining.map((row) => <tr key={row.trainingId}><td>{row.trainingName && <div>{row.trainingName}</div>}<span className={styles.mono}>{row.trainingId}</span></td><td className={styles.num}>{fmt(row.plays)}</td><td className={styles.num}>{fmt(row.completed)}</td><td className={styles.num}>{fmt(row.passed)}</td></tr>)}</tbody>
-          </DataTable>
-        </> : <p className={styles.muted}>Chưa có bài huấn luyện nào có lượt chơi trong kỳ.</p>}
-      </Panel>
-      {data.byBuilding.length > 0 && <Panel title="Theo công trình" description="Tối đa 100 công trình có nhiều lượt chơi nhất.">
-        <Table caption="Lượt chơi theo công trình">
-          <thead><tr><th>Công trình</th><th className={styles.num}>Lượt chơi</th><th className={styles.num}>Học viên</th><th className={styles.num}>Có kết quả</th></tr></thead>
-          <tbody>{data.byBuilding.map((row) => <tr key={row.buildingId}><td>{row.buildingName ?? `Công trình ${shortId(row.buildingId)}`}</td><td className={styles.num}>{fmt(row.plays)}</td><td className={styles.num}>{fmt(row.uniqueTrainees)}</td><td className={styles.num}>{fmt(row.completed)}</td></tr>)}</tbody>
-        </Table>
-      </Panel>}
-    </div>}
+        <ChartCard title="Thời lượng phiên" description="Từ lúc khởi chạy đến lúc kết thúc (giờ máy chủ)" height={120} data-testid="chart-duration">
+          <div className={styles.miniRow}>
+            <MiniStat label="Trung bình" value={formatSeconds(data.duration.averageSeconds)} />
+            <MiniStat label="Trung vị" value={formatSeconds(data.duration.medianSeconds)} />
+            <MiniStat label="Số phiên đo" value={fmt(data.duration.sessions)} />
+          </div>
+          {/* Figma also draws "Phân bố theo nhóm thời lượng": the API returns no duration histogram, so only the three figures are shown. */}
+        </ChartCard>
+      </div>
 
-    {data.cohorts && <Panel title={`Nhóm số liệu${data.groupBy ? ` · ${GROUP_LABELS[data.groupBy]}` : ""}`} description="Mỗi nhóm đếm học viên khác nhau riêng, không cộng dồn giữa các nhóm." style={{ marginTop: 16 }}>
-      {data.cohorts.length ? <Table caption="Số liệu theo nhóm">
-        <thead><tr><th>Nhóm</th><th className={styles.num}>Lượt chơi</th><th className={styles.num}>Học viên</th><th className={styles.num}>Có kết quả</th><th className={styles.num}>Bỏ dở</th><th className={styles.num}>Chờ đồng bộ</th><th className={styles.num}>Đạt / chấm</th><th className={styles.num}>Tỷ lệ đạt</th><th className={styles.num}>Thời lượng TB</th></tr></thead>
-        <tbody>{data.cohorts.map((row) => <tr key={row.key}><td>{row.label}</td><td className={styles.num}>{fmt(row.plays)}</td><td className={styles.num}>{fmt(row.uniqueTrainees)}</td><td className={styles.num}>{fmt(row.completed)}</td><td className={styles.num}>{fmt(row.abandoned)}</td><td className={styles.num}>{fmt(row.awaitingSync)}</td><td className={styles.num}>{fmt(row.passed)} / {fmt(row.assessed)}</td><td className={styles.num}>{formatRate(row.passRate, "—")}</td><td className={styles.num}>{formatSeconds(row.averageDurationSeconds)}</td></tr>)}</tbody>
-      </Table> : <p className={styles.muted}>Chưa có nhóm nào trong kỳ.</p>}
+      {(data.byTraining.length > 0 || data.byBuilding.length > 0 || data.byOrganization) && <div className={styles.trio}>
+        {data.byTraining.length > 0 && <ChartCard title="Theo bài huấn luyện" description="Tối đa 100 bài có nhiều lượt chơi nhất" height={120} data-testid="chart-trainings"
+          table={<ReportTable caption="Lượt chơi theo bài huấn luyện">
+            <thead><tr><th>Bài</th><Num header>Lượt chơi</Num><Num header>Có kết quả</Num><Num header>Đạt</Num></tr></thead>
+            <tbody>{data.byTraining.map((row) => <tr key={row.trainingId}><td>{row.trainingName && <div>{row.trainingName}</div>}<span className={styles.mono}>{row.trainingId}</span></td><Num>{fmt(row.plays)}</Num><Num>{fmt(row.completed)}</Num><Num>{fmt(row.passed)}</Num></tr>)}</tbody>
+          </ReportTable>}>
+          <RankedBars label="Lượt chơi theo bài huấn luyện" color={seriesColor.plays} rows={data.byTraining.slice(0, 8).map((row) => ({ key: row.trainingId, label: row.trainingName ?? `Bài ${shortId(row.trainingId)}`, value: row.plays, hint: `Có kết quả ${fmt(row.completed)} · Đạt ${fmt(row.passed)}` }))} />
+        </ChartCard>}
+        {data.byBuilding.length > 0 && <ChartCard title="Theo công trình" description="Tối đa 100 công trình có nhiều lượt chơi nhất" height={120} data-testid="chart-buildings"
+          table={<ReportTable caption="Lượt chơi theo công trình">
+            <thead><tr><th>Công trình</th><Num header>Lượt chơi</Num><Num header>Học viên</Num><Num header>Có kết quả</Num></tr></thead>
+            <tbody>{data.byBuilding.map((row) => <tr key={row.buildingId}><td>{row.buildingName ?? `Công trình ${shortId(row.buildingId)}`}</td><Num>{fmt(row.plays)}</Num><Num>{fmt(row.uniqueTrainees)}</Num><Num>{fmt(row.completed)}</Num></tr>)}</tbody>
+          </ReportTable>}>
+          <RankedBars label="Lượt chơi theo công trình" color={seriesColor.plays} rows={data.byBuilding.slice(0, 8).map((row) => ({ key: row.buildingId, label: row.buildingName ?? `Công trình ${shortId(row.buildingId)}`, value: row.plays, hint: `Học viên ${fmt(row.uniqueTrainees)} · Có kết quả ${fmt(row.completed)}` }))} />
+        </ChartCard>}
+        {data.byOrganization && <ChartCard title="Theo tổ chức" description="Tối đa 100 tổ chức có nhiều lượt chơi nhất trong kỳ" height={120} empty={data.byOrganization.length === 0} emptyText="Chưa có tổ chức nào có lượt chơi trong kỳ" data-testid="chart-organizations"
+          table={<ReportTable caption="Lượt chơi theo tổ chức">
+            <thead><tr><th>Tổ chức</th><Num header>Lượt chơi</Num><Num header>Học viên</Num><Num header>Có kết quả</Num></tr></thead>
+            <tbody>{data.byOrganization.map((row) => <tr key={row.organizationId}><td>{organizationName(row.organizationId)}</td><Num>{fmt(row.plays)}</Num><Num>{fmt(row.uniqueTrainees)}</Num><Num>{fmt(row.completed)}</Num></tr>)}</tbody>
+          </ReportTable>}>
+          <RankedBars label="Lượt chơi theo tổ chức" color={seriesColor.plays} rows={data.byOrganization.slice(0, 8).map((row) => ({
+            key: row.organizationId,
+            label: showOrganizationLinks ? <Link href={`${routes.adminOrganizations}/${row.organizationId}/analytics`}>{organizationName(row.organizationId)}</Link> : organizationName(row.organizationId),
+            value: row.plays,
+            hint: `Học viên ${fmt(row.uniqueTrainees)} · Có kết quả ${fmt(row.completed)}`,
+          }))} />
+        </ChartCard>}
+      </div>}
+    </>}
+
+    {data.cohorts && groupBy && !timeSeries && <Panel title={`Nhóm số liệu · theo ${GROUP_LABELS[groupBy].toLowerCase()}`} description="Mỗi nhóm đếm học viên khác nhau riêng, không cộng dồn giữa các nhóm." data-testid="card-cohorts">
+      {data.cohorts.length ? <CohortTable rows={data.cohorts} /> : <p className={styles.muted}>Chưa có nhóm nào trong kỳ.</p>}
     </Panel>}
 
-    {data.byOrganization && <Panel title="Theo tổ chức" description="Tối đa 100 tổ chức có nhiều lượt chơi nhất trong kỳ." style={{ marginTop: 16 }}>
-      {data.byOrganization.length ? <Table caption="Lượt chơi theo tổ chức">
-        <thead><tr><th>Tổ chức</th><th className={styles.num}>Lượt chơi</th><th className={styles.num}>Học viên</th><th className={styles.num}>Có kết quả</th></tr></thead>
-        <tbody>{data.byOrganization.map((row) => {
-          const name = organizationNames?.get(row.organizationId);
-          return <tr key={row.organizationId}>
-            <td>{showOrganizationLinks ? <Link href={`${routes.adminOrganizations}/${row.organizationId}/analytics`}>{name ?? `Tổ chức ${shortId(row.organizationId)}`}</Link> : name ?? `Tổ chức ${shortId(row.organizationId)}`}</td>
-            <td className={styles.num}>{fmt(row.plays)}</td><td className={styles.num}>{fmt(row.uniqueTrainees)}</td><td className={styles.num}>{fmt(row.completed)}</td>
-          </tr>;
-        })}</tbody>
-      </Table> : <p className={styles.muted}>Chưa có tổ chức nào có lượt chơi trong kỳ.</p>}
-    </Panel>}
+    {data.aiUsage && <AiUsageCard usage={data.aiUsage} />}
 
-    {data.aiUsage && <div style={{ marginTop: 16 }}><AiUsagePanel usage={data.aiUsage} /></div>}
-
-    {Object.keys(data.definitions).length > 0 && <details className={styles.tableToggle}>
+    {Object.keys(data.definitions).length > 0 && <details className={styles.definitions}>
       <summary>Định nghĩa số liệu (từ máy chủ)</summary>
-      <dl className="ops-stack" style={{ margin: "10px 0 0", gap: 8 }}>{Object.entries(data.definitions).map(([key, text]) => <div key={key}><dt><StatusBadge tone="neutral">{key}</StatusBadge></dt><dd style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: 13 }}>{text}</dd></div>)}</dl>
+      <dl>{Object.entries(data.definitions).map(([key, text]) => <div key={key}><dt><StatusBadge tone="neutral">{key}</StatusBadge></dt><dd>{text}</dd></div>)}</dl>
     </details>}
-  </>;
+
+    <Drawer open={scenarioTable} onOpenChange={setScenarioTable} size="lg" title="Theo kịch bản" description={`${fmt(scenarios.length)} kịch bản có lượt chơi trong kỳ (tối đa 100).`} flush data-testid="drawer-scenarios">
+      <ReportTable caption="Lượt chơi theo kịch bản" className={styles.drawerTable}>
+        <thead><tr><th>Kịch bản</th><Num header>Lượt chơi</Num><Num header>Học viên</Num><Num header>Có kết quả</Num><Num header>Đạt</Num></tr></thead>
+        <tbody>{scenarios.map((row) => <tr key={row.scenarioId}><td>{scenarioName(row)}</td><Num>{fmt(row.plays)}</Num><Num>{fmt(row.uniqueTrainees)}</Num><Num>{fmt(row.completed)}</Num><Num><StatusBadge tone={row.passed > 0 ? "success" : "neutral"}>{fmt(row.passed)}</StatusBadge></Num></tr>)}</tbody>
+      </ReportTable>
+    </Drawer>
+  </div>;
+}
+
+function CohortTable({ rows }: { rows: NonNullable<TrainingReport["cohorts"]> }) {
+  return <ReportTable caption="Số liệu theo nhóm">
+    <thead><tr><th>Nhóm</th><Num header>Lượt chơi</Num><Num header>Học viên</Num><Num header>Có kết quả</Num><Num header>Bỏ dở</Num><Num header>Chờ đồng bộ</Num><Num header>Đạt / chấm</Num><Num header>Tỷ lệ đạt</Num><Num header>Thời lượng TB</Num></tr></thead>
+    <tbody>{rows.map((row) => <tr key={row.key}><td>{row.label}</td><Num>{fmt(row.plays)}</Num><Num>{fmt(row.uniqueTrainees)}</Num><Num>{fmt(row.completed)}</Num><Num>{fmt(row.abandoned)}</Num><Num>{fmt(row.awaitingSync)}</Num><Num>{fmt(row.passed)} / {fmt(row.assessed)}</Num><Num>{formatRate(row.passRate, "—")}</Num><Num>{formatSeconds(row.averageDurationSeconds)}</Num></tr>)}</tbody>
+  </ReportTable>;
 }

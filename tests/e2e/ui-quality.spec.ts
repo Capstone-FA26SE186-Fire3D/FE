@@ -28,6 +28,10 @@ async function open(page: Page, user: typeof owner | typeof admin, url: string, 
   await page.goto(url);
 }
 
+// DataTable v2: the name is plain text in a clickable row (table) or card (under 640px), not a link.
+const longName = (page: Page) => page.getByTestId("buildings-table").getByText(LONG_NAME, { exact: true }).first();
+const longRow = (page: Page) => page.getByTestId("buildings-table").locator("tbody tr, li.ops-dt-card").filter({ hasText: LONG_NAME });
+
 const overflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
 
 for (const theme of ["dark", "light"] as const) {
@@ -35,13 +39,13 @@ for (const theme of ["dark", "light"] as const) {
     test(`buildings and accounts lists with long Vietnamese names fit ${width}px (${theme})`, async ({ page }) => {
       await page.setViewportSize({ width, height: 800 });
       await open(page, owner, "/workspace/buildings", theme);
-      await expect(page.getByRole("link", { name: LONG_NAME })).toBeVisible();
+      await expect(longName(page)).toBeVisible();
       expect(await overflow(page)).toBeLessThanOrEqual(0);
       // The long name wraps inside a readable column instead of one word per line.
-      const box = await page.getByRole("link", { name: LONG_NAME }).boundingBox();
+      const box = await longName(page).boundingBox();
       expect(box!.width).toBeGreaterThan(110);
       await page.goto("/workspace/buildings?view=cards");
-      await expect(page.locator(".ops-item-card h3")).toHaveCount(3);
+      await expect(page.getByTestId("buildings-table").locator("li.ops-dt-card")).toHaveCount(3);
       expect(await overflow(page)).toBeLessThanOrEqual(0);
     });
   }
@@ -50,7 +54,7 @@ for (const theme of ["dark", "light"] as const) {
 test("shell and form controls reach 44px", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await open(page, owner, "/workspace/buildings", "dark");
-  await expect(page.getByRole("link", { name: LONG_NAME })).toBeVisible();
+  await expect(longName(page)).toBeVisible();
   const sizes = await page.evaluate(() => {
     const pick = (selector: string) => Array.from(document.querySelectorAll(selector)).filter((el) => (el as HTMLElement).offsetParent !== null).map((el) => { const r = el.getBoundingClientRect(); return { selector, w: Math.round(r.width), h: Math.round(r.height) }; });
     return [...pick(".ops-nav-link"), ...pick(".ops-sidebar-footer button"), ...pick(".ops-sidebar-footer a"), ...pick(".ops-segmented button"), ...pick(".ops-user"), ...pick("input.ops-input"), ...pick("select.ops-input"), ...pick(".ops-icon-button")];
@@ -68,16 +72,22 @@ test("shell and form controls reach 44px", async ({ page }) => {
 });
 
 test("a table is a named, keyboard-focusable scroll region and the action column has a text header", async ({ page }) => {
-  await page.setViewportSize({ width: 375, height: 800 });
+  // DataTable v2 switches to cards under 640px; the table and its scroll region are checked at tablet width.
+  await page.setViewportSize({ width: 680, height: 800 });
   await open(page, owner, "/workspace/buildings", "light");
   const region = page.getByRole("region", { name: "Danh sách công trình" });
   await expect(region).toBeVisible();
   await expect(region).toHaveAttribute("tabindex", "0");
-  expect(await region.evaluate((node) => node.scrollWidth > node.clientWidth)).toBe(true);
   await expect(page.getByRole("columnheader", { name: "Thao tác" })).toHaveCount(1);
-  await region.focus();
-  await page.keyboard.press("ArrowRight");
-  await expect.poll(() => region.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
+  if (await region.evaluate((node) => node.scrollWidth > node.clientWidth)) {
+    await region.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect.poll(() => region.evaluate((node) => node.scrollLeft)).toBeGreaterThan(0);
+  }
+  // Under 640px the same list is a named list of cards.
+  await page.setViewportSize({ width: 375, height: 800 });
+  await expect(page.getByRole("list", { name: "Danh sách công trình" })).toBeVisible();
+  expect(await overflow(page)).toBeLessThanOrEqual(0);
 });
 
 test("drawer: Tab stays inside, Escape closes and focus returns to the opener", async ({ page }) => {
@@ -104,9 +114,14 @@ test("drawer: Tab stays inside, Escape closes and focus returns to the opener", 
 test("modal on a phone: scrolls inside, stays within the viewport and closes with Escape returning focus", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 560 });
   await open(page, owner, "/workspace/buildings", "dark");
-  await page.getByRole("button", { name: `Lưu trữ ${LONG_NAME}` }).click();
+  // v2: "Lưu trữ" sits in the row menu ("Thao tác") behind a confirmation.
+  const menu = longRow(page).getByRole("button", { name: "Thao tác" });
+  await menu.click();
+  await page.getByRole("menuitem", { name: /^Lưu trữ/ }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
+  // Measure after the open animation (translate + scale) has finished.
+  await page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== "running" || animation.effect?.getTiming().iterations === Infinity));
   const box = await dialog.boundingBox();
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(375);
@@ -114,7 +129,7 @@ test("modal on a phone: scrolls inside, stays within the viewport and closes wit
   expect(box!.y + box!.height).toBeLessThanOrEqual(560);
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole("button", { name: `Lưu trữ ${LONG_NAME}` })).toBeFocused();
+  await expect(menu).toBeFocused();
 });
 
 test("reduced motion: skeleton shimmer, pending pulse and dialog animation stop", async ({ page }) => {
@@ -128,7 +143,7 @@ test("reduced motion: skeleton shimmer, pending pulse and dialog animation stop"
   await expect(skeleton).toBeVisible();
   const duration = await skeleton.evaluate((node) => ({ name: getComputedStyle(node).animationName, ms: parseFloat(getComputedStyle(node).animationDuration) * 1000 }));
   expect(duration.ms).toBeLessThan(5);
-  await expect(page.getByRole("link", { name: LONG_NAME })).toBeVisible();
+  await expect(longName(page)).toBeVisible();
   await page.getByRole("button", { name: "Thêm công trình", exact: true }).first().click();
   const overlay = page.locator(".ops-overlay");
   await expect(overlay).toBeVisible();

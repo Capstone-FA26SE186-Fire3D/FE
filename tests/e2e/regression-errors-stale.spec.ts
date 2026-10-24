@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { expectChipValue, pick } from "./chip-helpers";
 import { CallLog, delay, page1, tokenSession } from "./regression-helpers";
 
 /*
@@ -18,6 +19,20 @@ async function session(page: Page, user: typeof orgUser) {
   await tokenSession(page, "tok");
   await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
 }
+
+/**
+ * The list v2 has no reload button for an OrganizationUser (rows refresh through the URL filters), so the in-place
+ * "Tải lại" cases run as PlatformAdmin on the same organization-scoped list, which keeps that button in its toolbar.
+ */
+async function adminSession(page: Page) {
+  await session(page, adminUser);
+  const org = { id: "org-1", name: "Tổ chức Một", slug: "org-1", isActive: true, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" };
+  await page.route("**/api/organizations?*", (route) => route.fulfill({ json: page1([org]) }));
+  await page.route("**/api/organizations/org-1", (route) => route.fulfill({ json: org }));
+}
+const ADMIN_LIST = "/workspace/buildings?org=org-1";
+/** "Trạng thái" filter chip: "" is "Đang dùng" (active), "archived" the archived rows. */
+const pickStatus = (page: Page, value: "" | "archived") => pick(page, "Trạng thái", { value });
 
 type Plan = (route: Route, call: number) => Promise<void> | void;
 
@@ -85,18 +100,18 @@ test.describe("stale rows and late answers (buildings list)", () => {
     await page.goto("/workspace/buildings");
     await expect(page.getByText("Tòa đang hoạt động 1")).toBeVisible();
 
-    await page.getByLabel("Trạng thái", { exact: true }).selectOption("archived");
+    await pickStatus(page, "archived");
     await expect(page.getByRole("alert").filter({ hasText: "Máy chủ gặp lỗi" })).toBeVisible();
     await expect(page.getByText("Tòa đang hoạt động 1")).toHaveCount(0);
 
-    await page.getByLabel("Trạng thái", { exact: true }).selectOption("active");
+    await pickStatus(page, "");
     await expect(page.getByText("Tòa đang hoạt động 1")).toBeVisible();
   });
 
   test("losing access (403 on reload) removes the rows instead of showing them next to the error", async ({ page }) => {
-    await session(page, orgUser);
+    await adminSession(page);
     await listEndpoint(page, "**/api/buildings?*", (route, call) => (call === 1 ? ok(ACTIVE)(route) : fail(403)(route)));
-    await page.goto("/workspace/buildings");
+    await page.goto(ADMIN_LIST);
     await expect(page.getByText("Tòa đang hoạt động 1")).toBeVisible();
     await page.getByRole("button", { name: "Tải lại" }).click();
     await expect(page.getByRole("alert").filter({ hasText: "không có quyền" })).toBeVisible();
@@ -104,9 +119,9 @@ test.describe("stale rows and late answers (buildings list)", () => {
   });
 
   test("a transient failure of the SAME query keeps its rows visible with a retry", async ({ page }) => {
-    await session(page, orgUser);
+    await adminSession(page);
     await listEndpoint(page, "**/api/buildings?*", (route, call) => (call === 1 ? ok(ACTIVE)(route) : fail(500)(route)));
-    await page.goto("/workspace/buildings");
+    await page.goto(ADMIN_LIST);
     await expect(page.getByText("Tòa đang hoạt động 1")).toBeVisible();
     await page.getByRole("button", { name: "Tải lại" }).click();
     await expect(page.getByRole("alert").filter({ hasText: "Máy chủ gặp lỗi" })).toBeVisible();
@@ -121,7 +136,7 @@ test.describe("stale rows and late answers (buildings list)", () => {
       return route.fulfill({ json: page1(ARCHIVED) });
     });
     await page.goto("/workspace/buildings");
-    await page.getByLabel("Trạng thái", { exact: true }).selectOption("archived");
+    await pickStatus(page, "archived");
     await expect(page.getByText("Tòa đã lưu trữ")).toBeVisible();
     await page.waitForTimeout(2200); // the slow answer for the old filter has arrived by now
     await expect(page.getByText("Tòa đã lưu trữ")).toBeVisible();
@@ -138,20 +153,20 @@ test.describe("stale rows and late answers (buildings list)", () => {
     });
     await page.goto("/workspace/buildings");
     await expect(page.getByText("Tòa đang hoạt động 1")).toBeVisible();
-    await page.getByLabel("Trạng thái", { exact: true }).selectOption("archived");
+    await pickStatus(page, "archived");
     await expect(page).toHaveURL(/status=archived/);
     await expect(page.getByText("Tòa đã lưu trữ")).toBeVisible();
 
     await page.reload();
-    await expect(page.getByLabel("Trạng thái", { exact: true })).toHaveValue("archived");
+    await expectChipValue(page, "Trạng thái", "archived");
     await expect(page.getByText("Tòa đã lưu trữ")).toBeVisible();
 
     await page.goBack();
-    await expect(page.getByLabel("Trạng thái", { exact: true })).toHaveValue("active");
+    await expectChipValue(page, "Trạng thái", "");
     await expect(page.getByText("Tòa đang hoạt động 1")).toBeVisible();
     await expect(page.getByText("Tòa đã lưu trữ")).toHaveCount(0);
     await page.goForward();
-    await expect(page.getByLabel("Trạng thái", { exact: true })).toHaveValue("archived");
+    await expectChipValue(page, "Trạng thái", "archived");
     await expect(page.getByText("Tòa đã lưu trữ")).toBeVisible();
     await expect(page.getByText("Tòa đang hoạt động 1")).toHaveCount(0);
 

@@ -7,7 +7,7 @@ import { useIdempotencyKey } from "@/api/idempotency";
 import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Drawer } from "@/components/ui/dialog";
+import { Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field, Input } from "@/components/ui/field";
 import { SkeletonRows } from "@/components/ui/skeleton";
@@ -36,10 +36,11 @@ const descriptions: Record<CreateMode, string> = {
 };
 
 /**
- * One drawer for every quotation an organization can start: New/Renewal (1..100 Buildings), Upgrade (Buildings with a
- * current paid period) and AI quota top-up. It only sends the intent; the BE prices every line and returns the snapshot.
+ * One modal (Figma "Tạo báo giá", every create form is a Modal) for every quotation an organization can start: New/Renewal
+ * (1..100 Buildings), Upgrade (Buildings with a current paid period) and AI quota top-up. It only sends the intent; the BE
+ * prices every line and returns the snapshot.
  */
-export function QuotationCreateDrawer({ open, onOpenChange, accessToken, mode, onModeChange, lockedBuildingId, preselect = NONE, onCreated }: {
+export function QuotationCreateModal({ open, onOpenChange, accessToken, mode, onModeChange, lockedBuildingId, preselect = NONE, onCreated }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   accessToken: string;
@@ -95,7 +96,7 @@ export function QuotationCreateDrawer({ open, onOpenChange, accessToken, mode, o
     }
   }, [accessToken]);
 
-  // Verify name/address (and upgrade eligibility) of Buildings that are pre-selected when the drawer opens.
+  // Verify name/address (and upgrade eligibility) of Buildings that are pre-selected when the modal opens.
   const known = useRef({ addresses, upgrades });
   useEffect(() => { known.current = { addresses, upgrades }; });
   const pickedKey = picked.join(",");
@@ -161,13 +162,12 @@ export function QuotationCreateDrawer({ open, onOpenChange, accessToken, mode, o
   const modes: Array<{ id: CreateMode; label: string }> = [{ id: "service", label: "Mua mới / gia hạn" }, { id: "upgrade", label: "Nâng cấp" }, { id: "topup", label: "Quota AI" }];
   const submitLabel = mode === "topup" ? "Tạo báo giá top-up" : `Tạo báo giá (${picked.length})`;
 
-  return <Drawer open={open} onOpenChange={(next) => { if (!next && submitting) return; onOpenChange(next); }} title="Tạo báo giá" description={descriptions[mode]}
+  return <Modal open={open} onOpenChange={(next) => { if (!next && submitting) return; onOpenChange(next); }} size="lg" title={lockedBuildingId ? titles[mode] : "Tạo báo giá"} description={descriptions[mode]} data-testid="quotation-create"
     footer={<><Button variant="quiet" onClick={() => onOpenChange(false)} disabled={submitting}>Hủy</Button><Button onClick={() => void submit()} disabled={!canSubmit}>{submitting ? "Đang tạo…" : submitLabel}</Button></>}>
     <div className="ops-stack">
       {!lockedBuildingId && <div role="radiogroup" aria-label="Loại báo giá" className="bill-segment">
         {modes.map((item) => <button key={item.id} type="button" role="radio" aria-checked={mode === item.id} data-active={mode === item.id} onClick={() => { setError(null); setPackageId(""); onModeChange(item.id); }}>{item.label}</button>)}
       </div>}
-      {lockedBuildingId && <p className="ops-field-label" style={{ margin: 0 }}>{titles[mode]}</p>}
 
       {mode === "topup" ? <fieldset className="ops-fieldset"><legend>Quota AI trả trước</legend>
         <Field label="Số lượng muốn mua" hint="Có thể để trống. Đơn vị do chính sách quota quy định; PlatformAdmin chốt số lượng, giá, khoảng hiệu lực, thuế và điều khoản khi phát hành." error={topUpInvalid ? "Nhập số nguyên dương hoặc để trống." : undefined}>{(p) => <Input {...p} inputMode="numeric" value={topUpUnits} onChange={(event) => { setTopUpUnits(event.target.value); setError(null); }} />}</Field>
@@ -210,5 +210,5 @@ export function QuotationCreateDrawer({ open, onOpenChange, accessToken, mode, o
       </>}
       {error && <Alert tone="danger" title="Chưa tạo được báo giá">{error.message}{error.details.length > 0 && <>{" "}{error.details.join(" ")}</>}</Alert>}
     </div>
-  </Drawer>;
+  </Modal>;
 }

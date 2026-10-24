@@ -32,7 +32,10 @@ type Mock = {
 
 async function open(page: Page, mock: Mock, url = "/workspace/buildings/building-1?tab=ifc") {
   const calls = { revision: 0, preview: 0, logs: 0 };
-  await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" })));
+  await page.addInitScript(() => {
+    sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" }));
+    localStorage.setItem("fire3d-org-tour", "done"); // the spotlight tour must never cover the page under test
+  });
   await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ETag: '"1"' } }));
   await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ETag: '"3"' } }));
   await page.route("**/api/buildings/building-1/revisions?*", (route) => route.fulfill({ json: page1(mock.revisions) }));
@@ -51,12 +54,15 @@ async function open(page: Page, mock: Mock, url = "/workspace/buildings/building
     : route.fulfill({ status: 409, contentType: "application/problem+json", body: JSON.stringify({ status: 409, title: "unavailable", code: "EQUIPMENT_CANDIDATES_UNAVAILABLE" }) }));
   await page.route("**/api/scenario-interactions/catalog", (route) => route.fulfill({ json: [{ runtimeVersion: "2.0.0", protocolVersion: "1", capabilities: ["door.standard", "door.exit"], capabilityContracts: { "door.standard": { version: "1.0.0", objectKinds: ["Equipment"] }, "door.exit": { version: "1.0.0", objectKinds: ["Equipment"] } } }] }));
   await page.goto(url);
-  await expect(page.getByTestId("pipeline-progress")).toBeVisible();
+  // The progress view is the default IFC sub-tab; `?sub=preview` shows the viewer card instead.
+  await expect(url.includes("sub=preview") ? page.locator("#revision-preview") : page.getByTestId("pipeline-progress")).toBeVisible();
   return calls;
 }
 
 const step = (page: Page, id: string) => page.getByTestId("pipeline-progress").locator(`li[data-step="${id}"]`);
 const next = (page: Page) => page.getByTestId("pipeline-next");
+/** "Tải lên IFC mới" opens the upload modal (Radix focuses the dialog's close button first, so the file input is not focused). */
+const uploadModal = (page: Page) => page.getByTestId("ifc-upload-modal");
 
 test.describe("IFC progress view", () => {
   test("a running job shows the attempt and the latest processing step; the file check stays non-blocking while Pending", async ({ page }) => {
@@ -90,7 +96,8 @@ test.describe("IFC progress view", () => {
     await expect(page.getByLabel("Lý do chạy lại")).toBeVisible();
     await page.getByRole("button", { name: "Hủy" }).click();
     await next(page).getByRole("button", { name: "Tải lên IFC mới" }).click();
-    await expect(page.getByLabel("Tệp IFC")).toBeFocused();
+    await expect(uploadModal(page)).toBeVisible();
+    await expect(uploadModal(page).getByLabel("Chọn tệp IFC")).toBeAttached();
   });
 
   test("NeedsFix with IFC_EXIT_UNKNOWN: QA done, the exit step blocks and its action goes to the exit door choice", async ({ page }) => {
@@ -106,12 +113,15 @@ test.describe("IFC progress view", () => {
     await expect(step(page, "exit")).toHaveAttribute("data-state", "error");
     await expect(step(page, "ready")).toHaveAttribute("data-state", "todo");
     await expect(next(page)).toContainText("Chọn cửa thoát ra ngoài");
+    // The action switches to the "Thiết bị" sub-tab, then focuses the first exit-door button.
     await next(page).getByRole("button", { name: "Chọn cửa thoát" }).click();
+    await expect(page).toHaveURL(/sub=equipment/);
     await expect(page.getByTestId("equipment-exit").first()).toBeFocused();
     await expect(page.getByTestId("exit-step")).toBeVisible();
 
-    // Per-issue next step from the QA guide.
-    await page.getByRole("tab", { name: "Issue" }).click();
+    // Per-issue next step from the QA guide (Issue chip of the "Kỹ thuật" sub-tab).
+    await page.getByTestId("ifc-sub-technical").click();
+    await expect(page.getByTestId("details-tab-issues")).toHaveAttribute("aria-pressed", "true");
     const exitRow = page.getByTestId("issue-row").filter({ has: page.getByText("IFC_EXIT_UNKNOWN") });
     await expect(exitRow.getByTestId("issue-action")).toHaveAttribute("data-action", "equipment");
     const editorRow = page.getByTestId("issue-row").filter({ has: page.getByText("IFC_NO_FIRE_EQUIPMENT") });
@@ -126,11 +136,16 @@ test.describe("IFC progress view", () => {
     await expect(step(page, "exit")).toHaveCount(0);
     await expect(next(page)).toContainText("Mô hình cần sửa");
     await expect(next(page)).toContainText("tải lên IFC mới");
-    await page.getByRole("tab", { name: "Nhật ký" }).click();
+    // Leave the technical details on "Nhật ký", go back to the progress view: "Xem issue QA" must land on the Issue chip.
+    await page.getByTestId("ifc-sub-technical").click();
+    await page.getByRole("button", { name: "Nhật ký", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Nhật ký", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await page.getByTestId("ifc-sub-progress").click();
     await next(page).getByRole("button", { name: "Xem issue QA" }).click();
-    await expect(page.getByRole("tab", { name: "Issue" })).toHaveAttribute("aria-selected", "true");
+    await expect(page).toHaveURL(/sub=technical/);
+    await expect(page.getByTestId("details-tab-issues")).toHaveAttribute("aria-pressed", "true");
     await page.getByTestId("issue-row").getByTestId("issue-action").click(); // IFC_NO_SPACES → re-upload
-    await expect(page.getByLabel("Tệp IFC")).toBeFocused();
+    await expect(uploadModal(page)).toBeVisible();
   });
 
   test("ReadyForScenario: every step done and “Soạn kịch bản” opens the scenarios tab", async ({ page }) => {
@@ -141,7 +156,7 @@ test.describe("IFC progress view", () => {
     await next(page).getByRole("button", { name: "Soạn kịch bản" }).click();
     await expect(page).toHaveURL(/tab=scenarios/);
     await expect(page).toHaveURL(/revision=rev-2/);
-    await expect(page.getByRole("tab", { name: "Kịch bản" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId("building-tab-scenarios")).toHaveAttribute("aria-selected", "true");
   });
 
   test("Rejected, rejected file and Superseded each get explicit guidance", async ({ page }) => {
@@ -182,16 +197,17 @@ test.describe("IFC progress view", () => {
   });
 
   test("preview: NotReady is checked again every 5s; ReprocessRequired explains the re-upload", async ({ page }) => {
-    const calls = await open(page, { revisions: [rev("Uploaded")], jobStatus: "Running" });
+    const previewUrl = "/workspace/buildings/building-1?tab=ifc&sub=preview";
+    const calls = await open(page, { revisions: [rev("Uploaded")], jobStatus: "Running" }, previewUrl);
     await expect(page.getByText("Preview chưa sẵn sàng")).toBeVisible();
     await expect.poll(() => calls.preview, { timeout: 12_000 }).toBeGreaterThanOrEqual(2);
 
     await page.unrouteAll({ behavior: "ignoreErrors" });
-    await open(page, { revisions: [rev("ReadyForScenario")], jobStatus: "Succeeded", preview: () => ({ ...notReady, revisionStatus: "ReadyForScenario", status: "ReprocessRequired", artifactId: "art-1", sha256Hash: "b".repeat(64) }) });
+    await open(page, { revisions: [rev("ReadyForScenario")], jobStatus: "Succeeded", preview: () => ({ ...notReady, revisionStatus: "ReadyForScenario", status: "ReprocessRequired", artifactId: "art-1", sha256Hash: "b".repeat(64) }) }, previewUrl);
     const reprocess = page.getByTestId("preview-reprocess");
     await expect(reprocess).toContainText("tải lên lại tệp IFC");
     await reprocess.getByRole("button", { name: "Tải lên IFC mới" }).click();
-    await expect(page.getByLabel("Tệp IFC")).toBeFocused();
+    await expect(uploadModal(page)).toBeVisible();
   });
 
   test("stepper screenshot", async ({ page }, testInfo) => {

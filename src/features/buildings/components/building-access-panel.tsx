@@ -1,14 +1,14 @@
 "use client";
 
-import { Copy, KeyRound, RefreshCw, ShieldOff } from "lucide-react";
+import { Copy, KeyRound, Lock, RefreshCw, ShieldOff } from "lucide-react";
 import { useRef, useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { ApiError } from "@/api/types/common";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/dialog";
-import { Field, Select } from "@/components/ui/field";
-import { Panel } from "@/components/ui/panel";
+import { Combobox } from "@/components/ui/combobox";
+import { ConfirmDialog } from "@/components/ui/dialog";
+import { Field } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
@@ -36,7 +36,15 @@ const copy: Record<Action["kind"], { title: string; confirm: string; impact: (ac
   },
 };
 
-/** Public/Private, participation code rotate/revoke. Every change sends If-Match "access-<n>" and asks for confirmation first. */
+const visibilityOptions = [
+  { value: "Private", label: "Riêng tư (cần mã tham gia)" },
+  { value: "Public", label: "Công khai (chỉ cần đăng nhập)" },
+];
+
+/**
+ * Figma "Truy cập · Quyền tham gia": left card = mode + apply; right card = participation code (create / rotate / revoke,
+ * the new code shown once in its own dialog). Every change sends If-Match "access-<n>" and asks for confirmation first.
+ */
 export function BuildingAccessPanel({ accessToken, buildingId }: { accessToken: string; buildingId: string }) {
   const toast = useToast();
   const busy = useRef(false);
@@ -100,9 +108,9 @@ export function BuildingAccessPanel({ accessToken, buildingId }: { accessToken: 
     }
   };
 
-  if (access.loading && !loaded) return <Panel title="Quyền tham gia"><Skeleton style={{ height: 120 }} /></Panel>;
+  if (access.loading && !loaded) return <div className="bd-access"><div className="org-card"><Skeleton style={{ height: 160 }} /></div><div className="org-card"><Skeleton style={{ height: 120 }} /></div></div>;
   if (access.error !== undefined && !loaded) {
-    return <Panel title="Quyền tham gia"><Alert tone="danger" title="Không tải được cài đặt truy cập" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reloadFresh}>Thử lại</Button>}>{describeApiError(access.error, "Hãy thử lại sau.")}</Alert></Panel>;
+    return <div className="org-card"><Alert tone="danger" title="Không tải được cài đặt truy cập" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reloadFresh}>Thử lại</Button>}>{describeApiError(access.error, "Hãy thử lại sau.")}</Alert></div>;
   }
   if (!loaded) return null;
 
@@ -111,44 +119,49 @@ export function BuildingAccessPanel({ accessToken, buildingId }: { accessToken: 
 
   return <div className="ops-stack">
     {stale && <Alert tone="warning" title="Cài đặt truy cập đã thay đổi" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reloadFresh}><RefreshCw size={14} aria-hidden="true" />Tải bản mới</Button>}>Có người khác vừa đổi chế độ hoặc mã tham gia. Chưa có thay đổi nào của bạn được áp dụng; hãy tải bản mới rồi thao tác lại.</Alert>}
-    {error && <Alert tone="danger">{error}</Alert>}
+    {error && !pending && <Alert tone="danger">{error}</Alert>}
 
-    {shownCode && <Panel title="Mã tham gia mới" bodyClassName="ops-stack">
-      <Alert tone="warning" title="Mã này chỉ hiển thị một lần">Hệ thống không lưu mã ở dạng đọc lại được. Sao chép và gửi cho học viên ngay; rời trang hoặc đóng khung này là không xem lại được (chỉ có thể tạo mã mới).</Alert>
-      <div className="ops-code-box"><code data-testid="participation-code">{shownCode}</code><Button variant="secondary" onClick={() => void copyCode()}><Copy size={16} aria-hidden="true" />Sao chép</Button></div>
-      <div className="ops-actions"><Button variant="quiet" onClick={() => setShownCode(null)}>Tôi đã lưu mã, ẩn đi</Button></div>
-    </Panel>}
+    <div className="bd-access">
+      <section className="org-card" aria-labelledby="bd-access-title">
+        <h2 id="bd-access-title" className="org-card-title">Quyền tham gia</h2>
+        <p className="org-card-sub">Quy định ai được vào công trình để tập huấn.</p>
+        <dl className="jr-kv bd-access-kv">
+          <div><dt>Chế độ</dt><dd><StatusBadge tone={isPublic ? "info" : "neutral"}>{isPublic ? "Công khai" : "Riêng tư"}</StatusBadge></dd></div>
+          <div><dt>Mã tham gia</dt><dd>{loaded.hasParticipationCode ? <StatusBadge tone="success">Đang có mã</StatusBadge> : <StatusBadge tone="neutral">Chưa có mã</StatusBadge>}</dd></div>
+          <div><dt>Phiên bản quyền</dt><dd>{loaded.accessRevision}</dd></div>
+        </dl>
+        <div className="bd-access-mode">
+          <Field label="Chế độ truy cập">{(p) => <Combobox {...p} value={selectedVisibility} options={visibilityOptions} groupLabel="Chế độ" searchPlaceholder="Tìm…" onChange={(value) => setVisibility(value as "Private" | "Public")} aria-label="Chế độ truy cập" />}</Field>
+          <Button variant="secondary" disabled={!visibilityDirty || working} onClick={() => { setError(""); setPending({ kind: "visibility", to: selectedVisibility }); }}>Áp dụng chế độ</Button>
+        </div>
+        <p className="ops-muted">Riêng tư: học viên đăng nhập và nhập mã tham gia hiện hành. Công khai: học viên chỉ cần đăng nhập. QR không cấp quyền. Đổi chế độ hoặc mã làm vô hiệu quyền đã cấp.</p>
+      </section>
 
-    <Panel title="Quyền tham gia" description="Quy định ai được vào công trình để tập huấn." bodyClassName="ops-stack">
-      <dl className="ops-kv">
-        <dt>Chế độ</dt><dd><StatusBadge tone={isPublic ? "info" : "neutral"}>{isPublic ? "Công khai" : "Riêng tư"}</StatusBadge></dd>
-        <dt>Mã tham gia</dt><dd>{loaded.hasParticipationCode ? <StatusBadge tone="success">Đang có mã</StatusBadge> : <StatusBadge tone="neutral">Chưa có mã</StatusBadge>}</dd>
-        <dt>Phiên bản quyền</dt><dd>{loaded.accessRevision}</dd>
-      </dl>
-      <p className="ops-muted">Riêng tư: học viên đăng nhập và nhập mã tham gia hiện hành. Công khai: học viên chỉ cần đăng nhập. QR không cấp quyền. Đổi chế độ hoặc mã làm vô hiệu quyền đã cấp trước đó.</p>
+      <section className="org-card" aria-labelledby="bd-code-title">
+        <div className="org-row">
+          <div><h2 id="bd-code-title" className="org-card-title" style={{ marginBottom: 2 }}>Mã tham gia</h2><p className="org-card-sub" style={{ margin: 0 }}>Mã chung do tổ chức cung cấp cho học viên.</p></div>
+          <Button onClick={() => { setError(""); setPending({ kind: "rotate" }); }} disabled={working}><KeyRound size={16} aria-hidden="true" />{loaded.hasParticipationCode ? "Tạo mã mới" : "Tạo mã tham gia"}</Button>
+        </div>
+        {shownCode ? <div className="ops-stack" style={{ marginTop: 14 }}>
+          <Alert tone="warning" title="Mã này chỉ hiển thị một lần">Hệ thống không lưu mã ở dạng đọc lại được. Sao chép và gửi cho học viên ngay; rời trang hoặc ẩn khung này là không xem lại được.</Alert>
+          <div className="ops-code-box"><code data-testid="participation-code">{shownCode}</code><Button variant="secondary" onClick={() => void copyCode()}><Copy size={16} aria-hidden="true" />Sao chép</Button></div>
+          <div className="ops-actions"><Button variant="quiet" onClick={() => setShownCode(null)}>Tôi đã lưu mã, ẩn đi</Button></div>
+        </div> : <div className="bd-confirm-state" data-tone="locked" style={{ marginTop: 14 }}><Lock size={16} aria-hidden="true" /><div><strong>{loaded.hasParticipationCode ? "Đang có mã; hệ thống không hiển thị lại mã cũ." : "Chưa có mã."}</strong><span>Mã chỉ hiển thị một lần ngay sau khi tạo — bạn sẽ sao chép trong hộp thoại.</span></div></div>}
+        {loaded.hasParticipationCode && <div className="ops-actions" style={{ marginTop: 14 }}><Button variant="quiet" onClick={() => { setError(""); setPending({ kind: "revoke" }); }} disabled={working}><ShieldOff size={16} aria-hidden="true" />Thu hồi mã</Button></div>}
+      </section>
+    </div>
 
-      <div className="ops-form-grid" style={{ alignItems: "end" }}>
-        <Field label="Chế độ truy cập">{(p) => <Select {...p} value={selectedVisibility} onChange={(event) => setVisibility(event.target.value as "Private" | "Public")}>
-          <option value="Private">Riêng tư (cần mã tham gia)</option>
-          <option value="Public">Công khai (chỉ cần đăng nhập)</option>
-        </Select>}</Field>
-        <div className="ops-actions"><Button variant="secondary" disabled={!visibilityDirty || working} onClick={() => { setError(""); setPending({ kind: "visibility", to: selectedVisibility }); }}>Áp dụng chế độ</Button></div>
-      </div>
-
-      <div className="ops-actions">
-        <Button onClick={() => { setError(""); setPending({ kind: "rotate" }); }} disabled={working}><KeyRound size={16} aria-hidden="true" />{loaded.hasParticipationCode ? "Tạo mã mới" : "Tạo mã tham gia"}</Button>
-        {loaded.hasParticipationCode && <Button variant="danger" onClick={() => { setError(""); setPending({ kind: "revoke" }); }} disabled={working}><ShieldOff size={16} aria-hidden="true" />Thu hồi mã</Button>}
-      </div>
-    </Panel>
-
-    <Modal
+    <ConfirmDialog
       open={pending !== null}
       onOpenChange={(open) => { if (!open && !working) setPending(null); }}
+      tone={pending?.kind === "revoke" ? "danger" : "primary"}
       title={pending ? copy[pending.kind].title : ""}
       description={pending ? copy[pending.kind].impact(pending, loaded.hasParticipationCode) : undefined}
-      footer={<><Button variant="quiet" onClick={() => setPending(null)} disabled={working}>Hủy</Button><Button variant={pending?.kind === "revoke" ? "danger" : "primary"} onClick={() => void run()} disabled={working}>{working ? "Đang áp dụng…" : pending ? copy[pending.kind].confirm : ""}</Button></>}
+      confirmLabel={pending ? copy[pending.kind].confirm : ""}
+      busy={working}
+      onConfirm={run}
     >
       {error ? <Alert tone="danger">{error}</Alert> : <p className="ops-muted">Thao tác này có hiệu lực ngay và không thể hoàn tác.</p>}
-    </Modal>
+    </ConfirmDialog>
   </div>;
 }
