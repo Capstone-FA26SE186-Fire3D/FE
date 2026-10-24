@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
-import { AI_PROPOSAL_PARAM } from "@/features/org-ai/components/apply-target-dialog";
+import { AI_PROPOSAL_PARAM } from "@/features/org-ai/proposal-param";
 
 import "./editor.css";
 import { useDraftProbe } from "../use-draft-probe";

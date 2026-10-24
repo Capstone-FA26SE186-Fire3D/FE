@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import { AiProposalApply } from "@/features/org-ai/components/ai-proposal-apply";
-import { AI_PROPOSAL_PARAM } from "@/features/org-ai/components/apply-target-dialog";
+import { AI_PROPOSAL_PARAM } from "@/features/org-ai/proposal-param";
 import { revisionLabel } from "@/features/buildings/pipeline";
 
 import { scenarioEditorApi, type LoadedDraft } from "../../api";

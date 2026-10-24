@@ -23,3 +23,12 @@ export const tourSteps: TourStep[] = [
 
 /** Shown instead of steps 3–5 when no building is open. */
 export const TOUR_NEEDS_BUILDING_TEXT = "Mở một công trình để xem các bước tiếp theo";
+
+/** The target element of a step, or null when it is absent or has no box (hidden sidebar on a phone). */
+export function findTourTarget(key: TourStep["key"]): HTMLElement | null {
+  if (typeof document === "undefined") return null;
+  const element = document.querySelector<HTMLElement>(`[data-tour="${key}"]`);
+  if (!element || !element.isConnected) return null;
+  const box = element.getBoundingClientRect();
+  return box.width > 0 && box.height > 0 ? element : null;
+}
