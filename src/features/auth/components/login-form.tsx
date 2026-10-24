@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { CircleAlert } from "lucide-react";
 import { ApiError } from "@/api/types/common";
 import { Button } from "@/components/ui/button";
+import { LoadingBlock } from "@/components/ui/spinner";
 import { PasswordInput } from "@/components/ui/password-input";
 import { hasFirebaseAuthConfig } from "@/configs/env";
 import { authApi } from "../api";
@@ -127,8 +128,8 @@ export function LoginForm() {
   };
 
   if (redirecting) {
-    return <div className="auth-redirect" role="status">
-      <p>Bạn đã đăng nhập. Đang chuyển hướng…</p>
+    return <div className="auth-redirect">
+      <LoadingBlock label="Bạn đã đăng nhập. Đang chuyển hướng…" />
       {redirectStalled && <p>Chưa chuyển được? <a href={postLoginRoute(user, requestedNext)}>Mở trang làm việc</a>. Nếu vẫn dừng ở đây, tải lại trang (Ctrl+F5).</p>}
     </div>;
   }

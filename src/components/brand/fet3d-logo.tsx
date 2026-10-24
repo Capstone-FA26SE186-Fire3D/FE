@@ -28,7 +28,7 @@ export function FET3DLogo({ variant = "lockup", className = "" }: FET3DLogoProps
         aria-hidden={isMark}
         width={1024}
         height={1024}
-        priority={variant === "lockup"}
+        sizes={isMark ? "38px" : "104px"}
       />
     </span>
   );
