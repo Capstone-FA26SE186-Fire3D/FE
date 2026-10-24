@@ -41,7 +41,7 @@ test.describe("AI filters read from the URL", () => {
     await signInAs(page, admin);
     await mockAi(page, mock);
     await page.goto("/admin/ai?status=Running");
-    await expect(page.getByTestId("admin-ai-row")).toHaveCount(1);
+    await expect(page.getByTestId("ai-requests-table").locator("tbody tr, li.ops-dt-card")).toHaveCount(1);
     expect(listCalls(mock, "GET", "/api/admin/ai/requests").at(-1)?.search ?? "").not.toContain("status=");
   });
 });

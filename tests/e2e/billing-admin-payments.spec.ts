@@ -69,11 +69,11 @@ test.describe("admin payments ledger (mock)", () => {
     await mockBilling(page, mock);
     await page.goto("/admin/commerce?tab=payments");
     await openChip(page, "Mã báo giá");
-    await page.getByLabel("Mã báo giá").fill("khong-phai-guid");
+    await page.getByRole("textbox", { name: "Mã báo giá" }).fill("khong-phai-guid");
     await page.getByRole("button", { name: "Áp dụng", exact: true }).click();
     await expect(page.getByText("Mã báo giá là GUID (36 ký tự).")).toBeVisible();
     const before = callsTo(mock, "GET", "/api/admin/payments/payos/checkouts").length;
-    await page.getByLabel("Mã báo giá").fill(ids.quote);
+    await page.getByRole("textbox", { name: "Mã báo giá" }).fill(ids.quote);
     await page.getByRole("button", { name: "Áp dụng", exact: true }).click();
     await expect.poll(() => callsTo(mock, "GET", "/api/admin/payments/payos/checkouts").length).toBeGreaterThan(before);
     await expect(ledgerRows(page)).toHaveCount(5);

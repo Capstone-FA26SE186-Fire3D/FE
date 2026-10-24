@@ -149,7 +149,8 @@ test.describe("admin support inbox", () => {
     const queries: URLSearchParams[] = [];
     await signIn(page, admin);
     await mockAdminLookups(page);
-    await page.route("**/api/admin/support/tickets?*", (route) => { queries.push(new URL(route.request().url()).searchParams); return route.fulfill({ json: { items: [ticket()], total: 45, page: 2, pageSize: 20 } }); });
+    // The sidebar badge counts open tickets with pageSize=1; only the list's own queries are recorded.
+    await page.route("**/api/admin/support/tickets?*", (route) => { const params = new URL(route.request().url()).searchParams; if (params.get("pageSize") !== "1") queries.push(params); return route.fulfill({ json: { items: [ticket()], total: 45, page: 2, pageSize: 20 } }); });
     await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ETag: '"support-2"' }, json: { ...ticket(), messages: messagesPage([message("m1", "u-9", "Em cần hỗ trợ gấp")]) } }));
 
     await page.goto("/admin/support?page=2&status=InProgress&priority=High");
@@ -467,6 +468,9 @@ test.describe("organization support", () => {
     await drawer.getByRole("button", { name: "Gửi tin nhắn" }).click();
     await expect.poll(() => sends.length).toBe(1);
     expect(sends[0].key).toBeTruthy();
+    // The ticket drawer is modal: close it before switching tabs.
+    await drawer.getByRole("button", { name: "Đóng" }).first().click();
+    await expect(drawer).toHaveCount(0);
 
     await page.getByRole("tab", { name: "Phản hồi" }).click();
     await expect(page.getByText("Bạn chưa gửi phản hồi nào")).toBeVisible();
@@ -514,7 +518,7 @@ test.describe("organization support", () => {
 test.describe("organization profile (new style)", () => {
   const organization = { id: "org-1", name: "Fire3D Studio", slug: "fire3d-studio", address: "Da Nang", phoneNumber: "+842361234567", isActive: true, profileRevision: 4, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" };
 
-  test("412 keeps the typed values, offers the newest version and saves with the new ETag; 409 shows the field error", async ({ page }) => {
+  test("412 keeps the typed values, loads the newest version and saves with the new ETag; 409 shows the field error", async ({ page }) => {
     const updates: { ifMatch: string | undefined; body: unknown }[] = [];
     let etag = '"4"';
     await signIn(page, owner);
@@ -528,15 +532,18 @@ test.describe("organization profile (new style)", () => {
 
     await page.goto("/workspace/profile");
     await page.getByLabel("Tên tổ chức", { exact: true }).fill("Fire3D Safety");
-    await page.getByRole("button", { name: "Lưu thay đổi" }).click();
-    await expect(page.getByText("Dữ liệu đã thay đổi trên máy chủ (412)")).toBeVisible();
+    await page.getByRole("button", { name: "Lưu hồ sơ" }).click();
+    // Same 412 handling as the personal profile (v2): my edits stay, "Tải bản mới" adopts the newer ETag.
+    await expect(page.getByText("Hồ sơ đã được cập nhật ở nơi khác")).toBeVisible();
+    await expect(page.getByLabel("Tên tổ chức", { exact: true })).toHaveValue("Fire3D Safety");
+    await page.getByRole("button", { name: "Tải bản mới" }).click();
     await expect(page.getByLabel("Tên tổ chức", { exact: true })).toHaveValue("Fire3D Safety");
 
-    await page.getByRole("button", { name: "Ghi đè bằng giá trị của tôi" }).click();
+    await page.getByRole("button", { name: "Lưu hồ sơ" }).click();
     await expect(page.getByText("Số điện thoại đã được tổ chức khác sử dụng.")).toBeVisible();
     expect(updates[1].ifMatch).toBe('"5"');
 
-    await page.getByRole("button", { name: "Ghi đè bằng giá trị của tôi" }).click();
+    await page.getByRole("button", { name: "Lưu hồ sơ" }).click();
     await expect(page.getByText("Đã lưu hồ sơ tổ chức")).toBeVisible();
     expect(updates[2].ifMatch).toBe('"5"');
   });

@@ -427,7 +427,7 @@ test.describe("media", () => {
     const backend = await setup(page);
     await createDraft(page, "co-video", "Có video", "Tóm tắt video.");
     const post = backend.bySlug("co-video")!;
-    await pickOption(page, page.getByLabel("Loại bài"), "Video");
+    await pickOption(page, page.getByRole("combobox", { name: "Loại bài" }), /^Video$/);
     const block = await addBlock(page, "video");
     await block.getByLabel(/^Liên kết video/).fill("https://vimeo.com/123456");
     await block.getByLabel(/^Liên kết video/).blur();
@@ -455,7 +455,7 @@ test.describe("media", () => {
     const backend = await setup(page);
     const dialog = await openNew(page);
     await fillBasics(dialog, "video-ngay", "Video ngay", "Tóm tắt.", "Mở đầu.");
-    await pickOption(page, dialog.getByLabel("Loại bài"), "Video");
+    await pickOption(page, dialog.getByRole("combobox", { name: "Loại bài" }), /^Video$/);
     await dialog.getByLabel(/^Liên kết video/).fill("https://vimeo.com/123456");
     await dialog.getByTestId("create-post").click();
     await expect(dialog.getByText(/LEARN_MEDIA_INVALID/).first()).toBeVisible();
@@ -720,7 +720,7 @@ test.describe("statuses in the list", () => {
     await pickChip(page, "Trạng thái", "tất cả");
     await page.getByLabel("Tìm bài").fill("cong-khai");
     await expect(table.getByRole("row")).toHaveCount(2);
-    await expect(page.getByText(/chỉ áp dụng cho .* bài của trang đang mở/)).toBeVisible();
+    await expect(page.getByText(/áp dụng cho \d+ bài của trang đang mở/)).toBeVisible();
   });
 
   test("hidden and deleted posts explain their RAG behaviour; a deleted post only offers restore", async ({ page }) => {
@@ -804,7 +804,8 @@ for (const width of [1440, 375]) {
       const paths = ["/admin/learn", `/admin/learn?quick=${published.id}`, "/admin/learn?section=situations", `/admin/learn?post=${draft.id}`, `/admin/learn?post=${draft.id}&tab=publish`, "/admin/learn?post=new"];
       for (const path of paths) {
         await page.goto(path);
-        await expect(page.getByRole("heading", { level: 1, name: "Learn CMS" })).toBeVisible();
+        // v2: quick edit and the new-post form are modal, which hides the page heading from the accessibility tree.
+        await expect(page.getByRole("dialog").or(page.getByRole("heading", { level: 1, name: "Learn CMS" })).first()).toBeVisible();
         await page.waitForTimeout(500);
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
         expect(overflow, `${path} overflows horizontally`).toBeLessThanOrEqual(0);

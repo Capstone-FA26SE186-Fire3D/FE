@@ -45,7 +45,7 @@ test.describe("command palette", () => {
     // No building is open: contextual actions are absent.
     await expect(palette(page).getByText("Hành động")).toHaveCount(0);
 
-    await page.getByPlaceholder("Tìm công trình, kịch bản, hành động…").fill("truong");
+    await page.getByPlaceholder("Tìm công trình, kịch bản, hành động…").fill("trường");
     await expect(palette(page).getByText("Công trình", { exact: true })).toBeVisible();
     await expect(palette(page).getByText("Trường Học GOT")).toBeVisible();
     await expect(palette(page).getByText("Nhà ở")).toHaveCount(0);
@@ -75,6 +75,8 @@ test.describe("command palette", () => {
     await mockBuildings(page);
     await page.addInitScript(() => localStorage.setItem("fire3d-recent-buildings", JSON.stringify([{ id: "b-2", name: "Nhà ở", floors: 4 }])));
     await page.goto("/workspace/buildings/b-1");
+    // The shortcut lives in the shell: wait until the session is restored and the shell is mounted.
+    await expect(page.getByRole("navigation", { name: "Quản lý tổ chức" })).toBeVisible();
     await page.keyboard.press("Control+k");
     await expect(palette(page)).toBeVisible();
     await expect(palette(page).getByText("Hành động")).toBeVisible();

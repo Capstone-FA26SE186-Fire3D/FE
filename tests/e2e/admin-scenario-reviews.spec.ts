@@ -383,7 +383,7 @@ test.describe("detail", () => {
     await expect(page).not.toHaveURL(/review=/);
 
     await page.goto("/admin/reviews?review=00000000-0000-4000-8000-00000000ffff");
-    await expect(drawer(page).getByText("Không tìm thấy bản duyệt")).toBeVisible();
+    await expect(drawer(page).getByRole("heading", { name: "Không tìm thấy bản duyệt" })).toBeVisible();
     await drawer(page).getByRole("button", { name: "Về hàng chờ" }).click();
     await expect(page).not.toHaveURL(/review=/);
 

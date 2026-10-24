@@ -3,6 +3,9 @@ import { expect, test, type Page } from "@playwright/test";
 import { BUILDING_ID, SCENARIO_ID } from "../fixtures/scenario-editor/fixture-building";
 import { admin, calls, mockAi, newAiMock, owner, requestId, signInAs, type AiMock } from "./org-ai-mock";
 
+// The panel, drawer and sheet animate in (scale/slide); measure them once every finite animation has finished (spinners loop forever).
+const settled = (page: Page) => page.waitForFunction(() => document.getAnimations().every((animation) => animation.playState !== "running" || animation.effect?.getTiming().iterations === Infinity));
+
 // The floating "Trợ lý AI" on every /workspace page (Figma 43:197 / 43:255 / 43:304 / 57:731). Route mocks that follow the
 // BE OpenAPI: evidence for FE behaviour, not for the real API.
 
@@ -47,9 +50,10 @@ test.describe("AI bubble: visibility and panel", () => {
     await launcher(page).click();
     await expect(panel(page)).toBeVisible();
     await expect(input(page)).toBeFocused();
+    await settled(page);
     const box = await page.getByTestId("ai-bubble-float").boundingBox();
-    expect(box?.width).toBe(400);
-    expect(box?.height).toBe(600);
+    expect(box?.width).toBeCloseTo(400, 0);
+    expect(box?.height).toBeCloseTo(600, 0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(1440 - 24); // anchored to the right edge (a scrollbar may take a few px)
     expect(box!.y + box!.height).toBeLessThanOrEqual(900 - 80); // above the launcher
     await expect(page.getByTestId("ai-chat-quota")).toHaveText("Còn 900 tokens");
@@ -72,7 +76,8 @@ test.describe("AI bubble: visibility and panel", () => {
     const drawer = page.getByTestId("ai-bubble-drawer");
     await expect(drawer).toBeVisible();
     await expect(page.getByTestId("ai-bubble-float")).toHaveCount(0);
-    expect((await drawer.boundingBox())?.width).toBe(640);
+    await settled(page);
+    expect((await drawer.boundingBox())?.width).toBeCloseTo(640, 0);
     await drawer.getByTestId("ai-chat-expand").click();
     await expect(drawer).toHaveCount(0);
     await expect(page.getByTestId("ai-bubble-float")).toBeVisible();
@@ -87,9 +92,10 @@ test.describe("AI bubble: visibility and panel", () => {
     await launcher(page).click();
     const sheet = page.getByTestId("ai-bubble-sheet");
     await expect(sheet).toBeVisible();
+    await settled(page);
     const box = await sheet.boundingBox();
-    expect(box?.width).toBe(390);
-    expect(box?.height).toBe(844);
+    expect(box?.width).toBeCloseTo(390, 0);
+    expect(box?.height).toBeCloseTo(844, 0);
     await expect(sheet.getByTestId("ai-chat-expand")).toHaveCount(0);
     await sheet.getByTestId("ai-chat-close").click();
     await expect(sheet).toHaveCount(0);
@@ -147,11 +153,13 @@ test.describe("AI bubble: asking", () => {
   test("limits are read before the POST; the user bubble shows at once, then the pending state, then the answer with citation chips; the conversation survives navigation", async ({ page }) => {
     const mock = newAiMock();
     await open(page, mock, "/workspace/ai");
+    // Hold the submit a moment so the pending state can be observed (the mock otherwise answers at once).
+    await page.route("**/api/ai/organization/answer", async (route) => { await new Promise((resolve) => setTimeout(resolve, 800)); await route.fallback(); });
     await launcher(page).click();
     await expect(page.getByTestId("ai-chat-pending")).toHaveCount(0);
     await input(page).fill("  Chiều rộng lối thoát nạn tối thiểu là bao nhiêu?  ");
     await page.keyboard.press("Enter"); // Enter sends; Shift+Enter would add a line
-    await expect(page.getByTestId("ai-chat-user")).toHaveText("Chiều rộng lối thoát nạn tối thiểu là bao nhiêu?");
+    await expect(page.getByTestId("ai-chat-user")).toContainText("Chiều rộng lối thoát nạn tối thiểu là bao nhiêu?");
     await expect(input(page)).toHaveValue("");
     await expect(page.getByTestId("ai-chat-pending")).toContainText(/Đang/);
     const answer = page.getByTestId("ai-chat-answer");
@@ -180,7 +188,7 @@ test.describe("AI bubble: asking", () => {
     // Navigating inside the workspace keeps the conversation (the state lives in the layout, not in the page).
     await page.getByRole("navigation", { name: /Quản lý tổ chức/ }).getByRole("link", { name: "Công trình" }).click();
     await expect(page).toHaveURL(/\/workspace\/buildings/);
-    await expect(page.getByTestId("ai-chat-user")).toHaveText("Chiều rộng lối thoát nạn tối thiểu là bao nhiêu?");
+    await expect(page.getByTestId("ai-chat-user")).toContainText("Chiều rộng lối thoát nạn tối thiểu là bao nhiêu?");
     await expect(page.getByTestId("ai-chat-answer")).toContainText("chiều rộng thông thủy");
     expect(calls(mock, "POST", "/api/ai/organization/answer")).toHaveLength(1);
   });

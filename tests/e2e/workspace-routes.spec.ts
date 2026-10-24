@@ -43,7 +43,8 @@ test("allows an OrganizationUser to open the browser-only IFC scanner", async ({
 
   await expect(page.getByRole("heading", { name: "Quét mô hình IFC" })).toBeVisible();
   await expect(page.getByLabel("Chọn tệp IFC")).toHaveAttribute("accept", ".ifc");
-  await expect(page.getByText("File chỉ được xử lý trong trình duyệt này.")).toBeVisible();
+  // Embedded in the workspace (v2) the note sits in the drop zone.
+  await expect(page.getByText(/chỉ được xử lý trong trình duyệt/).first()).toBeVisible();
 });
 
 test("keeps an OrganizationUser IFC file local before backend revisions exist", async ({ page }) => {

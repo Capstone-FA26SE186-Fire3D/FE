@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { BUILDING_ID, REVISION_ID } from "../fixtures/scenario-editor/fixture-building";
+import { pick } from "./chip-helpers";
 import { admin, calls, ids, iso, mockAi, newAiMock, owner, seedRequest, signInAs, type AiMock } from "./org-ai-mock";
 
 // AI v7 fields the FE#56 follow-up adds: limits, citation links and request input, revision pin for drafts, admin
@@ -98,14 +99,14 @@ test.describe("Admin AI v7 details", () => {
     seedRequest(mock, { status: "Succeeded", organizationId: "org-1" });
     seedRequest(mock, { status: "Succeeded", operation: "TraineeAnswer", audience: "trainee", organizationId: null });
     await open(page, mock, "/admin/ai", admin);
-    await expect(page.getByTestId("admin-ai-row")).toHaveCount(2);
-    await page.getByLabel("Đối tượng").selectOption("trainee");
-    await expect(page.getByTestId("admin-ai-row")).toHaveCount(1);
-    await expect(page.getByTestId("admin-ai-row")).toContainText("Hỏi đáp của Trainee");
-    await expect(page.getByTestId("admin-ai-row")).toContainText("không thuộc quota tổ chức");
+    await expect(page.getByTestId("ai-requests-table").locator("tbody tr, li.ops-dt-card")).toHaveCount(2);
+    await pick(page, "Đối tượng", { value: "trainee" });
+    await expect(page.getByTestId("ai-requests-table").locator("tbody tr, li.ops-dt-card")).toHaveCount(1);
+    await expect(page.getByTestId("ai-requests-table").locator("tbody tr, li.ops-dt-card")).toContainText("Hỏi đáp của Trainee");
+    await expect(page.getByTestId("ai-requests-table").locator("tbody tr, li.ops-dt-card")).toContainText("không thuộc quota tổ chức");
     await expect.poll(() => calls(mock, "GET", "/api/admin/ai/requests").at(-1)?.search).toContain("audience=trainee");
-    await page.getByLabel("Loại yêu cầu").selectOption("Answer");
-    await expect(page.getByTestId("admin-ai-row")).toHaveCount(0);
+    await pick(page, "Thao tác", { value: "Answer" });
+    await expect(page.getByTestId("ai-requests-table").locator("tbody tr, li.ops-dt-card")).toHaveCount(0);
     await expect.poll(() => calls(mock, "GET", "/api/admin/ai/requests").at(-1)?.search).toContain("operation=Answer");
   });
 
@@ -113,27 +114,28 @@ test.describe("Admin AI v7 details", () => {
     const mock = newAiMock();
     for (let n = 0; n < 24; n += 1) mock.policies.push({ id: `cccccccc-0000-4000-8000-${String(100 + n).padStart(12, "0")}`, operation: "ScenarioDraft", quotaUnit: "tokens", reserveUnits: 80, maxInputChars: 4000, maxSources: 10, dailyUnits: null, effectiveFrom: iso(-60 * 24 * (40 + n)), effectiveUntil: iso(-60 * 24 * (39 + n)), createdAt: iso(-60 * 24 * (40 + n)) });
     await open(page, mock, "/admin/ai?tab=policies", admin);
-    await expect(page.getByTestId("policy-row")).toHaveCount(20);
+    await expect(page.getByTestId("ai-policies-table").locator("tbody tr, li.ops-dt-card")).toHaveCount(20);
     await expect.poll(() => calls(mock, "GET", "/api/admin/ai/policies").at(-1)?.search).toContain("pageSize=20");
     await page.getByRole("button", { name: /Trang sau|Sau/ }).first().click();
-    await expect(page.getByTestId("policy-row")).toHaveCount(5);
-    await page.getByLabel("Thao tác").selectOption("Answer");
-    await expect(page.getByTestId("policy-row")).toHaveCount(1);
+    await expect(page.getByTestId("ai-policies-table").locator("tbody tr, li.ops-dt-card")).toHaveCount(5);
+    await pick(page, "Thao tác", { value: "Answer" });
+    await expect(page.getByTestId("ai-policies-table").locator("tbody tr, li.ops-dt-card")).toHaveCount(1);
     await expect.poll(() => calls(mock, "GET", "/api/admin/ai/policies").at(-1)?.search).toContain("operation=Answer");
 
     await page.getByTestId("policy-new").click();
     const form = page.getByRole("form", { name: "Tạo chính sách AI" });
-    await form.getByLabel("Thao tác").selectOption("TraineeAnswer");
+    await form.getByLabel("Thao tác").click();
+    await page.getByRole("option", { name: /\(TraineeAnswer\)/ }).click();
     await form.getByLabel("Đơn vị quota").fill("tokens");
     await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("50");
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("2000");
     await form.getByLabel("Số nguồn tối đa").fill("5");
     await form.getByTestId("policy-daily-units").fill("20");
-    await form.getByTestId("policy-create").click();
+    await page.getByTestId("policy-create").click();
     await expect(form.getByText("Phải lớn hơn hoặc bằng mức giữ chỗ mỗi yêu cầu.")).toBeVisible();
     expect(calls(mock, "POST", "/api/admin/ai/policies")).toHaveLength(0);
     await form.getByTestId("policy-daily-units").fill("500");
-    await form.getByTestId("policy-create").click();
+    await page.getByTestId("policy-create").click();
     await expect(page.getByText("Đã tạo chính sách AI")).toBeVisible();
     expect(calls(mock, "POST", "/api/admin/ai/policies")[0].body).toMatchObject({ operation: "TraineeAnswer", reserveUnits: 50, dailyUnits: 500 });
   });

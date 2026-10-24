@@ -169,6 +169,7 @@ test.describe("rubric sample lifecycle", () => {
     await expect(page).not.toHaveURL(/version=/);
     await expect(page.getByTestId("version-row-1")).toContainText("Bản nháp");
     await page.getByRole("button", { name: "Mở phiên bản 1" }).click();
+    await expect(page).toHaveURL(/version=[0-9a-f-]{36}/);
 
     // reload recovers from the server
     await page.reload();
@@ -223,7 +224,8 @@ test.describe("rubric sample lifecycle", () => {
     await expect(page).toHaveURL(/version=[0-9a-f-]{36}/);
     await page.getByTestId("publish-version").click();
     await page.getByTestId("confirm-publish").click();
-    await expect(page.getByText("Đã xuất bản phiên bản")).toBeVisible();
+    // The v1 toast may still be on screen: look for the v2 one.
+    await expect(page.getByRole("status").filter({ hasText: "v2 · bất biến" })).toBeVisible();
     await backToItem(page);
     await expect(page.getByTestId("version-row-2")).toContainText("Đã xuất bản");
     await expect(drawer(page)).toContainText("v2 · Rubric cơ bản (bản 2)");

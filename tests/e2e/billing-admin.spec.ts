@@ -301,7 +301,8 @@ for (const theme of ["light", "dark"] as const) {
       await signIn(page, admin);
       await mockBilling(page, mock);
       await page.goto("/admin/commerce?tab=packages");
-      await expect(page.getByRole("row", { name: /Gói Building 12 tháng/ }).first()).toBeVisible();
+      // DataTable v2: rows on desktop, cards under 640px.
+      await expect(page.getByTestId("admin-packages-table").getByText(/Gói Building 12 tháng/).first()).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       await page.screenshot({ path: testInfo.outputPath(`admin-packages-${theme}-${width}.png`), fullPage: true });
       await page.goto("/admin/commerce?tab=policies");

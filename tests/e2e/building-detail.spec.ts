@@ -243,7 +243,7 @@ test.describe("processing, QA and polling", () => {
     await expect(page.getByText("Đang chờ worker").first()).toBeVisible();
     await expect(page.getByText("Đang chờ kết quả QA")).toBeVisible();
     await expect(page.getByText("Worker chạy xong").first()).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText("Chưa có kết quả QA")).toBeVisible();
+    await expect(page.getByText("Chưa có kết quả QA").first()).toBeVisible();
     await expect(page.getByText("QA đạt", { exact: true })).toHaveCount(0);
     await expect(page.getByText("không có nghĩa là QA đạt")).toBeVisible();
     const seen = polls;

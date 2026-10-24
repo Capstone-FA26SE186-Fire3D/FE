@@ -23,15 +23,15 @@ async function session(page: Page) {
   await page.route("**/api/buildings/building-1/scenarios?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 20 } }));
 }
 
-/** First GET has no ETag (header not exposed); later GETs return `later` with ETag "9". PUTs are recorded and succeed. */
-function detail(writes: Write[], later: typeof building) {
-  let gets = 0;
+/**
+ * Every GET before the first save has no ETag (header not exposed); from the save on, GETs return `later` with ETag
+ * "9". The v2 detail page reads the Building more than once (header, journey card), so "before the save" rather than
+ * "the first GET" keeps the edit form on the ETag-less read. PUTs are recorded and succeed.
+ */
+function detail(writes: Write[], later: typeof building, state: { saving: boolean }) {
   return async (route: Route) => {
     const request = route.request();
-    if (request.method() === "GET") {
-      gets += 1;
-      return gets === 1 ? route.fulfill({ json: building }) : route.fulfill({ json: later, headers: { ETag: '"9"' } });
-    }
+    if (request.method() === "GET") return state.saving ? route.fulfill({ json: later, headers: { ETag: '"9"' } }) : route.fulfill({ json: building });
     writes.push({ ifMatch: request.headers()["if-match"], body: request.postDataJSON() });
     return route.fulfill({ json: { ...later, name: (request.postDataJSON() as { name: string }).name }, headers: { ETag: '"10"' } });
   };
@@ -57,8 +57,10 @@ for (const where of ["list", "overview"] as const) {
     test("data changed meanwhile: no PUT, the newer version is shown, the retry keeps its coordinates", async ({ page }) => {
       await session(page);
       const writes: Write[] = [];
-      await page.route("**/api/buildings/building-1", detail(writes, moved));
+      const state = { saving: false };
+      await page.route("**/api/buildings/building-1", detail(writes, moved, state));
       await open(page);
+      state.saving = true;
       await page.getByRole("button", { name: "Lưu thay đổi" }).click();
       await expect(page.getByTestId("building-conflict")).toContainText("Công trình vừa được thay đổi ở nơi khác");
       await expect(page.getByLabel("Tên công trình", { exact: true })).toHaveValue("Tên của tôi");
@@ -75,8 +77,10 @@ for (const where of ["list", "overview"] as const) {
     test("data unchanged: saves at once with the ETag read at save time", async ({ page }) => {
       await session(page);
       const writes: Write[] = [];
-      await page.route("**/api/buildings/building-1", detail(writes, building));
+      const state = { saving: false };
+      await page.route("**/api/buildings/building-1", detail(writes, building, state));
       await open(page);
+      state.saving = true;
       await page.getByRole("button", { name: "Lưu thay đổi" }).click();
       await expect(page.getByText("Đã lưu công trình")).toBeVisible();
       await expect(page.getByTestId("building-conflict")).toHaveCount(0);

@@ -87,7 +87,8 @@ test.describe("/workspace/library (read only)", () => {
     await page.getByRole("button", { name: "Xem mẫu BINH-CO2" }).click();
     await expect(page).toHaveURL(/item=/);
     const drawer = page.getByRole("dialog");
-    await expect(drawer.getByTestId("org-item-detail")).toContainText("Bình CO2 5 kg");
+    // v2 drawer: the item name is the drawer title, the body holds the version details.
+    await expect(drawer.getByRole("heading", { name: "Bình CO2 5 kg" })).toBeVisible();
     await expect(drawer.getByTestId("version-preview")).toContainText("Không thêm năng lực cho runtime");
     await expect(drawer).toContainText("Áp dụng là sao chép");
     expect(backend.calls.filter((call) => call.path.startsWith("/api/admin"))).toEqual([]);

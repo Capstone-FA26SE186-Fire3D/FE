@@ -180,7 +180,8 @@ test.describe("building services tab (mock)", () => {
     const mock = newMock();
     await signIn(page, owner);
     await mockBilling(page, mock);
-    queue(mock, "GET /api/billing/entitlements", { status: 500, json: { title: "x" } });
+    // v2: the building header and the sidebar mini-stepper read entitlements too, so every call fails here.
+    queue(mock, "GET /api/billing/entitlements", ...Array.from({ length: 8 }, () => ({ status: 500, json: { title: "x" } })));
     await page.goto("/workspace/buildings/b-1?tab=services");
     await expect(page.getByText("Chờ BE (#56)")).toHaveCount(0);
     await expect(page.getByTestId("v7-pending")).toHaveCount(0);
