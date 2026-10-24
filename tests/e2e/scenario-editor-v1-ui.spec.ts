@@ -60,8 +60,11 @@ test("opens a fet3d.editor/1 draft: six kinds, pinned Geometry, floor-local coor
   await expect(page.getByTestId("glb-position")).toContainText("1, 3.5, 2 m");
   await expect.poll(() => page.evaluate(() => window.__fire3dEditorScene?.markerPosition("object", 3))).toEqual([1, 3.5, 2]);
 
-  // layers come from the semantic mapping (IFC type -> node names) and exist only because matching glTF nodes were found
-  const walls = page.getByRole("button", { name: "IfcWall", exact: true });
+  // layers come from the semantic mapping (IFC type -> node names) and exist only because matching glTF nodes were found;
+  // they sit in a collapsed "Lớp hiển thị" box and show the Vietnamese name of the IFC type (IfcWall -> "Tường").
+  await page.getByText("Lớp hiển thị", { exact: true }).click();
+  const walls = page.getByRole("button", { name: "Tường", exact: true });
+  await expect(walls).toHaveAttribute("title", /IfcWall/);
   await expect(walls).toHaveAttribute("aria-pressed", "true");
   await walls.click();
   await expect(walls).toHaveAttribute("aria-pressed", "false");

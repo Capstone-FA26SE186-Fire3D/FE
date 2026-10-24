@@ -247,3 +247,22 @@
 /* Narrow viewport: icons only (labels stay as aria-label/title). */
 @container (max-width: 760px) { .se-float-kind span, .se-float-tool span { display: none; } .se-float-kind, .se-float-tool { padding: 0 10px; } }
 @media (max-width: 767px), (pointer: coarse) { .se-float-tool, .se-float-kind { min-height: 44px; } }
+
+/* Layer toggles: one collapsible box with compact chips instead of a full-height list. */
+.se-layers-box { border: 1px solid var(--line); border-radius: 10px; background: var(--bg-soft); }
+.se-layers-box > summary { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 10px; list-style: none; cursor: pointer; }
+.se-layers-box > summary::-webkit-details-marker { display: none; }
+.se-layers-box > summary:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; border-radius: 10px; }
+.se-layers-title { display: inline-flex; flex: none; align-items: center; gap: 6px; white-space: nowrap; color: var(--text); font-size: 12px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+.se-layers-count { min-width: 0; margin-left: auto; overflow: hidden; color: var(--dim); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.se-layers-caret { flex: none; color: var(--muted); transition: transform 150ms ease; }
+.se-layers-box[open] .se-layers-caret { transform: rotate(180deg); }
+.se-layers-box[open] { padding-bottom: 10px; }
+.se-layers-group { margin: 6px 10px 6px; color: var(--dim); font-size: 11px; font-weight: 600; }
+.se-layer-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0 10px; list-style: none; }
+.se-layer-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--text); font: inherit; font-size: 12.5px; cursor: pointer; }
+.se-layer-chip:hover:not(:disabled) { border-color: var(--line-strong); }
+.se-layer-chip[aria-pressed="false"] { color: var(--dim); background: transparent; border-style: dashed; }
+.se-layer-chip:disabled { opacity: .5; cursor: not-allowed; }
+.se-layer-chip:focus-visible { outline: 2px solid var(--ember); outline-offset: 1px; }
+@media (max-width: 767px), (pointer: coarse) { .se-layer-chip { min-height: 40px; } }
