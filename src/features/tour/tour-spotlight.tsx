@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { m, presets } from "@/components/ui/motion";
 import { usePortalContainer } from "@/features/theme/theme-scope";
-import { TOUR_NEEDS_BUILDING_TEXT, tourSteps, type TourStep } from "./tour-steps";
+import { findTourTarget, TOUR_NEEDS_BUILDING_TEXT, tourSteps, type TourStep } from "./tour-steps";
 
 type Rect = { top: number; left: number; width: number; height: number };
 type Layout = { rect: Rect | null; viewport: { width: number; height: number }; mobile: boolean };
@@ -17,15 +17,6 @@ const GUTTER = 16;
 const GAP = 12;
 /** Approximate popover height used to decide above/below before it is measured. */
 const POPOVER_ESTIMATE = 220;
-
-/** The target element of a step, or null when it is absent or has no box (hidden sidebar on a phone). */
-export function findTourTarget(key: TourStep["key"]): HTMLElement | null {
-  if (typeof document === "undefined") return null;
-  const element = document.querySelector<HTMLElement>(`[data-tour="${key}"]`);
-  if (!element || !element.isConnected) return null;
-  const box = element.getBoundingClientRect();
-  return box.width > 0 && box.height > 0 ? element : null;
-}
 
 function roundedRectPath(rect: Rect, radius: number) {
   const r = Math.min(radius, rect.width / 2, rect.height / 2);
