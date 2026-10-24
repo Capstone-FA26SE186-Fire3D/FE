@@ -24,6 +24,7 @@ import { parseStatusParam, shortId, statusLabel, statusTone } from "../format";
 import type { ReviewStatus, ReviewSummary } from "../types";
 import { ReviewDrawer } from "./review-detail";
 import "./reviews.css";
+import { LoadingBlock } from "@/components/ui/spinner";
 
 const PAGE_SIZE = 20;
 const STATUSES: ReviewStatus[] = ["Submitted", "Approved", "Rejected"];
@@ -90,7 +91,7 @@ export function ReviewsModule() {
   const needle = stripAccents(search.trim());
   const visible = useMemo(() => (needle ? items.filter((item) => stripAccents(`${item.scenarioName} ${item.organizationName} ${item.buildingName}`).includes(needle)) : items), [items, needle]);
 
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (user?.role !== 0) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin duyệt được kịch bản.</Alert>;
 
   const totalCount = list.data?.totalCount ?? 0;

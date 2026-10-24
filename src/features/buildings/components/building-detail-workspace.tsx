@@ -40,6 +40,7 @@ import { QrPanel } from "./qr-panel";
 import { RevisionDetailsPanel } from "./revision-details-panel";
 import { ScenariosPanel } from "./scenarios-panel";
 import "../building-v2.css";
+import { LoadingBlock } from "@/components/ui/spinner";
 
 export const buildingTabs = ["journey", "ifc", "scenarios", "access", "services"] as const;
 export type BuildingTab = (typeof buildingTabs)[number];
@@ -252,7 +253,7 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
     else pipelineState.refresh();
   };
 
-  if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
+  if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
 
   const crumbs: Crumb[] = isAdmin && data
     ? [{ label: "Quản trị", href: routes.adminOverview }, { label: "Tổ chức", href: routes.adminOrganizations }, { label: "Công trình", href: `${routes.adminOrganizations}/${data.organizationId}/buildings` }, { label: data.name }]
