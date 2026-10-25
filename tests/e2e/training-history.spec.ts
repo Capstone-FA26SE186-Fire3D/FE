@@ -526,11 +526,11 @@ test.describe("detail drawer: result", () => {
 });
 
 test.describe("hub integration", () => {
-  test("Lịch sử and Hỏi đáp are both real views", async ({ page }) => {
+  test("Lịch sử and Trợ lý AI are both real views", async ({ page }) => {
     const backend = new TrainingBackend();
     seedMix(backend);
     await start(page, backend, "/learning-hub?view=history");
-    await expect(page.getByRole("link", { name: /^Hỏi đáp/ })).not.toContainText(/chưa khả dụng/i);
+    await expect(page.getByRole("link", { name: /^Trợ lý AI/ }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /^Lịch sử/ })).not.toContainText(/chưa khả dụng/i);
     await page.getByRole("link", { name: /^Lịch sử/ }).click();
     await expect(page).toHaveURL(/view=history/);
