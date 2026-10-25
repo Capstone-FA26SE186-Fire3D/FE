@@ -52,7 +52,7 @@ function useKindTotal(kind: LibraryKind, token: string, reloadKey: number) {
 }
 
 /**
- * Items of every kind and state (Figma 53:1111): kind sub-tabs with totals, a DataTable whose row opens the item drawer
+ * Items of every kind and state (Figma 53:1111): kind sub-tabs with totals, a DataTable whose row opens the item popup
  * (`?item=`), and a "···" menu (Mở · Tạo phiên bản · Ngừng dùng/Dùng lại, the only item write the API has). Kind and the
  * code search are applied by the server and live in the URL together with the page; the state filter only narrows the
  * page that is loaded and says so.

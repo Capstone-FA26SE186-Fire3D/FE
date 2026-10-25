@@ -175,6 +175,7 @@ kbd { display: inline-block; min-width: 18px; padding: 1px 5px; border: 1px soli
 /* ───────── Dialog / drawer sizes, eyebrow, tools, confirm ───────── */
 .ops-dialog[data-size="sm"] { width: min(440px, calc(100vw - 32px)); }
 .ops-dialog[data-size="lg"] { width: min(720px, calc(100vw - 32px)); }
+.ops-dialog[data-size="xl"] { width: min(880px, calc(100vw - 32px)); height: min(880px, calc(100dvh - 48px)); }
 .ops-drawer[data-size="md"] { width: min(560px, 100vw); }
 .ops-drawer[data-size="lg"] { width: min(640px, 100vw); }
 .ops-drawer[data-size="xl"] { width: min(720px, 100vw); }
@@ -378,6 +379,7 @@ kbd { display: inline-block; min-width: 18px; padding: 1px 5px; border: 1px soli
 /* ───────── Phone: modals become bottom sheets, right drawers fill the screen (Figma 07 Responsive) ───────── */
 @media (max-width: 767px) {
   .ops-dialog { top: auto; left: 0; right: 0; bottom: 0; width: 100vw; max-height: 92dvh; border-width: 1px 0 0; border-radius: 16px 16px 0 0; transform: none; animation: ops-slide-up 240ms cubic-bezier(.2,.8,.2,1); }
+  .ops-dialog[data-size="xl"] { height: 92dvh; }
   .ops-dialog::before { content: ""; position: absolute; left: 50%; top: 8px; width: 40px; height: 4px; border-radius: 2px; background: var(--line-strong); transform: translateX(-50%); }
   .ops-dialog .ops-dialog-head { padding-top: 22px; }
   .ops-drawer[data-side="right"], .ops-drawer[data-side="left"] { width: 100vw; }
