@@ -8,7 +8,7 @@ import { useAsyncData } from "@/api/use-async-data";
 import { DetailList, formatDateTime } from "@/components/ops/detail-parts";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog, Drawer } from "@/components/ui/dialog";
+import { ConfirmDialog, Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonDetail, SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -21,14 +21,14 @@ import { kindLabel, type LibraryItem, type LibraryVersion, type WithEtag } from 
 import { VersionEditor } from "./version-editor";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const DRAWER_ID = "library-item-drawer";
+const DIALOG_ID = "library-item-dialog";
 
 /** The state of the new-version form: blank, a copy of an earlier version, or the author's own unsaved content. */
 type NewSeed = { form: VersionForm | null; from: string | null };
 
 /**
- * One item in a right drawer (Figma 53:1111 · row click opens the detail): its state, activation, version list and, when
- * `&version=` is set, the version editor in the same drawer behind a back button. URL: `?item=<id>&version=<id|new>`.
+ * One item in a centered popup (row click opens the detail): its state, activation, version list and, when
+ * `&version=` is set, the version editor in the same popup behind a back button. URL: `?item=<id>&version=<id|new>`.
  * The item is read with its ETag (the item revision), which PATCH carries as If-Match; versions carry their own ETag.
  */
 export function ItemDetail({ accessToken, itemId, versionParam, onVersion, onClose, onListChanged }: {
@@ -60,7 +60,7 @@ export function ItemDetail({ accessToken, itemId, versionParam, onVersion, onClo
   const editing = versionParam !== "";
 
   const shell = (props: { title: string; description?: string; eyebrow?: ReactNode; headerExtra?: ReactNode; footer?: ReactNode; children: ReactNode }) =>
-    <Drawer open onOpenChange={(open) => { if (!open && !toggleBusy) onClose(); }} size="lg" data-testid={DRAWER_ID} {...props} />;
+    <Modal open onOpenChange={(open) => { if (!open && !toggleBusy) onClose(); }} size="xl" data-testid={DIALOG_ID} {...props} />;
 
   if (itemQuery.error !== undefined && !current) {
     const view = describeLibraryError(itemQuery.error);
@@ -149,7 +149,7 @@ export function ItemDetail({ accessToken, itemId, versionParam, onVersion, onClo
       <section aria-label="Phiên bản" className="ops-stack" style={{ gap: 10 }}>
         <div>
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Phiên bản</h3>
-          <p className="ops-field-hint" style={{ margin: "2px 0 0" }}>Bản đã xuất bản không sửa được; mỗi lần đổi nội dung tạo một phiên bản mới. Chọn một phiên bản để mở trong ngăn này.</p>
+          <p className="ops-field-hint" style={{ margin: "2px 0 0" }}>Bản đã xuất bản không sửa được; mỗi lần đổi nội dung tạo một phiên bản mới. Chọn một phiên bản để mở ngay trong cửa sổ này.</p>
         </div>
         {versions.length === 0
           ? <EmptyState icon={FilePlus2} title="Chưa có phiên bản nào" description="Tạo phiên bản đầu tiên, nhập nội dung rồi xuất bản để tổ chức dùng được." action={<Button size="sm" onClick={() => startNew(null, null)}>Tạo phiên bản</Button>} />

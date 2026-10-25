@@ -3,7 +3,7 @@ import { RUBRIC_CATALOG } from "../fixtures/scenario-editor/v1-fixtures";
 import { installLibraryBackend, LibraryBackend, signIn, type Actor } from "./library-mock";
 
 /*
- * PlatformAdmin Organization Library (Admin v2: DataTable + item drawer) against a STATEFUL MOCK of the real contract
+ * PlatformAdmin Organization Library (Admin v2: DataTable + item popup) against a STATEFUL MOCK of the real contract
  * (library-mock.ts). Mock evidence only: it shows the UI sends the right routes, headers (If-Match, Idempotency-Key) and
  * payloads and handles the documented responses. It proves nothing about the deployed API.
  */
@@ -25,12 +25,12 @@ const seedRubricDraft = (backend: LibraryBackend) => {
 };
 
 const table = (page: Page) => page.getByTestId("library-items-table");
-const drawer = (page: Page) => page.getByTestId("library-item-drawer");
+const itemDialog = (page: Page) => page.getByTestId("library-item-dialog");
 /** The item code is printed once per row (as the title, or under the published name), in the table and in the card layout. */
 const rowOf = (page: Page, code: string) => table(page).getByText(code, { exact: true });
-/** Back from the version editor to the item summary inside the same drawer. */
-const backToItem = (page: Page) => drawer(page).getByRole("button", { name: "Về mục" }).click();
-/** A confirmation stacked over the drawer, picked by its question. */
+/** Back from the version editor to the item summary inside the same popup. */
+const backToItem = (page: Page) => itemDialog(page).getByRole("button", { name: "Về mục" }).click();
+/** A confirmation stacked over the popup, picked by its question. */
 const confirmDialog = (page: Page, question: string) => page.getByRole("dialog").filter({ hasText: question });
 
 /** Opens the item through the list (a direct goto can be filled before hydration, which then resets the inputs). */
@@ -38,7 +38,7 @@ async function openItem(page: Page, code: string) {
   await page.goto("/admin/library");
   await rowOf(page, code).click();
   await expect(page).toHaveURL(/item=[0-9a-f-]{36}/);
-  await expect(drawer(page)).toContainText(code);
+  await expect(itemDialog(page)).toContainText(code);
 }
 
 const uuidFrom = (url: string, key: string) => new URL(url).searchParams.get(key) ?? "";
@@ -72,7 +72,7 @@ test.describe("production Library admin", () => {
     await setup(page, () => undefined, "guest");
     await page.goto("/admin/library");
     await expect(page.getByRole("link", { name: "Đăng nhập" })).toBeVisible();
-    await expect(drawer(page)).toHaveCount(0);
+    await expect(itemDialog(page)).toHaveCount(0);
   });
 
   test("API 403 on the list is shown with its cause and a retry", async ({ page }) => {
@@ -132,14 +132,14 @@ test.describe("rubric sample lifecycle", () => {
     await dialog.getByTestId("new-item-code").fill("rubric-co-ban");
     await expect(dialog.getByText("Sẽ lưu là: RUBRIC-CO-BAN")).toBeVisible();
     await dialog.getByTestId("create-item").click();
-    await expect(drawer(page)).toContainText("RUBRIC-CO-BAN");
+    await expect(itemDialog(page)).toContainText("RUBRIC-CO-BAN");
     const created = backend.callsTo("POST", /items$/);
     expect(created).toHaveLength(1);
     expect(created[0].body).toEqual({ kind: "RubricSample", code: "RUBRIC-CO-BAN" });
     expect(created[0].headers["idempotency-key"]).toBeTruthy();
     await expect(page.getByText("Mục chỉ hiện cho tổ chức khi có ít nhất một phiên bản đã xuất bản")).toBeVisible();
 
-    // new Draft (same drawer, back button): every field starts blank, nothing is pre-filled except the server's own catalog default schema_version
+    // new Draft (same popup, back button): every field starts blank, nothing is pre-filled except the server's own catalog default schema_version
     await page.getByTestId("new-version").click();
     await expect(page).toHaveURL(/version=new/);
     await expect(page.getByTestId("version-editor")).toBeVisible();
@@ -211,7 +211,7 @@ test.describe("rubric sample lifecycle", () => {
     await expect(page.getByText("Phiên bản đã xuất bản không sửa được")).toBeVisible();
     await backToItem(page);
     await expect(page.getByText("Bản tổ chức đang thấy")).toBeVisible();
-    await expect(drawer(page)).toContainText("v1 · Tên của tôi");
+    await expect(itemDialog(page)).toContainText("v1 · Tên của tôi");
     await page.getByRole("button", { name: "Mở phiên bản 1" }).click();
 
     await page.getByTestId("new-from-published").click();
@@ -228,7 +228,7 @@ test.describe("rubric sample lifecycle", () => {
     await expect(page.getByRole("status").filter({ hasText: "v2 · từ giờ không sửa được nữa" })).toBeVisible();
     await backToItem(page);
     await expect(page.getByTestId("version-row-2")).toContainText("Đã xuất bản");
-    await expect(drawer(page)).toContainText("v2 · Rubric cơ bản (bản 2)");
+    await expect(itemDialog(page)).toContainText("v2 · Rubric cơ bản (bản 2)");
 
     // v1 never changed
     expect(backend.versions).toHaveLength(2);
@@ -270,7 +270,7 @@ test.describe("rubric sample lifecycle", () => {
     await expect(dialog.getByText("Máy chủ đang bận")).toBeVisible();
     await expect(dialog.getByTestId("create-item")).toHaveText("Thử lại");
     await dialog.getByTestId("create-item").click();
-    await expect(drawer(page)).toContainText("SMOKE-HOOD");
+    await expect(itemDialog(page)).toContainText("SMOKE-HOOD");
     const creates = backend.callsTo("POST", /items$/);
     expect(creates).toHaveLength(2);
     expect(creates[1].headers["idempotency-key"]).toBe(creates[0].headers["idempotency-key"]);
@@ -410,13 +410,13 @@ test.describe("equipment and template payloads", () => {
 });
 
 test.describe("item activation", () => {
-  test("deactivate (drawer) asks for confirmation, sends PATCH with If-Match, and 412 keeps the dialog with a reload", async ({ page }) => {
+  test("deactivate (popup) asks for confirmation, sends PATCH with If-Match, and 412 keeps the dialog with a reload", async ({ page }) => {
     const backend = await setup(page, (b) => {
       b.seedItem("Equipment", "BINH-CHUA-CHAY");
       b.seedVersion("BINH-CHUA-CHAY", { name: "Bình CO2", payload: { description: "Bình CO2 5 kg." }, publish: true });
     });
     await openItem(page, "BINH-CHUA-CHAY");
-    await expect(drawer(page)).toContainText("v1 · Bình CO2");
+    await expect(itemDialog(page)).toContainText("v1 · Bình CO2");
     backend.items[0].revision += 1; // another admin touched the item: its revision moved, my If-Match is stale
     await page.getByTestId("toggle-active").click();
     const confirm = confirmDialog(page, "Ngừng dùng mục này?");
@@ -429,10 +429,10 @@ test.describe("item activation", () => {
     expect(patches).toHaveLength(2);
     expect(patches[1].body).toEqual({ isActive: false });
     expect(patches[1].headers["idempotency-key"]).toBeTruthy();
-    await expect(drawer(page)).toContainText("Mục đang ngừng dùng");
+    await expect(itemDialog(page)).toContainText("Mục đang ngừng dùng");
     expect(backend.items[0].isActive).toBe(false);
     expect(backend.versions[0].status).toBe("Published"); // versions survive deactivation
-    await drawer(page).getByRole("button", { name: "Đóng" }).first().click();
+    await itemDialog(page).getByRole("button", { name: "Đóng" }).first().click();
     await expect(page).not.toHaveURL(/item=/);
     await expect(table(page).getByRole("row").filter({ hasText: "BINH-CHUA-CHAY" })).toContainText("Ngừng dùng");
   });
@@ -449,7 +449,7 @@ test.describe("item activation", () => {
     expect(patch.body).toEqual({ isActive: true });
     expect(backend.items[0].isActive).toBe(true);
     await expect(table(page).getByRole("row").filter({ hasText: "BINH-CU" })).toContainText("Chưa có phiên bản");
-    // "Tạo phiên bản" from the menu opens the drawer straight on the new-version form.
+    // "Tạo phiên bản" from the menu opens the popup straight on the new-version form.
     await table(page).getByRole("row").filter({ hasText: "BINH-CU" }).getByRole("button", { name: "Thao tác" }).click();
     await page.getByRole("menuitem", { name: "Tạo phiên bản" }).click();
     await expect(page).toHaveURL(/version=new/);
@@ -475,7 +475,7 @@ for (const width of [1440, 375]) {
       await noOverflow(page);
       await shot("list");
       await rowOf(page, "RUBRIC-CO-BAN-RAT-DAI-DE-KIEM-TRA-XUONG-DONG-VA-TRAN-NGANG").click();
-      await expect(drawer(page)).toBeVisible();
+      await expect(itemDialog(page)).toBeVisible();
       await noOverflow(page);
       await shot("item");
       await page.getByRole("button", { name: "Mở phiên bản 1" }).click();
@@ -503,7 +503,7 @@ test("URL keeps item and version so a deep link and the back button work", async
   expect(id).toBe(backend.versions[0].id);
   await page.goBack();
   await expect(page.getByTestId("version-editor")).toHaveCount(0);
-  await expect(drawer(page)).toBeVisible(); // the item drawer stays
+  await expect(itemDialog(page)).toBeVisible(); // the item popup stays
   await page.goForward();
   await expect(page.getByTestId("version-name")).toHaveValue("Rubric cơ bản");
   await page.goto(`/admin/library?item=${backend.items[0].id}&version=00000000-0000-4000-8000-00000000dead`);
