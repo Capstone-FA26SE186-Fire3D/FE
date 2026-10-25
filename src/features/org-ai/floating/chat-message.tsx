@@ -12,13 +12,14 @@ import { routes } from "@/configs/routes";
 import { isObject } from "@/features/scenario-editor/store/json";
 
 import { readProposalNotes, readProposalState } from "../apply-plan";
-import { orgAiApi } from "../api";
+import { orgAiApi, traineeAiApi } from "../api";
 import { aiErrorText, failureText, hasResultType, isInFlight, isSuccessfulDraft, operationLabel, sourceKindLabel, statusLabel, statusTone } from "../labels";
 import type { AiCitation, AiRequest } from "../types";
 import { citationHref } from "../components/request-view";
+import { traineeRequestHref } from "../trainee";
 import type { ChatMessage } from "./ai-bubble-context";
 
-const detailHref = (request: AiRequest) => `${routes.workspaceAi}?tab=${isSuccessfulDraft(request) ? "saved" : "history"}&request=${encodeURIComponent(request.requestId)}`;
+const detailHref = (request: AiRequest, trainee?: boolean) => trainee ? traineeRequestHref(request.requestId) : `${routes.workspaceAi}?tab=${isSuccessfulDraft(request) ? "saved" : "history"}&request=${encodeURIComponent(request.requestId)}`;
 
 /** v7 citations live on the request; `result.citations` only for answers from before BE#89. */
 const citationsOf = (request: AiRequest): AiCitation[] => (Array.isArray(request.citations) ? request.citations : Array.isArray(request.result?.citations) ? request.result.citations : []);
@@ -93,9 +94,9 @@ function DraftSummary({ request }: { request: AiRequest }) {
  * and renders the outcome the way the full `RequestView` does, in chat size: answer + citation chips, draft summary,
  * or the InsufficientEvidence / RejectedBySafetyGate / Failed / NeedsReconcile explanation. Nothing is inferred locally.
  */
-export function AssistantMessage({ message, accessToken, onSettled, onApply }: { message: Extract<ChatMessage, { role: "assistant" }>; accessToken: string; onSettled: (request: AiRequest) => void; onApply?: (request: AiRequest) => void }) {
+export function AssistantMessage({ message, accessToken, onSettled, onApply, trainee }: { message: Extract<ChatMessage, { role: "assistant" }>; accessToken: string; onSettled: (request: AiRequest) => void; onApply?: (request: AiRequest) => void; trainee?: boolean }) {
   const requestId = message.requestId;
-  const fetcher = useCallback((signal: AbortSignal) => orgAiApi.getRequest(accessToken, requestId, signal), [accessToken, requestId]);
+  const fetcher = useCallback((signal: AbortSignal) => (trainee ? traineeAiApi.getRequest(accessToken, requestId, signal) : orgAiApi.getRequest(accessToken, requestId, signal)), [accessToken, requestId, trainee]);
   const isDone = useCallback((request: AiRequest) => !isInFlight(request.status), []);
   const polling = usePolling<AiRequest>({ fetcher, isDone, resetKey: `bubble:${requestId}` });
   const gone = polling.error instanceof ApiError && (polling.error.status === 404 || polling.error.status === 403 || polling.error.status === 401);
@@ -118,7 +119,7 @@ export function AssistantMessage({ message, accessToken, onSettled, onApply }: {
   const copy = copyTextOf(request);
   const draft = isSuccessfulDraft(request);
   return <div className="ai-msg ai-msg--assistant" data-testid="ai-chat-answer" data-status={request.status} data-result-type={request.resultType ?? undefined}>
-    {request.status === "Failed" && <p className="ai-msg-text"><StatusBadge tone="danger">{statusLabel(request.status)}</StatusBadge> {failure ?? "Dịch vụ AI không trả được kết quả."} Phần hạn mức đã giữ chỗ được hoàn lại (xem lịch sử sử dụng).</p>}
+    {request.status === "Failed" && <p className="ai-msg-text"><StatusBadge tone="danger">{statusLabel(request.status)}</StatusBadge> {failure ?? "Dịch vụ AI không trả được kết quả."} {trainee ? "Lượt hỏi đã giữ chỗ được hoàn lại." : "Phần hạn mức đã giữ chỗ được hoàn lại (xem lịch sử sử dụng)."}</p>}
     {request.status === "NeedsReconcile" && <p className="ai-msg-text"><StatusBadge tone="warning">{statusLabel(request.status)}</StatusBadge> {failure ?? "Hệ thống chưa xác nhận được kết quả từ dịch vụ AI."} Không gửi lại câu hỏi này để tránh trừ trùng; quản trị FET3D sẽ đối soát.</p>}
     {hasResultType(request, "InsufficientEvidence") && <p className="ai-msg-text" data-testid="ai-chat-insufficient"><StatusBadge tone="warning">{statusLabel(request.status, request.resultType)}</StatusBadge> {request.result?.message?.trim() || "Các nguồn đã chọn chưa đủ thông tin để trả lời có trích dẫn. Hãy hỏi cụ thể hơn."}</p>}
     {hasResultType(request, "RejectedBySafetyGate") && <p className="ai-msg-text" data-testid="ai-chat-rejected"><StatusBadge tone="danger">{statusLabel(request.status, request.resultType)}</StatusBadge> {request.result?.message?.trim() || "Yêu cầu hoặc kết quả bị chặn bởi cổng an toàn nên không có nội dung để hiển thị."}</p>}
@@ -130,7 +131,7 @@ export function AssistantMessage({ message, accessToken, onSettled, onApply }: {
     <div className="ai-msg-actions">
       {copy && <CopyAction text={copy} />}
       {draft && onApply && readProposalState(request.result) && <button type="button" className="ai-action" onClick={() => onApply(request)} data-testid="ai-chat-apply"><FileEdit size={12} aria-hidden="true" />Dùng làm bản nháp</button>}
-      <Link className="ai-action" href={detailHref(request)} data-testid="ai-chat-detail">Xem chi tiết</Link>
+      <Link className="ai-action" href={detailHref(request, trainee)} data-testid="ai-chat-detail">Xem chi tiết</Link>
       <span className="ai-msg-meta" title={`${operationLabel(request.operation)} · ${requestId}`}><StatusBadge tone={statusTone(request.status, request.resultType)} data-testid="ai-chat-status">{statusLabel(request.status, request.resultType)}</StatusBadge></span>
     </div>
   </div>;

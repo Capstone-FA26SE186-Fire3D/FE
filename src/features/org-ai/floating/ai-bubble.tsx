@@ -18,12 +18,14 @@ import "./ai-bubble.css";
 
 // The conversation UI and the apply dialog load when the panel first opens; the page only ships the launcher.
 const AiChatPanel = dynamic(() => import("./ai-chat-panel").then((module) => module.AiChatPanel), { ssr: false });
+const TraineeChatPanel = dynamic(() => import("./trainee-chat-panel").then((module) => module.TraineeChatPanel), { ssr: false });
 const ApplyTargetDialog = dynamic(() => import("../components/apply-target-dialog").then((module) => module.ApplyTargetDialog), { ssr: false });
 
 export { useAiBubble } from "./ai-bubble-context";
 
 /**
- * Floating "Trợ lý AI" on every `/workspace/*` page (Figma 43:197 / 43:255 / 57:731). OrganizationUser only; the admin
+ * Floating "Trợ lý AI" on every `/workspace/*` page (Figma 43:197 / 43:255 / 57:731) for the OrganizationUser, and on the
+ * Trainee's learning hub (`AiBubbleProvider audience="trainee"`, own daily allowance and question context). The admin
  * never sees it. Collapsed: pill + ember sparkle button, bottom-right. Open: a 400×600 panel anchored bottom-right, a
  * full-screen sheet under 768px, or (expand) a 640px drawer. The conversation lives in `AiBubbleProvider` (layout), so it
  * survives navigation; this component only draws it and manages focus (into the composer on open, back to the launcher
@@ -31,11 +33,12 @@ export { useAiBubble } from "./ai-bubble-context";
  */
 export function AiBubble() {
   const bubble = useAiBubble();
-  const { enabled, accessToken, open, expanded, openPanel, closePanel, togglePanel, setExpanded, focusToken, consumeFocus } = bubble;
+  const { audience, enabled, accessToken, open, expanded, openPanel, closePanel, togglePanel, setExpanded, focusToken, consumeFocus } = bubble;
   const router = useRouter();
   const pathname = usePathname();
   const phone = useMediaQuery("(max-width: 767px)");
-  const context = usePageContext(accessToken, enabled && open);
+  const trainee = audience === "trainee";
+  const context = usePageContext(accessToken, enabled && open && !trainee);
   const launcher = useRef<HTMLButtonElement>(null);
   const [applying, setApplying] = useState<AiRequest | null>(null);
   const wasOpen = useRef(open);
@@ -75,17 +78,23 @@ export function AiBubble() {
     <AnimatePresence>
       {showPanel && <m.div key={pathname} id="ai-bubble-panel" className="ai-panel-float" role="dialog" aria-modal="false" aria-labelledby="ai-bubble-title" onKeyDown={onPanelKey}
         initial={{ opacity: 0, y: 12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 12, scale: 0.98 }} transition={presets.softSpring} data-testid="ai-bubble-float">
-        <AiChatPanel context={context} variant="panel" onClose={closePanel} onToggleExpand={toggleExpand} onApply={onApply} focusToken={showPanel ? focusToken : null} onFocused={consumeFocus} />
+        {trainee
+          ? <TraineeChatPanel variant="panel" onClose={closePanel} onToggleExpand={toggleExpand} focusToken={showPanel ? focusToken : null} onFocused={consumeFocus} />
+          : <AiChatPanel context={context} variant="panel" onClose={closePanel} onToggleExpand={toggleExpand} onApply={onApply} focusToken={showPanel ? focusToken : null} onFocused={consumeFocus} />}
       </m.div>}
     </AnimatePresence>
 
     <Drawer open={showSheet} onOpenChange={(value) => { if (!value) closePanel(); }} side="bottom" title="Trợ lý AI" hideTitle flush className="ai-sheet" data-testid="ai-bubble-sheet">
-      <AiChatPanel context={context} variant="sheet" onClose={closePanel} onApply={onApply} focusToken={showSheet ? focusToken : null} onFocused={consumeFocus} />
+      {trainee
+        ? <TraineeChatPanel variant="sheet" onClose={closePanel} focusToken={showSheet ? focusToken : null} onFocused={consumeFocus} />
+        : <AiChatPanel context={context} variant="sheet" onClose={closePanel} onApply={onApply} focusToken={showSheet ? focusToken : null} onFocused={consumeFocus} />}
     </Drawer>
 
     <Drawer open={showDrawer} onOpenChange={(value) => { if (!value) closePanel(); }} size="lg" title="Trợ lý AI" hideTitle flush className="ai-sheet ai-sheet--wide" data-testid="ai-bubble-drawer">
       {/* Only the variant on screen takes the focus request: a drawer or sheet that is closing must not keep it. */}
-      <AiChatPanel context={context} variant="drawer" onClose={closePanel} onToggleExpand={toggleExpand} onApply={onApply} focusToken={showDrawer ? focusToken : null} onFocused={consumeFocus} />
+      {trainee
+        ? <TraineeChatPanel variant="drawer" onClose={closePanel} onToggleExpand={toggleExpand} focusToken={showDrawer ? focusToken : null} onFocused={consumeFocus} />
+        : <AiChatPanel context={context} variant="drawer" onClose={closePanel} onToggleExpand={toggleExpand} onApply={onApply} focusToken={showDrawer ? focusToken : null} onFocused={consumeFocus} />}
     </Drawer>
 
     {applying && <ApplyTargetDialog accessToken={accessToken} request={applying} onClose={() => setApplying(null)} />}

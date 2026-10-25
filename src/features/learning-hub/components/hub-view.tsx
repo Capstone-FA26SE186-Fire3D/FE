@@ -1,11 +1,14 @@
 "use client";
 
-import { BookOpen, Bookmark, History, LayoutDashboard, LifeBuoy, LogOut, Menu, MessageSquare, User, X, type LucideIcon } from "lucide-react";
+import { BookOpen, Bookmark, History, LayoutDashboard, LifeBuoy, LogOut, Menu, Sparkles, User, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import "@/assets/styles/ops.css";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { MotionProvider } from "@/components/ui/motion";
+import { LoadingBlock } from "@/components/ui/spinner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ToastProvider } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
@@ -14,10 +17,12 @@ import { useAuthSession } from "@/features/auth/auth-session";
 import { ThemeScope } from "@/features/theme/theme-scope";
 import { TraineeSupport } from "@/features/support/components/trainee-support";
 import "../learning-hub.css";
-import { AskPanel } from "./ask-panel";
+import { AiBubble } from "@/features/org-ai/floating/ai-bubble";
+import { AiBubbleProvider } from "@/features/org-ai/floating/ai-bubble-context";
 import { HistoryPanel } from "./history-panel";
 import { Overview } from "./overview";
 import { SavedPosts } from "./saved-posts";
+import { OpenAssistantButton, TraineeAi } from "./trainee-ai";
 
 type ViewKey = "overview" | "saved" | "questions" | "history" | "support" | "profile";
 type View = { key: ViewKey; label: string; short: string; icon: LucideIcon; kicker?: string; description?: string };
@@ -26,7 +31,7 @@ type View = { key: ViewKey; label: string; short: string; icon: LucideIcon; kick
 const views: readonly View[] = [
   { key: "overview", label: "Tổng quan", short: "Tổng quan", icon: LayoutDashboard, description: "Bắt đầu từ bài đã lưu, hỏi AI hoặc mở ứng dụng để luyện tập." },
   { key: "saved", label: "Bài đã lưu", short: "Đã lưu", icon: Bookmark, description: "Quay lại bài viết, mẹo và video bạn đã lưu. Bài bị gỡ vẫn nằm ở đây cho tới khi bạn bỏ lưu." },
-  { key: "questions", label: "Hỏi đáp AI", short: "Hỏi AI", icon: MessageSquare, description: "Hỏi về bài đang đọc hoặc kết quả luyện tập của bạn. Câu trả lời luôn kèm nguồn." },
+  { key: "questions", label: "Trợ lý AI", short: "Trợ lý AI", icon: Sparkles, description: "Trò chuyện với trợ lý ở nút nổi góc màn hình trên mọi trang. Trang này để xem lại câu hỏi đã hỏi và lượt hỏi hôm nay. Câu trả lời luôn kèm nguồn, chỉ để tham khảo." },
   { key: "history", label: "Lịch sử luyện tập", short: "Lịch sử", icon: History, description: "Mỗi phiên có hai trạng thái riêng: hoàn thành phiên và kết quả đánh giá. Luyện tập lại không giới hạn." },
   { key: "support", label: "Hỗ trợ", short: "Hỗ trợ", icon: LifeBuoy },
   { key: "profile", label: "Hồ sơ", short: "Hồ sơ", icon: User },
@@ -42,7 +47,8 @@ function Gate({ children }: { children: ReactNode }) {
 }
 
 export function HubView() {
-  return <ThemeScope className="learning-scope"><ToastProvider><Workspace /></ToastProvider></ThemeScope>;
+  // The assistant's conversation sits above the views so it survives switching between them, as on `/workspace/*`.
+  return <ThemeScope className="learning-scope"><ToastProvider><AiBubbleProvider audience="trainee"><Workspace /><MotionProvider><TooltipProvider><AiBubble /></TooltipProvider></MotionProvider></AiBubbleProvider></ToastProvider></ThemeScope>;
 }
 
 function Workspace() {
@@ -68,7 +74,7 @@ function Workspace() {
 
   const closeMenu = () => setMenuOpen(false);
   const next = "/learning-hub" + (params.size ? "?" + params.toString() : "");
-  if (!ready) return <Gate><p role="status">Đang khôi phục phiên đăng nhập…</p></Gate>;
+  if (!ready) return <main className="ops-access"><LoadingBlock label="Đang mở thư viện cá nhân…" /></main>;
   if (!isAuthenticated) return <Gate><div className="ops-panel ops-panel-body"><h1>Thư viện cá nhân</h1><p>Đăng nhập để xem bài đã lưu, hỗ trợ và hồ sơ của bạn.</p><Button asChild><Link href={`${routes.login}?next=${encodeURIComponent(next)}`}>Đăng nhập</Link></Button></div></Gate>;
 
   const displayName = user?.fullName || user?.email || "";
@@ -81,6 +87,7 @@ function Workspace() {
     <div className="learning-page-actions">
       {(view === "overview" || view === "saved") && <Link className={buttonVariants({ variant: "secondary" })} href={routes.learn}>Khám phá bài học</Link>}
       {view === "history" && <Link className={buttonVariants({ variant: "secondary" })} href={routes.download}>Mở trên điện thoại</Link>}
+      {view === "questions" && <OpenAssistantButton />}
     </div>
   </header> : null;
 
@@ -106,7 +113,7 @@ function Workspace() {
         {header}
         {view === "overview" && <Overview />}
         {view === "saved" && <SavedPosts />}
-        {view === "questions" && <AskPanel articleParam={rawArticle} />}
+        {view === "questions" && <TraineeAi />}
         {view === "history" && <HistoryPanel />}
         {view === "support" && <TraineeSupport />}
         {view === "profile" && <AccountProfile />}
