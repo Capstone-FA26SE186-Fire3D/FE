@@ -41,7 +41,7 @@ test.describe("admin payments ledger (mock)", () => {
     await pick(page, "Trạng thái", { value: "NeedsReconcile" });
     await expect(page).toHaveURL(/status=NeedsReconcile/);
     await expect(ledgerRows(page)).toHaveCount(15);
-    await expect(ledgerRows(page).first().getByTestId("payment-states")).toContainText("Checkout: Cần đối soát");
+    await expect(ledgerRows(page).first().getByTestId("payment-states")).toContainText("Liên kết: Cần đối soát");
     await page.getByRole("combobox", { name: "Tổ chức" }).click();
     await page.getByRole("option", { name: "FET3D Lab" }).click();
     await expect(page).toHaveURL(/org=org-1/);
@@ -71,7 +71,7 @@ test.describe("admin payments ledger (mock)", () => {
     await openChip(page, "Mã báo giá");
     await page.getByRole("textbox", { name: "Mã báo giá" }).fill("khong-phai-guid");
     await page.getByRole("button", { name: "Áp dụng", exact: true }).click();
-    await expect(page.getByText("Mã báo giá là GUID (36 ký tự).")).toBeVisible();
+    await expect(page.getByText("Mã báo giá chưa đúng. Dán đủ mã gồm 36 ký tự.")).toBeVisible();
     const before = callsTo(mock, "GET", "/api/admin/payments/payos/checkouts").length;
     await page.getByRole("textbox", { name: "Mã báo giá" }).fill(ids.quote);
     await page.getByRole("button", { name: "Áp dụng", exact: true }).click();
@@ -93,7 +93,7 @@ test.describe("admin payments ledger (mock)", () => {
     await mockBilling(page, mock);
     await page.goto("/admin/commerce?tab=payments");
     const stuck = ledgerRows(page).nth(0);
-    await expect(stuck.getByTestId("payment-states")).toContainText("Checkout: Cần đối soát");
+    await expect(stuck.getByTestId("payment-states")).toContainText("Liên kết: Cần đối soát");
     await expect(stuck.getByTestId("payment-states")).toContainText("Thanh toán: Đã nhận tiền");
     await expect(stuck.getByTestId("payment-states")).toContainText("Kích hoạt: Cần đối soát");
     await expectReconcileOffered(page, stuck, true);
@@ -131,7 +131,7 @@ test.describe("admin payments ledger (mock)", () => {
     expect(callsTo(mock, "POST", `/api/admin/payments/payos/checkouts/${ids.checkout}/reconcile`)).toHaveLength(1);
     // Nothing more to reconcile: the action is closed again.
     await expect(reconcile).toBeDisabled();
-    await expect(detail.getByText(/Đối soát chỉ mở khi/)).toBeVisible();
+    await expect(detail.getByText(/Chỉ đối soát được khi/)).toBeVisible();
   });
 
   test("reconcile on a payment that is already provisioned stays disabled and sends nothing", async ({ page }) => {
@@ -174,12 +174,12 @@ test.describe("admin payments ledger (mock)", () => {
     await pick(page, "Trạng thái", { value: "Paid" });
     await expect.poll(() => callsTo(mock, "GET", "/api/admin/payments/payos/requests").at(-1)!.search).toContain("status=Paid");
 
-    // The lookup lives in the page-header modal ("Tra cứu checkout").
-    await page.getByRole("button", { name: "Tra cứu checkout" }).click();
-    await page.getByRole("textbox", { name: "Tra cứu theo mã checkout" }).fill("not-a-guid");
+    // The lookup lives in the page-header modal ("Tra cứu thanh toán").
+    await page.getByRole("button", { name: "Tra cứu thanh toán" }).click();
+    await page.getByRole("textbox", { name: "Mã lượt thanh toán" }).fill("not-a-guid");
     await page.getByRole("button", { name: "Tra cứu", exact: true }).click();
-    await expect(page.getByText("Nhập mã checkout dạng GUID")).toBeVisible();
-    await page.getByRole("textbox", { name: "Tra cứu theo mã checkout" }).fill(ids.checkout);
+    await expect(page.getByText("Dán đủ mã lượt thanh toán")).toBeVisible();
+    await page.getByRole("textbox", { name: "Mã lượt thanh toán" }).fill(ids.checkout);
     await page.getByRole("button", { name: "Tra cứu", exact: true }).click();
     await expect(page.getByTestId("payment-detail")).toBeVisible();
     expect(callsTo(mock, "GET", `/api/payments/payos/checkouts/${ids.checkout}`).length).toBeGreaterThan(0);
@@ -208,7 +208,7 @@ test.describe("admin payments ledger (mock)", () => {
     await expect(page.getByText("Không tải được danh sách thanh toán")).toBeVisible();
     await page.getByRole("button", { name: "Thử lại" }).first().click();
     await expect(page.getByText("Không có thanh toán", { exact: true })).toBeVisible();
-    await expect(page.getByText(/Chưa có checkout nào/)).toBeVisible();
+    await expect(page.getByText(/Chưa có lượt thanh toán nào/)).toBeVisible();
     await page.goto("/admin/commerce?tab=payments&status=Failed");
     await expect(page.getByText(/Không có bản ghi khớp bộ lọc/)).toBeVisible();
   });
@@ -228,7 +228,7 @@ test.describe("admin payments ledger (mock)", () => {
     await mockBilling(page, mock);
     queue(mock, `GET /api/payments/payos/checkouts/${ids.checkout}`, { status: 403, json: { code: "BILLING_ROLE_FORBIDDEN", title: "forbidden" } });
     await page.goto(`/admin/commerce?tab=payments&checkout=${ids.checkout}`);
-    await expect(page.getByText("Không đọc được checkout")).toBeVisible();
+    await expect(page.getByText("Không đọc được thông tin thanh toán")).toBeVisible();
     await expect(page.getByTestId("payment-status")).toHaveCount(0);
   });
 });

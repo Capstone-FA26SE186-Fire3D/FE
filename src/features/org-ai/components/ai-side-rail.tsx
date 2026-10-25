@@ -27,11 +27,11 @@ export function AiQuotaCard({ accessToken }: { accessToken: string }) {
 
   return <div className={styles.grid2} data-testid="ai-quota-card">
     <section className="org-card" aria-labelledby="org-ai-quota-title">
-      <h2 id="org-ai-quota-title" className="org-card-title">Quota AI trả trước</h2>
-      <p className="org-card-sub">Gộp từ các gói công trình và top-up đã thanh toán. Hết quota thì chặn yêu cầu tính phí mới; không có nợ trả sau.</p>
-      {quota.loading && !quota.data && <SkeletonRows rows={2} label="Đang tải quota…" />}
-      {quota.error !== undefined && !quota.data && <Alert tone="danger" title="Chưa đọc được quota" action={<Button size="sm" variant="secondary" className="mt-3" onClick={quota.reload}>Thử lại</Button>}>{aiErrorText(quota.error)}</Alert>}
-      {quota.data && units.length === 0 && <p className="org-card-sub">Tổ chức chưa có quota AI.</p>}
+      <h2 id="org-ai-quota-title" className="org-card-title">Hạn mức AI trả trước</h2>
+      <p className="org-card-sub">Gộp từ các gói công trình và các lần nạp thêm đã thanh toán. Hết hạn mức thì yêu cầu tính phí mới bị chặn; không có nợ trả sau.</p>
+      {quota.loading && !quota.data && <SkeletonRows rows={2} label="Đang tải hạn mức…" />}
+      {quota.error !== undefined && !quota.data && <Alert tone="danger" title="Chưa đọc được hạn mức" action={<Button size="sm" variant="secondary" className="mt-3" onClick={quota.reload}>Thử lại</Button>}>{aiErrorText(quota.error)}</Alert>}
+      {quota.data && units.length === 0 && <p className="org-card-sub">Tổ chức chưa có hạn mức AI.</p>}
       <div className="org-stack-sm">
         {units.map((unit) => <div key={unit.quotaUnit} className="org-sub-card" data-testid="ai-rail-quota">
           <span className="org-meta">Còn lại</span>
@@ -47,12 +47,12 @@ export function AiQuotaCard({ accessToken }: { accessToken: string }) {
         </div>)}
       </div>
       {quota.data && <p className={styles.dim} style={{ marginTop: 10 }}>Số liệu lúc {formatDateTime(quota.data.asOf)}.</p>}
-      <div style={{ marginTop: 14 }}><Button asChild variant="secondary"><Link href={BILLING_AI_HREF}>Nạp quota AI</Link></Button></div>
+      <div style={{ marginTop: 14 }}><Button asChild variant="secondary"><Link href={BILLING_AI_HREF}>Nạp thêm hạn mức AI</Link></Button></div>
     </section>
 
     <section className="org-card" aria-labelledby="org-ai-limits-title">
       <h2 id="org-ai-limits-title" className="org-card-title">Giới hạn theo chính sách</h2>
-      <p className="org-card-sub">Mức giữ chỗ cho một yêu cầu và giới hạn đầu vào do PlatformAdmin quy định; máy chủ chốt theo mức dùng thực tế.</p>
+      <p className="org-card-sub">Mức giữ chỗ cho một yêu cầu và giới hạn đầu vào do quản trị FET3D quy định; máy chủ chốt theo mức dùng thực tế.</p>
       {limits.loading && !limits.data && <SkeletonRows rows={2} label="Đang tải giới hạn…" />}
       {limits.error !== undefined && !limits.data && <Alert tone="danger" title="Chưa đọc được giới hạn" action={<Button size="sm" variant="secondary" className="mt-3" onClick={limits.reload}>Thử lại</Button>}>{aiErrorText(limits.error)}</Alert>}
       {limits.data && items.length === 0 && <p className="org-card-sub">Chưa có chính sách AI đang hiệu lực.</p>}

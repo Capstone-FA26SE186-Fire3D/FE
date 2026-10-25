@@ -3,6 +3,7 @@
 import { RefreshCw, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
+import { SupportCode } from "@/components/ui/support-code";
 import { Alert } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/dialog";
@@ -39,7 +40,6 @@ function CriteriaTable({ criteria }: { criteria: CriterionResult[] }) {
           <strong data-testid={criterion.label ? "criterion-label" : undefined}>{criterion.label || metricName(criterion.metric)}</strong>
           {criterion.label && <span className="th-table-metric">{metricName(criterion.metric)}</span>}
           {criterion.description && <span className="ops-muted th-table-desc">{criterion.description}</span>}
-          {criterion.id && <span className="th-code">Mã tiêu chí: {criterion.id}</span>}
         </td>
         <td data-label="Số đo">{formatMetricValue(criterion.metric, criterion.value)}</td>
         <td data-label="Yêu cầu">{threshold}{criterion.weight === null ? null : <small>Trọng số {criterion.weight.toLocaleString("vi-VN")}</small>}</td>
@@ -47,7 +47,6 @@ function CriteriaTable({ criteria }: { criteria: CriterionResult[] }) {
         <td data-label="Kết quả">
           <StatusBadge tone={unavailable ? "warning" : criterion.passed ? "success" : "danger"}>{unavailable ? "Chưa chấm" : criterion.passed ? "Đạt" : "Chưa đạt"}</StatusBadge>
           {criterion.reason && <small>{criterionReasonText(criterion.reason)}</small>}
-          {criterion.reason && <span className="th-code">{criterion.reason}</span>}
         </td>
       </tr>;
     })}</tbody>
@@ -60,7 +59,7 @@ function ResultFacts({ result }: { result: TrainingResult }) {
   return <>
     <div data-testid="result-outcome">
       <p>{reasonText(result.reason)}</p>
-      {result.reason && <p className="th-code">Mã lý do: {result.reason}</p>}
+      {result.reason && <SupportCode code={result.reason} />}
     </div>
     <div data-testid="result-score" className="th-scoreline">
       <span>Điểm</span>
@@ -77,23 +76,23 @@ function ResultBody({ result }: { result: TrainingResult }) {
       <h3 id="th-criteria-heading">Tiêu chí</h3>
       {result.criteria && result.criteria.length > 0
         ? <CriteriaTable criteria={result.criteria} />
-        : <p className="ops-muted" data-testid="no-criteria">Máy chủ không trả tiêu chí chi tiết cho lượt này.</p>}
+        : <p className="ops-muted" data-testid="no-criteria">Lượt này không có tiêu chí chấm chi tiết.</p>}
     </section>
 
     <section aria-labelledby="th-metrics-heading">
       <h3 id="th-metrics-heading">Số đo chính</h3>
       {metricKeys.length > 0
         ? <dl className="th-tiles" data-testid="metrics">{metricKeys.map((key) => <div key={key}><dt>{metricName(key)}</dt><dd>{formatMetricValue(key, result.metrics[key])}</dd></div>)}</dl>
-        : <p className="ops-muted">Máy chủ không trả số đo nào cho lượt này.</p>}
+        : <p className="ops-muted">Lượt này chưa có số đo nào.</p>}
     </section>
 
     <details>
-      <summary className="ops-muted" style={{ cursor: "pointer", minHeight: 44, display: "flex", alignItems: "center" }}>Thông tin kỹ thuật</summary>
+      <summary className="ops-muted" style={{ cursor: "pointer", minHeight: 44, display: "flex", alignItems: "center" }}>Thông tin cho bộ phận hỗ trợ</summary>
       <dl className="th-metrics" style={{ marginTop: 8 }}>
         <dt>Mã lượt tập</dt><dd className="th-code">{result.sessionId}</dd>
         <dt>Lưu kết quả lúc</dt><dd>{formatWhen(result.createdAt)}</dd>
-        {result.lastEventSequence !== null && <><dt>Sự kiện cuối được tính</dt><dd>{result.lastEventSequence}</dd></>}
-        {result.rubricHash && <><dt>Bộ tiêu chí (hash)</dt><dd className="th-code">{result.rubricHash.slice(0, 16)}…</dd></>}
+        {result.lastEventSequence !== null && <><dt>Số sự kiện đã tính</dt><dd>{result.lastEventSequence}</dd></>}
+        {result.rubricHash && <><dt>Mã bộ tiêu chí</dt><dd className="th-code">{result.rubricHash.slice(0, 16)}…</dd></>}
       </dl>
     </details>
   </>;
@@ -112,7 +111,7 @@ function Body({ sessionId, known, onRefresh, onClose, accessToken }: { sessionId
     return <Alert tone="danger" title={failure.title} action={<div className="ops-actions mt-3">
       {failure.retryable && <Button size="sm" variant="secondary" onClick={reload}><RefreshCw size={16} aria-hidden="true" />Thử lại</Button>}
       <Button size="sm" variant="quiet" onClick={onClose}>Về danh sách</Button>
-    </div>}>{failure.message}{failure.code ? ` (mã lỗi: ${failure.code})` : ""}</Alert>;
+    </div>}>{failure.message}<SupportCode code={failure.code} /></Alert>;
   }
   if (!detail.data) return <SkeletonRows rows={4} label="Đang tải kết quả lượt tập…" />;
 
@@ -126,7 +125,7 @@ function Body({ sessionId, known, onRefresh, onClose, accessToken }: { sessionId
     {meta?.known && <dl className="ops-kv">
       <dt>Bài tập</dt><dd>{trainingTitle(meta.known).title}</dd>
       {trainingTitle(meta.known).sub && <><dt>Kịch bản</dt><dd>{trainingTitle(meta.known).sub}</dd></>}
-      <dt>Building</dt><dd>{meta.known.building.name || "—"}</dd>
+      <dt>Công trình</dt><dd>{meta.known.building.name || "—"}</dd>
     </dl>}
     {meta && <dl className="ops-kv">
       <dt>Chế độ</dt><dd>{modeLabel(data.load?.kind === "result" ? data.load.result.mode || meta.mode : meta.mode)}</dd>
@@ -177,7 +176,7 @@ export function ResultDrawer({ sessionId, known, accessToken, onClose, onRefresh
     open
     onOpenChange={(open) => { if (!open) onClose(); }}
     title={title}
-    description="Trạng thái phiên và kết quả được máy chủ lưu riêng cho tài khoản của bạn."
+    description="Trạng thái phiên và kết quả được lưu riêng cho tài khoản của bạn."
     className="th-drawer"
   >
     <div data-testid="history-detail">{body}</div>
@@ -203,7 +202,7 @@ function InlinePane({ title, onClose, children }: { title: string; onClose: () =
       <h2>{title}</h2>
       <Button size="icon" variant="ghost" onClick={onClose} aria-label="Đóng"><X size={18} aria-hidden="true" /></Button>
     </div>
-    <p className="th-pane-sub">Trạng thái phiên và kết quả được máy chủ lưu riêng cho tài khoản của bạn.</p>
+    <p className="th-pane-sub">Trạng thái phiên và kết quả được lưu riêng cho tài khoản của bạn.</p>
     {children}
   </section>;
 }

@@ -53,8 +53,8 @@ export function ScenarioForm({ draft, issues, actions, catalog }: {
     <Group title="Rubric chấm điểm" description="Nhập đúng tiêu chí của tổ chức. Hệ thống không đặt sẵn ngưỡng đạt hay trọng số; chính sách chấm chưa được chốt." testId="group-rubric">
       {listIssue("$.rubric") && <span className="ops-field-error" role="alert">{listIssue("$.rubric")}</span>}
       <div className="se-coord-grid">
-        <TextField label="Phiên bản schema rubric" value={typeof rubric?.schema_version === "string" ? rubric.schema_version : ""} data-testid="rubric-schema"
-          onCommit={(value) => actions.setField(["rubric", "schema_version"], value, "Sửa schema rubric")} />
+        <TextField label="Phiên bản định dạng rubric" value={typeof rubric?.schema_version === "string" ? rubric.schema_version : ""} data-testid="rubric-schema"
+          onCommit={(value) => actions.setField(["rubric", "schema_version"], value, "Sửa phiên bản định dạng rubric")} />
         <NumberField label="Ngưỡng đạt" data-testid="rubric-threshold" value={typeof rubric?.pass_threshold === "number" ? rubric.pass_threshold : undefined}
           onCommit={(value) => actions.setField(["rubric", "pass_threshold"], value, "Sửa ngưỡng đạt")} />
       </div>
@@ -69,7 +69,7 @@ export function ScenarioForm({ draft, issues, actions, catalog }: {
             {issue && <span className="ops-field-error" role="alert">{issue}</span>}
             <div className="se-coord-grid">
               <TextField label="Mã tiêu chí" value={typeof c.id === "string" ? c.id : ""} onCommit={(value) => actions.setField(["rubric", "criteria", index, "id"], value, "Sửa mã tiêu chí")} />
-              <TextField label="Chỉ số (metric)" value={typeof c.metric === "string" ? c.metric : ""} onCommit={(value) => actions.setField(["rubric", "criteria", index, "metric"], value, "Sửa chỉ số")} />
+              <TextField label="Chỉ số đo" value={typeof c.metric === "string" ? c.metric : ""} onCommit={(value) => actions.setField(["rubric", "criteria", index, "metric"], value, "Sửa chỉ số")} />
               <Field label="Toán tử">
                 {(props) => <Select {...props} value={typeof c.operator === "string" ? c.operator : ""} onChange={(event) => actions.setField(["rubric", "criteria", index, "operator"], event.target.value || undefined, "Sửa toán tử", false)}>
                   <option value="">Chọn…</option>
@@ -94,26 +94,26 @@ export function ScenarioForm({ draft, issues, actions, catalog }: {
       </div>
     </Group>
 
-    <Group title="Tuyến thoát hiểm" description="Mô tả tuyến dưới dạng văn bản (BE lưu danh sách chuỗi); chưa có tuyến vẽ trên mô hình." testId="group-routes">
+    <Group title="Tuyến thoát hiểm" description="Mô tả từng tuyến bằng chữ; chưa vẽ được tuyến trên mô hình." testId="group-routes">
       <StringList label="Tuyến thoát hiểm" items={routes} addLabel="Thêm tuyến" placeholder="Ví dụ: Cầu thang bộ B → sảnh tầng 1" error={listIssue("$.routingConfig.evacuationRoutes")}
         onChange={(index, value) => actions.setField(["routingConfig", "evacuationRoutes", index], value, "Sửa tuyến")}
         onAdd={() => actions.addItem(["routingConfig", "evacuationRoutes"], "", "Thêm tuyến")}
         onRemove={(index) => actions.removeItem(["routingConfig", "evacuationRoutes"], index, "Xóa tuyến")} testId="routes" />
     </Group>
 
-    <Group title="Tương thích runtime" description="Danh mục runtime do máy chủ cung cấp. BE kiểm tra năng lực bắt buộc theo runtime khi bấm Kiểm tra." testId="group-runtime">
-      {catalog.loading ? <Skeleton style={{ height: 42 }} /> : <Field label="Phiên bản runtime" error={listIssue("$.runtimeVersion")} hint={catalog.error ? "Không tải được danh mục runtime; vẫn có thể nhập tay." : runtimes.length ? undefined : "Danh mục runtime đang trống."}>
-        {(props) => runtimes.length ? <Select {...props} value={runtimeVersion} onChange={(event) => actions.setField(["runtimeVersion"], event.target.value || undefined, "Chọn runtime", false)}>
+    <Group title="Tương thích ứng dụng" description="Danh sách phiên bản ứng dụng do hệ thống cung cấp. Khi bấm Kiểm tra, hệ thống xem phiên bản đã chọn có đủ các khả năng bắt buộc không." testId="group-runtime">
+      {catalog.loading ? <Skeleton style={{ height: 42 }} /> : <Field label="Phiên bản ứng dụng" error={listIssue("$.runtimeVersion")} hint={catalog.error ? "Không tải được danh sách phiên bản ứng dụng; vẫn có thể nhập tay." : runtimes.length ? undefined : "Chưa có phiên bản ứng dụng nào được công bố."}>
+        {(props) => runtimes.length ? <Select {...props} value={runtimeVersion} onChange={(event) => actions.setField(["runtimeVersion"], event.target.value || undefined, "Chọn phiên bản ứng dụng", false)}>
           <option value="">Chọn…</option>
           {runtimeVersion && !runtimes.includes(runtimeVersion) && <option value={runtimeVersion}>{runtimeVersion} (không có trong danh mục)</option>}
           {runtimes.map((version) => <option key={version} value={version}>{version}</option>)}
-        </Select> : <input className="ops-input" {...props} value={runtimeVersion} onChange={(event) => actions.setField(["runtimeVersion"], event.target.value || undefined, "Nhập runtime")} />}
+        </Select> : <input className="ops-input" {...props} value={runtimeVersion} onChange={(event) => actions.setField(["runtimeVersion"], event.target.value || undefined, "Nhập phiên bản ứng dụng")} />}
       </Field>}
-      <StringList label="Năng lực runtime bắt buộc" items={capabilities} addLabel="Thêm năng lực" error={listIssue("$.requiredCapabilities")}
-        onChange={(index, value) => actions.setField(["requiredCapabilities", index], value, "Sửa năng lực")}
-        onAdd={() => actions.addItem(["requiredCapabilities"], "", "Thêm năng lực")}
-        onRemove={(index) => actions.removeItem(["requiredCapabilities"], index, "Xóa năng lực")} testId="capabilities" />
-      <StringList label="Neo đối tượng (IFC)" items={anchors} addLabel="Thêm neo" error={listIssue("$.objectAnchors")} hint="Mã neo phải tồn tại trong hình học đã được chấp nhận của revision; BE kiểm tra khi Kiểm tra."
+      <StringList label="Khả năng bắt buộc của ứng dụng" items={capabilities} addLabel="Thêm khả năng" error={listIssue("$.requiredCapabilities")}
+        onChange={(index, value) => actions.setField(["requiredCapabilities", index], value, "Sửa khả năng")}
+        onAdd={() => actions.addItem(["requiredCapabilities"], "", "Thêm khả năng")}
+        onRemove={(index) => actions.removeItem(["requiredCapabilities"], index, "Xóa khả năng")} testId="capabilities" />
+      <StringList label="Neo đối tượng (IFC)" items={anchors} addLabel="Thêm neo" error={listIssue("$.objectAnchors")} hint="Mã neo phải có trong mô hình 3D đã đạt kiểm tra của bản IFC; hệ thống kiểm tra khi bấm Kiểm tra."
         onChange={(index, value) => actions.setField(["objectAnchors", index], value, "Sửa neo")}
         onAdd={() => actions.addItem(["objectAnchors"], "", "Thêm neo")}
         onRemove={(index) => actions.removeItem(["objectAnchors"], index, "Xóa neo")} testId="anchors" />

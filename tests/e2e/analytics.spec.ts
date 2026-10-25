@@ -117,10 +117,10 @@ test.describe("organization analytics", () => {
     await expect(page.getByText("Tài khoản theo vai trò")).toHaveCount(0);
     // Processing jobs: one chip per kind found in the report, the chosen kind as a 100 % bar with every status named.
     const jobs = page.getByTestId("chart-jobs");
-    await expect(jobs.getByRole("group", { name: "Loại tiến trình" }).getByRole("button")).toHaveText([/Geometry/, /Build gói/]);
-    await expect(jobs.getByRole("img", { name: /Tiến trình Geometry theo trạng thái/ })).toHaveAccessibleName(/Hoàn tất 6.*Thất bại 1/);
+    await expect(jobs.getByRole("group", { name: "Loại tiến trình" }).getByRole("button")).toHaveText([/Dựng mô hình 3D/, /Dựng gói/]);
+    await expect(jobs.getByRole("img", { name: /Tiến trình Dựng mô hình 3D theo trạng thái/ })).toHaveAccessibleName(/Hoàn tất 6.*Thất bại 1/);
     await jobs.getByTestId("jobkind-PackageBuild").click();
-    await expect(jobs.getByRole("img", { name: /Tiến trình Build gói theo trạng thái/ })).toHaveAccessibleName(/Đang chạy 2/);
+    await expect(jobs.getByRole("img", { name: /Tiến trình Dựng gói theo trạng thái/ })).toHaveAccessibleName(/Đang chạy 2/);
     await expect(page.getByTestId("chart-tickets").getByRole("list", { name: "Giá trị" }).getByRole("listitem")).toHaveText([/Mới\s*2/, /Đã giải quyết\s*3/]);
     expect(urls.at(-1)).toContain("/api/organizations/me/analytics/operations?from=");
     expect(Array.from(params(urls.at(-1) as string).keys()).sort()).toEqual(["from", "to"]);
@@ -218,7 +218,7 @@ test.describe("organization analytics", () => {
 
     const modes = page.getByTestId("chart-modes");
     await modes.getByText("Xem bảng số liệu").click();
-    await expect(modes.getByRole("table", { name: "Lượt chơi theo chế độ" }).getByRole("row", { name: /Guided Drill\s*12\s*8/ })).toBeVisible();
+    await expect(modes.getByRole("table", { name: "Lượt chơi theo chế độ" }).getByRole("row", { name: /Có hướng dẫn\s*12\s*8/ })).toBeVisible();
     // No duration histogram in the API: the card prints the three figures only.
     await expect(page.getByTestId("chart-duration")).toContainText("Số phiên đo");
     await expect(page.getByTestId("chart-duration").getByText("Phân bố theo nhóm thời lượng")).toHaveCount(0);
@@ -334,7 +334,7 @@ test.describe("admin analytics", () => {
     await expect(page.getByRole("group", { name: "Tổng quan hệ thống" }).getByTestId("kpi-accounts").locator(".ops-kpi-value")).toHaveText("45");
     await expect(kpi(page, "kpi-sessions")).toHaveText("40"); // default training report: plays
     await expect(kpi(page, "kpi-payments")).toHaveText("7"); // default revenue report: 2 USD + 5 VND transactions
-    await expect(page.locator("#ops-main").getByText("Chờ BE")).toHaveCount(0);
+    await expect(page.locator("#ops-main").getByText("Sắp có")).toHaveCount(0);
     // The report section asks for operations; the "Phiên 30 ngày" and "Thanh toán 30 ngày" tiles read the default training and revenue reports once each.
     expect([...urls].sort()).toEqual(["/api/admin/analytics/operations", "/api/admin/analytics/revenue", "/api/admin/analytics/training"]);
     // Platform-only cards: accounts by role (bar, one colour per role) and organizations (donut).
@@ -344,7 +344,7 @@ test.describe("admin analytics", () => {
 
     await page.getByRole("tab", { name: "Huấn luyện" }).click();
     await expect(page.getByRole("link", { name: "Trường An Toàn" })).toHaveAttribute("href", "/admin/organizations/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/analytics");
-    await expect(page.getByText("Tổ chức bbbbbbbb…").first()).toBeVisible();
+    await expect(page.getByText("Tổ chức chưa đặt tên").first()).toBeVisible();
     await expect(page.getByText("Sử dụng AI")).toBeVisible();
 
     await page.getByRole("tab", { name: "Doanh thu" }).click();
@@ -400,7 +400,7 @@ test.describe("admin analytics", () => {
     await expect(page.getByText("đã vô hiệu hóa (vẫn đọc được số liệu)")).toBeVisible();
     await page.getByRole("tab", { name: "Vận hành" }).click();
     await expect(page.getByText("Tài khoản theo vai trò")).toHaveCount(0);
-    await expect(page.getByText("Ticket gắn với tổ chức này")).toBeVisible();
+    await expect(page.getByText("Yêu cầu hỗ trợ của tổ chức này")).toBeVisible();
     expect(urls).toEqual(["/api/admin/organizations/org-9/analytics/training", "/api/admin/organizations/org-9/analytics/operations"]);
 
     missing = true;

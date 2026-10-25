@@ -40,7 +40,7 @@ export function OrganizationAi() {
   const tab: TabKey = isTab(tabParam) ? tabParam : "history";
 
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
-  if (user?.role !== 1 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Hỏi đáp và đề xuất kịch bản bằng AI dành cho tài khoản tổ chức (OrganizationUser).</Alert>;
+  if (user?.role !== 1 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Hỏi đáp và đề xuất kịch bản bằng AI chỉ dành cho tài khoản tổ chức.</Alert>;
 
   const changeTab = (value: string) => {
     if (!isTab(value) || value === tab) return;
@@ -50,10 +50,10 @@ export function OrganizationAi() {
   return <div className="org">
     <PageHeader
       title="Trợ lý AI"
-      description="Chat nằm ở bong bóng nổi trên mọi trang. Trang này để xem lại lịch sử, bản đề xuất đã lưu và quota. AI chỉ đề xuất; không tự sửa kịch bản, không phát hành, không phải chứng nhận an toàn."
+      description="Chat nằm ở bong bóng nổi trên mọi trang. Trang này để xem lại lịch sử, bản đề xuất đã lưu và hạn mức AI. AI chỉ đề xuất; không tự sửa kịch bản, không phát hành, không phải chứng nhận an toàn."
       eyebrow="Huấn luyện" breadcrumbs={[{ label: "Trợ lý AI" }]}
       actions={<>
-        <Button asChild variant="quiet"><Link href={BILLING_AI_HREF}><Gauge size={16} aria-hidden="true" />Quota AI & top-up</Link></Button>
+        <Button asChild variant="quiet"><Link href={BILLING_AI_HREF}><Gauge size={16} aria-hidden="true" />Hạn mức AI & nạp thêm</Link></Button>
         {bubble?.enabled && <Button type="button" onClick={bubble.openPanel} data-testid="ai-open-bubble"><Sparkles size={16} aria-hidden="true" />Mở trợ lý</Button>}
       </>}
     />
@@ -61,7 +61,7 @@ export function OrganizationAi() {
       <TabsList aria-label="Trợ lý AI">
         <TabsTrigger value="history">Lịch sử hội thoại</TabsTrigger>
         <TabsTrigger value="saved">Đề xuất đã lưu</TabsTrigger>
-        <TabsTrigger value="quota">Quota & giới hạn</TabsTrigger>
+        <TabsTrigger value="quota">Hạn mức & giới hạn</TabsTrigger>
       </TabsList>
       <TabsContent value="history">{tab === "history" && <HistoryTab accessToken={accessToken} variant="history" onApply={setApplying} />}</TabsContent>
       <TabsContent value="saved">{tab === "saved" && <HistoryTab accessToken={accessToken} variant="saved" onApply={setApplying} />}</TabsContent>

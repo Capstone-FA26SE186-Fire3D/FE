@@ -105,7 +105,7 @@ function QuickBody({ accessToken, initial, onClose, onOpenEditor, onChanged, onR
       apply(result);
       setSaveState("done");
       window.setTimeout(() => setSaveState("idle"), 1200);
-      toast.notify({ tone: "success", title: "Đã lưu bản nháp", description: `v${result.data.versionNumber} · ETag ${result.etag}` });
+      toast.notify({ tone: "success", title: "Đã lưu bản nháp", description: `Phiên bản ${result.data.versionNumber}` });
       onChanged();
     } catch (cause) {
       setSaveState("idle");
@@ -128,7 +128,7 @@ function QuickBody({ accessToken, initial, onClose, onOpenEditor, onChanged, onR
         commandDone(intent);
         setPost(result);
         try { apply(await learnAdminApi.getVersion(accessToken, version.data.id)); } catch { onReload(); }
-        toast.notify({ tone: "success", title: "Đã xuất bản", description: `v${version.data.versionNumber} của ${result.data.slug} · bài ${postStatusView[result.data.publicationStatus].label.toLowerCase()}` });
+        toast.notify({ tone: "success", title: "Đã xuất bản", description: `Phiên bản ${version.data.versionNumber} của bài “${result.data.slug}” · bài ${postStatusView[result.data.publicationStatus].label.toLowerCase()}` });
       } else if (operation.kind === "lifecycle") {
         const intent = { op: operation.operation, postId: post.data.id, etag: post.etag };
         const result = await learnAdminApi.lifecycle(accessToken, post.data.id, operation.operation, post.etag, commandKey(intent));

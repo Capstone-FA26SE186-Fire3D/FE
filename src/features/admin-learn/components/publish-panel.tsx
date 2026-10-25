@@ -12,7 +12,7 @@ import type { AdminPost, AdminVersion, LifecycleOperation } from "../types";
  * "Xuất bản và hiển thị": the post's state as the server reports it, the publish action for the open Draft, and the lifecycle
  * actions that state allows. Each button explains why it is disabled instead of hiding.
  */
-export function PublishPanel({ post, postEtag, version, versionEtag, dirty, publishBlockers, busy, onPublish, onLifecycle, onNewVersion }: {
+export function PublishPanel({ post, version, dirty, publishBlockers, busy, onPublish, onLifecycle, onNewVersion }: {
   post: AdminPost;
   postEtag: string;
   version: AdminVersion | null;
@@ -31,12 +31,11 @@ export function PublishPanel({ post, postEtag, version, versionEtag, dirty, publ
   const publishedVersion = post.versions?.find((item) => item.id === post.publishedVersionId) ?? null;
   const publishReasons = [...(deleted ? ["Bài đã bị xóa: khôi phục bài trước khi xuất bản."] : []), ...(dirty ? ["Lưu bản nháp trước khi xuất bản."] : []), ...publishBlockers];
 
-  return <Panel title="Xuất bản và hiển thị" description="Mỗi lệnh gửi ETag (If-Match) và một Idempotency-Key giữ nguyên khi thử lại, nên thử lại sau lỗi mạng không tạo thao tác trùng." bodyClassName="ops-stack">
+  return <Panel title="Xuất bản và hiển thị" description="Bấm thử lại sau lỗi mạng là an toàn: hệ thống không thực hiện một thao tác hai lần." bodyClassName="ops-stack">
     <DetailList columns={2} items={[
       { label: "Trạng thái bài", value: <StatusBadge tone={view.tone}>{view.label}</StatusBadge> },
-      { label: "ETag bài (revision)", value: <code>{postEtag}</code> },
       { label: "Bản đang công khai", value: publishedVersion ? `v${publishedVersion.versionNumber} · ${publishedVersion.title}` : post.publishedVersion ? `v${post.publishedVersion.versionNumber} · ${post.publishedVersion.title}` : "Chưa có" },
-      { label: "Bản đang mở", value: version ? <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>v{version.versionNumber}<StatusBadge tone={versionStatusView[version.status].tone}>{versionStatusView[version.status].label}</StatusBadge><code>{versionEtag}</code></span> : "—" },
+      { label: "Bản đang mở", value: version ? <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>v{version.versionNumber}<StatusBadge tone={versionStatusView[version.status].tone}>{versionStatusView[version.status].label}</StatusBadge></span> : "—" },
       { label: "Cập nhật", value: formatDateTime(post.updatedAt) },
     ]} />
     <p style={{ margin: 0, color: "var(--muted)", fontSize: 13, lineHeight: 1.6 }} data-testid="status-visibility">{view.visibility}</p>
@@ -48,7 +47,7 @@ export function PublishPanel({ post, postEtag, version, versionEtag, dirty, publ
       </span>}
       {!isDraft && version && !deleted && <span style={{ display: "inline-flex", flexDirection: "column", gap: 4, maxWidth: 360 }}>
         <Button variant="secondary" disabled={busy} onClick={onNewVersion}><FilePlus2 size={16} aria-hidden="true" />Tạo bản nháp mới từ v{version.versionNumber}</Button>
-        <span className="ops-field-hint">Bản đã xuất bản là bất biến; sửa nội dung bằng cách tạo bản nháp mới rồi xuất bản.</span>
+        <span className="ops-field-hint">Bản đã xuất bản không sửa được; muốn đổi nội dung, hãy tạo bản nháp mới rồi xuất bản.</span>
       </span>}
       {lifecycleFor[post.publicationStatus].map((operation) => <Button key={operation} variant={lifecycleCopy[operation].danger ? "danger" : operation === "show" || operation === "restore" ? "primary" : "secondary"} disabled={busy} onClick={() => onLifecycle(operation)}>{lifecycleCopy[operation].label}</Button>)}
     </div>

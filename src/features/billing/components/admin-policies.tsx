@@ -20,6 +20,9 @@ import "../billing.css";
 
 const PAGE_SIZE = 20;
 const UNIT = /^[a-z][a-z0-9_-]{0,49}$/;
+const AUDIENCE: Record<string, string> = { organization: "Tổ chức" };
+const POLICY_KIND: Record<string, string> = { quota: "Hạn mức trả trước" };
+const ROLLOVER: Record<string, string> = { None: "Không cộng dồn sang kỳ sau" };
 
 /**
  * Prepaid AI quota policy versions (Figma "Thương mại · Chính sách quota"). A version is immutable (no edit, no delete):
@@ -56,7 +59,7 @@ export function PoliciesSection({ accessToken }: { accessToken: string }) {
     lock.current = true; setSaving(true); setFormError("");
     try {
       const created = await billingApi.createQuotaPolicy(accessToken, { quotaUnit: unit.trim(), effectiveFrom: fromIso as string, effectiveUntil: untilIso });
-      toast.notify({ tone: "success", title: "Đã tạo phiên bản chính sách", description: `${created.quotaUnit} · ${created.id.slice(0, 8)}. Phiên bản không thể sửa; thay đổi sẽ là phiên bản mới.` });
+      toast.notify({ tone: "success", title: "Đã tạo phiên bản chính sách", description: `Đơn vị ${created.quotaUnit}. Phiên bản không thể sửa; muốn thay đổi hãy tạo phiên bản mới.` });
       setOpen(false);
       list.reload();
     } catch (cause) {
@@ -69,36 +72,36 @@ export function PoliciesSection({ accessToken }: { accessToken: string }) {
   const total = list.data?.totalCount ?? 0;
 
   const columns: DataColumn<QuotaPolicy>[] = [
-    { key: "version", header: "Phiên bản", primary: true, render: (item) => <CellTitle title={<span className="bill-mono">{item.id.slice(0, 8)}</span>} sub={<span className="bill-mono bill-wrap">{item.id}</span>} /> },
+    { key: "version", header: "Phiên bản", primary: true, render: (item) => <CellTitle title={<span className="bill-mono">{item.id.slice(0, 8)}</span>} /> },
     { key: "unit", header: "Đơn vị", width: 140, render: (item) => item.quotaUnit },
     { key: "period", header: "Hiệu lực", width: 240, render: (item) => <CellTitle title={formatDateTime(item.effectiveFrom)} sub={`đến ${item.effectiveUntil ? formatDateTime(item.effectiveUntil) : "không giới hạn"}`} /> },
-    { key: "audience", header: "Đối tượng", width: 220, hideBelow: 900, render: (item) => <CellTitle title={`${item.audience} · ${item.policyKind}`} sub={`rollover: ${item.rollover}`} /> },
+    { key: "audience", header: "Đối tượng", width: 220, hideBelow: 900, render: (item) => <CellTitle title={`${AUDIENCE[item.audience] ?? "Khác"} · ${POLICY_KIND[item.policyKind] ?? "Khác"}`} sub={ROLLOVER[item.rollover] ?? "Khác"} /> },
   ];
 
   return <div className="ops-stack">
     <DataTable<QuotaPolicy>
-      caption="Phiên bản chính sách quota AI"
+      caption="Phiên bản chính sách hạn mức AI"
       data-testid="admin-quota-policies-table"
       columns={columns}
       rows={items}
       rowKey={(item) => item.id}
       loading={list.loading && !list.data}
-      error={list.error !== undefined ? <Alert tone="danger" title="Không tải được chính sách quota" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert> : undefined}
+      error={list.error !== undefined ? <Alert tone="danger" title="Không tải được chính sách hạn mức" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert> : undefined}
       toolbar={<>
-        <p className="bill-muted ops-toolbar-grow" style={{ margin: 0 }}>Bất biến theo phiên bản; quota không cộng dồn sang kỳ sau (rollover None do máy chủ đặt). Không có chính sách hay số lượng mặc định.</p>
+        <p className="bill-muted ops-toolbar-grow" style={{ margin: 0 }}>Mỗi phiên bản không sửa được; hạn mức không cộng dồn sang kỳ sau. Không có chính sách hay số lượng mặc định.</p>
         <Button variant="quiet" onClick={list.reload} disabled={list.loading} aria-label="Tải lại danh sách"><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
         <Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo phiên bản</Button>
       </>}
-      empty={<EmptyState icon={Gauge} title="Chưa có chính sách quota" description="Tạo phiên bản đầu tiên (đơn vị và khoảng hiệu lực) trước khi cấu hình gói có quota AI hoặc phát hành top-up." action={<Button onClick={openCreate}>Tạo phiên bản</Button>} />}
+      empty={<EmptyState icon={Gauge} title="Chưa có chính sách hạn mức" description="Tạo phiên bản đầu tiên (đơn vị và khoảng hiệu lực) trước khi cấu hình gói có hạn mức AI hoặc phát hành báo giá nạp thêm." action={<Button onClick={openCreate}>Tạo phiên bản</Button>} />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
 
     <Modal open={open} onOpenChange={(next) => { if (!next && !saving) setOpen(false); }} title="Tạo phiên bản chính sách" description="Không thể sửa hay xóa sau khi tạo. Đơn vị là lựa chọn nghiệp vụ rõ ràng; hệ thống không quy đổi giữa các đơn vị."
       footer={<><Button type="button" variant="quiet" onClick={() => setOpen(false)} disabled={saving}>Hủy</Button><Button type="submit" form={formId} disabled={saving}>{saving ? "Đang tạo…" : "Tạo phiên bản"}</Button></>}>
       <form id={formId} onSubmit={submit} noValidate className="ops-stack">
-        <Field label="Đơn vị quota" required error={errors.quotaUnit} hint="Ví dụ do bạn quy định (chữ thường, 1–50 ký tự).">{(p) => <Input {...p} maxLength={50} autoComplete="off" value={unit} onChange={(event) => setUnit(event.target.value)} />}</Field>
+        <Field label="Đơn vị hạn mức" required error={errors.quotaUnit} hint="Ví dụ do bạn quy định (chữ thường, 1–50 ký tự).">{(p) => <Input {...p} maxLength={50} autoComplete="off" value={unit} onChange={(event) => setUnit(event.target.value)} />}</Field>
         <div className="ops-form-grid">
-          <Field label="Hiệu lực từ" required error={errors.effectiveFrom} hint="Giờ địa phương, lưu dưới dạng UTC.">{(p) => <Input {...p} type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} />}</Field>
+          <Field label="Hiệu lực từ" required error={errors.effectiveFrom} hint="Theo giờ địa phương.">{(p) => <Input {...p} type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} />}</Field>
           <Field label="Hiệu lực đến" error={errors.effectiveUntil} hint="Để trống nếu không giới hạn.">{(p) => <Input {...p} type="datetime-local" value={until} onChange={(event) => setUntil(event.target.value)} />}</Field>
         </div>
         {formError && <Alert tone="danger" title="Chưa tạo được phiên bản">{formError}</Alert>}

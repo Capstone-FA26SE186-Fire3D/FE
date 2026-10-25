@@ -50,9 +50,9 @@ function message(error: unknown, fallback: string) {
 export function describeV1Failure(error: unknown): { message: string; conflict: boolean; issues: Issue[] } {
   if (error instanceof ApiError) {
     const issues = toIssues(error.payload?.issues);
-    if (error.status === 422 && error.code === "EDITOR_SCHEMA_INVALID") return { conflict: false, issues, message: `Máy chủ từ chối cấu trúc fet3d.editor/1 (422 EDITOR_SCHEMA_INVALID): ${issues.length} vấn đề. Nội dung của bạn vẫn được giữ.` };
-    if (error.status === 422 && error.code === "EDITOR_SCHEMA_VERSION_UNSUPPORTED") return { conflict: false, issues, message: "Máy chủ không hỗ trợ schemaVersion của bản nháp này (EDITOR_SCHEMA_VERSION_UNSUPPORTED)." };
-    if (error.status === 400 && error.code === "EDITOR_JSON_MALFORMED") return { conflict: false, issues, message: "Máy chủ không đọc được JSON đã gửi (EDITOR_JSON_MALFORMED)." };
+    if (error.status === 422 && error.code === "EDITOR_SCHEMA_INVALID") return { conflict: false, issues, message: `Hệ thống chưa nhận nội dung bản nháp: ${issues.length} lỗi cấu trúc. Nội dung của bạn vẫn được giữ.` };
+    if (error.status === 422 && error.code === "EDITOR_SCHEMA_VERSION_UNSUPPORTED") return { conflict: false, issues, message: "Hệ thống chưa hỗ trợ định dạng của bản nháp này." };
+    if (error.status === 400 && error.code === "EDITOR_JSON_MALFORMED") return { conflict: false, issues, message: "Hệ thống không đọc được nội dung đã gửi. Hãy tải lại trang rồi thử lại." };
     return { ...describeSaveError(error), issues };
   }
   return { ...describeSaveError(error), issues: [] };
@@ -190,7 +190,7 @@ export function useEditorV1({ accessToken, draftId, initial, context }: { access
     if (!conflict?.theirs) return;
     const merged = resolveMerge(conflict.theirs.state, conflict.units, choices);
     if (!isV1State(merged)) {
-      setConflict({ ...conflict, error: "Kết quả đối chiếu không còn khai báo fet3d.editor/1 (bản trên máy chủ không theo contract mới). Hãy chọn lại hoặc tải lại trang." });
+      setConflict({ ...conflict, error: "Kết quả ghép hai bản không còn là bản nháp soạn trên mô hình 3D (bản đã lưu theo định dạng khác). Hãy chọn lại hoặc tải lại trang." });
       return;
     }
     dispatch({ type: "replace", draft: merged, baseline: conflict.theirs.state, etag: conflict.theirs.etag, version: conflict.theirs.version });

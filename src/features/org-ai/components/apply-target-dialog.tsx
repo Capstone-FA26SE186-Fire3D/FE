@@ -56,7 +56,7 @@ export function ApplyTargetDialog({ accessToken, request, onClose }: { accessTok
       {selectedBuilding && scenarios.loading && !scenarios.data && <SkeletonRows rows={1} label="Đang tải kịch bản…" />}
       {scenarios.error !== undefined && <Alert tone="danger" title="Không tải được kịch bản" action={<Button type="button" size="sm" variant="secondary" className="mt-3" onClick={scenarios.reload}>Thử lại</Button>}>{aiErrorText(scenarios.error)}</Alert>}
       {scenarios.data && scenarioItems.length === 0 && <Alert tone="warning" title="Công trình này chưa có kịch bản">Tạo một kịch bản ở trang công trình rồi quay lại. Đề xuất vẫn được giữ trong lịch sử.</Alert>}
-      {scenarioItems.length > 0 && <Field label="Kịch bản" hint="Ở bước sau bạn chọn hoặc tạo bản nháp fet3d.editor/1 của kịch bản này.">
+      {scenarioItems.length > 0 && <Field label="Kịch bản" hint="Ở bước sau bạn chọn hoặc tạo bản nháp của kịch bản này.">
         {(props) => <Select {...props} value={selectedScenario} onChange={(event) => setScenarioId(event.target.value)}>{scenarioItems.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select>}
       </Field>}
     </div>

@@ -26,7 +26,7 @@ export function carryOverCandidates(legacy: JsonObject): CarryItem[] {
   if (typeof seconds === "number") add("timeLimitSeconds", "Thời gian tối đa", `${seconds} giây`, seconds);
   if (typeof legacy.randomSeed === "number") add("randomSeed", "Hạt giống ngẫu nhiên", String(legacy.randomSeed), legacy.randomSeed);
   if (typeof legacy.replanIntervalSeconds === "number") add("replanIntervalSeconds", "Chu kỳ lập lại kế hoạch", `${legacy.replanIntervalSeconds} giây`, legacy.replanIntervalSeconds);
-  if (typeof legacy.runtimeVersion === "string" && SEMVER_PATTERN.test(legacy.runtimeVersion)) add("runtimeVersion", "Phiên bản runtime", legacy.runtimeVersion, legacy.runtimeVersion);
+  if (typeof legacy.runtimeVersion === "string" && SEMVER_PATTERN.test(legacy.runtimeVersion)) add("runtimeVersion", "Phiên bản ứng dụng", legacy.runtimeVersion, legacy.runtimeVersion);
   return items;
 }
 

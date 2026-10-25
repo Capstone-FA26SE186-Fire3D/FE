@@ -270,7 +270,7 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError, highlight, sema
   }, [downloadUrl, attempt]);
 
   return <div className="ops-preview">
-    <div ref={hostRef} role="img" aria-label="Mô hình 3D từ artifact IFC đã xử lý" style={{ position: "absolute", inset: 0 }} />
+    <div ref={hostRef} role="img" aria-label="Mô hình 3D dựng từ tệp IFC" style={{ position: "absolute", inset: 0 }} />
     {status === "loading" && <div className="ops-preview-overlay" role="status"><p className="ops-muted">Đang tải mô hình 3D…</p></div>}
     {status === "ready" && found !== null && <p className="ops-preview-note" role="status" data-testid="preview-highlight" style={{ position: "absolute", left: 8, bottom: 8, margin: 0, padding: "4px 8px", borderRadius: 6, background: "var(--surface)", fontSize: 12 }}>
       {found > 0 ? `Đang đánh dấu ${found} cấu kiện (màu cam).` : "Không tìm thấy cấu kiện này trong mô hình xem trước."}

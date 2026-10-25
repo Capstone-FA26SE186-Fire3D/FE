@@ -76,7 +76,7 @@ function Pending({ text }: { text: string }) {
 function DraftSummary({ request }: { request: AiRequest }) {
   const state = readProposalState(request.result);
   const notes = readProposalNotes(request.result);
-  if (!state) return <p className="ai-msg-text">Máy chủ báo hoàn tất nhưng đề xuất không theo fet3d.editor/1 nên không áp dụng được.</p>;
+  if (!state) return <p className="ai-msg-text">Máy chủ báo hoàn tất nhưng đề xuất không đúng định dạng của trình soạn thảo nên không áp dụng được.</p>;
   const objectives = Array.isArray(state.learningObjectives) ? state.learningObjectives.filter((item): item is string => typeof item === "string") : [];
   const objects = Array.isArray(state.objects) ? state.objects.filter(isObject).length : 0;
   return <div className="ai-msg-draft" data-testid="ai-chat-draft">
@@ -118,8 +118,8 @@ export function AssistantMessage({ message, accessToken, onSettled, onApply }: {
   const copy = copyTextOf(request);
   const draft = isSuccessfulDraft(request);
   return <div className="ai-msg ai-msg--assistant" data-testid="ai-chat-answer" data-status={request.status} data-result-type={request.resultType ?? undefined}>
-    {request.status === "Failed" && <p className="ai-msg-text"><StatusBadge tone="danger">{statusLabel(request.status)}</StatusBadge> {failure ?? "Dịch vụ AI không trả được kết quả."} Phần quota đã giữ chỗ được hoàn lại theo lịch sử sử dụng.</p>}
-    {request.status === "NeedsReconcile" && <p className="ai-msg-text"><StatusBadge tone="warning">{statusLabel(request.status)}</StatusBadge> {failure ?? "Hệ thống chưa xác nhận được kết quả từ dịch vụ AI."} Không gửi lại câu hỏi này để tránh trừ trùng; PlatformAdmin sẽ đối soát.</p>}
+    {request.status === "Failed" && <p className="ai-msg-text"><StatusBadge tone="danger">{statusLabel(request.status)}</StatusBadge> {failure ?? "Dịch vụ AI không trả được kết quả."} Phần hạn mức đã giữ chỗ được hoàn lại (xem lịch sử sử dụng).</p>}
+    {request.status === "NeedsReconcile" && <p className="ai-msg-text"><StatusBadge tone="warning">{statusLabel(request.status)}</StatusBadge> {failure ?? "Hệ thống chưa xác nhận được kết quả từ dịch vụ AI."} Không gửi lại câu hỏi này để tránh trừ trùng; quản trị FET3D sẽ đối soát.</p>}
     {hasResultType(request, "InsufficientEvidence") && <p className="ai-msg-text" data-testid="ai-chat-insufficient"><StatusBadge tone="warning">{statusLabel(request.status, request.resultType)}</StatusBadge> {request.result?.message?.trim() || "Các nguồn đã chọn chưa đủ thông tin để trả lời có trích dẫn. Hãy hỏi cụ thể hơn."}</p>}
     {hasResultType(request, "RejectedBySafetyGate") && <p className="ai-msg-text" data-testid="ai-chat-rejected"><StatusBadge tone="danger">{statusLabel(request.status, request.resultType)}</StatusBadge> {request.result?.message?.trim() || "Yêu cầu hoặc kết quả bị chặn bởi cổng an toàn nên không có nội dung để hiển thị."}</p>}
     {hasResultType(request, "KnowledgeAnswer") && (typeof request.result?.answer === "string"

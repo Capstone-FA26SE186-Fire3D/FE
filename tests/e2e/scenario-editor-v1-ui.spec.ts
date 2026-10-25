@@ -40,7 +40,7 @@ const noOverflow = (page: Page, width: number) => page.evaluate(() => document.d
 test("opens a fet3d.editor/1 draft: six kinds, pinned Geometry, floor-local coordinates map to GLB exactly as the BE fixture (L2 (1,0,2) -> (1,3.5,2))", async ({ page }) => {
   const mock = v1Mock();
   const log = await openV1(page, mock);
-  await expect(page.getByTestId("schema-badge")).toHaveText("fet3d.editor/1");
+  await expect(page.getByTestId("schema-badge")).toHaveText("Soạn trên mô hình 3D");
   await expect(page.getByRole("heading", { name: /Sơ tán tầng 1/ })).toBeVisible();
   await expect(status(page)).toHaveText("Đã lưu");
   for (const kind of ["Spawn", "Hazard", "Goal", "Npc", "BlockedElement", "Equipment"]) await expect(page.getByTestId(`list-${kind}`).getByRole("button")).toHaveCount(1);
@@ -112,7 +112,7 @@ test("entry screen: ReprocessRequired or NotReady Geometry locks draft creation 
   await expect(page.getByTestId("create-draft")).toBeDisabled();
   mock.floorsStatus = "NotReady";
   await page.reload();
-  await expect(page.getByText("Revision chưa có Geometry được chấp nhận")).toBeVisible();
+  await expect(page.getByText("Bản IFC chưa có mô hình 3D đạt kiểm tra")).toBeVisible();
   await expect(page.getByTestId("create-draft")).toBeDisabled();
   expect(mock.createDraftCalls).toHaveLength(0);
 });
@@ -122,8 +122,8 @@ test("entry screen: revision status is labelled in Vietnamese and NeedsFix is ex
   await installEditorMocks(page, mock);
   await page.route(`**/api/buildings/${BUILDING_ID}/revisions*`, (route) => route.fulfill({ json: { items: [{ id: REVISION_ID, buildingId: BUILDING_ID, versionLabel: "IFC rev. 01", status: "NeedsFix", createdAt: "2026-10-01T00:00:00Z", sourceDocument: null }], totalCount: 1, page: 1, pageSize: 50 } }));
   await page.goto(`/workspace/buildings/${BUILDING_ID}/scenarios/${SCENARIO_ID}`);
-  await expect(page.getByLabel("Revision IFC")).toContainText("IFC rev. 01 · Cần sửa mô hình");
-  await expect(page.getByTestId("revision-needs-fix")).toContainText("IFC_EXIT_UNKNOWN");
+  await expect(page.getByLabel("Bản IFC", { exact: true })).toContainText("IFC rev. 01 · Cần sửa mô hình");
+  await expect(page.getByTestId("revision-needs-fix")).toContainText("cửa thoát ra ngoài");
   await expect(page.getByTestId("revision-ifc-link")).toHaveAttribute("href", `/workspace/buildings/${BUILDING_ID}?tab=ifc&revision=${REVISION_ID}`);
 });
 
@@ -266,7 +266,6 @@ test("rotation: an untouched quaternion is saved bit for bit, typing degrees rep
   await openV1(page, mock);
   await item(page, 0).click();
   await expect(page.getByTestId("field-yaw")).toHaveValue("90");
-  await expect(page.getByTestId("glb-position")).toContainText("(0.0000, 0.7071, 0.0000, 0.7071)");
   await coord(page, "z").fill("9");
   await page.getByTestId("save").click();
   await expect(status(page)).toHaveText("Đã lưu");
@@ -344,7 +343,7 @@ test("empty catalog: capability kinds are locked with configuration guidance, no
   await expect(page.getByTestId("add-Goal")).toBeEnabled();
   await tab(page, "Khả dụng").click();
   await expect(kinds(page).locator('[data-kind="Hazard"]')).toHaveAttribute("data-state", "no-capability");
-  await expect(kinds(page).locator('[data-kind="Hazard"]')).toContainText("Danh mục runtime đang trống");
+  await expect(kinds(page).locator('[data-kind="Hazard"]')).toContainText("Chưa có phiên bản ứng dụng nào được công bố");
   await expect(kinds(page).locator('[data-kind="Spawn"]')).toHaveAttribute("data-state", "ready");
   await tab(page, "Kịch bản").click();
   await expect(page.getByTestId("runtime-empty")).toContainText("không tự tạo");
@@ -356,7 +355,7 @@ test("runtime without a capability for a kind: the object form names the runtime
   const mock = v1Mock({ catalog: onlyFire });
   await openV1(page, mock);
   await item(page, 3).click(); // the NPC of the fixture
-  await expect(page.getByTestId("no-capability")).toContainText("objectKinds gồm Npc");
+  await expect(page.getByTestId("no-capability")).toContainText("chưa hỗ trợ NPC");
   await expect(page.getByTestId("field-capability")).toHaveCount(0);
   await tab(page, "Khả dụng").click();
   await expect(kinds(page).locator('[data-kind="Npc"]')).toHaveAttribute("data-state", "no-capability");
@@ -377,7 +376,7 @@ test("wrong parameter: advisory error in the form, validate-state sends the unsa
   };
   await item(page, 0).click(); // select something else: the issue must bring the author back to the hazard
   await page.getByTestId("validate").click();
-  await expect(page.getByTestId("server-report")).toContainText("Máy chủ báo 2 vấn đề");
+  await expect(page.getByTestId("server-report")).toContainText("Hệ thống báo 2 vấn đề");
   // the request body is the UNSAVED document: it contains the typed 99 and nothing was stored
   expect(mock.validateStateCalls).toHaveLength(1);
   expect((mock.validateStateCalls[0].body.objects as Array<{ parameters?: { intensity?: number } }>)[2].parameters?.intensity).toBe(99);
@@ -411,7 +410,7 @@ test("a validate result belongs to the content that was sent: any later edit mar
   mock.validateState.delayMs = 0;
   await page.getByTestId("validate-inline").click();
   await expect(page.getByTestId("server-report")).toHaveAttribute("data-stale", "false");
-  await expect(page.getByTestId("server-report")).toContainText("Máy chủ xác nhận nội dung hiện tại hợp lệ");
+  await expect(page.getByTestId("server-report")).toContainText("Hệ thống xác nhận nội dung hiện tại hợp lệ");
   expect(mock.validateStateCalls).toHaveLength(2);
   expect(mock.validateStateCalls[0].body.name).toBe("Sơ tán tầng 1");
   expect(mock.validateStateCalls[1].body.name).toBe("Sơ tán tầng 1 (sửa lúc đang kiểm tra)");
@@ -434,7 +433,7 @@ test("PUT refused with 422 EDITOR_SCHEMA_INVALID: content is kept, the server's 
   mock.putProblems = [{ status: 422, body: { code: "EDITOR_SCHEMA_INVALID", title: "Draft state does not satisfy fet3d.editor/1.", issues: [{ code: "STRING_FORMAT_INVALID", path: "$.objects[4].label", message: "Server: nhãn không hợp lệ." }] } }];
   await page.getByTestId("save").click();
   await expect(status(page)).toHaveText("Lỗi khi lưu");
-  await expect(page.getByText("422 EDITOR_SCHEMA_INVALID")).toBeVisible();
+  await expect(page.getByText("Hệ thống chưa nhận nội dung bản nháp")).toBeVisible();
   await expect(page.getByTestId("field-label")).toHaveValue("Cửa bị chặn");
   await expect(page.getByTestId("object-form")).toContainText("Server: nhãn không hợp lệ.");
   expect(mock.puts).toHaveLength(0);
@@ -452,9 +451,9 @@ test("other PUT answers: 400 EDITOR_JSON_MALFORMED, 422 EDITOR_SCHEMA_VERSION_UN
   await item(page, 0).click();
   await page.getByTestId("field-label").fill("Phòng 101A");
   for (const [answer, text] of [
-    [{ status: 400, body: { code: "EDITOR_JSON_MALFORMED", title: "Malformed" } }, "EDITOR_JSON_MALFORMED"],
-    [{ status: 422, body: { code: "EDITOR_SCHEMA_VERSION_UNSUPPORTED", title: "Unsupported" } }, "EDITOR_SCHEMA_VERSION_UNSUPPORTED"],
-    [{ status: 428, body: { code: "PRECONDITION_REQUIRED", title: "If-Match is required." } }, "Thiếu If-Match"],
+    [{ status: 400, body: { code: "EDITOR_JSON_MALFORMED", title: "Malformed" } }, "Hệ thống không đọc được nội dung đã gửi"],
+    [{ status: 422, body: { code: "EDITOR_SCHEMA_VERSION_UNSUPPORTED", title: "Unsupported" } }, "Hệ thống chưa hỗ trợ định dạng của bản nháp này"],
+    [{ status: 428, body: { code: "PRECONDITION_REQUIRED", title: "If-Match is required." } }, "Bản nháp cần tải lại trước khi lưu"],
   ] as const) {
     mock.putProblems = [answer];
     await page.getByTestId("save").click();
@@ -533,14 +532,14 @@ test("the pinned Geometry differs from the revision's current artifact: banner, 
   const stale = { artifactId: "11111111-2222-4333-8444-555555555555", sha256Hash: "c".repeat(64) };
   const mock = v1Mock({ state: { ...v1State(), geometry: stale } });
   await openV1(page, mock);
-  await expect(page.getByText("Geometry của revision đã đổi sau khi bản nháp ghim")).toBeVisible();
+  await expect(page.getByText("Mô hình 3D của bản IFC đã đổi sau khi bản nháp được gắn")).toBeVisible();
   await tab(page, "Mô hình").click();
   await expect(page.getByTestId("geometry-panel")).toContainText("Khác bản hiện tại");
   await page.getByTestId("repin-geometry").click();
   await expect(status(page)).toHaveText("Chưa lưu");
-  await expect(page.getByText("Geometry của revision đã đổi sau khi bản nháp ghim")).toHaveCount(0);
+  await expect(page.getByText("Mô hình 3D của bản IFC đã đổi sau khi bản nháp được gắn")).toHaveCount(0);
   await page.getByTestId("undo").click();
-  await expect(page.getByText("Geometry của revision đã đổi sau khi bản nháp ghim")).toBeVisible();
+  await expect(page.getByText("Mô hình 3D của bản IFC đã đổi sau khi bản nháp được gắn")).toBeVisible();
   await page.getByTestId("redo").click();
   await page.getByTestId("save").click();
   await expect(status(page)).toHaveText("Đã lưu");
@@ -607,8 +606,8 @@ test("a schemaVersion the editor does not know is shown read-only: nothing is wr
   const mock = v1Mock({ state: { schemaVersion: "fet3d.editor/2", objects: [] } });
   await installEditorMocks(page, mock);
   await page.goto(EDITOR_URL);
-  await expect(page.getByRole("heading", { name: "Bản nháp dùng schemaVersion chưa được hỗ trợ" })).toBeVisible();
-  await expect(page.getByText("fet3d.editor/2")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Bản nháp dùng định dạng chưa được hỗ trợ" })).toBeVisible();
+  await expect(page.getByText("Nội dung không bị thay đổi.")).toBeVisible();
   expect(mock.puts).toHaveLength(0);
 });
 
@@ -722,7 +721,7 @@ for (const theme of ["light", "dark"] as const) {
         await page.screenshot({ path: testInfo.outputPath(`v1-${width}-${theme}-${name}.png`), fullPage: mobile });
       }
       await page.getByTestId("validate").click();
-      await expect(page.getByTestId("server-report")).toContainText("Máy chủ báo 1 vấn đề");
+      await expect(page.getByTestId("server-report")).toContainText("Hệ thống báo 1 vấn đề");
       await noOverflow(page, width);
       await page.screenshot({ path: testInfo.outputPath(`v1-${width}-${theme}-issues.png`), fullPage: mobile });
       const validate = page.getByTestId("validate-inline");

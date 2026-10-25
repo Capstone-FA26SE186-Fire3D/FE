@@ -12,6 +12,7 @@ import { Donut } from "@/components/charts/lazy";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
+import { SupportCode } from "@/components/ui/support-code";
 import { CellTitle, DataTable, type DataColumn } from "@/components/ui/data-table";
 import { Drawer, Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -53,7 +54,7 @@ function AdminDetail({ accessToken, request, refresh, orgName }: { accessToken: 
       done();
       setScheduled(result);
       setConfirm(false);
-      toast.notify({ tone: "success", title: "Đã lên lịch tra cứu nhà cung cấp", description: "Chưa phải kết quả: trạng thái cập nhật khi worker xử lý." });
+      toast.notify({ tone: "success", title: "Đã lên lịch tra cứu nhà cung cấp", description: "Chưa phải kết quả: trạng thái tự cập nhật khi hệ thống tra cứu xong." });
       refresh();
     } catch (cause) {
       setError(cause);
@@ -66,32 +67,32 @@ function AdminDetail({ accessToken, request, refresh, orgName }: { accessToken: 
     <section className={styles.section} aria-label="Thông tin quản trị">
       <h3>Thông tin quản trị</h3>
       <dl className="ops-kv" data-testid="ai-admin-meta">
-        <dt>Tổ chức</dt><dd>{request.audience === "trainee" ? "Trainee (không thuộc quota tổ chức)" : orgName(request.organizationId)}</dd>
+        <dt>Tổ chức</dt><dd>{request.audience === "trainee" ? "Học viên (không tính vào hạn mức tổ chức)" : orgName(request.organizationId)}</dd>
         <dt>Người gửi</dt><dd className={styles.mono}>{request.actorUserId ?? "—"}</dd>
         <dt>Chính sách</dt><dd className={styles.mono}>{request.policyId ?? "—"}</dd>
         <dt>Số lần gửi</dt><dd>{request.attempts ?? "—"}</dd>
-        {request.failureCode && <><dt>Mã lỗi</dt><dd><span className={styles.mono}>{request.failureCode}</span> <span className={styles.dim}>{failureText(request.failureCode)}</span></dd></>}
+        {request.failureCode && <><dt>Lỗi</dt><dd>{failureText(request.failureCode)}<SupportCode code={request.failureCode} /></dd></>}
         <dt>Đối soát yêu cầu lúc</dt><dd>{reconcileAt ? formatDateTime(reconcileAt) : "Chưa"}</dd>
         <dt>Cập nhật lúc</dt><dd>{formatDateTime(request.updatedAt)}</dd>
       </dl>
       {request.providerResult !== undefined && <div>
-        <strong>Kết quả thô của nhà cung cấp (chỉ PlatformAdmin thấy)</strong>
+        <strong>Kết quả gốc từ nhà cung cấp AI (chỉ quản trị FET3D thấy)</strong>
         <pre className={styles.json} data-testid="ai-provider-result">{JSON.stringify(request.providerResult, null, 2)}</pre>
       </div>}
     </section>
 
     {request.status === "NeedsReconcile" && <section className={styles.section} aria-label="Đối soát">
       <h3>Đối soát</h3>
-      <p className={styles.muted}>Đối soát chỉ lên lịch cho worker tra cứu yêu cầu này ở nhà cung cấp theo mã ổn định. Nó không sửa số đã dùng và không hoàn quota thủ công: có kết quả hợp lệ thì chốt theo kết quả, nhà cung cấp báo chưa nhận thì giải phóng giữ chỗ, còn lại giữ nguyên Chờ đối soát.</p>
-      {reconcileAt && <Alert tone="info" title="Đã lên lịch tra cứu">Yêu cầu đối soát lúc {formatDateTime(reconcileAt)}. Trạng thái bên trên tự cập nhật; 202 chưa phải là đã chốt.</Alert>}
-      {error !== undefined && <Alert tone="danger" title="Chưa lên lịch được đối soát" action={<Button size="sm" variant="secondary" className="mt-3" onClick={() => void run()} disabled={busy}>Thử lại (cùng khóa)</Button>}>{aiErrorText(error)}{error instanceof ApiError && error.code === "AI_RECONCILE_NOT_ALLOWED" ? "" : " Nội dung thử lại dùng cùng khóa chống trùng."}</Alert>}
+      <p className={styles.muted}>Đối soát nhờ hệ thống hỏi lại nhà cung cấp AI về yêu cầu này. Thao tác không sửa số đã dùng và không tự hoàn hạn mức: nhà cung cấp có kết quả hợp lệ thì chốt theo kết quả, báo chưa nhận thì trả lại phần giữ chỗ, còn lại vẫn ở trạng thái Chờ đối soát.</p>
+      {reconcileAt && <Alert tone="info" title="Đã lên lịch tra cứu">Yêu cầu đối soát lúc {formatDateTime(reconcileAt)}. Trạng thái bên trên tự cập nhật; đã lên lịch chưa có nghĩa là đã có kết quả.</Alert>}
+      {error !== undefined && <Alert tone="danger" title="Chưa lên lịch được đối soát" action={<Button size="sm" variant="secondary" className="mt-3" onClick={() => void run()} disabled={busy}>Thử lại</Button>}>{aiErrorText(error)}{error instanceof ApiError && error.code === "AI_RECONCILE_NOT_ALLOWED" ? "" : " Bấm thử lại sẽ không tạo lệnh trùng."}</Alert>}
       <div><Button type="button" onClick={() => setConfirm(true)} disabled={!canReconcile || busy} data-testid="ai-reconcile"><RefreshCw size={16} aria-hidden="true" />Đối soát yêu cầu này</Button></div>
     </section>}
 
     <Modal open={confirm} onOpenChange={(open) => { if (!open && !busy) setConfirm(false); }} size="sm" title="Đối soát yêu cầu AI?"
-      description="Chỉ lên lịch tra cứu ở nhà cung cấp; không tự thay đổi quota hay kết quả."
+      description="Chỉ lên lịch hỏi lại nhà cung cấp; không tự thay đổi hạn mức hay kết quả."
       footer={<><Button type="button" variant="quiet" onClick={() => setConfirm(false)} disabled={busy}>Hủy</Button><Button type="button" onClick={() => void run()} disabled={busy} data-testid="ai-reconcile-confirm">{busy ? "Đang gửi…" : "Xác nhận đối soát"}</Button></>}>
-      <p className={styles.muted}>Yêu cầu <span className={styles.mono}>{request.requestId}</span> đang giữ chỗ quota của {orgName(request.organizationId)}. Gửi lệnh đối soát?</p>
+      <p className={styles.muted}>Yêu cầu này đang giữ chỗ hạn mức của {orgName(request.organizationId)}. Gửi lệnh đối soát?</p>
       {error !== undefined && <Alert tone="danger" title="Chưa gửi được">{aiErrorText(error)}</Alert>}
     </Modal>
   </div>;
@@ -147,7 +148,7 @@ export function AdminRequestsTab({ accessToken, usage }: { accessToken: string; 
 
   const columns: DataColumn<AiRequest>[] = [
     { key: "request", header: "Yêu cầu", primary: true, render: (item) => <CellTitle title={`${operationLabel(item.operation)} · ${formatDateTime(item.createdAt)}`} sub={<span className={styles.mono}>{item.requestId.slice(0, 8)}…</span>} /> },
-    { key: "organization", header: "Tổ chức", width: 200, render: (item) => item.audience === "trainee" ? <CellTitle title="Trainee" sub="không thuộc quota tổ chức" /> : orgName(item.organizationId) },
+    { key: "organization", header: "Tổ chức", width: 200, render: (item) => item.audience === "trainee" ? <CellTitle title="Học viên" sub="không tính vào hạn mức tổ chức" /> : orgName(item.organizationId) },
     { key: "status", header: "Trạng thái", width: 190, render: (item) => <CellTitle title={<StatusBadge tone={statusTone(item.status, item.resultType)}>{statusLabel(item.status, item.resultType)}</StatusBadge>} sub={item.reconcileRequestedAt ? "Đã yêu cầu đối soát" : undefined} /> },
     { key: "usage", header: "Sử dụng", width: 150, hideBelow: 900, render: (item) => (item.consumedUnits !== undefined ? formatQuota(item.consumedUnits, item.quotaUnit) : item.reservedUnits !== undefined ? `Giữ chỗ ${formatQuota(item.reservedUnits, item.quotaUnit)}` : "—") },
   ];

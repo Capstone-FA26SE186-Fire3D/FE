@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { CircleAlert } from "lucide-react";
+import { messageOf } from "@/api/describe-error";
 import { ApiError } from "@/api/types/common";
 import { Button } from "@/components/ui/button";
 import { LoadingBlock } from "@/components/ui/spinner";
@@ -22,7 +23,7 @@ type FieldErrors = Record<string, string>;
 // Shown after the server revoked every session (explicit Google link, first local password).
 const sessionNotices: Record<string, string> = {
   "google-linked": "Google đã được liên kết với tài khoản của bạn. Vì lý do bảo mật, mọi phiên đăng nhập đã được thu hồi: hãy đăng nhập lại bằng email hoặc Google.",
-  "password-set": "Mật khẩu Fire3D đã được đặt. Vì lý do bảo mật, mọi phiên đăng nhập đã được thu hồi: hãy đăng nhập lại bằng email và mật khẩu mới hoặc bằng Google.",
+  "password-set": "Mật khẩu FET3D đã được đặt. Vì lý do bảo mật, mọi phiên đăng nhập đã được thu hồi: hãy đăng nhập lại bằng email và mật khẩu mới hoặc bằng Google.",
 };
 
 function errorCode(error: unknown) {
@@ -31,7 +32,7 @@ function errorCode(error: unknown) {
 }
 
 function errorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
+  return messageOf(error, fallback);
 }
 
 function toFieldErrors(error: unknown): FieldErrors {
@@ -326,10 +327,10 @@ export function LoginForm() {
         <button type="button" role="tab" disabled={submitting || otpPending} aria-selected={mode === "login"} onClick={() => selectMode("login")}>Đăng nhập</button>
         <button type="button" role="tab" disabled={submitting || otpPending} aria-selected={mode === "register"} onClick={() => selectMode("register")}>Tạo tài khoản</button>
       </div>}
-      <h1 ref={headingRef} tabIndex={-1}>{googleOnboarding ? "Hoàn thiện tài khoản Google" : mode === "login" ? "Đăng nhập Fire3D" : "Tạo tài khoản"}</h1>
+      <h1 ref={headingRef} tabIndex={-1}>{googleOnboarding ? "Hoàn thiện tài khoản Google" : mode === "login" ? "Đăng nhập FET3D" : "Tạo tài khoản"}</h1>
       <p id="auth-note">{googleOnboarding ? "Chọn loại tài khoản và hoàn thiện thông tin để tiếp tục." : mode === "login" ? "Tiếp tục học với tài khoản của bạn." : otpSent ? "Bước 2 / 2 · Xác minh email" : "Bước 1 / 2 · Thông tin tài khoản"}</p>
       {sessionNotice && !message && <div role="status" className="verification-panel"><p>{sessionNotice}</p></div>}
-      {message && <div role="alert" aria-label="Lỗi xác thực" className="form-message"><CircleAlert aria-hidden="true" size={18} /><div><strong>Thông báo từ Fire3D</strong><p>{message}</p><button type="button" disabled={submitting} onClick={() => { setMessage(""); headingRef.current?.focus(); }}>Kiểm tra thông tin và thử lại</button></div></div>}
+      {message && <div role="alert" aria-label="Lỗi xác thực" className="form-message"><CircleAlert aria-hidden="true" size={18} /><div><strong>Thông báo từ FET3D</strong><p>{message}</p><button type="button" disabled={submitting} onClick={() => { setMessage(""); headingRef.current?.focus(); }}>Kiểm tra thông tin và thử lại</button></div></div>}
       {googleOnboarding && <div className="verification-panel" role="status"><p>{googleOnboarding.recovery ? "Bấm Tiếp tục với Google để kiểm tra tài khoản và nhận phiên đăng nhập." : !googleOnboarding.proof ? "Hiện chưa thể tạo tài khoản Google vì dịch vụ chưa cung cấp xác minh cần thiết. Bạn có thể thử lại Google hoặc đăng ký bằng email." : proofExpired ? "Xác minh đã hết hạn. Hãy thử lại Google." : `Đang hoàn thiện cho ${googleOnboarding.proof.email}`}</p></div>}
       {googleWait && <p className="verification-status" role="status">Có thể thử lại sau {googleWait.seconds} giây.</p>}
       <fieldset className="auth-fields" disabled={submitting || otpPending} hidden={mode === "register" && otpSent && !googleOnboarding}>

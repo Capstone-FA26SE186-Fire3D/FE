@@ -11,7 +11,7 @@ import { fold, installLearnBackend, LearnBackend, signIn } from "./learn-mock";
 const LIST = /^\/api\/learn\/posts$/;
 const cards = (page: Page) => page.locator(".learn-card");
 const count = (page: Page) => page.locator(".learn-result-count");
-const box = (page: Page) => page.getByRole("searchbox", { name: "Tìm bài Learn" });
+const box = (page: Page) => page.getByRole("searchbox", { name: "Tìm bài học" });
 const listCalls = (backend: LearnBackend) => backend.callsTo("GET", LIST).map((call) => new URLSearchParams(call.search));
 const titles = (page: Page) => cards(page).locator("h2").allTextContents();
 
@@ -366,7 +366,7 @@ test.describe("states", () => {
     const backend = await setup(page, seedLibrary);
     backend.failNext("GET", LIST, { status: 500, json: { code: "BOOM", title: "boom" } });
     await page.goto("/learn?search=chay&kind=Video");
-    await expect(page.getByRole("alert").filter({ hasText: "BOOM" })).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: "Máy chủ đang gặp lỗi" })).toBeVisible();
     await expect(cards(page)).toHaveCount(0);
     await expect(page.getByText("khớp bộ lọc")).toHaveCount(0);
     await page.getByRole("button", { name: "Thử lại" }).click();
@@ -473,12 +473,12 @@ test.describe("SEO", () => {
   test("the bare list is indexable; search, filter and page variants are noindex", async ({ page }) => {
     await setup(page, seedLibrary);
     await page.goto("/learn");
-    await expect(page).toHaveTitle("Learn — FET3D");
+    await expect(page).toHaveTitle("Bài học — FET3D");
     await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", /Bài viết, mẹo và video ngắn/);
     await expect(page.locator('meta[name="robots"]')).toHaveCount(0);
     for (const variant of ["?search=chay", "?kind=Tip", "?situation=smoke", "?page=2"]) {
       await page.goto(`/learn${variant}`);
-      await expect(page).toHaveTitle("Learn — FET3D");
+      await expect(page).toHaveTitle("Bài học — FET3D");
       await expect(page.locator('meta[name="robots"]'), variant).toHaveAttribute("content", /noindex/);
     }
   });
@@ -523,7 +523,7 @@ for (const width of [1440, 375]) {
       const url = "/learn?search=" + encodeURIComponent("cháy một-chuỗi-rất-dài-không-có-khoảng-trắng-".repeat(1)) + "&kind=Article&kind=Tip&situation=fire-at-home&situation=smoke";
       for (const path of ["/learn", "/learn?search=chay", url, "/learn?search=a", "/learn?kind=Podcast"]) {
         await page.goto(path);
-        await expect(page.getByRole("searchbox", { name: "Tìm bài Learn" })).toBeVisible();
+        await expect(page.getByRole("searchbox", { name: "Tìm bài học" })).toBeVisible();
         await page.waitForTimeout(500);
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
         expect(overflow, `${path} overflows horizontally`).toBeLessThanOrEqual(0);

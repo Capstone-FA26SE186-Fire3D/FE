@@ -245,7 +245,7 @@ test.describe("AI bubble: asking", () => {
     await launcher(page).click();
     await input(page).fill("Hỏi rồi mất phản hồi");
     await send(page).click();
-    await expect(page.getByTestId("ai-unknown")).toContainText("Không gửi một yêu cầu mới");
+    await expect(page.getByTestId("ai-unknown")).toContainText("Đừng tạo yêu cầu mới");
     expect(mock.requests).toHaveLength(1);
     await page.getByTestId("ai-retry-same-key").click();
     await expect(page.getByTestId("ai-chat-answer")).toBeVisible();
@@ -286,11 +286,11 @@ test.describe("AI bubble: quota out", () => {
     const mock = newAiMock({ quota: { units: [{ quotaUnit: "tokens", granted: 1000, reserved: 100, consumed: 900, expired: 0, available: 0, scheduled: 0 }] } });
     await open(page, mock, "/workspace/ai");
     await launcher(page).click();
-    await expect(page.getByTestId("ai-chat-quota")).toHaveText("Quota đã hết");
+    await expect(page.getByTestId("ai-chat-quota")).toHaveText("Hạn mức đã hết");
     const blocked = page.getByTestId("ai-quota-blocked");
-    await expect(blocked).toContainText("Quota AI đã hết");
+    await expect(blocked).toContainText("Hạn mức AI đã hết");
     await expect(blocked).toContainText("50 tokens");
-    await expect(blocked.getByRole("link", { name: "Nạp quota" })).toHaveAttribute("href", "/workspace/billing?tab=ai");
+    await expect(blocked.getByRole("link", { name: "Nạp thêm hạn mức" })).toHaveAttribute("href", "/workspace/billing?tab=ai");
     await expect(input(page)).toHaveCount(0);
     expect(calls(mock, "POST", "/api/ai/organization/answer")).toHaveLength(0);
   });
@@ -300,7 +300,7 @@ test.describe("AI bubble: quota out", () => {
     await open(page, mock, "/workspace/ai");
     await launcher(page).click();
     await expect(page.getByTestId("ai-quota-blocked")).toContainText("còn 30 tokens");
-    await expect(page.getByTestId("ai-chat-quota")).toHaveText("Quota không đủ cho một yêu cầu");
+    await expect(page.getByTestId("ai-chat-quota")).toHaveText("Hạn mức không đủ cho một yêu cầu");
     mock.limits = [{ operation: "Answer", policyActive: false, quotaUnit: null, estimatedReserve: null, maxInputChars: null, maxSources: null, availableUnits: 900, canSubmit: false }];
     await page.reload();
     await launcher(page).click();

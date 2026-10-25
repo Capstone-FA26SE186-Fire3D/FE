@@ -243,10 +243,10 @@ test.describe("prepare and follow", () => {
     expect(mock.prepareCalls[0].key).toBeTruthy();
 
     // Cancel, then a new playtest is a new intent with a new key.
-    await page.getByRole("button", { name: "Hủy playtest" }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Hủy playtest" }).click();
+    await page.getByRole("button", { name: "Hủy chạy thử" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Hủy chạy thử" }).click();
     await expect(statusBox(page)).toContainText("Đã hủy");
-    await page.getByRole("button", { name: "Tạo playtest mới" }).click();
+    await page.getByRole("button", { name: "Tạo lượt chạy thử mới" }).click();
     await expect(create(page)).toBeVisible();
     await create(page).click();
     await expect(statusBox(page)).toContainText("Đã chuẩn bị");
@@ -310,7 +310,7 @@ test.describe("prepare and follow", () => {
     await expect(completion).toContainText("Passed");
     await expect(completion).toContainText("42");
     await expect(page.getByTestId("handoff-card")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Hủy playtest" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Hủy chạy thử" })).toHaveCount(0);
     const settled = mock.getCalls;
     await page.waitForTimeout(3600);
     expect(mock.getCalls).toBe(settled);
@@ -336,28 +336,28 @@ test.describe("cancel", () => {
     const mock = newMock({ playtest: newRow() });
     await setup(page, mock);
     await openTab(page, `&playtest=${IDS.playtest}`);
-    await page.getByRole("button", { name: "Hủy playtest" }).click();
+    await page.getByRole("button", { name: "Hủy chạy thử" }).click();
     await expect(page.getByRole("dialog")).toContainText("chưa trừ lượt dùng thử");
     await page.getByRole("dialog").getByRole("button", { name: "Giữ lại" }).click();
     expect(mock.cancelCalls).toHaveLength(0);
-    await page.getByRole("button", { name: "Hủy playtest" }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Hủy playtest" }).click();
+    await page.getByRole("button", { name: "Hủy chạy thử" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Hủy chạy thử" }).click();
     await expect(statusBox(page)).toContainText("Đã hủy");
     expect(mock.cancelCalls).toHaveLength(1);
     expect(mock.cancelCalls[0].key).toBeTruthy();
-    await expect(page.getByRole("button", { name: "Hủy playtest" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Hủy chạy thử" })).toHaveCount(0);
   });
 
   test("a lost cancel response is retried with the same key and ends Cancelled", async ({ page }) => {
     const mock = newMock({ playtest: newRow({ status: "Running" }), cancelReplies: [0, 200] });
     await setup(page, mock);
     await openTab(page, `&playtest=${IDS.playtest}`);
-    await expect(page.getByRole("button", { name: "Hủy playtest" })).toBeVisible();
-    await page.getByRole("button", { name: "Hủy playtest" }).click();
+    await expect(page.getByRole("button", { name: "Hủy chạy thử" })).toBeVisible();
+    await page.getByRole("button", { name: "Hủy chạy thử" }).click();
     await expect(page.getByRole("dialog")).toContainText("không được hoàn lại tự động");
-    await page.getByRole("dialog").getByRole("button", { name: "Hủy playtest" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Hủy chạy thử" }).click();
     await expect(page.getByRole("dialog").getByRole("alert")).toBeVisible();
-    await page.getByRole("dialog").getByRole("button", { name: "Hủy playtest" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Hủy chạy thử" }).click();
     await expect(statusBox(page)).toContainText("Đã hủy");
     expect(mock.cancelCalls).toHaveLength(2);
     expect(mock.cancelCalls[1].key).toBe(mock.cancelCalls[0].key);
@@ -368,16 +368,16 @@ test.describe("cancel", () => {
     await setup(page, mock);
     await openTab(page, `&playtest=${IDS.playtest}`);
     await expect(statusBox(page)).toContainText("Đã chuẩn bị");
-    await expect(page.getByRole("button", { name: "Hủy playtest" })).toHaveCount(0);
-    await expect(page.getByText("Máy chủ không cho phép phiên này hủy playtest")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Hủy chạy thử" })).toHaveCount(0);
+    await expect(page.getByText("Lượt chạy thử này hiện không hủy được từ trang web")).toBeVisible();
 
     const second = newMock({ playtest: newRow(), cancelReplies: [{ status: 409, code: "PLAYTEST_TERMINAL" }] });
     await page.unrouteAll({ behavior: "ignoreErrors" });
     await setup(page, second);
     await openTab(page, `&playtest=${IDS.playtest}`);
-    await page.getByRole("button", { name: "Hủy playtest" }).click();
+    await page.getByRole("button", { name: "Hủy chạy thử" }).click();
     second.playtest = { ...(second.playtest as PlaytestRow), status: "Completed" };
-    await page.getByRole("dialog").getByRole("button", { name: "Hủy playtest" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Hủy chạy thử" }).click();
     await expect(statusBox(page)).toContainText("Đã hoàn tất");
   });
 
@@ -388,8 +388,8 @@ test.describe("cancel", () => {
     await openTab(page, `&playtest=${IDS.playtest}`);
     await expect(statusBox(page)).toContainText("Đã chuẩn bị");
     await expect.poll(() => mock.getCalls, { timeout: 8000 }).toBeGreaterThanOrEqual(2);
-    await page.getByRole("button", { name: "Hủy playtest" }).click();
-    await page.getByRole("dialog").getByRole("button", { name: "Hủy playtest" }).click();
+    await page.getByRole("button", { name: "Hủy chạy thử" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Hủy chạy thử" }).click();
     await expect(statusBox(page)).toContainText("Đã hủy");
     await page.waitForTimeout(3500);
     await expect(statusBox(page)).toContainText("Đã hủy");
@@ -523,7 +523,7 @@ test.describe("errors", () => {
     await expect(page.getByRole("alert").filter({ hasText: "ngoài phạm vi của bạn" })).toBeVisible();
     await page.waitForTimeout(3600);
     expect(mock.getCalls).toBe(1);
-    await expect(page.getByRole("button", { name: "Bỏ playtest này" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Bỏ lượt chạy thử này" })).toBeVisible();
     mock.getFails = null;
     await page.getByRole("button", { name: "Thử lại" }).click();
     await expect(statusBox(page)).toContainText("Đã chuẩn bị");

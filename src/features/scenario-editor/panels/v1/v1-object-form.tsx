@@ -34,7 +34,7 @@ export function V1ObjectForm({ object, issues, actions, geometry, catalog, runti
   onOpenScenario: () => void;
 }) {
   if (!object) {
-    return <EmptyState icon={MousePointer2} title="Chưa chọn đối tượng" description="Chọn một đối tượng trong cây hoặc trên khung nhìn để chỉnh vị trí, neo, năng lực và tham số. Dùng công cụ “Đặt đối tượng” hoặc nút Thêm để tạo mới." />;
+    return <EmptyState icon={MousePointer2} title="Chưa chọn đối tượng" description="Chọn một đối tượng trong cây hoặc trên khung nhìn để chỉnh vị trí, neo, khả năng và tham số. Dùng công cụ “Đặt đối tượng” hoặc nút Thêm để tạo mới." />;
   }
   const { index } = object;
   const base = `$.objects[${index}]`;
@@ -72,8 +72,8 @@ export function V1ObjectForm({ object, issues, actions, geometry, catalog, runti
       <legend>Vị trí <StatusBadge>m · cục bộ theo tầng</StatusBadge></legend>
       <Field label="Tầng" required error={messageAt(issues, `${base}.placement.floorId`)}>
         {(props) => <Select {...props} data-testid="field-floor" value={object.floorId} onChange={(event) => actions.setFloor(index, event.target.value)}>
-          {!floor && <option value={object.floorId}>{object.floorId ? `${object.floorId} (không có trong Geometry)` : "Chọn tầng…"}</option>}
-          {geometry?.floors.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.id}</option>)}
+          {!floor && <option value={object.floorId}>{object.floorId ? `${object.floorId} (không có trong mô hình 3D)` : "Chọn tầng…"}</option>}
+          {geometry?.floors.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </Select>}
       </Field>
       <div className="se-coord-grid">
@@ -86,8 +86,7 @@ export function V1ObjectForm({ object, issues, actions, geometry, catalog, runti
           value={round3(yaw.degrees)} onCommit={(value) => { if (value !== undefined) actions.setYaw(index, value); }} />
       </div>
       <p className="ops-field-hint" data-testid="glb-position">
-        {glb ? `Trong mô hình (GLB, Y hướng lên): ${round3(glb.x)}, ${round3(glb.y)}, ${round3(glb.z)} m.` : "Chưa tính được vị trí trong mô hình vì tầng không có trong Geometry."}
-        {" "}Quay được lưu dưới dạng quaternion đơn vị ({object.rotation.x.toFixed(4)}, {object.rotation.y.toFixed(4)}, {object.rotation.z.toFixed(4)}, {object.rotation.w.toFixed(4)}).
+        {glb ? `Trong mô hình (GLB, Y hướng lên): ${round3(glb.x)}, ${round3(glb.y)}, ${round3(glb.z)} m.` : "Chưa tính được vị trí trong mô hình vì tầng không có trong mô hình 3D."}
         {!yaw.pure && " Hướng hiện có nghiêng ngoài trục đứng; nhập độ sẽ thay bằng xoay quanh trục đứng."}
       </p>
     </fieldset>
@@ -113,12 +112,12 @@ function AnchorField({ object, kind, geometry, error, actions, pick }: { object:
   return <fieldset className="ops-fieldset" data-testid="anchor-field">
     <legend>Cấu kiện neo (IFC) {required && <StatusBadge tone="warning">Bắt buộc</StatusBadge>}</legend>
     {candidates.length === 0
-      ? <p className="ops-field-hint">{geometry ? "Tầng này chưa có cấu kiện nào trong ánh xạ ngữ nghĩa của Geometry nên chưa chọn được neo." : "Cần Geometry hợp lệ để chọn cấu kiện neo."}</p>
+      ? <p className="ops-field-hint">{geometry ? "Tầng này chưa có cấu kiện nào dùng làm neo được." : "Cần mô hình 3D hợp lệ để chọn cấu kiện neo."}</p>
       : <>
         {candidates.length > 12 && <Field label="Lọc cấu kiện" hint={`${candidates.length} cấu kiện trên tầng này; hiển thị tối đa ${MAX_ANCHOR_OPTIONS}.`}>
           {(props) => <Input {...props} value={filter} onChange={(event) => setFilter(event.target.value)} autoComplete="off" spellCheck={false} />}
         </Field>}
-        <Field label="Cấu kiện" required={required} error={error} hint="Chọn từ ánh xạ ngữ nghĩa của đúng tầng; IFC GlobalId được lưu làm anchorId.">
+        <Field label="Cấu kiện" required={required} error={error} hint="Chọn cấu kiện trên đúng tầng của đối tượng.">
           {(props) => <Select {...props} data-testid="field-anchor" value={object.anchorId ?? ""} onChange={(event) => actions.setAnchor(object.index, event.target.value || undefined)}>
             <option value="">{required ? "Chọn cấu kiện…" : "Không neo"}</option>
             {object.anchorId && !current && !shown.some((entry) => entry.ifcGlobalId === object.anchorId) && <option value={object.anchorId}>{object.anchorId} (không thuộc tầng này)</option>}
@@ -142,34 +141,34 @@ function CapabilityField({ object, kind, catalog, runtimeVersion, issues, action
   const error = messageAt(issues, `${base}.capability`) ?? messageAt(issues, `${base}.capability.id`) ?? messageAt(issues, `${base}.capability.version`);
 
   let guidance: React.ReactNode = null;
-  if (catalog.loading) guidance = <p className="ops-field-hint" role="status">Đang đọc danh mục năng lực runtime…</p>;
-  else if (catalog.error) guidance = <Alert tone="danger" title="Không tải được danh mục runtime" action={<Button type="button" size="sm" variant="secondary" onClick={catalog.reload}>Thử lại</Button>} />;
-  else if (catalog.runtimes.length === 0) guidance = <Alert tone="warning" title="Danh mục runtime đang trống" ><span data-testid="catalog-empty">Chưa có runtime nào được công bố. Quản trị viên cần cấu hình runtime và capabilityContracts; editor không tự tạo năng lực. {required ? "Loại này bắt buộc có năng lực nên chưa hoàn thiện được." : ""}</span></Alert>;
-  else if (!runtime) guidance = <p className="ops-field-hint">Chọn phiên bản runtime ở tab Kịch bản để xem năng lực. <Button type="button" variant="quiet" size="sm" onClick={onOpenScenario}>Mở tab Kịch bản</Button></p>;
-  else if (options.length === 0) guidance = <Alert tone="warning" title={`Runtime ${runtime.runtimeVersion} chưa có năng lực cho ${KIND_META[kind].lower}`}><span data-testid="no-capability">Runtime này chưa công bố capabilityContracts có objectKinds gồm {kind}. Chọn runtime khác hoặc nhờ quản trị viên công bố; editor không tự tạo năng lực.</span></Alert>;
+  if (catalog.loading) guidance = <p className="ops-field-hint" role="status">Đang tải danh sách khả năng của ứng dụng…</p>;
+  else if (catalog.error) guidance = <Alert tone="danger" title="Không tải được danh sách khả năng của ứng dụng" action={<Button type="button" size="sm" variant="secondary" onClick={catalog.reload}>Thử lại</Button>} />;
+  else if (catalog.runtimes.length === 0) guidance = <Alert tone="warning" title="Chưa có phiên bản ứng dụng nào" ><span data-testid="catalog-empty">Chưa có phiên bản ứng dụng nào được công bố. Quản trị FET3D cần cấu hình thêm; trình soạn không tự tạo khả năng. {required ? "Loại này bắt buộc chọn khả năng nên chưa hoàn thiện được." : ""}</span></Alert>;
+  else if (!runtime) guidance = <p className="ops-field-hint">Chọn phiên bản ứng dụng ở tab Kịch bản để xem các khả năng. <Button type="button" variant="quiet" size="sm" onClick={onOpenScenario}>Mở tab Kịch bản</Button></p>;
+  else if (options.length === 0) guidance = <Alert tone="warning" title={`Phiên bản ứng dụng ${runtime.runtimeVersion} chưa có khả năng cho ${KIND_META[kind].lower}`}><span data-testid="no-capability">Phiên bản này chưa hỗ trợ {KIND_META[kind].lower}. Chọn phiên bản khác hoặc nhờ quản trị FET3D bổ sung; trình soạn không tự tạo khả năng.</span></Alert>;
 
   return <fieldset className="ops-fieldset" data-testid="capability-field">
-    <legend>Năng lực runtime {required && <StatusBadge tone="warning">Bắt buộc</StatusBadge>}</legend>
+    <legend>Khả năng trong ứng dụng {required && <StatusBadge tone="warning">Bắt buộc</StatusBadge>}</legend>
     {guidance}
-    {runtime && options.length > 0 && <Field label="Năng lực" required={required} error={error}
-      hint={selected?.description ?? "Hành vi trong Unity do năng lực này quyết định, không do loại đối tượng."}>
+    {runtime && options.length > 0 && <Field label="Khả năng" required={required} error={error}
+      hint={selected?.description ?? "Đối tượng hoạt động thế nào trong ứng dụng là do khả năng này, không do loại đối tượng."}>
       {(props) => <Select {...props} data-testid="field-capability" value={object.capability?.id ?? ""}
         onChange={(event) => {
           const next = options.find((option) => option.id === event.target.value);
           actions.setCapability(object.index, next ? { id: next.id, version: next.version } : undefined);
         }}>
-        <option value="">{required ? "Chọn năng lực…" : "Không dùng năng lực"}</option>
-        {object.capability && !options.some((option) => option.id === object.capability?.id) && <option value={object.capability.id}>{object.capability.id}@{object.capability.version} (không có trong runtime)</option>}
+        <option value="">{required ? "Chọn khả năng…" : "Không dùng khả năng"}</option>
+        {object.capability && !options.some((option) => option.id === object.capability?.id) && <option value={object.capability.id}>{object.capability.id}@{object.capability.version} (phiên bản ứng dụng này không có)</option>}
         {options.map((option) => <option key={option.id} value={option.id}>{option.id} · v{option.version}</option>)}
       </Select>}
     </Field>}
-    {object.capability && !runtime && <p className="ops-field-hint">Đang dùng {object.capability.id}@{object.capability.version}; chọn runtime để kiểm tra.</p>}
+    {object.capability && !runtime && <p className="ops-field-hint">Đang dùng {object.capability.id}@{object.capability.version}; chọn phiên bản ứng dụng để kiểm tra.</p>}
     {selected && object.capability && selected.version !== object.capability.version && <div className="ops-stack">
-      <Alert tone="warning" title="Phiên bản năng lực khác runtime">Đối tượng dùng v{object.capability.version}, runtime công bố v{selected.version}.</Alert>
+      <Alert tone="warning" title="Phiên bản khả năng khác với ứng dụng">Đối tượng dùng v{object.capability.version}, ứng dụng đang có v{selected.version}.</Alert>
       <div><Button type="button" size="sm" variant="secondary" data-testid="update-capability-version" onClick={() => actions.setCapability(object.index, { id: selected.id, version: selected.version })}>Cập nhật lên v{selected.version}</Button></div>
     </div>}
     {selected && <ParameterFields capability={selected} object={object} issues={issues} actions={actions} />}
-    {!selected && !object.capability && Object.keys(object.parameters).length > 0 && <p className="ops-field-hint">Có tham số nhưng chưa chọn năng lực; máy chủ yêu cầu tham số rỗng khi không có năng lực.</p>}
+    {!selected && !object.capability && Object.keys(object.parameters).length > 0 && <p className="ops-field-hint">Có tham số nhưng chưa chọn khả năng; khi không chọn khả năng thì phải bỏ hết tham số.</p>}
   </fieldset>;
 }
 

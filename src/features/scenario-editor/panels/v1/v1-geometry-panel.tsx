@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Alert } from "@/components/ui/alert";
+import { SupportCode } from "@/components/ui/support-code";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 
@@ -13,7 +14,6 @@ import { ifcToGlb, round3 } from "../../v1/matrix";
 import { ReprocessGuide } from "../geometry-status";
 import { NumberField } from "../fields";
 
-const short = (value: string, n = 10) => `${value.slice(0, n)}…`;
 
 /**
  * Geometry the draft is pinned to and the floors/transform the editor works with. The IFC → GLB `coordinateTransform` is
@@ -34,26 +34,26 @@ export function V1GeometryPanel({ reading, preview, pin, buildingId, revisionId,
   const glb = info && ifc.x !== undefined && ifc.y !== undefined && ifc.z !== undefined ? ifcToGlb(info.coordinateTransform, { x: ifc.x, y: ifc.y, z: ifc.z }) : null;
 
   return <div className="se-form" data-testid="geometry-panel">
-    <div className="se-form-head"><div><h3>Mô hình và Geometry</h3><p>Đối tượng ghim vào một artifact Geometry đã được chấp nhận của revision và dùng tọa độ cục bộ của từng tầng.</p></div></div>
+    <div className="se-form-head"><div><h3>Mô hình 3D</h3><p>Bản nháp được gắn với một mô hình 3D đã đạt kiểm tra của bản IFC; đối tượng dùng tọa độ của từng tầng.</p></div></div>
 
     {reading.kind === "reprocess" && <ReprocessGuide buildingId={buildingId} revisionId={revisionId} />}
-    {reading.kind === "not-ready" && <Alert tone="warning" title="Chưa có Geometry được chấp nhận">Revision đang xử lý hoặc chưa có artifact đạt kiểm tra. Có thể đặt đối tượng sau khi Geometry sẵn sàng.</Alert>}
-    {reading.kind === "invalid" && <Alert tone="danger" title="Geometry không đạt contract">{reading.reason}</Alert>}
+    {reading.kind === "not-ready" && <Alert tone="warning" title="Chưa có mô hình 3D đạt kiểm tra">Bản IFC đang được xử lý hoặc chưa qua kiểm tra tự động. Có thể đặt đối tượng sau khi mô hình 3D sẵn sàng.</Alert>}
+    {reading.kind === "invalid" && <Alert tone="danger" title="Mô hình 3D chưa đúng chuẩn của trình soạn">{reading.reason}</Alert>}
     {preview.phase === "error" && <Alert tone="danger" title="Không lấy được thông tin mô hình">{preview.error}</Alert>}
 
     {info && <>
       <fieldset className="ops-fieldset">
-        <legend>Artifact đã ghim {matches === true && <StatusBadge tone="success">Khớp</StatusBadge>}{matches === false && <StatusBadge tone="warning">Khác bản hiện tại</StatusBadge>}{matches === null && <StatusBadge tone="danger">Chưa ghim</StatusBadge>}</legend>
+        <legend>Mô hình đã gắn {matches === true && <StatusBadge tone="success">Khớp</StatusBadge>}{matches === false && <StatusBadge tone="warning">Khác bản hiện tại</StatusBadge>}{matches === null && <StatusBadge tone="danger">Chưa ghim</StatusBadge>}</legend>
         <dl className="se-facts" data-testid="geometry-facts">
-          <div><dt>Hiện tại</dt><dd><code title={info.artifactId}>{short(info.artifactId, 13)}</code> · SHA-256 <code title={info.sha256Hash}>{short(info.sha256Hash, 12)}</code></dd></div>
-          <div><dt>Bản nháp ghim</dt><dd>{pin ? <><code title={pin.artifactId}>{short(pin.artifactId, 13)}</code> · SHA-256 <code title={pin.sha256Hash}>{short(pin.sha256Hash, 12)}</code></> : "Chưa ghim"}</dd></div>
+          <div><dt>Mô hình mới nhất</dt><dd>Đã có<SupportCode id={info.artifactId} /></dd></div>
+          <div><dt>Bản nháp đang gắn</dt><dd>{pin ? <>{matches ? "Mô hình mới nhất" : "Một mô hình cũ hơn"}<SupportCode id={pin.artifactId} /></> : "Chưa gắn"}</dd></div>
           <div><dt>Hệ tọa độ</dt><dd>mét · Y hướng lên · tay phải</dd></div>
           {modelSummary && <div><dt>Mô hình</dt><dd data-testid="model-summary">{modelSummary}</dd></div>}
         </dl>
-        {matches !== true && <Alert tone="warning" title={pin ? "Geometry của revision đã đổi sau khi ghim" : "Bản nháp chưa ghim Geometry"}>
+        {matches !== true && <Alert tone="warning" title={pin ? "Mô hình 3D của bản IFC đã đổi sau khi gắn" : "Bản nháp chưa gắn mô hình 3D"}>
           <div className="ops-stack">
-            <span>{pin ? "Tầng và cấu kiện neo có thể đã khác. Ghim lại rồi chạy Kiểm tra để máy chủ xác nhận từng đối tượng." : "Ghim artifact hiện tại để máy chủ kiểm tra được tầng và neo."}</span>
-            <div><Button type="button" size="sm" variant="secondary" data-testid="repin-geometry" onClick={() => onRepin({ artifactId: info.artifactId, sha256Hash: info.sha256Hash })}>{pin ? "Ghim lại artifact hiện tại" : "Ghim artifact hiện tại"}</Button></div>
+            <span>{pin ? "Tầng và cấu kiện neo có thể đã khác. Gắn lại rồi bấm Kiểm tra để hệ thống xác nhận từng đối tượng." : "Gắn mô hình mới nhất để hệ thống kiểm tra được tầng và neo."}</span>
+            <div><Button type="button" size="sm" variant="secondary" data-testid="repin-geometry" onClick={() => onRepin({ artifactId: info.artifactId, sha256Hash: info.sha256Hash })}>{pin ? "Gắn lại mô hình mới nhất" : "Gắn mô hình mới nhất"}</Button></div>
           </div>
         </Alert>}
       </fieldset>
@@ -61,9 +61,9 @@ export function V1GeometryPanel({ reading, preview, pin, buildingId, revisionId,
       <fieldset className="ops-fieldset">
         <legend>Tầng ({info.floors.length})</legend>
         <ul className="se-floors" data-testid="floor-list">
-          {[...info.floors].sort((a, b) => a.elevationMeters - b.elevationMeters).map((floor) => <li key={floor.id}><strong>{floor.name}</strong><code>{floor.id}</code><span>{round3(floor.elevationMeters)} m</span></li>)}
+          {[...info.floors].sort((a, b) => a.elevationMeters - b.elevationMeters).map((floor) => <li key={floor.id}><strong>{floor.name}</strong><span>{round3(floor.elevationMeters)} m</span></li>)}
         </ul>
-        <p className="ops-field-hint">{info.semantic.length} cấu kiện trong ánh xạ ngữ nghĩa dùng làm neo.</p>
+        <p className="ops-field-hint">{info.semantic.length} cấu kiện có thể dùng làm neo.</p>
       </fieldset>
 
       <fieldset className="ops-fieldset">

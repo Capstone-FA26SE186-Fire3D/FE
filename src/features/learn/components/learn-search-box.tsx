@@ -52,7 +52,7 @@ export function LearnSearchBox({ value, onCommit }: { value: string; onCommit: (
   };
 
   return <form className="learn-search" role="search" onSubmit={submit}>
-    <label className="learn-search-label" htmlFor={inputId}>Tìm bài Learn</label>
+    <label className="learn-search-label" htmlFor={inputId}>Tìm bài học</label>
     <div className="learn-search-row">
       <div className="learn-search-field">
         <Search size={18} aria-hidden="true" />

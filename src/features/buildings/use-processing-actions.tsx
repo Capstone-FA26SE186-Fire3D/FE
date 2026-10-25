@@ -40,10 +40,10 @@ export function useProcessingActions({ accessToken, revision, job, onChanged }: 
     try {
       await buildingsApi.processRevision(accessToken, revision.id, processKey.keyFor({ revisionId: revision.id }));
       processKey.done();
-      toast.notify({ tone: "success", title: "Đã gửi yêu cầu xử lý", description: "Yêu cầu được nhận (202); worker sẽ xử lý và trang tự cập nhật." });
+      toast.notify({ tone: "success", title: "Đã gửi yêu cầu xử lý", description: "Hệ thống đã nhận yêu cầu; mô hình sẽ được xử lý và trang tự cập nhật." });
       onChanged();
     } catch (error) {
-      setActionError({ revisionId: revision.id, message: describeApiError(error, "Không thể gửi yêu cầu xử lý. Hãy thử lại; yêu cầu lặp lại sẽ không tạo job trùng.") });
+      setActionError({ revisionId: revision.id, message: describeApiError(error, "Không thể gửi yêu cầu xử lý. Hãy thử lại; gửi lại sẽ không tạo lượt xử lý trùng.") });
     } finally {
       busy.current = false;
       setWorking(null);
@@ -70,10 +70,10 @@ export function useProcessingActions({ accessToken, revision, job, onChanged }: 
       retryKey.done();
       setRetryOpen(false);
       setReason("");
-      toast.notify({ tone: "success", title: "Đã yêu cầu chạy lại job", description: "Worker sẽ nhận lại job; chưa phải đã xử lý xong." });
+      toast.notify({ tone: "success", title: "Đã yêu cầu chạy lại", description: "Mô hình sẽ được xử lý lại; trang tự cập nhật khi có kết quả." });
       onChanged();
     } catch (error) {
-      setRetryError(describeApiError(error, "Không thể yêu cầu chạy lại job này."));
+      setRetryError(describeApiError(error, "Không thể yêu cầu chạy lại lượt xử lý này."));
     } finally {
       busy.current = false;
       setWorking(null);
@@ -83,8 +83,8 @@ export function useProcessingActions({ accessToken, revision, job, onChanged }: 
   const modal = <Modal
     open={retryOpen}
     onOpenChange={(open) => { if (!open && working !== "retry") setRetryOpen(false); }}
-    title="Chạy lại job thất bại?"
-    description="Job được đưa lại vào hàng đợi. Lý do được lưu để truy vết; gửi lại cùng lý do sẽ không tạo thêm yêu cầu."
+    title="Chạy lại lượt xử lý bị lỗi?"
+    description="Mô hình sẽ được xếp hàng xử lý lại. Lý do được lưu lại để tra cứu; gửi lại cùng lý do sẽ không tạo thêm yêu cầu."
     footer={<><Button variant="quiet" onClick={() => setRetryOpen(false)} disabled={working === "retry"}>Hủy</Button><Button onClick={() => void submitRetry()} disabled={working === "retry"}>{working === "retry" ? "Đang gửi…" : "Chạy lại"}</Button></>}
   >
     <Field label="Lý do chạy lại" required error={retryError || undefined}>{(p) => <Textarea {...p} rows={3} maxLength={1000} value={reason} onChange={(event) => setReason(event.target.value)} />}</Field>

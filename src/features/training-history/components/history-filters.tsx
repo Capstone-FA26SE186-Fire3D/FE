@@ -30,9 +30,9 @@ export function HistoryFilterBar({ filters, buildings, knownBuildingNames, onCha
   actions?: ReactNode;
 }) {
   const problem = rangeError(filters);
-  const buildingOptions = buildings.map((building) => ({ value: building.id, label: building.name || building.id.slice(0, 8) }));
+  const buildingOptions = buildings.map((building) => ({ value: building.id, label: building.name || "Tòa nhà chưa có tên" }));
   if (filters.buildingId && !buildings.some((building) => building.id === filters.buildingId)) {
-    buildingOptions.unshift({ value: filters.buildingId, label: knownBuildingNames.get(filters.buildingId) ?? `Tòa nhà đã chọn (${filters.buildingId.slice(0, 8)}…)` });
+    buildingOptions.unshift({ value: filters.buildingId, label: knownBuildingNames.get(filters.buildingId) ?? "Tòa nhà đã chọn" });
   }
   return <div>
     <FilterChips label="Bộ lọc lịch sử" className="th-chips">

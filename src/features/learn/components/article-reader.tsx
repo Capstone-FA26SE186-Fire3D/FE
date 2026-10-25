@@ -40,7 +40,7 @@ function ReaderState({ title, message, retry }: { title: string; message: string
     <h1>{title}</h1><p>{message}</p>
     <div className="learn-state-actions">
       {retry && <Button variant="secondary" onClick={retry}><RefreshCw size={16} aria-hidden="true" />Thử lại</Button>}
-      <Button asChild variant="quiet"><Link href={routes.learn}>Xem thư viện Learn</Link></Button>
+      <Button asChild variant="quiet"><Link href={routes.learn}>Xem thư viện bài học</Link></Button>
     </div>
   </div>;
 }
@@ -65,7 +65,7 @@ export function ArticleReader({ slug }: { slug: string }) {
     <div className="reader-layout">
       <article className="article-reading">
         <nav className="reader-breadcrumb" aria-label="Đường dẫn">
-          <Link href={routes.learn}>Khám phá Learn</Link><span aria-hidden="true">›</span><span aria-current="page">{kindLabel[version.kind]}</span>
+          <Link href={routes.learn}>Khám phá bài học</Link><span aria-hidden="true">›</span><span aria-current="page">{kindLabel[version.kind]}</span>
         </nav>
         <ul className="learn-tags reader-chips" aria-label="Loại bài và tình huống">
           <li><span className="reader-kind-chip" data-kind={version.kind}>{kindLabel[version.kind]}</span></li>

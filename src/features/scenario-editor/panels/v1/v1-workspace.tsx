@@ -157,7 +157,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
     toast.notify({ tone: "success", title: "Đã áp dụng mẫu vào bản nháp", description: "Chưa lưu. Hoàn tác bằng nút Hoàn tác hoặc Ctrl+Z." });
   }, [edit, toast]);
 
-  const placeDisabledReason = !geometry ? "Cần Geometry hợp lệ để đặt đối tượng" : activeFloor === null ? "Chọn một tầng trước khi đặt đối tượng" : null;
+  const placeDisabledReason = !geometry ? "Cần mô hình 3D hợp lệ để đặt đối tượng" : activeFloor === null ? "Chọn một tầng trước khi đặt đối tượng" : null;
 
   const onSave = useCallback(async () => {
     const result = await editor.save();
@@ -251,7 +251,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const nextFuture = state.history.future[0];
   const versionsHref = `${routes.workspaceBuildings}/${buildingId}/scenarios/${scenarioId}/versions`;
   const listHref = `${routes.workspaceBuildings}/${buildingId}/scenarios`;
-  const saveBlockedReason = editor.shapeProblems.length > 0 ? `Chưa thể lưu: ${editor.shapeProblems[0].path} ${editor.shapeProblems[0].message}` : null;
+  const saveBlockedReason = editor.shapeProblems.length > 0 ? `Chưa thể lưu: ${editor.shapeProblems[0].message}` : null;
   const issueCount = issues.length;
 
   const tree = <V1Tree floors={geometry?.floors ?? []} geometryNote={reading.kind === "reprocess" ? "Cần xử lý lại IFC; chưa có dữ liệu tầng." : reading.kind === "invalid" ? reading.reason : null}
@@ -265,19 +265,19 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const previewBanner = preview.phase === "reprocess"
     ? <ReprocessGuide buildingId={buildingId} revisionId={revisionId} />
     : preview.phase === "not-ready"
-      ? <Alert tone="warning" title="Mô hình 3D chưa sẵn sàng" action={<div className="se-banner-actions"><span data-testid="preview-revision-status">Trạng thái revision: {revisionLabel(preview.preview?.revisionStatus).label}.{preview.preview?.revisionStatus === "NeedsFix" ? " QA chưa đạt hoặc chưa xác nhận cửa thoát; xử lý ở tab IFC." : ""} Tự kiểm tra lại mỗi vài giây{preview.attempts >= 24 ? " (đã dừng, hãy thử lại)" : ""}.{geometry ? " Có thể đặt đối tượng theo tọa độ tầng." : ""}</span><Button type="button" size="sm" variant="secondary" onClick={preview.refresh}>Kiểm tra lại</Button>{preview.preview?.revisionStatus === "NeedsFix" && <Button asChild size="sm" variant="quiet"><Link href={ifcTabHref(buildingId, revisionId)} data-testid="preview-ifc-link">Mở tab IFC</Link></Button>}</div>} />
+      ? <Alert tone="warning" title="Mô hình 3D chưa sẵn sàng" action={<div className="se-banner-actions"><span data-testid="preview-revision-status">Trạng thái bản IFC: {revisionLabel(preview.preview?.revisionStatus).label}.{preview.preview?.revisionStatus === "NeedsFix" ? " Mô hình chưa qua kiểm tra tự động hoặc chưa xác nhận cửa thoát; xử lý ở tab IFC." : ""} Tự kiểm tra lại mỗi vài giây{preview.attempts >= 24 ? " (đã dừng, hãy thử lại)" : ""}.{geometry ? " Có thể đặt đối tượng theo tọa độ tầng." : ""}</span><Button type="button" size="sm" variant="secondary" onClick={preview.refresh}>Kiểm tra lại</Button>{preview.preview?.revisionStatus === "NeedsFix" && <Button asChild size="sm" variant="quiet"><Link href={ifcTabHref(buildingId, revisionId)} data-testid="preview-ifc-link">Mở tab IFC</Link></Button>}</div>} />
       : preview.phase === "error"
         ? <Alert tone="danger" title="Không lấy được thông tin mô hình" action={<div className="se-banner-actions"><span>{preview.error}</span><Button type="button" size="sm" variant="secondary" onClick={preview.refresh}>Thử lại</Button></div>} />
         : reading.kind === "invalid"
-          ? <Alert tone="danger" title="Geometry không đạt contract fet3d.editor/1">{reading.reason}</Alert>
+          ? <Alert tone="danger" title="Mô hình 3D chưa đúng chuẩn của trình soạn">{reading.reason}</Alert>
           : null;
 
   const pinBanner = geometry && pin && (pin.artifactId !== geometry.artifactId || pin.sha256Hash !== geometry.sha256Hash)
-    ? <Alert tone="warning" title="Geometry của revision đã đổi sau khi bản nháp ghim" action={<div className="se-banner-actions"><span>Tầng và neo có thể không còn khớp.</span><Button type="button" size="sm" variant="secondary" onClick={() => setPanelTab("geometry")}>Xem Geometry</Button></div>} />
+    ? <Alert tone="warning" title="Mô hình 3D của bản IFC đã đổi sau khi bản nháp được gắn" action={<div className="se-banner-actions"><span>Tầng và neo có thể không còn khớp.</span><Button type="button" size="sm" variant="secondary" onClick={() => setPanelTab("geometry")}>Xem mô hình</Button></div>} />
     : null;
 
   const saveBanner = (status === "conflict" || status === "error") && state.saveError
-    ? <Alert tone="danger" title={status === "conflict" ? "Xung đột phiên bản" : "Lưu không thành công"} action={<div className="se-banner-actions"><span>{state.saveError}</span>
+    ? <Alert tone="danger" title={status === "conflict" ? "Bản nháp vừa được lưu ở nơi khác" : "Lưu không thành công"} action={<div className="se-banner-actions"><span>{state.saveError}</span>
       {status === "conflict"
         ? <Button type="button" size="sm" onClick={() => setConflictOpen(true)} data-testid="open-conflict">Đối chiếu với bản mới</Button>
         : <><Button type="button" size="sm" variant="secondary" onClick={() => void onSave()}>Thử lại</Button>{editor.report?.source === "save" && <Button type="button" size="sm" variant="quiet" onClick={() => setPanelTab("issues")}>Xem vấn đề</Button>}</>}</div>} />
@@ -291,7 +291,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
       <Button asChild variant="secondary" size="sm"><Link href={listHref} aria-label="Về danh sách kịch bản"><ChevronLeft size={16} aria-hidden="true" />Kịch bản</Link></Button>
       <div className="se-title">
         <h1>{readString(state.draft, "name") || scenario.data?.name || "Soạn kịch bản"}</h1>
-        <p>Bản nháp #{meta.draftNumber} · <StatusBadge tone="info" data-testid="schema-badge">fet3d.editor/1</StatusBadge>{activeFloorV1 ? <> · {activeFloorV1.name}</> : null}</p>
+        <p>Bản nháp #{meta.draftNumber} · <StatusBadge tone="info" data-testid="schema-badge">Soạn trên mô hình 3D</StatusBadge>{activeFloorV1 ? <> · {activeFloorV1.name}</> : null}</p>
       </div>
       <V1Actions status={status} saveBlockedReason={saveBlockedReason} onSave={() => void onSave()} onValidate={() => void onValidate()} validating={editor.validating} versionsHref={versionsHref} />
     </header>

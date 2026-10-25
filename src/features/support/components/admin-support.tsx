@@ -30,7 +30,7 @@ export function AdminSupport() {
   const tab: TabKey = isTab(tabParam) ? tabParam : "tickets";
 
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
-  if (user?.role !== 0 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin có thể xem hộp thư hỗ trợ và nhật ký audit.</Alert>;
+  if (user?.role !== 0 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ quản trị FET3D xem được hộp thư hỗ trợ và nhật ký thao tác.</Alert>;
 
   const changeTab = (value: string) => {
     if (!isTab(value) || value === tab) return;
@@ -40,11 +40,11 @@ export function AdminSupport() {
   return <>
     <PageHeader
       eyebrow="Xử lý công việc"
-      title="Hỗ trợ và audit"
-      description="Hàng đợi hỗ trợ và nhật ký thao tác quan trọng. Audit chỉ nằm ở trang này; số lượng lấy từ máy chủ."
-      breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Hỗ trợ & audit" }]}
+      title="Hỗ trợ và nhật ký"
+      description="Yêu cầu hỗ trợ, phản hồi và nhật ký các thao tác quan trọng."
+      breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Hỗ trợ & nhật ký" }]}
     />
-    <SubTabs label="Hỗ trợ và audit" value={tab} onValueChange={changeTab} items={[{ value: "tickets", label: "Ticket" }, { value: "feedback", label: "Phản hồi" }, { value: "audit", label: "Nhật ký audit" }]}>
+    <SubTabs label="Hỗ trợ và nhật ký" value={tab} onValueChange={changeTab} items={[{ value: "tickets", label: "Yêu cầu hỗ trợ" }, { value: "feedback", label: "Phản hồi" }, { value: "audit", label: "Nhật ký thao tác" }]}>
       <div className="ops-subtabs-content">
         {tab === "tickets" && <AdminTicketsTab accessToken={accessToken} myId={user.id} />}
         {tab === "feedback" && <AdminFeedbackTab accessToken={accessToken} />}

@@ -67,7 +67,7 @@ export function errorText(cause: unknown, fallback: string) {
     if (cause.status === 403) return "Bạn không có quyền thực hiện thao tác này.";
     if (cause.status === 404) return "Không tìm thấy mục này. Có thể đã bị xóa hoặc bạn không có quyền xem.";
     if (cause.status === 429) return cause.retryAfterSeconds ? `Thao tác quá nhanh. Thử lại sau ${cause.retryAfterSeconds} giây.` : "Thao tác quá nhanh. Hãy thử lại sau ít phút.";
-    if (cause.code === "TICKET_CLOSED") return "Ticket đã đóng nên không nhận tin nhắn mới. Mở lại ticket để tiếp tục trao đổi.";
+    if (cause.code === "TICKET_CLOSED") return "Yêu cầu đã đóng nên không nhận tin nhắn mới. Mở lại yêu cầu để tiếp tục trao đổi.";
     if (cause.code === "IDEMPOTENCY_KEY_CONFLICT") return "Yêu cầu trước đó đã được gửi với nội dung khác. Hãy tải lại rồi gửi lại.";
     if (cause.status >= 400 && cause.status < 500 && cause.message) return cause.message;
   }

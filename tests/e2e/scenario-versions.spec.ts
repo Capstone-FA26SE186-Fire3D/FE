@@ -221,7 +221,7 @@ test.describe("snapshot", () => {
     // The draft loads on its own: no extra "Tải draft" click before "Tạo snapshot" is usable.
     await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toContainText('"12"');
     await page.getByRole("button", { name: "Kiểm tra bản nháp" }).click();
-    await expect(page.getByText("SPAWN_REQUIRED")).toBeVisible();
+    await expect(page.getByRole("list", { name: "Vấn đề của bản nháp" })).toContainText("SPAWN_REQUIRED");
     await page.getByRole("button", { name: "Tạo phiên bản", exact: true }).click();
     await expect(page.getByRole("alert").filter({ hasText: "Không tạo được snapshot" }).or(page.getByRole("alert")).first()).toBeVisible();
     await page.getByRole("button", { name: "Tạo phiên bản", exact: true }).click();
@@ -262,7 +262,7 @@ test.describe("snapshot", () => {
     await expect(page.getByRole("button", { name: "Tải bản nháp" })).toBeDisabled();
     // A disabled snapshot button says why.
     await expect(page.getByRole("button", { name: "Tạo phiên bản", exact: true })).toBeDisabled();
-    await expect(page.getByRole("status").filter({ hasText: "Chưa có draft để tạo phiên bản." })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Chưa có bản nháp để tạo phiên bản." })).toBeVisible();
   });
 
   test("412 keeps the draft the user was viewing and offers the newer one for comparison", async ({ page }) => {
@@ -567,7 +567,7 @@ test.describe("access and deep links", () => {
     await setup(page, newMock());
     await page.route(`**/api/scenario-versions/${IDS.version}/readiness`, (route) => route.fulfill({ status: 500 }));
     await page.goto(`${base}?tab=readiness`);
-    await expect(page.getByRole("alert").filter({ hasText: "Không đọc được readiness từ máy chủ" })).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: "Không đọc được điều kiện phát hành" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Thử lại" }).first()).toBeVisible();
   });
 });

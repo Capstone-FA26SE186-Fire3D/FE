@@ -1,5 +1,6 @@
 import { stableStringify } from "@/api/idempotency";
 import { POST_SLUG_MAX, SLUG_PATTERN } from "@/features/learn/slug";
+import { kindLabel } from "@/features/learn/types";
 import { blocksFromWire, blocksToWire, checkBlocks, MARKUP, MARKUP_MESSAGE, type EditorBlock } from "./blocks";
 import type { AdminVersion, LearnKind, SituationRef, VersionInput } from "./types";
 
@@ -76,7 +77,7 @@ export function describeDifferences(mine: EditorContent, server: AdminVersion): 
   const out: string[] = [];
   if (own.title !== theirs.title) out.push(`tiêu đề (máy chủ: “${theirs.title}”)`);
   if (own.summary !== theirs.summary) out.push("tóm tắt");
-  if (own.kind !== theirs.kind) out.push(`loại bài (máy chủ: ${theirs.kind})`);
+  if (own.kind !== theirs.kind) out.push(`loại bài (máy chủ: ${kindLabel[theirs.kind]})`);
   if (own.coverImageUrl !== theirs.coverImageUrl) out.push("ảnh bìa");
   if (stableStringify(own.blocks) !== stableStringify(theirs.blocks)) out.push("khối nội dung");
   if (stableStringify(own.situationIds) !== stableStringify(theirs.situationIds)) out.push("tình huống");
@@ -85,8 +86,8 @@ export function describeDifferences(mine: EditorContent, server: AdminVersion): 
 }
 
 export function checkSlug(slug: string): string | undefined {
-  if (!slug.trim()) return "Nhập đường dẫn (slug) cho bài.";
-  if (slug.length > POST_SLUG_MAX) return `Slug tối đa ${POST_SLUG_MAX} ký tự.`;
-  if (!SLUG_PATTERN.test(slug)) return "Slug chỉ gồm chữ thường không dấu, số và dấu gạch ngang (ví dụ: thoat-nan-khoi-khoi).";
+  if (!slug.trim()) return "Nhập đường dẫn rút gọn cho bài.";
+  if (slug.length > POST_SLUG_MAX) return `Đường dẫn rút gọn tối đa ${POST_SLUG_MAX} ký tự.`;
+  if (!SLUG_PATTERN.test(slug)) return "Đường dẫn rút gọn chỉ gồm chữ thường không dấu, số và dấu gạch ngang (ví dụ: thoat-nan-khoi-khoi).";
   return undefined;
 }

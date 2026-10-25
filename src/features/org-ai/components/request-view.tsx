@@ -7,6 +7,7 @@ import { useState, type ReactNode } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { SupportCode } from "@/components/ui/support-code";
 import { routes } from "@/configs/routes";
 import { formatDateTime, formatNumber, formatQuota } from "@/features/billing/format";
 import { isObject, type JsonObject } from "@/features/scenario-editor/store/json";
@@ -18,6 +19,8 @@ import type { AiCitation, AiRequest, AiSourceLink } from "../types";
 import styles from "../org-ai.module.css";
 
 export const BILLING_AI_HREF = `${routes.workspaceBilling}?tab=ai`;
+
+const ALLOCATION_STATUS: Record<string, string> = { Reserved: "đang giữ", Consumed: "đã tính", Released: "đã trả lại" };
 
 function CopyId({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
@@ -64,7 +67,7 @@ export function Citations({ request, admin }: { request: AiRequest; admin?: bool
           <span className={styles.dim}>
             {sourceKindLabel(citation.kind)}{version ? ` · phiên bản ${version}` : ""}{citation.locator ? ` · vị trí: ${citation.locator}` : ""}{typeof citation.relevance === "number" ? ` · độ liên quan ${Math.round(citation.relevance * 100)}%` : ""}
           </span>
-          {source?.contentHash && <span className={styles.dim}>Mã băm nội dung <span className={styles.mono}>{source.contentHash.slice(0, 16)}…</span></span>}
+          {source?.contentHash && <span className={styles.dim}>Mã nội dung <span className={styles.mono}>{source.contentHash.slice(0, 12)}…</span></span>}
         </li>;
       })}
     </ul>
@@ -87,14 +90,14 @@ export function ResultNotes({ request }: { request: AiRequest }) {
 export function Usage({ request, admin, trainee }: { request: AiRequest; admin?: boolean; trainee?: boolean }) {
   const unit = request.quotaUnit;
   return <section className={styles.section} aria-label="Sử dụng" data-testid="ai-usage">
-    <h3>Sử dụng kỹ thuật</h3>
+    <h3>Mức sử dụng</h3>
     <dl className={styles.meta}>
-      <dt>Đơn vị</dt><dd>{unit ?? "—"} <span className={styles.dim}>(do máy chủ quy định; không quy đổi)</span></dd>
+      <dt>Đơn vị</dt><dd>{unit ?? "—"} <span className={styles.dim}>(do hệ thống quy định)</span></dd>
       <dt>Đã giữ chỗ</dt><dd>{request.reservedUnits !== undefined ? formatQuota(request.reservedUnits, unit) : "—"}</dd>
       <dt>Đã tính</dt><dd>{request.consumedUnits !== undefined ? formatQuota(request.consumedUnits, unit) : isInFlight(request.status) || request.status === "NeedsReconcile" ? "Chưa có (chưa chốt)" : "—"}</dd>
-      {admin && request.allocations && request.allocations.length > 0 && <><dt>Theo đợt cấp</dt><dd>{request.allocations.map((allocation) => `${allocation.grantId.slice(0, 8)}: giữ ${formatNumber(allocation.reservedUnits)}, tính ${allocation.consumedUnits === null ? "—" : formatNumber(allocation.consumedUnits)} (${allocation.status})`).join(" · ")}</dd></>}
+      {admin && request.allocations && request.allocations.length > 0 && <><dt>Theo đợt cấp</dt><dd>{request.allocations.map((allocation) => `${allocation.grantId.slice(0, 8)}: giữ ${formatNumber(allocation.reservedUnits)}, tính ${allocation.consumedUnits === null ? "—" : formatNumber(allocation.consumedUnits)} (${ALLOCATION_STATUS[allocation.status] ?? "khác"})`).join(" · ")}</dd></>}
     </dl>
-    {!admin && !trainee && <p className={styles.dim}>Quota được giữ chỗ trước và chốt theo mức dùng thực tế; số dư và lịch sử nằm ở <Link href={BILLING_AI_HREF}>Quota AI</Link>.</p>}
+    {!admin && !trainee && <p className={styles.dim}>Hạn mức được giữ chỗ trước và chốt theo mức dùng thực tế; số dư và lịch sử nằm ở <Link href={BILLING_AI_HREF}>Hạn mức AI</Link>.</p>}
     {trainee && <p className={styles.dim}>Mỗi câu hỏi giữ chỗ trong hạn mức hôm nay của bạn và chốt theo mức dùng thực tế; phần không dùng được trả lại.</p>}
   </section>;
 }
@@ -110,10 +113,10 @@ export function DraftPreview({ state, notes }: { state: JsonObject; notes: strin
     <dl className={styles.meta}>
       <dt>Tên</dt><dd>{typeof state.name === "string" ? state.name : "Chưa có"}</dd>
       {typeof state.timeLimitSeconds === "number" && <><dt>Giới hạn thời gian</dt><dd>{formatNumber(state.timeLimitSeconds)} giây</dd></>}
-      {typeof state.runtimeVersion === "string" && <><dt>Runtime</dt><dd>{state.runtimeVersion}</dd></>}
+      {typeof state.runtimeVersion === "string" && <><dt>Phiên bản ứng dụng</dt><dd>{state.runtimeVersion}</dd></>}
       {isObject(state.modePolicy) && Array.isArray(state.modePolicy.allowedModes) && <><dt>Chế độ cho phép</dt><dd>{state.modePolicy.allowedModes.join(", ")}</dd></>}
-      {rubric && <><dt>Rubric</dt><dd>{criteria} tiêu chí{typeof rubric.pass_threshold === "number" ? ` · ngưỡng đạt ${rubric.pass_threshold}` : ""} <span className={styles.dim}>(đề xuất của AI, chưa phải quyết định của tổ chức)</span></dd></>}
-      {geometry && <><dt>Geometry ghim</dt><dd className={styles.mono}>{typeof geometry.artifactId === "string" ? geometry.artifactId : "?"}</dd></>}
+      {rubric && <><dt>Tiêu chí chấm điểm</dt><dd>{criteria} tiêu chí{typeof rubric.pass_threshold === "number" ? ` · ngưỡng đạt ${rubric.pass_threshold}` : ""} <span className={styles.dim}>(đề xuất của AI, chưa phải quyết định của tổ chức)</span></dd></>}
+      {geometry && <><dt>Mô hình đã ghim</dt><dd>{typeof geometry.artifactId === "string" ? "Có" : "Không rõ"}</dd></>}
     </dl>
     {objectives.length > 0 && <div><strong>Mục tiêu học tập</strong><ul className={styles.list}>{objectives.map((item, index) => <li key={index} className={styles.quote}>{item}</li>)}</ul></div>}
     {typeof state.learnerInstructions === "string" && <div><strong>Hướng dẫn cho người học</strong><p className={styles.quote}>{state.learnerInstructions}</p></div>}
@@ -125,8 +128,8 @@ export function DraftPreview({ state, notes }: { state: JsonObject; notes: strin
           const placement = isObject(object.placement) ? object.placement : {};
           const kind = typeof object.kind === "string" ? object.kind : "?";
           return <li key={index} className={styles.item}>
-            <span className={styles.itemTitle}>{typeof object.id === "string" ? object.id : "?"} · {KIND_META[kind as ObjectKind]?.label ?? kind}{typeof object.label === "string" && object.label ? ` · ${object.label}` : ""}</span>
-            <span className={styles.dim}>Tầng {typeof placement.floorId === "string" ? placement.floorId : "?"}{typeof object.anchorId === "string" ? ` · Neo BIM (IFC GlobalId) ${object.anchorId}` : ""}{isObject(object.capability) && typeof object.capability.id === "string" ? ` · năng lực ${object.capability.id}` : ""}</span>
+            <span className={styles.itemTitle}>{typeof object.id === "string" ? object.id : "?"} · {KIND_META[kind as ObjectKind]?.label ?? "Đối tượng khác"}{typeof object.label === "string" && object.label ? ` · ${object.label}` : ""}</span>
+            <span className={styles.dim}>Tầng {typeof placement.floorId === "string" ? placement.floorId : "?"}{typeof object.anchorId === "string" ? ` · Gắn phần tử IFC ${object.anchorId}` : ""}{isObject(object.capability) && typeof object.capability.id === "string" ? ` · khả năng ${object.capability.id}` : ""}</span>
           </li>;
         })}</ul>}
     </div>
@@ -153,22 +156,23 @@ export function RequestView({ request, admin, trainee, onApply, extra }: { reque
       <dt>Mã yêu cầu</dt><dd><CopyId value={request.requestId} /></dd>
       {request.completedAt && <><dt>Hoàn tất lúc</dt><dd>{formatDateTime(request.completedAt)}</dd></>}
       {request.input?.buildingName && <><dt>Công trình</dt><dd>{request.input.buildingName}</dd></>}
-      {request.input?.revisionId && <><dt>Revision mô hình ghim</dt><dd className={styles.mono}>{request.input.revisionId}</dd></>}
+      {request.input?.revisionId && <><dt>Bản IFC đã ghim</dt><dd className={styles.mono} title={request.input.revisionId}>{request.input.revisionId.slice(0, 8)}…</dd></>}
     </dl>
     {request.input?.text && <section className={styles.section} aria-label="Nội dung đã gửi" data-testid="ai-input">
       <h3>{request.operation === "ScenarioDraft" ? "Yêu cầu đã gửi" : "Câu hỏi đã gửi"}</h3>
       <p className={styles.quote}>{request.input.text}</p>
     </section>}
 
-    {isInFlight(request.status) && <Alert tone="info" title={request.status === "Accepted" ? "Yêu cầu đang chờ xử lý" : "Dịch vụ AI đang xử lý"}>Đây là xử lý bất đồng bộ; trang tự cập nhật khi có kết quả. Không cần gửi lại.</Alert>}
+    {isInFlight(request.status) && <Alert tone="info" title={request.status === "Accepted" ? "Yêu cầu đang chờ xử lý" : "Dịch vụ AI đang xử lý"}>Trang tự cập nhật khi có kết quả. Không cần gửi lại.</Alert>}
 
     {request.status === "NeedsReconcile" && <Alert tone="warning" title="Chưa rõ kết quả, đang chờ đối soát">
-      {failure ?? "Hệ thống chưa xác nhận được kết quả từ dịch vụ AI."} {trainee ? "Phần lượt hỏi" : "Quota"} của yêu cầu này đang được giữ chỗ và không bị tính hay hoàn lại tự động; PlatformAdmin sẽ đối soát. Không gửi lại câu hỏi này để tránh trừ trùng.
+      {failure ?? "Hệ thống chưa xác nhận được kết quả từ dịch vụ AI."} {trainee ? "Phần lượt hỏi" : "Hạn mức"} của yêu cầu này đang được giữ chỗ và không bị tính hay hoàn lại tự động; quản trị FET3D sẽ đối soát. Không gửi lại câu hỏi này để tránh trừ trùng.
+      {!admin && <SupportCode code={request.failureCode ?? undefined} id={request.requestId} />}
     </Alert>}
 
-    {request.status === "Failed" && <Alert tone="danger" title="Yêu cầu thất bại">{failure ?? "Dịch vụ AI không trả được kết quả."} {trainee ? "Phần lượt hỏi đã giữ chỗ được trả lại." : "Xem phần hoàn lại quota ở lịch sử sử dụng của Quota AI."}</Alert>}
+    {request.status === "Failed" && <Alert tone="danger" title="Yêu cầu thất bại">{failure ?? "Dịch vụ AI không trả được kết quả."} {trainee ? "Phần lượt hỏi đã giữ chỗ được trả lại." : "Xem phần hoàn lại hạn mức ở lịch sử sử dụng của Hạn mức AI."}{!admin && <SupportCode code={request.failureCode ?? undefined} id={request.requestId} />}</Alert>}
 
-    {request.resultWithheld && <div data-testid="ai-withheld"><Alert tone="info" title="Không còn hiển thị câu trả lời">Bài tập huấn hoặc bài Learn bạn hỏi kèm không còn truy cập được (đã hết quyền, bị gỡ hoặc ẩn), nên câu trả lời và trích dẫn không còn được hiển thị.</Alert></div>}
+    {request.resultWithheld && <div data-testid="ai-withheld"><Alert tone="info" title="Không còn hiển thị câu trả lời">Bài tập huấn hoặc bài học bạn hỏi kèm không còn truy cập được (đã hết quyền, bị gỡ hoặc ẩn), nên câu trả lời và trích dẫn không còn được hiển thị.</Alert></div>}
 
     {hasResultType(request, "InsufficientEvidence") && <div data-testid="ai-insufficient"><Alert tone="warning" title="Chưa đủ căn cứ để trả lời">{result?.message?.trim() || "Các nguồn đã chọn chưa đủ thông tin để trả lời có trích dẫn. Hãy mở rộng phạm vi nguồn hoặc hỏi cụ thể hơn."}</Alert></div>}
 
@@ -185,7 +189,7 @@ export function RequestView({ request, admin, trainee, onApply, extra }: { reque
         <DraftPreview state={state} notes={notes} />
         {onApply && <div><Button type="button" onClick={() => onApply(request)} data-testid="ai-apply"><ShieldAlert size={16} aria-hidden="true" />Áp dụng vào bản nháp…</Button></div>}
       </section>
-      : <Alert tone="warning" title="Không đọc được đề xuất">Máy chủ báo hoàn tất nhưng nội dung không theo fet3d.editor/1, nên không thể áp dụng.</Alert>)}
+      : <Alert tone="warning" title="Không đọc được đề xuất">Máy chủ báo hoàn tất nhưng nội dung không đúng định dạng của trình soạn thảo, nên không thể áp dụng.</Alert>)}
 
     {request.status === "Succeeded" && <ResultNotes request={request} />}
     {request.status === "Succeeded" && <Citations request={request} admin={admin} />}

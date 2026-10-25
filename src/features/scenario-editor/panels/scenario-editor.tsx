@@ -53,8 +53,8 @@ export function ScenarioEditor({ buildingId, scenarioId }: { buildingId: string;
   const { loaded, mode } = state;
   if (mode === "unsupported") {
     return <div className="se-start">
-      <EmptyState icon={FileX2} title="Bản nháp dùng schemaVersion chưa được hỗ trợ"
-        description={`Bản nháp khai báo schemaVersion “${state.schemaVersion ?? "?"}”. Editor này chỉ mở fet3d.editor/1 và bản nháp cũ không có schemaVersion. Nội dung không bị thay đổi.`}
+      <EmptyState icon={FileX2} title="Bản nháp dùng định dạng chưa được hỗ trợ"
+        description="Trình soạn này chỉ mở được bản nháp soạn trên mô hình 3D và bản nháp cũ. Nội dung không bị thay đổi."
         action={<Button asChild variant="secondary"><Link href={backHref}>Chọn bản nháp khác</Link></Button>} />
     </div>;
   }
@@ -65,7 +65,7 @@ export function ScenarioEditor({ buildingId, scenarioId }: { buildingId: string;
     return <V1Workspace key={`${probe.key}:${loaded.etag}`} accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} draftId={draftId} initial={loaded} />;
   }
   return <>
-    {aiRequest && <div className="se-banners"><Alert tone="warning" title="Đề xuất AI chỉ áp dụng được vào bản nháp fet3d.editor/1">Bản nháp này theo định dạng cũ nên không nhận đề xuất AI. Chọn hoặc tạo bản nháp fet3d.editor/1 của kịch bản, hoặc quay lại Trợ lý AI.</Alert></div>}
+    {aiRequest && <div className="se-banners"><Alert tone="warning" title="Đề xuất AI chỉ áp dụng được vào bản nháp soạn trên mô hình 3D">Bản nháp này theo định dạng cũ nên không nhận đề xuất AI. Chọn hoặc tạo bản nháp mới trên mô hình 3D của kịch bản, hoặc quay lại Trợ lý AI.</Alert></div>}
     <LegacyHost key={probe.key} accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} draftId={draftId} initial={loaded} />
   </>;
 }

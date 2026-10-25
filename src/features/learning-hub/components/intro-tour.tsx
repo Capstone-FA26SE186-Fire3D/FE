@@ -10,7 +10,7 @@ import { cn } from "@/utils/cn";
 const TOUR_KEY = "fire3d-trainee-tour";
 
 export const TOUR_STEPS = [
-  { title: "Đọc trong Learn", text: "Bài viết, mẹo và video công khai về thoát hiểm và phòng cháy. Đọc để chuẩn bị, không bắt buộc trước khi luyện tập.", action: { label: "Mở Learn", href: routes.learn } },
+  { title: "Đọc bài học", text: "Bài viết, mẹo và video công khai về thoát hiểm và phòng cháy. Đọc để chuẩn bị, không bắt buộc trước khi luyện tập.", action: { label: "Mở thư viện bài học", href: routes.learn } },
   { title: "Luyện tập trên ứng dụng", text: "Cài ứng dụng Android, quét mã công trình rồi chọn Learn, Luyện có hướng dẫn hoặc Đánh giá. Bạn có thể bắt đầu ở bước này ngay.", action: { label: "Tải ứng dụng", href: routes.download } },
   { title: "Xem kết quả", text: "Sau khi đồng bộ, lịch sử hiển thị riêng trạng thái phiên và kết quả đánh giá. Hoàn thành phiên không có nghĩa là đạt.", action: { label: "Mở lịch sử luyện tập", href: "/learning-hub?view=history" } },
 ] as const;

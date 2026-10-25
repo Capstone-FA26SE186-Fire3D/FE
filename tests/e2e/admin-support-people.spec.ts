@@ -85,7 +85,7 @@ test.describe("admin organization profile", () => {
     await expect(drawer.getByText("Hồ sơ vừa được thay đổi ở nơi khác")).toBeVisible();
     await expect(drawer.getByLabel("Địa chỉ")).toHaveValue("99 Nguyễn Văn Linh");
     await drawer.getByRole("button", { name: "Tải bản mới để đối chiếu" }).click();
-    await expect(drawer.getByText(/Máy chủ hiện: Fire3D Lab · 1 Lê Lợi, Đà Nẵng · \+842369998888/)).toBeVisible();
+    await expect(drawer.getByText(/Bản mới nhất: Fire3D Lab · 1 Lê Lợi, Đà Nẵng · \+842369998888/)).toBeVisible();
     await expect(drawer.getByLabel("Địa chỉ")).toHaveValue("99 Nguyễn Văn Linh");
     await drawer.getByRole("button", { name: "Lưu hồ sơ" }).click();
     await expect.poll(() => org.address).toBe("99 Nguyễn Văn Linh");
@@ -270,13 +270,13 @@ test.describe("audit detail", () => {
       { field: "revision", before: 2, after: 3 },
     ] } }));
     await page.goto("/admin/support?tab=audit");
-    await expect(page.getByRole("row").filter({ hasText: "Support" }).first().getByText("Platform Admin")).toBeVisible();
-    await expect(page.getByRole("row").filter({ hasText: "Support" }).first().getByText("Trường An Toàn")).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Yêu cầu hỗ trợ" }).first().getByText("Platform Admin")).toBeVisible();
+    await expect(page.getByRole("row").filter({ hasText: "Yêu cầu hỗ trợ" }).first().getByText("Trường An Toàn")).toBeVisible();
     await expect(page.getByRole("row").nth(2).getByText("Hệ thống")).toBeVisible();
 
-    await page.getByRole("row").filter({ hasText: "Support" }).first().click();
+    await page.getByRole("row").filter({ hasText: "Yêu cầu hỗ trợ" }).first().click();
     await expect(page).toHaveURL(new RegExp(`log=${guid(5)}`));
-    const drawer = page.getByRole("dialog", { name: "Chi tiết bản ghi audit" });
+    const drawer = page.getByRole("dialog", { name: "Chi tiết thao tác" });
     const diff = drawer.getByRole("table", { name: "Thay đổi theo từng trường" });
     await expect(diff.getByRole("row").filter({ hasText: "Trạng thái" })).toContainText("Mới");
     await expect(diff.getByRole("row").filter({ hasText: "Trạng thái" })).toContainText("Đang xử lý");
@@ -293,7 +293,7 @@ test.describe("audit detail", () => {
 
     // A deep link reloads from the server.
     await page.goto(`/admin/support?tab=audit&log=${guid(5)}`);
-    await expect(page.getByRole("dialog", { name: "Chi tiết bản ghi audit" }).getByRole("table", { name: "Thay đổi theo từng trường" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Chi tiết thao tác" }).getByRole("table", { name: "Thay đổi theo từng trường" })).toBeVisible();
   });
 
   test("a record without allowed changes says so; 404 and 5xx are explained", async ({ page }) => {
@@ -309,7 +309,7 @@ test.describe("audit detail", () => {
     await expect(page.getByText("Không tìm thấy bản ghi")).toBeVisible();
     status = 500;
     await page.goto(`/admin/support?tab=audit&log=${guid(5)}`);
-    await expect(page.getByText("Không mở được bản ghi audit")).toBeVisible();
+    await expect(page.getByText("Không mở được chi tiết thao tác")).toBeVisible();
   });
 });
 
@@ -375,7 +375,7 @@ test.describe("Trainee support entry (FR-SUPPORT-01)", () => {
     await expect(row).toBeVisible();
     await row.click();
     const detail = page.getByTestId("ticket-drawer");
-    await expect(detail.getByText("Nhân viên Fire3D · Đội hỗ trợ Fire3D")).toBeVisible();
+    await expect(detail.getByText("Nhân viên Fire3D · Đội hỗ trợ FET3D")).toBeVisible();
   });
 
   test("feedback from a Trainee is created once and listed after reload", async ({ page }) => {
@@ -449,7 +449,7 @@ test.describe("layout", () => {
         await page.screenshot({ path: testInfo.outputPath(`ticket-${scheme}-${width}.png`) });
 
         await page.goto(`/admin/support?tab=audit&log=${guid(5)}`);
-        await expect(page.getByRole("dialog", { name: "Chi tiết bản ghi audit" }).getByRole("table", { name: "Thay đổi theo từng trường" })).toBeVisible();
+        await expect(page.getByRole("dialog", { name: "Chi tiết thao tác" }).getByRole("table", { name: "Thay đổi theo từng trường" })).toBeVisible();
         await page.waitForTimeout(400);
         expect(await overflow(page)).toBeLessThanOrEqual(0);
         await page.screenshot({ path: testInfo.outputPath(`audit-${scheme}-${width}.png`) });

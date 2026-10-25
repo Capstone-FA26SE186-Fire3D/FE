@@ -10,7 +10,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Table } from "@/components/ui/table";
 import { formatDateTime } from "@/utils/date-range";
 import { supportApi } from "../api";
-import { auditFieldLabel, formatAuditValue } from "../labels";
+import { auditActionLabel, auditFieldLabel, auditTargetLabel, formatAuditValue } from "../labels";
 import type { AuditFieldChange } from "../types";
 import styles from "./support.module.css";
 
@@ -45,26 +45,26 @@ export function AuditDetail({ id, accessToken, onFilter }: { id: string; accessT
   if (!log) {
     if (detail.error !== undefined) {
       const missing = detail.error instanceof ApiError && detail.error.status === 404;
-      return <Alert tone="danger" title={missing ? "Không tìm thấy bản ghi" : "Không mở được bản ghi audit"} action={missing ? undefined : <Button size="sm" variant="secondary" className="mt-3" onClick={detail.reload}>Thử lại</Button>}>{missing ? "Bản ghi không tồn tại hoặc không còn truy cập được." : "Hãy kiểm tra kết nối rồi thử lại."}</Alert>;
+      return <Alert tone="danger" title={missing ? "Không tìm thấy bản ghi" : "Không mở được chi tiết thao tác"} action={missing ? undefined : <Button size="sm" variant="secondary" className="mt-3" onClick={detail.reload}>Thử lại</Button>}>{missing ? "Bản ghi không tồn tại hoặc không còn truy cập được." : "Hãy kiểm tra kết nối rồi thử lại."}</Alert>;
     }
     return <SkeletonDetail rows={8} />;
   }
 
   const rows: Array<[string, string, FilterPatch | null, boolean]> = [
     ["Thời điểm", formatDateTime(log.createdAt), null, false],
-    ["Hành động", log.action, { action: log.action }, false],
-    ["Loại đối tượng", log.targetEntity ?? "—", null, false],
+    ["Hành động", auditActionLabel(log.action), { action: log.action }, false],
+    ["Loại đối tượng", auditTargetLabel(log.targetEntity), null, false],
     ["Mã đối tượng", log.targetId ?? "—", log.targetId ? { targetId: log.targetId } : null, true],
     ["Người thực hiện", log.actorDisplayName?.trim() || (log.userId ? "Chưa có tên hiển thị" : "Hệ thống / không xác định"), log.userId ? { actorId: log.userId } : null, false],
     ["Mã người thực hiện", log.userId ?? "—", null, true],
     ["Tổ chức", log.organizationName?.trim() || (log.organizationId ? "Chưa có tên hiển thị" : "Không thuộc tổ chức"), log.organizationId ? { organizationId: log.organizationId } : null, false],
     ["Mã tổ chức", log.organizationId ?? "—", null, true],
-    ["Mã correlation", log.correlationId ?? "—", log.correlationId ? { correlationId: log.correlationId } : null, true],
+    ["Mã truy vết", log.correlationId ?? "—", log.correlationId ? { correlationId: log.correlationId } : null, true],
     ["Mã bản ghi", log.id, null, true],
   ];
 
   return <div className="ops-stack" data-testid="audit-detail">
-    <div className={styles.ticketHead}><StatusBadge tone="neutral">{log.action}</StatusBadge><StatusBadge tone="info">Chỉ metadata</StatusBadge></div>
+    <div className={styles.ticketHead}><StatusBadge tone="neutral">{auditActionLabel(log.action)}</StatusBadge><StatusBadge tone="info">Chỉ thông tin chung</StatusBadge></div>
     <dl className="ops-kv">
       {rows.map(([label, value, filter, mono]) => <div key={label} style={{ display: "contents" }}>
         <dt>{label}</dt>
@@ -75,7 +75,7 @@ export function AuditDetail({ id, accessToken, onFilter }: { id: string; accessT
       <h3>Thay đổi</h3>
       <Changes changes={log.changes ?? []} />
     </section>
-    {log.reason && <p className={styles.muted} style={{ display: "flex", alignItems: "center", gap: 8 }}><LockKeyhole size={16} aria-hidden="true" /><StatusBadge tone="neutral">Có lý do quản trị</StatusBadge>Lý do là văn bản tự do nên không hiển thị ở giao diện này.</p>}
-    <Alert tone="info">Chỉ hiển thị metadata và các trường thay đổi được backend cho phép (trạng thái, mã, thời điểm, số liệu). Không có mật khẩu, token, nội dung ticket hay dữ liệu cá nhân.</Alert>
+    {log.reason && <p className={styles.muted} style={{ display: "flex", alignItems: "center", gap: 8 }}><LockKeyhole size={16} aria-hidden="true" /><StatusBadge tone="neutral">Có lý do quản trị</StatusBadge>Lý do do người thực hiện tự nhập nên không hiển thị ở đây.</p>}
+    <Alert tone="info">Chỉ hiển thị thông tin chung và các thay đổi được phép xem (trạng thái, mã, thời điểm, số liệu). Không có mật khẩu, mã đăng nhập, nội dung yêu cầu hỗ trợ hay dữ liệu cá nhân.</Alert>
   </div>;
 }

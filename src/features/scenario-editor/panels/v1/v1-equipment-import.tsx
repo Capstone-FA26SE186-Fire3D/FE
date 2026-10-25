@@ -71,16 +71,16 @@ export function V1EquipmentImport({ accessToken, buildingId, revisionId, draft, 
   };
 
   return <Modal open onOpenChange={(open) => { if (!open) onClose(); }} className="se-import-modal" title="Thêm thiết bị đã xác nhận"
-    description="Thiết bị phát hiện từ IFC đã được xác nhận hoặc đổi loại trở thành đối tượng Thiết bị: neo vào cấu kiện IFC, năng lực theo loại đã chọn, vị trí theo tầng. Chưa lưu, hoàn tác được."
+    description="Thiết bị phát hiện từ IFC đã được xác nhận hoặc đổi loại trở thành đối tượng Thiết bị: neo vào cấu kiện IFC, khả năng theo loại đã chọn, vị trí theo tầng. Chưa lưu, hoàn tác được."
     footer={<><Button type="button" variant="quiet" onClick={onClose}>Đóng</Button>
       <Button type="button" onClick={confirm} disabled={toAdd.length === 0} data-testid="equipment-import-confirm">Thêm {toAdd.length} thiết bị (chưa lưu)</Button></>}>
     <div className="ops-stack" data-testid="equipment-import">
       {view.loading && !data && <SkeletonRows rows={3} label="Đang tải thiết bị đã xác nhận…" />}
-      {unavailable && <Alert tone="info" title="Revision chưa có hình học được chấp nhận">Danh sách thiết bị có sau khi xử lý IFC xong và QA đạt.</Alert>}
+      {unavailable && <Alert tone="info" title="Bản IFC chưa có mô hình 3D đạt kiểm tra">Danh sách thiết bị có sau khi xử lý IFC xong và mô hình qua kiểm tra tự động.</Alert>}
       {view.error !== undefined && !unavailable && <Alert tone="danger" title="Không tải được thiết bị" action={<Button type="button" size="sm" variant="secondary" className="mt-3" onClick={view.reload}>Thử lại</Button>}>{describeApiError(view.error, "Hãy thử lại sau.")}</Alert>}
-      {data && !data.metadataAvailable && <Alert tone="info" title="Worker chưa gửi dữ liệu thiết bị">Revision này không có building_metadata. Đặt thiết bị bằng tay trong trình soạn thảo.</Alert>}
-      {plan?.blocked === "geometry" && <Alert tone="warning" title="Cần Geometry hợp lệ">Thiết bị được neo vào cấu kiện IFC và đặt theo tầng của Geometry; hãy chờ mô hình sẵn sàng.</Alert>}
-      {plan?.blocked === "runtime" && <Alert tone="warning" title={runtimeVersion ? `Không tìm thấy runtime ${runtimeVersion}` : "Chọn runtime trước"}>Năng lực (capability) và phiên bản của thiết bị lấy từ runtime của bản nháp. Chọn runtime ở tab “Kịch bản”.</Alert>}
+      {data && !data.metadataAvailable && <Alert tone="info" title="Chưa có dữ liệu thiết bị">Bản IFC này không có thông tin thiết bị. Đặt thiết bị bằng tay trong trình soạn thảo.</Alert>}
+      {plan?.blocked === "geometry" && <Alert tone="warning" title="Cần mô hình 3D hợp lệ">Thiết bị được neo vào cấu kiện IFC và đặt theo tầng của mô hình 3D; hãy chờ mô hình sẵn sàng.</Alert>}
+      {plan?.blocked === "runtime" && <Alert tone="warning" title={runtimeVersion ? `Không tìm thấy phiên bản ứng dụng ${runtimeVersion}` : "Chọn phiên bản ứng dụng trước"}>Khả năng và phiên bản của thiết bị lấy theo phiên bản ứng dụng của bản nháp. Chọn phiên bản ở tab “Kịch bản”.</Alert>}
       {plan && !plan.blocked && data?.metadataAvailable && <>
         {toAdd.length === 0 && <div data-testid="equipment-import-empty"><Alert tone="info" title="Không có thiết bị mới để thêm">
           {data.items.length === 0 ? "IFC không có thiết bị nào." : skipped.length > 0 ? "Các thiết bị đã xác nhận đều đã có trong bản nháp hoặc không thêm được (xem lý do bên dưới)." : "Chưa có thiết bị nào được xác nhận hoặc đổi loại."}
@@ -89,7 +89,7 @@ export function V1EquipmentImport({ accessToken, buildingId, revisionId, draft, 
         {needParameters > 0 && <Alert tone="warning" title="Cần điền tham số bắt buộc">{needParameters} thiết bị có tham số bắt buộc (không có giá trị mặc định). Sau khi thêm, chọn từng thiết bị và điền tham số trước khi lưu.</Alert>}
         {toAdd.length > 0 && <h3 className="se-import-title">Sẽ thêm {toAdd.length} thiết bị</h3>}
         {toAdd.length > 0 && <Table caption="Sẽ thêm vào bản nháp" data-testid="equipment-import-add">
-          <thead><tr><th>Năng lực</th><th>Cấu kiện IFC</th><th>Tầng · vị trí (m)</th><th>Tham số bắt buộc</th></tr></thead>
+          <thead><tr><th>Khả năng</th><th>Cấu kiện IFC</th><th>Tầng · vị trí (m)</th><th>Tham số bắt buộc</th></tr></thead>
           <tbody>{toAdd.map((row) => <tr key={row.candidate.id} data-testid="equipment-import-row">
             <td>{row.catalogKey}{row.candidate.decision?.decision === "Retyped" && <> <StatusBadge tone="info">Đã đổi loại</StatusBadge></>}</td>
             <td><span className="ops-mono">{row.candidate.ifcGlobalId}</span>{row.candidate.ifcClass ? ` · ${row.candidate.ifcClass}` : ""}</td>
@@ -99,7 +99,7 @@ export function V1EquipmentImport({ accessToken, buildingId, revisionId, draft, 
         </Table>}
         {skipped.length > 0 && <h3 className="se-import-title">Không thêm ({skipped.length})</h3>}
         {skipped.length > 0 && <Table caption="Không thêm" data-testid="equipment-import-skip">
-          <thead><tr><th>Năng lực</th><th>Cấu kiện IFC</th><th>Lý do</th></tr></thead>
+          <thead><tr><th>Khả năng</th><th>Cấu kiện IFC</th><th>Lý do</th></tr></thead>
           <tbody>{skipped.map((row) => <tr key={row.candidate.id} data-testid="equipment-import-skip-row">
             <td>{row.catalogKey ?? row.candidate.catalogKey}</td>
             <td className="ops-mono">{row.candidate.ifcGlobalId}</td>

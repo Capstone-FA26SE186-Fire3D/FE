@@ -1,3 +1,4 @@
+import { ERROR_TEXT, isVietnamese } from "./error-text";
 import { ApiError } from "./types/common";
 
 /**
@@ -7,6 +8,7 @@ import { ApiError } from "./types/common";
  */
 export function describeApiError(error: unknown, fallback: string): string {
   if (error instanceof ApiError) {
+    if (error.code && ERROR_TEXT[error.code]) return ERROR_TEXT[error.code];
     if (error.status === 401) return "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.";
     if (error.status === 403) return "Bạn không có quyền thực hiện thao tác này.";
     if (error.status === 404) return "Không tìm thấy dữ liệu. Có thể dữ liệu đã bị xóa hoặc không thuộc tổ chức này.";
@@ -16,8 +18,16 @@ export function describeApiError(error: unknown, fallback: string): string {
       return error.retryAfterSeconds ? `Hệ thống đang bận. Hãy thử lại sau ${error.retryAfterSeconds} giây.` : "Hệ thống đang bận. Hãy thử lại sau ít phút.";
     }
     if (error.status >= 500) return "Máy chủ gặp lỗi. Hãy thử lại sau.";
+    if (isVietnamese(error.serverMessage)) return error.serverMessage;
     return error.fieldErrors[0]?.message ?? fallback;
   }
   if (error instanceof TypeError) return "Mất kết nối tới máy chủ. Kiểm tra mạng rồi thử lại.";
   return fallback;
+}
+
+/** `error.message` when it is safe to show (an `ApiError`, or Vietnamese text this app wrote); otherwise `fallback`. */
+export function messageOf(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) return error.message;
+  if (error instanceof TypeError) return "Mất kết nối tới máy chủ. Kiểm tra mạng rồi thử lại.";
+  return error instanceof Error && isVietnamese(error.message) ? error.message : fallback;
 }

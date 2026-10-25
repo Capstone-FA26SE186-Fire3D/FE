@@ -25,7 +25,7 @@ export function RagConsole() {
     } catch (cause) {
       if (!controller.signal.aborted) {
         setError(true);
-        setMessage(cause instanceof TypeError ? "Không kết nối được dịch vụ tài liệu. Hãy kiểm tra API và thử lại." : cause instanceof SyntaxError ? "Dịch vụ trả về dữ liệu không hợp lệ." : cause instanceof Error ? cause.message : "Không thể xử lý yêu cầu lúc này.");
+        setMessage(cause instanceof TypeError ? "Không kết nối được dịch vụ tài liệu. Hãy kiểm tra kết nối rồi thử lại." : cause instanceof SyntaxError ? "Dịch vụ trả về dữ liệu không hợp lệ." : cause instanceof Error ? cause.message : "Không thể xử lý yêu cầu lúc này.");
       }
     } finally {
       pending.current = null;

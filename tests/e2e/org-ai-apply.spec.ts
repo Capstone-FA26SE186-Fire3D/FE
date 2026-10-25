@@ -37,9 +37,9 @@ test("a stored proposal opens as a preview over the open draft; defaults leave p
   for (const key of ["name", "learningObjectives", "learnerInstructions"]) await expect(page.getByTestId(`ai-field-${key}`).getByRole("checkbox")).toBeChecked();
   for (const key of ["timeLimitSeconds", "modePolicy", "rubric", "runtimeVersion"]) await expect(page.getByTestId(`ai-field-${key}`).getByRole("checkbox")).not.toBeChecked();
   // Same pinned Geometry: spatial objects can be offered; the one on an unknown floor is read-only with the reason.
-  await expect(page.getByTestId("ai-geometry-match")).toContainText("cùng Geometry");
+  await expect(page.getByTestId("ai-geometry-match")).toContainText("cùng bản mô hình");
   await expect(page.getByTestId("ai-object")).toHaveCount(3);
-  await expect(page.getByTestId("ai-object").filter({ hasText: "ai-spawn-9" })).toContainText("Tầng không có trong Geometry của bản nháp");
+  await expect(page.getByTestId("ai-object").filter({ hasText: "ai-spawn-9" })).toContainText("Tầng không có trong mô hình của bản nháp");
   await expect(page.getByTestId("ai-apply-objects")).not.toBeChecked();
   await expect(page.getByTestId("ai-confirm-apply")).toContainText("Áp dụng 3 thay đổi");
 
@@ -99,9 +99,9 @@ test("a proposal pinned to another Geometry offers no spatial objects (read-only
   const request = seedRequest(ai, { operation: "ScenarioDraft" });
   const editor = editorMock();
   await openEditor(page, editor, ai, `${EDITOR_URL}&aiRequest=${request.requestId}`);
-  await expect(page.getByTestId("ai-geometry-match")).toContainText("Geometry khác");
+  await expect(page.getByTestId("ai-geometry-match")).toContainText("bản mô hình khác");
   await expect(page.getByTestId("ai-apply-objects")).toHaveCount(0);
-  await expect(page.getByTestId("ai-object").first()).toContainText("không ghim cùng Geometry");
+  await expect(page.getByTestId("ai-object").first()).toContainText("không dùng cùng bản mô hình");
   await page.getByTestId("ai-confirm-apply").click();
   await expect(page.getByTestId("list-Spawn").getByRole("button")).toHaveCount(1);
   await expect(page.getByRole("heading", { name: /Sơ tán do báo cháy tầng 2/ })).toBeVisible();
@@ -153,6 +153,6 @@ test("a legacy (non-v1) draft explains why the proposal cannot be applied", asyn
   const request = seedRequest(ai, { operation: "ScenarioDraft" });
   const editor = newMock(); // legacy sample state
   await openEditor(page, editor, ai, `${EDITOR_URL}&aiRequest=${request.requestId}`);
-  await expect(page.getByText("Đề xuất AI chỉ áp dụng được vào bản nháp fet3d.editor/1")).toBeVisible();
+  await expect(page.getByText("Đề xuất AI chỉ áp dụng được vào bản nháp soạn trên mô hình 3D")).toBeVisible();
   await expect(page.getByTestId("ai-apply-dialog")).toHaveCount(0);
 });

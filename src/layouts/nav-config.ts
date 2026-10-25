@@ -42,7 +42,7 @@ export const organizationArea: OperationsArea = {
     { href: routes.workspaceProfile, label: "Hồ sơ tổ chức", icon: UserRound, group: "Quản lý" },
     { href: routes.workspaceIfc, label: "Quét mô hình IFC", icon: ScanLine, group: "Công cụ" },
   ],
-  secondaryLink: { href: routes.learn, label: "Khám phá Learn", icon: BookOpen },
+  secondaryLink: { href: routes.learn, label: "Khám phá bài học", icon: BookOpen },
 };
 
 export const adminArea: OperationsArea = {
@@ -51,17 +51,17 @@ export const adminArea: OperationsArea = {
   brandSubtitle: "Quản trị hệ thống",
   navLabel: "Quản trị hệ thống",
   allowedRoles: [0],
-  signInPrompt: "Đăng nhập bằng tài khoản PlatformAdmin để vào khu quản trị.",
-  deniedMessage: "Chỉ PlatformAdmin có thể truy cập khu quản trị.",
+  signInPrompt: "Đăng nhập bằng tài khoản quản trị FET3D để vào khu quản trị.",
+  deniedMessage: "Chỉ quản trị FET3D được vào khu quản trị.",
   deniedHref: routes.home,
   deniedLabel: "Về trang chủ",
   nav: [
     { href: routes.adminOverview, label: "Tổng quan", icon: LayoutDashboard, group: "Xử lý công việc" },
     { href: routes.adminReviews, label: "Duyệt kịch bản", icon: ClipboardCheck, group: "Xử lý công việc" },
-    { href: routes.adminSupport, label: "Hỗ trợ & audit", icon: LifeBuoy, group: "Xử lý công việc" },
+    { href: routes.adminSupport, label: "Hỗ trợ & nhật ký", icon: LifeBuoy, group: "Xử lý công việc" },
     { href: routes.adminAccounts, label: "Tài khoản", icon: Users, group: "Quản lý hệ thống" },
     { href: routes.adminOrganizations, label: "Tổ chức", icon: Landmark, group: "Quản lý hệ thống" },
-    { href: routes.adminLearn, label: "Learn CMS", icon: BookOpen, group: "Quản lý nội dung" },
+    { href: routes.adminLearn, label: "Bài học", icon: BookOpen, group: "Quản lý nội dung" },
     { href: routes.adminLibrary, label: "Thư viện mẫu", icon: Library, group: "Quản lý nội dung" },
     { href: routes.adminAi, label: "AI & nguồn tri thức", icon: BrainCircuit, group: "Quản lý nội dung" },
     { href: routes.adminCommerce, label: "Dịch vụ & thanh toán", icon: CreditCard, group: "Thương mại" },

@@ -38,7 +38,7 @@ test("PlatformAdmin creates, reviews and locks an Organization through the Fire3
   await page.getByTestId("organizations-table").getByRole("row", { name: /Fire3D Lab/ }).click();
   await expect(page).toHaveURL(/organization=org-1/);
   const detail = page.getByTestId("organization-drawer");
-  await expect(detail.getByRole("link", { name: "Tạo OrganizationUser" })).toHaveAttribute("href", "/admin/accounts?organizationId=org-1");
+  await expect(detail.getByRole("link", { name: "Tạo tài khoản tổ chức" })).toHaveAttribute("href", "/admin/accounts?organizationId=org-1");
   await expect(detail.getByRole("link", { name: "Xem công trình" })).toHaveAttribute("href", "/admin/organizations/org-1/buildings");
   await expect(detail.getByText("Chờ BE: địa chỉ và số điện thoại")).toHaveCount(0);
   await expect(detail.getByRole("button", { name: "Sửa hồ sơ" })).toBeVisible();
@@ -56,7 +56,7 @@ test("PlatformAdmin creates, reviews and locks an Organization through the Fire3
   await page.getByRole("button", { name: "Tạo tổ chức", exact: true }).first().click();
   const form = page.getByRole("dialog", { name: "Tạo tổ chức" });
   await form.getByLabel("Tên tổ chức").fill("Trường An Toàn");
-  await expect(form.getByLabel("Slug tổ chức")).toHaveValue("truong-an-toan");
+  await expect(form.getByLabel("Đường dẫn rút gọn")).toHaveValue("truong-an-toan");
   await form.getByRole("button", { name: "Tạo tổ chức" }).click();
   await expect.poll(() => createPayload).toEqual({ name: "Trường An Toàn", slug: "truong-an-toan" });
   await expect(page.getByText("Đã tạo tổ chức", { exact: true })).toBeVisible();
@@ -104,7 +104,7 @@ test("organization admin shows empty, error-with-retry and rejects duplicate slu
   const form = page.getByRole("dialog", { name: "Tạo tổ chức" });
   await form.getByLabel("Tên tổ chức").fill("Trùng");
   await form.getByRole("button", { name: "Tạo tổ chức" }).click();
-  await expect(form.getByText(/Slug này đã được dùng/)).toBeVisible();
+  await expect(form.getByText(/Đường dẫn rút gọn này đã được dùng/)).toBeVisible();
   await expect(form.getByLabel("Tên tổ chức")).toHaveValue("Trùng");
 });
 
@@ -124,6 +124,6 @@ test("Accounts form receives Organization scope from the admin handoff", async (
   await page.getByRole("button", { name: "Tạo tài khoản", exact: true }).click();
   const form = page.getByRole("dialog", { name: "Tạo tài khoản" });
   // Fixed-choice fields are comboboxes (Admin v2): the trigger shows the chosen label.
-  await expect(form.getByRole("combobox", { name: "Vai trò" })).toHaveText("Thành viên tổ chức");
+  await expect(form.getByRole("combobox", { name: "Vai trò" })).toHaveText("Tài khoản tổ chức");
   await expect(form.getByRole("combobox", { name: "Tổ chức" })).toHaveText("Fire3D Lab");
 });

@@ -128,7 +128,7 @@ export function GoogleLinkPanel({ accessToken, profile, onProfileChange, onReloa
 
   const status = googleOnly ? "Chỉ đăng nhập bằng Google" : linked ? "Đã liên kết Google" : "Chưa liên kết Google";
   const alerts = <>
-    {!hasFirebaseAuthConfig && <Alert tone="info" title="Google chưa được cấu hình">Môi trường này chưa có cấu hình Firebase nên chưa thể xác thực Google.</Alert>}
+    {!hasFirebaseAuthConfig && <Alert tone="info" title="Chưa bật đăng nhập Google">Trang này chưa bật đăng nhập Google nên chưa thể liên kết.</Alert>}
     {wait && <Alert tone="warning" title="Cần chờ trước khi thử lại">Có thể thử lại sau {wait.seconds} giây.</Alert>}
     {notice && <Alert tone="success" title="Đã kiểm tra">{notice}</Alert>}
     {problem && !problem.field && <Alert tone={problem.needsLogin ? "warning" : "danger"} title={problem.needsLogin ? "Cần đăng nhập lại" : "Không hoàn tất được"} action={problem.needsLogin ? <Button asChild size="sm" variant="secondary" className="mt-3"><Link href={routes.login}>Đăng nhập lại</Link></Button> : problem.reload ? <Button type="button" size="sm" variant="secondary" className="mt-3" onClick={onReload}>Tải lại hồ sơ</Button> : undefined}>{problem.message}</Alert>}
@@ -136,7 +136,7 @@ export function GoogleLinkPanel({ accessToken, profile, onProfileChange, onReloa
 
   return <Panel title="Đăng nhập bằng Google" description="Liên kết Google để đăng nhập nhanh hơn. Email, vai trò và quyền truy cập không thay đổi." data-testid="google-link-panel" bodyClassName="ops-stack">
     <div><StatusBadge tone={linked ? "success" : "neutral"}>{status}</StatusBadge></div>
-    {linked && hasLocalLogin && <p className="ops-muted">Tài khoản này đã liên kết Google và có mật khẩu Fire3D. Hiện chưa có thao tác hủy liên kết trong ứng dụng.</p>}
+    {linked && hasLocalLogin && <p className="ops-muted">Tài khoản này đã liên kết Google và có mật khẩu FET3D. Hiện chưa có thao tác hủy liên kết trong ứng dụng.</p>}
 
     {!linked && <form onSubmit={link} noValidate className="ops-stack" aria-label="Liên kết Google">
       <p className="ops-muted">Nhập mật khẩu hiện tại, sau đó xác thực tài khoản Google. Khi liên kết thành công, mọi phiên đăng nhập sẽ bị thu hồi và bạn đăng nhập lại.</p>
@@ -145,8 +145,8 @@ export function GoogleLinkPanel({ accessToken, profile, onProfileChange, onReloa
       <div><Button type="submit" disabled={disabled}><GoogleIcon />{working ? "Đang xác thực…" : "Xác thực Google và liên kết"}</Button></div>
     </form>}
 
-    {googleOnly && <form onSubmit={setPassword} noValidate className="ops-stack" aria-label="Đặt mật khẩu Fire3D">
-      <p className="ops-muted">Tài khoản này chưa có mật khẩu Fire3D. Đặt mật khẩu để đăng nhập bằng email. Bạn cần xác thực Google lại ngay lúc đặt, và mọi phiên sẽ bị thu hồi sau khi đặt.</p>
+    {googleOnly && <form onSubmit={setPassword} noValidate className="ops-stack" aria-label="Đặt mật khẩu FET3D">
+      <p className="ops-muted">Tài khoản này chưa có mật khẩu FET3D. Đặt mật khẩu để đăng nhập bằng email. Bạn cần xác thực Google lại ngay lúc đặt, và mọi phiên sẽ bị thu hồi sau khi đặt.</p>
       <Field label="Mật khẩu mới" required hint="6 đến 128 ký tự." error={localError.newPassword ?? (problem?.field === "newPassword" ? problem.message : undefined)}>{(p) => <PasswordInput {...p} className="ops-input" visibilityLabel="mật khẩu mới để đặt lần đầu" autoComplete="new-password" required minLength={6} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />}</Field>
       <Field label="Xác nhận mật khẩu mới" required error={localError.confirmPassword}>{(p) => <PasswordInput {...p} className="ops-input" visibilityLabel="xác nhận mật khẩu mới để đặt lần đầu" autoComplete="new-password" required minLength={6} maxLength={128} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />}</Field>
       {alerts}

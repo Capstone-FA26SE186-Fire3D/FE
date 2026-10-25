@@ -79,7 +79,7 @@ function Workspace() {
       {selected.description && <p>{selected.description}</p>}
     </div>
     <div className="learning-page-actions">
-      {(view === "overview" || view === "saved") && <Link className={buttonVariants({ variant: "secondary" })} href={routes.learn}>Khám phá Learn</Link>}
+      {(view === "overview" || view === "saved") && <Link className={buttonVariants({ variant: "secondary" })} href={routes.learn}>Khám phá bài học</Link>}
       {view === "history" && <Link className={buttonVariants({ variant: "secondary" })} href={routes.download}>Mở trên điện thoại</Link>}
     </div>
   </header> : null;
@@ -89,7 +89,7 @@ function Workspace() {
       <Link className="learning-brand" href="/" aria-label="FET3D, về trang chủ" onClick={closeMenu}><span className="learning-wordmark">FET3D<i aria-hidden="true" /></span><small>Thư viện cá nhân</small></Link>
       <nav id="learning-navigation" className="learning-navigation" aria-label="Quản lý học tập">
         <div className="learning-nav-items">{views.map((item) => <Link key={item.key} href={hrefOf(item.key)} aria-current={view === item.key ? "page" : undefined} onClick={closeMenu}><item.icon size={20} strokeWidth={1.75} aria-hidden="true" /><span className="learning-nav-label">{item.label}</span></Link>)}</div>
-        <div className="learning-nav-bottom"><div className="learning-nav-theme"><span>Giao diện</span><ThemeToggle /></div><Link href={routes.learn} onClick={closeMenu}><BookOpen size={20} strokeWidth={1.75} aria-hidden="true" />Khám phá Learn</Link><button type="button" onClick={() => void logout()}><LogOut size={20} strokeWidth={1.75} aria-hidden="true" />Đăng xuất</button></div>
+        <div className="learning-nav-bottom"><div className="learning-nav-theme"><span>Giao diện</span><ThemeToggle /></div><Link href={routes.learn} onClick={closeMenu}><BookOpen size={20} strokeWidth={1.75} aria-hidden="true" />Khám phá bài học</Link><button type="button" onClick={() => void logout()}><LogOut size={20} strokeWidth={1.75} aria-hidden="true" />Đăng xuất</button></div>
       </nav>
     </aside>
     <button type="button" className="learning-scrim" aria-label="Đóng menu" tabIndex={-1} onClick={() => { closeMenu(); menuButton.current?.focus(); }} />

@@ -3,7 +3,7 @@ import { env, hasFirebaseAuthConfig } from "@/configs/env";
 /** Firebase is only needed when the user signs in with Google/Firebase: load it on demand, not in every page bundle. */
 async function firebaseAuth() {
   if (!hasFirebaseAuthConfig) {
-    throw new Error("Chưa cấu hình Firebase cho môi trường này.");
+    throw new Error("Trang này chưa bật đăng nhập Google.");
   }
 
   const [{ getApps, initializeApp }, { getAuth }] = await Promise.all([import("firebase/app"), import("firebase/auth")]);

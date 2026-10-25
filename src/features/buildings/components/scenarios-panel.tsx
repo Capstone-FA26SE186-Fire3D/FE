@@ -118,7 +118,7 @@ export function ScenariosPanel({ accessToken, buildingId, revisionLabel, scenari
       rowHref={editorHref}
       rowMenu={(scenario) => [{ label: "Mở trình soạn", icon: PenLine, onSelect: () => router.push(editorHref(scenario)) }]}
       toolbar={<>
-        <p className="ops-muted" style={{ flex: "1 1 240px" }}>{revisionLabel ? `Kịch bản gắn với công trình; bản nháp dựa trên revision đang chọn (${revisionLabel}).` : "Kịch bản gắn với công trình; bản nháp được tạo trong trình soạn."}</p>
+        <p className="ops-muted" style={{ flex: "1 1 240px" }}>{revisionLabel ? `Kịch bản gắn với công trình; bản nháp dựa trên bản IFC đang chọn (${revisionLabel}).` : "Kịch bản gắn với công trình; bản nháp được tạo trong trình soạn."}</p>
         <Button variant="quiet" size="sm" onClick={scenarios.reload} disabled={loading}><RefreshCw size={14} aria-hidden="true" />Tải lại</Button>
         <Button onClick={() => { setError(""); setFieldError(""); setOpen(true); }} data-testid="scenario-create"><Plus size={16} aria-hidden="true" />Tạo kịch bản</Button>
       </>}

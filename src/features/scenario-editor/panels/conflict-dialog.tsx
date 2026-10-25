@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 
 import type { ConflictState } from "../use-scenario-editor";
+import { parseJsonPath } from "../store/json";
 import { defaultChoice, summarizeValue, type MergeChoice, type UnitStatus } from "../store/merge";
 
 const STATUS_LABEL: Record<UnitStatus, { text: string; tone: "info" | "warning" | "success" | "neutral" }> = {
@@ -22,11 +23,17 @@ const STATUS_LABEL: Record<UnitStatus, { text: string; tone: "info" | "warning" 
 
 const FIELD_NAME: Record<string, string> = {
   spawnPoints: "Điểm xuất phát", hazards: "Nguy cơ", scoringConfig: "Chấm điểm", routingConfig: "Tuyến thoát hiểm", rubric: "Rubric",
-  learningObjectives: "Mục tiêu học tập", learnerInstructions: "Hướng dẫn người học", objectAnchors: "Neo đối tượng", requiredCapabilities: "Năng lực runtime",
-  runtimeVersion: "Phiên bản runtime", goals: "Goal", npcs: "NPC", blockedElements: "Vùng chặn", modePolicy: "Chính sách chế độ", safetyThresholds: "Ngưỡng an toàn",
+  learningObjectives: "Mục tiêu học tập", learnerInstructions: "Hướng dẫn người học", objectAnchors: "Neo đối tượng", requiredCapabilities: "Khả năng cần có của ứng dụng",
+  runtimeVersion: "Phiên bản ứng dụng", goals: "Điểm đến", npcs: "NPC", blockedElements: "Vùng chặn", modePolicy: "Chính sách chế độ", safetyThresholds: "Ngưỡng an toàn",
   // fet3d.editor/1
-  schemaVersion: "Phiên bản schema", name: "Tên kịch bản", geometry: "Geometry đã ghim", objects: "Đối tượng", timeLimitSeconds: "Thời gian tối đa", randomSeed: "Hạt giống ngẫu nhiên", replanIntervalSeconds: "Chu kỳ lập kế hoạch lại",
+  schemaVersion: "Định dạng bản nháp", name: "Tên kịch bản", geometry: "Mô hình 3D đã gắn", objects: "Đối tượng", timeLimitSeconds: "Thời gian tối đa", randomSeed: "Hạt giống ngẫu nhiên", replanIntervalSeconds: "Chu kỳ lập kế hoạch lại",
 };
+
+/** Where a change sits, in words: "Nguy cơ › mục 2 › intensity" instead of `$.hazards[1].intensity`. */
+function placeOf(path: string): string {
+  const parts = parseJsonPath(path).map((segment) => typeof segment === "number" ? `mục ${segment + 1}` : FIELD_NAME[segment] ?? segment);
+  return parts.length > 0 ? parts.join(" › ") : "Toàn bộ";
+}
 
 /**
  * Shown after a 412. The author's draft stays untouched in the editor; this dialog loads the server's version and lets the
@@ -51,13 +58,13 @@ export function ConflictDialog({ open, conflict, onLoad, onApply, onClose }: {
       {conflict?.theirs && <Button type="button" data-testid="apply-merge" onClick={() => onApply(choices)}>Áp dụng lựa chọn (chưa lưu)</Button>}
     </>}>
     {!conflict && <div className="ops-stack">
-      <Alert tone="warning" title="Xung đột phiên bản (412)">Một người khác, hoặc một tab khác của bạn, đã lưu bản nháp này sau lần bạn tải gần nhất.</Alert>
+      <Alert tone="warning" title="Bản nháp vừa được lưu ở nơi khác">Một người khác, hoặc một tab khác của bạn, đã lưu bản nháp này sau lần bạn tải gần nhất.</Alert>
       <div><Button type="button" onClick={onLoad} data-testid="load-theirs"><RefreshCw size={16} aria-hidden="true" /> Tải bản mới để đối chiếu</Button></div>
     </div>}
     {conflict?.loading && <div role="status" aria-live="polite"><Skeleton style={{ height: 120 }} /></div>}
     {conflict?.error && <div className="ops-stack"><Alert tone="danger" title="Không tải được bản mới">{conflict.error}</Alert><div><Button type="button" variant="secondary" onClick={onLoad}>Thử lại</Button></div></div>}
     {conflict?.theirs && (units.length === 0
-      ? <Alert tone="success" title="Hai bản giống nhau">Máy chủ có cùng nội dung với bản của bạn. Áp dụng để lấy ETag mới rồi lưu tiếp.</Alert>
+      ? <Alert tone="success" title="Hai bản giống nhau">Bản đã lưu có cùng nội dung với bản của bạn. Bấm áp dụng rồi lưu tiếp.</Alert>
       : <ul className="se-merge" data-testid="merge-list">
         {units.map((unit) => {
           const current = choiceOf(unit.key, defaultChoice(unit));
@@ -66,7 +73,7 @@ export function ConflictDialog({ open, conflict, onLoad, onApply, onClose }: {
             <fieldset>
               <legend><span>{FIELD_NAME[unit.key] ?? unit.key}</span> <StatusBadge tone={meta.tone}>{meta.text}</StatusBadge></legend>
               <ul className="se-merge-changes">
-                {unit.changes.slice(0, 6).map((change) => <li key={change.path}><code>{change.path}</code><span>Bạn: {summarizeValue(change.mine)}</span><span>Máy chủ: {summarizeValue(change.theirs)}</span></li>)}
+                {unit.changes.slice(0, 6).map((change) => <li key={change.path}><code>{placeOf(change.path)}</code><span>Bạn: {summarizeValue(change.mine)}</span><span>Máy chủ: {summarizeValue(change.theirs)}</span></li>)}
                 {unit.changes.length > 6 && <li className="ops-field-hint">… và {unit.changes.length - 6} khác biệt nữa.</li>}
               </ul>
               <div className="se-merge-choice">

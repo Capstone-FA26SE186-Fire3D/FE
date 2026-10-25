@@ -13,7 +13,7 @@ import { StatusBadge, type Tone } from "@/components/ui/status-badge";
 import { formatDate } from "@/features/buildings/format";
 import { qrLandingApi, type QrTraining } from "../api";
 
-const modeLabels: Record<string, string> = { Learn: "Learn", Guided: "Guided Drill", Assessment: "Assessment" };
+const modeLabels: Record<string, string> = { Learn: "Học (Learn)", Guided: "Luyện có hướng dẫn", Assessment: "Đánh giá" };
 const trainingStatus: Record<string, { label: string; tone: Tone }> = {
   Active: { label: "Đang mở", tone: "success" },
   Draft: { label: "Nháp", tone: "neutral" },

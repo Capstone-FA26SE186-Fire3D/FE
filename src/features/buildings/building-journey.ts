@@ -73,11 +73,11 @@ export function buildJourney(input: JourneyInput): JourneyStepModel[] {
     },
     {
       key: "version", title: "Phiên bản", done: hasVersion(input), lockReason: hasDraft(input) ? undefined : "Cần lưu bản nháp trước",
-      detail: hasVersion(input) ? `Mới nhất v${scenario?.versionNumber}` : "Tạo phiên bản đóng băng từ bản nháp",
+      detail: hasVersion(input) ? `Mới nhất v${scenario?.versionNumber}` : "Tạo phiên bản cố định từ bản nháp",
     },
     {
       key: "release", title: "Chuẩn bị phát hành", done: isPublished(input), lockReason: isApproved(input) ? undefined : "Cần nội dung được duyệt",
-      detail: isPublished(input) ? "Đã phát hành" : input.releaseStatus ? `Release ${input.releaseStatus}` : "Tạo release rồi phát hành",
+      detail: isPublished(input) ? "Đã phát hành" : input.releaseStatus?.toLowerCase() === "revoked" ? "Bản phát hành đã bị thu hồi" : input.releaseStatus ? "Đã tạo bản phát hành, chưa phát hành" : "Tạo bản phát hành rồi phát hành",
     },
     {
       key: "usage", title: "Quản lý sử dụng", done: false, lockReason: isPublished(input) ? undefined : "Mở sau khi phát hành",
@@ -101,20 +101,20 @@ export function buildJourney(input: JourneyInput): JourneyStepModel[] {
 export function journeyConditions(input: JourneyInput): JourneyCondition[] {
   const status = input.revision?.status;
   const technical: JourneyCondition = status === "ConfirmedForTraining"
-    ? { key: "technical", title: "Sẵn sàng kỹ thuật (IFC QA)", description: "Kiểm tra mô hình, cửa thoát và thiết bị.", label: "Đạt · xác nhận", tone: "success" }
+    ? { key: "technical", title: "Mô hình dùng được cho huấn luyện", description: "Kiểm tra tự động mô hình, cửa thoát và thiết bị.", label: "Đạt · xác nhận", tone: "success" }
     : status === "ReadyForScenario"
-      ? { key: "technical", title: "Sẵn sàng kỹ thuật (IFC QA)", description: "Kiểm tra mô hình, cửa thoát và thiết bị.", label: "Chờ xác nhận", tone: "warning" }
-      : { key: "technical", title: "Sẵn sàng kỹ thuật (IFC QA)", description: "Kiểm tra mô hình, cửa thoát và thiết bị.", label: input.revision ? "Chưa đạt" : "Chưa có IFC", tone: "neutral" };
+      ? { key: "technical", title: "Mô hình dùng được cho huấn luyện", description: "Kiểm tra tự động mô hình, cửa thoát và thiết bị.", label: "Chờ xác nhận", tone: "warning" }
+      : { key: "technical", title: "Mô hình dùng được cho huấn luyện", description: "Kiểm tra tự động mô hình, cửa thoát và thiết bị.", label: input.revision ? "Chưa đạt" : "Chưa có IFC", tone: "neutral" };
 
   const review = input.scenario?.reviewStatus?.toLowerCase();
   const v = input.scenario?.versionNumber;
   const content: JourneyCondition = review === "approved"
-    ? { key: "content", title: "Duyệt nội dung", description: "PlatformAdmin đã duyệt đúng bản đóng băng. Sửa sẽ tạo phiên bản mới và duyệt lại.", label: `Đã duyệt v${v}`, tone: "success" }
+    ? { key: "content", title: "Duyệt nội dung", description: "Quản trị FET3D đã duyệt đúng phiên bản này. Nếu sửa, hệ thống tạo phiên bản mới và cần duyệt lại.", label: `Đã duyệt v${v}`, tone: "success" }
     : review === "submitted"
-      ? { key: "content", title: "Duyệt nội dung", description: "Đã gửi duyệt bản đóng băng; chờ PlatformAdmin.", label: `Chờ duyệt v${v}`, tone: "warning" }
+      ? { key: "content", title: "Duyệt nội dung", description: "Đã gửi duyệt phiên bản; đang chờ quản trị FET3D.", label: `Chờ duyệt v${v}`, tone: "warning" }
       : review === "rejected"
         ? { key: "content", title: "Duyệt nội dung", description: input.scenario?.rejectReason ? `Lý do: ${input.scenario.rejectReason}` : "Sửa nội dung sẽ tạo phiên bản mới.", label: "Bị từ chối", tone: "danger" }
-        : { key: "content", title: "Duyệt nội dung", description: "Gửi duyệt đóng băng nội dung; sửa sẽ tạo phiên bản mới và duyệt lại.", label: v != null ? "Chưa gửi duyệt" : "Chưa có phiên bản", tone: "neutral" };
+        : { key: "content", title: "Duyệt nội dung", description: "Gửi duyệt một phiên bản cố định; nếu sửa, hệ thống tạo phiên bản mới và cần duyệt lại.", label: v != null ? "Chưa gửi duyệt" : "Chưa có phiên bản", tone: "neutral" };
 
   const serviceTone: Record<ServiceState, { label: string; tone: Tone }> = {
     effective: { label: "Đang hoạt động", tone: "success" },
@@ -123,7 +123,7 @@ export function journeyConditions(input: JourneyInput): JourneyCondition[] {
     upcoming: { label: "Chưa đến kỳ", tone: "info" },
     none: { label: "Chưa có dịch vụ", tone: "neutral" },
   };
-  const service: JourneyCondition = { key: "service", title: "Dịch vụ công trình", description: "Gói 6 hoặc 12 tháng; chỉ lần bắt đầu đầu tiên của mỗi Trainee tính một suất.", ...(input.service ? serviceTone[input.service] : { label: "Chưa có dữ liệu", tone: "neutral" as Tone }) };
+  const service: JourneyCondition = { key: "service", title: "Dịch vụ công trình", description: "Gói 6 hoặc 12 tháng; mỗi học viên chỉ tính một suất ở lần học đầu tiên.", ...(input.service ? serviceTone[input.service] : { label: "Chưa có dữ liệu", tone: "neutral" as Tone }) };
   return [technical, content, service];
 }
 
@@ -135,7 +135,7 @@ export function journeyChecklist(input: JourneyInput): ChecklistItem[] {
   const review = input.scenario?.reviewStatus?.toLowerCase();
   const raw: Array<{ key: string; label: string; done: boolean; tab?: "ifc" | "scenarios" }> = [
     { key: "upload", label: "Tải lên tệp IFC", done: Boolean(input.revision), tab: "ifc" },
-    { key: "qa", label: "Xác nhận kiểm tra QA", done: status === "ConfirmedForTraining", tab: "ifc" },
+    { key: "qa", label: "Xác nhận mô hình dùng được cho huấn luyện", done: status === "ConfirmedForTraining", tab: "ifc" },
     { key: "scenario", label: "Soạn kịch bản đầu tiên", done: hasDraft(input), tab: "scenarios" },
     { key: "submit", label: "Gửi duyệt nội dung", done: review === "submitted" || review === "approved" },
     { key: "publish", label: "Phát hành và tạo mã QR", done: isPublished(input) },

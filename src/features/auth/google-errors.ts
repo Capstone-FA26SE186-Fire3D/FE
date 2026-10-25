@@ -1,3 +1,4 @@
+import { messageOf } from "@/api/describe-error";
 import { ApiError } from "@/api/types/common";
 
 export function googleErrorMessage(error: unknown) {
@@ -13,5 +14,5 @@ export function googleErrorMessage(error: unknown) {
   if (code === "GOOGLE_PROVIDER_UNAVAILABLE") return "Dịch vụ Google tạm thời không khả dụng. Hãy thử lại sau.";
   if (code === "ACCOUNT_DISABLED") return "Tài khoản hoặc tổ chức đã bị khóa. Liên hệ quản trị viên để được hỗ trợ.";
   if (code === "ACCOUNT_LINK_REQUIRED" || code === "EMAIL_EXISTS") return "Email đã có tài khoản. Hãy đăng nhập bằng email; tài khoản Google chưa được liên kết.";
-  return error instanceof Error ? error.message : "Không thể hoàn tất Google. Hãy thử lại.";
+  return messageOf(error, "Không thể hoàn tất Google. Hãy thử lại.");
 }

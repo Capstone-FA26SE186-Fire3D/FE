@@ -17,9 +17,9 @@ import type { OperationsReport } from "../types";
 import { KpiTile, Num, ReportTable, sumCounts, toneColor } from "./charts";
 import styles from "./analytics.module.css";
 
-const roleNames: Record<string, string> = { PlatformAdmin: "Admin", OrganizationUser: "Tổ chức", Trainee: "Học viên" };
+const roleNames: Record<string, string> = { PlatformAdmin: "Quản trị FET3D", OrganizationUser: "Tổ chức", Trainee: "Học viên" };
 /** Job kinds as the Figma chips name them; an unknown kind keeps its server name. */
-const kindLabels: Record<string, string> = { IfcProcessing: "Geometry", Geometry: "Geometry", PlaytestPackage: "Playtest", ReleasePackage: "Release", PackageBuild: "Build gói" };
+const kindLabels: Record<string, string> = { IfcProcessing: "Dựng mô hình 3D", Geometry: "Dựng mô hình 3D", PlaytestPackage: "Gói chạy thử", ReleasePackage: "Gói phát hành", PackageBuild: "Dựng gói" };
 const jobStatusLabel: Record<string, string> = { Queued: "Đang chờ", Running: "Đang chạy", Processing: "Đang xử lý", Succeeded: "Hoàn tất", Failed: "Thất bại", Cancelled: "Đã hủy", Canceled: "Đã hủy" };
 const ticketOrder = ["Open", "InProgress", "Resolved", "Closed"];
 
@@ -73,7 +73,7 @@ export function OperationsReportView({ data, scope, organizationId }: { data: Op
       {platform && <KpiTile label="Tài khoản (hiện tại)" value={accountsTotal} hint={`${fmt(accountsActive)} hoạt động · ${fmt(accountsTotal - accountsActive)} vô hiệu`} data-testid="kpi-accounts" />}
       <KpiTile label="Công trình (hiện tại)" value={buildingsTotal} hint={buildingsTotal ? `${fmt(buildingsActive)} hoạt động · ${fmt(buildingsTotal - buildingsActive)} lưu trữ` : "Chưa có công trình"} data-testid="kpi-buildings" />
       <KpiTile label="Tiến trình xử lý (trong kỳ)" value={jobsTotal} hint={`${fmt(jobsFailed)} thất bại`} data-testid="kpi-jobs" />
-      <KpiTile label="Ticket hỗ trợ (trong kỳ)" value={ticketsTotal} hint={`${fmt(ticketsOpen)} chưa xử lý xong`} data-testid="kpi-tickets" />
+      <KpiTile label="Yêu cầu hỗ trợ (trong kỳ)" value={ticketsTotal} hint={`${fmt(ticketsOpen)} chưa xử lý xong`} data-testid="kpi-tickets" />
     </div>
 
     <div className={styles.trio}>
@@ -86,7 +86,7 @@ export function OperationsReportView({ data, scope, organizationId }: { data: Op
         <Donut size={140} slices={[{ key: "active", label: "Đang hoạt động", value: buildingsActive, color: seriesColor.passed }, { key: "archived", label: "Đã lưu trữ", value: buildingsTotal - buildingsActive, color: seriesColor.neutral }]} center={{ value: fmt(buildingsTotal), caption: "công trình" }} />
       </ChartCard>
 
-      <ChartCard title="Tiến trình xử lý" description="Tạo trong khoảng thời gian đã chọn, gồm xử lý IFC và build gói. Hoàn tất xử lý không đồng nghĩa mô hình đã đạt QA." height={140} empty={kinds.length === 0} emptyText="Không có tiến trình nào trong khoảng thời gian này" data-testid="chart-jobs"
+      <ChartCard title="Tiến trình xử lý" description="Tạo trong khoảng thời gian đã chọn, gồm xử lý IFC và dựng gói. Xử lý xong chưa có nghĩa là mô hình đã đạt kiểm tra tự động." height={140} empty={kinds.length === 0} emptyText="Không có tiến trình nào trong khoảng thời gian này" data-testid="chart-jobs"
         table={<ReportTable caption="Tiến trình theo loại và trạng thái">
           <thead><tr><th>Loại</th><th>Trạng thái</th><Num header>Số tiến trình</Num></tr></thead>
           <tbody>{data.processingJobs.map((item) => <tr key={`${item.kind}-${item.status}`}><td>{kindLabels[item.kind] ?? item.kind}</td><td>{jobStatusLabel[item.status] ?? item.status}</td><Num>{fmt(item.count)}</Num></tr>)}</tbody>
@@ -97,10 +97,10 @@ export function OperationsReportView({ data, scope, organizationId }: { data: Op
         </div>
       </ChartCard>
 
-      <ChartCard title="Ticket hỗ trợ" description={platform ? "Theo trạng thái · tạo trong khoảng thời gian đã chọn" : scope === "admin-organization" ? "Ticket gắn với tổ chức này, tạo trong khoảng thời gian đã chọn" : "Ticket do bạn tạo trong khoảng thời gian đã chọn"} height={140} empty={ticketsTotal === 0} emptyText="Chưa có ticket trong kỳ này" data-testid="chart-tickets"
+      <ChartCard title="Yêu cầu hỗ trợ" description={platform ? "Theo trạng thái · tạo trong khoảng thời gian đã chọn" : scope === "admin-organization" ? "Yêu cầu hỗ trợ của tổ chức này, tạo trong khoảng thời gian đã chọn" : "Yêu cầu hỗ trợ bạn tạo trong khoảng thời gian đã chọn"} height={140} empty={ticketsTotal === 0} emptyText="Chưa có yêu cầu hỗ trợ trong kỳ này" data-testid="chart-tickets"
         actions={<Button asChild size="sm" variant="quiet"><Link href={ticketsHref}><LifeBuoy size={16} aria-hidden="true" />{platform || scope === "admin-organization" ? "Mở hộp thư" : "Mở hỗ trợ"}</Link></Button>}
-        table={<ReportTable caption="Ticket theo trạng thái">
-          <thead><tr><th>Trạng thái</th><Num header>Số ticket</Num></tr></thead>
+        table={<ReportTable caption="Yêu cầu hỗ trợ theo trạng thái">
+          <thead><tr><th>Trạng thái</th><Num header>Số yêu cầu</Num></tr></thead>
           <tbody>{tickets.map((item) => <tr key={item.status}><td>{ticketStatusLabel(item.status)}</td><Num>{fmt(item.count)}</Num></tr>)}</tbody>
         </ReportTable>}>
         <Donut size={140} slices={ticketSlices} center={{ value: fmt(ticketsTotal), caption: "ticket" }} />

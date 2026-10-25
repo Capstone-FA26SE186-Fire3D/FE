@@ -39,7 +39,7 @@ function Check({ ok, children }: { ok: boolean; children: string }) {
 
 const periodColumns: DataColumn<Entitlement>[] = [
   { key: "period", header: "Kỳ dịch vụ", primary: true, render: (item) => <CellTitle title={`${formatDate(item.startsAt)} – ${formatDate(item.endsAt)}`} sub={item.paymentTransactionId ? "Đã thanh toán" : "Không qua thanh toán (dùng thử/cấp tay)"} /> },
-  { key: "status", header: "Trạng thái", width: 160, render: (item) => entitlementStatus[item.status] ?? item.status },
+  { key: "status", header: "Trạng thái", width: 160, render: (item) => entitlementStatus[item.status] ?? "Không rõ" },
   { key: "effective", header: "Hiệu lực hiện tại", width: 170, render: (item) => <StatusBadge tone={item.isEffective ? "success" : "neutral"}>{item.isEffective ? "Đang hiệu lực" : "Không hiệu lực"}</StatusBadge> },
 ];
 
@@ -115,7 +115,7 @@ export function BuildingServicesTab({ buildingId }: { buildingId: string }) {
 
   const quotationColumns: DataColumn<Quotation>[] = [
     { key: "number", header: "Mã đơn", primary: true, render: (item) => <CellTitle title={<span className="bill-mono">{item.quotationNumber}</span>} sub={`${item.items.some((line) => line.purchaseAction === "Upgrade") ? "Nâng cấp · " : ""}${item.items.length} công trình`} /> },
-    { key: "content", header: "Nội dung", width: 160, hideBelow: 900, render: (item) => item.purpose === "AIQuotaTopUp" ? "Top-up quota AI" : "Công trình" },
+    { key: "content", header: "Nội dung", width: 160, hideBelow: 900, render: (item) => item.purpose === "AIQuotaTopUp" ? "Nạp thêm hạn mức AI" : "Công trình" },
     { key: "amount", header: "Số tiền", width: 150, align: "right", render: (item) => <span className="bill-money">{formatVnd(item.totalAmount)}</span> },
     { key: "status", header: "Trạng thái", width: 210, render: (item) => <QuotationStatusBadge status={item.status} /> },
     { key: "valid", header: "Hiệu lực đến", width: 170, hideBelow: 1100, render: (item) => formatDateTime(item.validUntil) },
@@ -124,15 +124,15 @@ export function BuildingServicesTab({ buildingId }: { buildingId: string }) {
   return <div className="ops-stack bill-building" data-testid="building-services">
     {entitlements.error !== undefined && <Alert tone="danger" title="Không tải được dịch vụ của công trình" action={<Button size="sm" variant="secondary" className="mt-3" onClick={entitlements.reload}>Thử lại</Button>}>{billingErrorText(entitlements.error)}</Alert>}
     {entitlements.loading && !entitlements.data ? <SkeletonKpis count={3} /> : entitlements.data && <div className="bill-kpis" role="group" aria-label="Tình trạng dịch vụ">
-      <div className="ops-kpi" data-testid="kpi-state"><span className="ops-kpi-label">Trạng thái</span><div className="ops-kpi-row"><strong className="ops-kpi-value bill-kpi-text">{stateText}</strong>{stateBadge}</div><span className="ops-kpi-hint">Máy chủ xác định theo kỳ dịch vụ (UTC)</span></div>
+      <div className="ops-kpi" data-testid="kpi-state"><span className="ops-kpi-label">Trạng thái</span><div className="ops-kpi-row"><strong className="ops-kpi-value bill-kpi-text">{stateText}</strong>{stateBadge}</div><span className="ops-kpi-hint">Tính theo kỳ dịch vụ</span></div>
       <div className="ops-kpi" data-testid="kpi-period"><span className="ops-kpi-label">Kỳ hiện tại</span><div className="ops-kpi-row"><strong className="ops-kpi-value bill-kpi-text">{summary.current ? `${formatDate(summary.current.startsAt)} – ${formatDate(summary.current.endsAt)}` : "—"}</strong></div><span className="ops-kpi-hint">{summary.current ? "Kỳ đang hiệu lực" : "Không có kỳ đang hiệu lực"}</span></div>
       <div className="ops-kpi" data-testid="kpi-days"><span className="ops-kpi-label">Còn lại</span><div className="ops-kpi-row"><strong className="ops-kpi-value">{daysLeft === null ? "—" : <><NumberPop value={daysLeft} /> ngày</>}</strong></div><span className="ops-kpi-hint">{summary.current ? `Hết hạn ${formatDate(summary.current.endsAt)}` : summary.latest ? `Kỳ gần nhất kết thúc ${formatDate(summary.latest.endsAt)}` : "Chưa mở kỳ dịch vụ"}</span></div>
     </div>}
     {summary.state === "expiring" && <Alert tone="warning" title={`Dịch vụ hết hạn sau ${Math.max(summary.daysLeft ?? 0, 0)} ngày`} action={canPurchase ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => setCreate({ open: true, mode: "service" })}>Gia hạn ngay</Button> : undefined}>Nhắc trước {EXPIRY_REMINDER_DAYS} ngày khi kỳ sắp kết thúc. Gia hạn mở kỳ mới (suất học viên tính lại); nâng cấp giữ kỳ hiện tại.</Alert>}
     {summary.state === "expired" && <Alert tone="danger" title="Dịch vụ đã hết hạn" action={canPurchase ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => setCreate({ open: true, mode: "service" })}>Gia hạn dịch vụ</Button> : undefined}>Kỳ gần nhất kết thúc {formatDate(summary.latest?.endsAt)}. Học viên vẫn xem được trạng thái nhưng không bắt đầu phiên học mới cho tới khi gia hạn.</Alert>}
 
-    <Panel title="Gói dịch vụ hiện có" description="Phí game + hạn mức học viên + quota AI. Giá, giảm giá, kỳ dịch vụ, học viên và quota do máy chủ tính ở báo giá." actions={<Button size="sm" variant="quiet" onClick={reloadAll} disabled={entitlements.loading}><RefreshCw size={14} aria-hidden="true" />Tải lại</Button>} bodyClassName="ops-stack">
-      {!canPurchase && <Alert tone="info" title="Chỉ xem">PlatformAdmin không mua dịch vụ thay tổ chức. Dùng khu Thương mại để phát hành và đối soát.</Alert>}
+    <Panel title="Gói dịch vụ hiện có" description="Phí game + số học viên + hạn mức AI. Giá, giảm giá, kỳ dịch vụ, số học viên và hạn mức do hệ thống tính ở báo giá." actions={<Button size="sm" variant="quiet" onClick={reloadAll} disabled={entitlements.loading}><RefreshCw size={14} aria-hidden="true" />Tải lại</Button>} bodyClassName="ops-stack">
+      {!canPurchase && <Alert tone="info" title="Chỉ xem">Quản trị FET3D không mua dịch vụ thay tổ chức. Dùng khu Thương mại để phát hành và đối soát.</Alert>}
       {summary.state === "none" && entitlements.data && <EmptyState icon={Building2} title="Công trình chưa có dịch vụ" description="Mua gói 6 hoặc 12 tháng để học viên có thể bắt đầu phiên học. Chọn gói trong hộp thoại báo giá." />}
       {building.loading && !building.data && <SkeletonDetail rows={3} />}
       {building.error !== undefined && <Alert tone="danger" title="Không tải được thông tin công trình" action={<Button size="sm" variant="secondary" className="mt-3" onClick={building.reload}>Thử lại</Button>}>{billingErrorText(building.error)}</Alert>}
@@ -145,13 +145,13 @@ export function BuildingServicesTab({ buildingId }: { buildingId: string }) {
       <div className="ops-actions" data-testid="purchase-actions">
         <Button onClick={() => setCreate({ open: true, mode: "service" })} disabled={!readyToBuy}><FileText size={16} aria-hidden="true" />{buyLabel}</Button>
         <Button variant="secondary" onClick={() => setCreate({ open: true, mode: "upgrade" })} disabled={!readyToBuy || summary.state === "none" || summary.state === "expired"}>Nâng cấp học viên</Button>
-        <Button variant="secondary" onClick={() => setCreate({ open: true, mode: "topup" })} disabled={!canPurchase}><Sparkles size={16} aria-hidden="true" />Mua thêm quota AI</Button>
+        <Button variant="secondary" onClick={() => setCreate({ open: true, mode: "topup" })} disabled={!canPurchase}><Sparkles size={16} aria-hidden="true" />Nạp thêm hạn mức AI</Button>
       </div>
       {entitlements.data && entitlements.data.items.length > 0 && <DataTable caption="Các kỳ dịch vụ của công trình" columns={periodColumns} rows={entitlements.data.items} rowKey={(item) => item.id} empty={null} className="bill-periods" />}
-      <p className="bill-dim" style={{ margin: 0 }}>Mua nhiều công trình cùng lúc hoặc số lượng lớn? <Link href={`${routes.workspaceBilling}?tab=quotes`}>Mở Dịch vụ & thanh toán</Link>. Quota AI dùng chung cả tổ chức: <Link href={`${routes.workspaceBilling}?tab=ai`}>xem số dư</Link>.</p>
+      <p className="bill-dim" style={{ margin: 0 }}>Mua nhiều công trình cùng lúc hoặc số lượng lớn? <Link href={`${routes.workspaceBilling}?tab=quotes`}>Mở Dịch vụ & thanh toán</Link>. Hạn mức AI dùng chung cả tổ chức: <Link href={`${routes.workspaceBilling}?tab=ai`}>xem số dư</Link>.</p>
     </Panel>
 
-    <Panel title="Học viên và suất" description="Học viên tối đa hiệu lực (kể cả nâng cấp) và số suất đã dùng trong kỳ. Chỉ lần bắt đầu online đầu tiên của mỗi học viên tính một suất." bodyClassName="ops-stack">
+    <Panel title="Học viên và suất" description="Học viên tối đa hiệu lực (kể cả nâng cấp) và số suất đã dùng trong kỳ. Chỉ lần bắt đầu học trực tuyến đầu tiên của mỗi học viên được tính một suất." bodyClassName="ops-stack">
       <ServiceCapacity accessToken={token} buildingId={buildingId} refreshKey={settled} />
     </Panel>
 
@@ -165,12 +165,12 @@ export function BuildingServicesTab({ buildingId }: { buildingId: string }) {
         rowKey={(item) => item.id}
         loading={quotations.loading && !quotations.data}
         onRowClick={(item) => openQuotation(item.id)}
-        empty={<EmptyState icon={FileText} title="Chưa có báo giá cho công trình này" description="Tạo báo giá ở gói dịch vụ bên trên. Sau khi PlatformAdmin phát hành, bạn chấp nhận và thanh toán tại đây." />}
+        empty={<EmptyState icon={FileText} title="Chưa có báo giá cho công trình này" description="Tạo báo giá ở gói dịch vụ bên trên. Sau khi quản trị FET3D phát hành, bạn chấp nhận và thanh toán tại đây." />}
       />
       <p className="bill-dim" style={{ margin: "-6px 0 0" }}>Bấm một hàng để xem báo giá và thanh toán trong ngăn bên phải.</p>
     </div>
 
-    <Drawer open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) closeQuotation(); }} size="xl" title="Chi tiết báo giá" description="Số tiền, kỳ và điều khoản là bản chụp do hệ thống phát hành." eyebrow={current ? <><span className="bill-mono">{current.data.quotationNumber}</span><QuotationStatusBadge status={current.data.status} /></> : undefined} data-testid="quotation-drawer">
+    <Drawer open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) closeQuotation(); }} size="xl" title="Chi tiết báo giá" description="Số tiền, kỳ và điều khoản giữ đúng như lúc phát hành." eyebrow={current ? <><span className="bill-mono">{current.data.quotationNumber}</span><QuotationStatusBadge status={current.data.status} /></> : undefined} data-testid="quotation-drawer">
       {selectedId && selected.loading && !current && <SkeletonDetail rows={6} />}
       {selectedId && selected.error !== undefined && !current && <Alert tone="danger" title="Không tải được báo giá" action={<Button size="sm" variant="secondary" className="mt-3" onClick={selected.reload}>Thử lại</Button>}>{billingErrorText(selected.error)}</Alert>}
       {current && <div className="ops-stack" data-testid="selected-quotation">

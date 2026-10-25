@@ -63,6 +63,6 @@ export function EditorToolbar({ tool, onTool, gizmoEnabled, canUndo, canRedo, on
     <Button type="button" variant="secondary" disabled={validating} onClick={onValidate} data-testid="validate"><ShieldCheck size={16} aria-hidden="true" /><span className="se-label">{validating ? "Đang kiểm tra…" : "Kiểm tra"}</span></Button>
     <Button type="button" disabled={saveDisabled} onClick={onSave} data-testid="save" title="Lưu (Ctrl/Cmd+S)"><Save size={16} aria-hidden="true" /><span className="se-label se-keep">{status === "saving" ? "Đang lưu…" : "Lưu"}</span></Button>
     <Button asChild variant="quiet"><Link href={versionsHref} data-testid="versions-link" aria-label="Phiên bản"><History size={16} aria-hidden="true" /><span className="se-label">Phiên bản</span></Link></Button>
-    <Button asChild variant="quiet"><Link href={`${versionsHref}?tab=playtest`} data-testid="playtest" title="Playtest chạy trên bản snapshot đã build package: mở tab Playtest của màn phiên bản"><Play size={16} aria-hidden="true" /><span className="se-label">Playtest</span></Link></Button>
+    <Button asChild variant="quiet"><Link href={`${versionsHref}?tab=playtest`} data-testid="playtest" title="Chạy thử dùng phiên bản đã dựng gói: mở tab Chạy thử ở trang phiên bản"><Play size={16} aria-hidden="true" /><span className="se-label">Chạy thử</span></Link></Button>
   </div>;
 }

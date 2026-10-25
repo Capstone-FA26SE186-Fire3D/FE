@@ -107,7 +107,7 @@ export function QrLanding({ token }: { token: string }) {
           </div>
         </div>
       </div>
-      <p className="ops-muted"><ShieldCheck size={14} aria-hidden="true" style={{ display: "inline", verticalAlign: "-2px", marginRight: 6 }} />Mã QR chỉ xác định công trình, không cấp quyền. Khi bạn bắt đầu một bài trong ứng dụng, máy chủ kiểm tra lại quyền tham gia, hạn dịch vụ của công trình và số suất người học. Hết hạn dịch vụ vẫn xem được trang này nhưng không bắt đầu được phiên mới.</p>
+      <p className="ops-muted"><ShieldCheck size={14} aria-hidden="true" style={{ display: "inline", verticalAlign: "-2px", marginRight: 6 }} />Mã QR chỉ xác định công trình, không cấp quyền. Khi bạn bắt đầu một bài trong ứng dụng, hệ thống kiểm tra lại quyền tham gia, hạn dịch vụ của công trình và số suất người học. Hết hạn dịch vụ vẫn xem được trang này nhưng không bắt đầu được phiên mới.</p>
       {resolution.error !== undefined && <Alert tone="warning" title="Trạng thái có thể đã cũ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reload}>Tải lại</Button>}>Không làm mới được thông tin công trình. Đang hiển thị lần tải gần nhất.</Alert>}
     </Panel>
 
@@ -118,7 +118,7 @@ export function QrLanding({ token }: { token: string }) {
       </>
       : user.role === TRAINEE
         ? <ParticipationForm accessToken={accessToken ?? ""} buildingId={building.buildingId} onVerified={onVerified} onSessionLost={onSessionLost} />
-        : <EmptyState icon={CircleSlash} title="Tài khoản này không nhập được mã tham gia" description="Chỉ tài khoản học viên (Trainee) xác minh mã tham gia để vào công trình Riêng tư." />}
+        : <EmptyState icon={CircleSlash} title="Tài khoản này không nhập được mã tham gia" description="Chỉ tài khoản học viên mới xác minh được mã tham gia để vào công trình Riêng tư." />}
 
     <MobileGuide />
   </>;

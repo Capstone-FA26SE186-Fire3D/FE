@@ -11,30 +11,30 @@ import { KIND_META, OBJECT_KINDS, type ObjectKind } from "../v1/contract";
 function describe(status: KindStatus): { tone: Tone; badge: string; text: string } {
   switch (status.state) {
     case "ready":
-      return { tone: "success", badge: "Sẵn sàng", text: status.capabilities > 0 ? `Runtime công bố ${status.capabilities} năng lực dùng được cho loại này.` : "Không cần năng lực runtime để đặt loại này." };
+      return { tone: "success", badge: "Sẵn sàng", text: status.capabilities > 0 ? `Ứng dụng có ${status.capabilities} khả năng dùng được cho loại này.` : "Loại này không cần chọn khả năng của ứng dụng." };
     case "needs-geometry":
       return {
-        tone: "warning", badge: "Cần Geometry",
-        text: status.geometry === "reprocess" ? "Revision cần xử lý lại IFC; chưa có tọa độ để đặt đối tượng."
-          : status.geometry === "loading" ? "Đang đọc Geometry của revision."
-            : status.geometry === "invalid" ? "Geometry không đạt contract nên không đặt được đối tượng."
-              : "Revision chưa có Geometry được chấp nhận.",
+        tone: "warning", badge: "Cần mô hình 3D",
+        text: status.geometry === "reprocess" ? "Cần xử lý lại IFC; bản IFC này chưa có tọa độ để đặt đối tượng."
+          : status.geometry === "loading" ? "Đang đọc mô hình 3D của bản IFC."
+            : status.geometry === "invalid" ? "Mô hình 3D chưa đúng chuẩn của trình soạn nên không đặt được đối tượng."
+              : "Bản IFC chưa có mô hình 3D đạt kiểm tra.",
       };
     case "catalog-loading":
-      return { tone: "pending", badge: "Đang tải", text: "Đang đọc danh mục năng lực runtime." };
+      return { tone: "pending", badge: "Đang tải", text: "Đang tải danh sách khả năng của ứng dụng." };
     case "catalog-error":
-      return { tone: "danger", badge: "Lỗi danh mục", text: "Không tải được danh mục năng lực runtime; chưa chọn được năng lực cho loại này." };
+      return { tone: "danger", badge: "Lỗi danh mục", text: "Không tải được danh sách khả năng của ứng dụng; chưa chọn được khả năng cho loại này." };
     case "no-capability":
       return {
-        tone: "warning", badge: "Chưa có năng lực",
+        tone: "warning", badge: "Chưa có khả năng",
         text: status.runtimes === 0
-          ? "Danh mục runtime đang trống. Quản trị viên cần công bố runtime và capabilityContracts cho loại này; editor không tự tạo năng lực."
+          ? "Chưa có phiên bản ứng dụng nào được công bố. Quản trị FET3D cần cấu hình khả năng cho loại này; trình soạn không tự tạo."
           : status.runtime
-            ? `Runtime ${status.runtime} chưa công bố năng lực cho loại này. Chọn runtime khác hoặc nhờ quản trị viên công bố capabilityContracts.`
-            : "Chưa runtime nào công bố năng lực cho loại này. Quản trị viên cần cấu hình capabilityContracts; editor không tự tạo năng lực.",
+            ? `Phiên bản ứng dụng ${status.runtime} chưa hỗ trợ loại này. Chọn phiên bản khác hoặc nhờ quản trị FET3D bổ sung.`
+            : "Chưa phiên bản ứng dụng nào hỗ trợ loại này. Quản trị FET3D cần cấu hình thêm; trình soạn không tự tạo.",
       };
     case "no-anchor":
-      return { tone: "warning", badge: "Chưa có cấu kiện neo", text: "Geometry chưa có ánh xạ ngữ nghĩa (semanticMapping) nên không chọn được cấu kiện IFC để neo." };
+      return { tone: "warning", badge: "Chưa có cấu kiện neo", text: "Mô hình 3D chưa có danh sách cấu kiện nên chưa chọn được cấu kiện IFC để neo." };
     default:
       return { tone: "neutral", badge: "", text: "" };
   }
@@ -56,7 +56,7 @@ export function KindAvailability({ statuses, onRetryCatalog }: { statuses: Recor
         {status.state === "catalog-error" && <Button type="button" variant="quiet" size="sm" onClick={onRetryCatalog}>Tải lại danh mục</Button>}
       </section>;
     })}
-    <p className="ops-field-hint">Loại đối tượng chỉ là phân loại vị trí. Hành vi trong Unity do năng lực (capability) mà runtime công bố quyết định; editor không suy ra hành vi từ loại.</p>
+    <p className="ops-field-hint">Loại đối tượng chỉ cho biết vị trí đặt. Đối tượng hoạt động thế nào trong ứng dụng là do khả năng bạn chọn cho nó.</p>
   </div>;
 }
 
@@ -64,9 +64,9 @@ export function KindAvailability({ statuses, onRetryCatalog }: { statuses: Recor
 export function LegacyKinds() {
   return <div className="se-form" data-testid="legacy-kinds">
     <section className="se-locked" data-state="v1-only">
-      <header><h3>Chỉ có trong fet3d.editor/1</h3><StatusBadge tone="neutral"><FileClock size={12} aria-hidden="true" /> Bản nháp cũ</StatusBadge></header>
-      <p>Mục tiêu (Goal), NPC, cấu kiện bị chặn và thiết bị chỉ được đặt trong bản nháp theo fet3d.editor/1, với tọa độ cục bộ của tầng và năng lực lấy từ runtime.</p>
-      <p>Bản nháp cũ không bị đổi hay chuyển tọa độ. Dùng nút “Tạo bản nháp mới theo fet3d.editor/1” ở đầu trang khi Geometry của revision hợp lệ.</p>
+      <header><h3>Chỉ có khi soạn trên mô hình 3D</h3><StatusBadge tone="neutral"><FileClock size={12} aria-hidden="true" /> Bản nháp cũ</StatusBadge></header>
+      <p>Điểm đến, NPC, cấu kiện bị chặn và thiết bị chỉ đặt được trong bản nháp soạn trên mô hình 3D, theo tọa độ của từng tầng.</p>
+      <p>Bản nháp cũ không bị đổi hay chuyển tọa độ. Dùng nút “Tạo bản nháp mới trên mô hình 3D” ở đầu trang khi mô hình 3D của bản IFC hợp lệ.</p>
     </section>
   </div>;
 }

@@ -14,10 +14,10 @@ export type StatusView = { label: string; tone: Tone; hint: string };
 const sessionStatuses: Record<string, StatusView> = {
   Launching: { label: "Đang khởi động", tone: "info", hint: "Phiên đã bắt đầu trên thiết bị nhưng chưa vào bài." },
   Running: { label: "Đang chơi", tone: "info", hint: "Lượt tập đang diễn ra, hoặc thiết bị chưa báo kết thúc." },
-  AwaitingSync: { label: "Chờ đồng bộ", tone: "warning", hint: "Thiết bị đã báo kết thúc nhưng máy chủ còn thiếu dữ liệu. Kết quả sẽ có sau khi thiết bị đồng bộ xong." },
+  AwaitingSync: { label: "Chờ đồng bộ", tone: "warning", hint: "Thiết bị đã báo kết thúc nhưng hệ thống còn thiếu dữ liệu. Kết quả sẽ có sau khi thiết bị đồng bộ xong." },
   Completed: { label: "Đã hoàn thành", tone: "neutral", hint: "Hoàn thành lượt tập không có nghĩa là đạt." },
   CompletedWithSupersededRelease: { label: "Hoàn thành, bản phát hành đã thay", tone: "neutral", hint: "Lượt tập hoàn thành trên một bản phát hành sau đó đã được thay thế." },
-  ScenarioUnsurvivable: { label: "Kịch bản không khả thi", tone: "warning", hint: "Máy chủ ghi nhận phiên này dừng vì kịch bản không thể hoàn thành. Đây không phải kết quả đánh giá." },
+  ScenarioUnsurvivable: { label: "Kịch bản không khả thi", tone: "warning", hint: "Phiên này dừng vì kịch bản không thể hoàn thành. Đây không phải kết quả đánh giá." },
   Aborted: { label: "Đã hủy", tone: "warning", hint: "Lượt tập bị hủy nên không có kết quả hợp lệ." },
   Abandoned: { label: "Đã bỏ dở", tone: "warning", hint: "Lượt tập bị bỏ dở nên không có kết quả hợp lệ." },
   Crashed: { label: "Gặp lỗi", tone: "danger", hint: "Ứng dụng dừng đột ngột nên không có kết quả hợp lệ." },
@@ -27,18 +27,18 @@ const sessionStatuses: Record<string, StatusView> = {
 };
 
 export function sessionStatusView(status: string): StatusView {
-  return sessionStatuses[status] ?? { label: status ? `Trạng thái khác: ${status}` : "Chưa rõ trạng thái", tone: "neutral", hint: "Web chưa nhận biết trạng thái này; hiển thị đúng giá trị máy chủ trả." };
+  return sessionStatuses[status] ?? { label: "Chưa rõ trạng thái", tone: "neutral", hint: "Trang web chưa hiểu trạng thái này. Hãy tải lại sau hoặc liên hệ hỗ trợ." };
 }
 
 const outcomes: Record<string, StatusView> = {
-  Passed: { label: "Đạt", tone: "success", hint: "Đáp ứng các yêu cầu của bài theo máy chủ." },
+  Passed: { label: "Đạt", tone: "success", hint: "Đáp ứng các yêu cầu của bài." },
   NotPassed: { label: "Chưa đạt", tone: "danger", hint: "Chưa đáp ứng các yêu cầu của bài. Bạn có thể làm lại." },
   Incomplete: { label: "Chưa hoàn tất", tone: "warning", hint: "Lượt tập kết thúc trước khi hoàn thành nên không được chấm." },
   NotAssessed: { label: "Không chấm điểm", tone: "neutral", hint: "Lượt tập này không được chấm đạt hoặc chưa đạt." },
 };
 
 export function outcomeView(outcome: string): StatusView {
-  return outcomes[outcome] ?? { label: outcome ? `Kết quả khác: ${outcome}` : "Chưa rõ kết quả", tone: "neutral", hint: "Web chưa nhận biết kết quả này; hiển thị đúng giá trị máy chủ trả." };
+  return outcomes[outcome] ?? { label: "Chưa rõ kết quả", tone: "neutral", hint: "Trang web chưa hiểu kết quả này. Hãy tải lại sau hoặc liên hệ hỗ trợ." };
 }
 
 const waiting = new Set(["Launching", "Running", "AwaitingSync"]);
@@ -47,7 +47,7 @@ const waiting = new Set(["Launching", "Running", "AwaitingSync"]);
 export function resultCellView(item: Pick<HistoryItem, "status" | "resultStatus">): StatusView {
   if (item.resultStatus) return outcomeView(item.resultStatus);
   if (waiting.has(item.status) || item.status === "Completed" || item.status === "CompletedWithSupersededRelease") {
-    return { label: "Chưa có kết quả", tone: "pending", hint: "Máy chủ chưa lưu kết quả cho lượt này." };
+    return { label: "Chưa có kết quả", tone: "pending", hint: "Chưa có kết quả được lưu cho lượt này." };
   }
   return { label: "Không có kết quả", tone: "neutral", hint: "Lượt này không tạo kết quả hợp lệ." };
 }
@@ -67,10 +67,10 @@ const reasons: Record<string, string> = {
   BELOW_PASS_THRESHOLD: "Tỷ lệ tiêu chí đạt thấp hơn ngưỡng đạt của bài.",
   ALL_REQUIREMENTS_MET: "Đã đáp ứng các yêu cầu của bài.",
 };
-export const reasonText = (code: string) => reasons[code] ?? (code ? "Lý do do máy chủ trả (chưa có bản dịch)." : "Máy chủ không nêu lý do.");
+export const reasonText = (code: string) => reasons[code] ?? (code ? "Chưa có mô tả cho lý do này." : "Không có lý do kèm theo.");
 
 const criterionReasons: Record<string, string> = { METRIC_UNAVAILABLE: "Không có số đo để so sánh nên tiêu chí tính là chưa đạt." };
-export const criterionReasonText = (code: string) => criterionReasons[code] ?? code;
+export const criterionReasonText = (code: string) => criterionReasons[code] ?? "Chưa có mô tả cho lý do này.";
 
 const operators: Record<string, string> = { gte: "≥", lte: "≤", eq: "=" };
 export const operatorSymbol = (operator: string) => operators[operator] ?? operator;

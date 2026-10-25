@@ -31,8 +31,8 @@ import "@/assets/styles/ops-v2.css";
 
 const PAGE_SIZE = 20;
 const roles: Array<{ value: UserRole; label: string }> = [
-  { value: 0, label: "Platform admin" },
-  { value: 1, label: "Thành viên tổ chức" },
+  { value: 0, label: "Quản trị FET3D" },
+  { value: 1, label: "Tài khoản tổ chức" },
   { value: 2, label: "Học viên" },
 ];
 /** PlatformAdmin is granted outside this screen (Figma: "Không thể gán PlatformAdmin ở đây"), so the create form does not offer it. */
@@ -162,7 +162,7 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
   };
 
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
-  if (user?.role !== 0) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin có thể xem và quản lý tài khoản.</Alert>;
+  if (user?.role !== 0) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ quản trị FET3D có thể xem và quản lý tài khoản.</Alert>;
 
   const columns: DataColumn<ManagedAccount>[] = [
     { key: "email", header: "Email", primary: true, render: (account) => <CellTitle title={account.email} sub={account.fullName || account.username || undefined} /> },
@@ -231,12 +231,12 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
           { label: "Họ tên", value: selected.fullName?.trim() ? selected.fullName : "Chưa có" },
           { label: "Vai trò", value: roleLabel(selected.role) },
           ...(selected.username ? [{ label: "Tên người dùng", value: selected.username }] : []),
-          { label: "Tổ chức", value: selected.organizationId ? orgName(selected.organizationId) ?? selected.organizationId : "—" },
+          { label: "Tổ chức", value: orgCell(selected.organizationId) },
           { label: "Trạng thái", value: statusChip(selected) },
           { label: "Đăng nhập gần nhất", value: formatDate(selected.lastLoginAt) },
           { label: "Ngày tạo", value: formatDate(selected.createdAt) },
         ]} />
-        <Alert tone="info" title="Không thể gán PlatformAdmin ở đây">Quyền PlatformAdmin cấp ngoài giao diện này theo quy trình riêng. Vai trò và tổ chức của tài khoản không đổi được sau khi tạo.</Alert>
+        <Alert tone="info" title="Không cấp quyền quản trị FET3D ở đây">Quyền quản trị FET3D được cấp riêng, không qua trang này. Vai trò và tổ chức của tài khoản không đổi được sau khi tạo.</Alert>
       </div>}
     </Drawer>
 
@@ -249,8 +249,8 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
         <Field label="Email" required error={fieldErrors.email}>{(p) => <Input {...p} type="email" autoComplete="off" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />}</Field>
         <Field label="Mật khẩu" required hint="Từ 12 đến 128 ký tự." error={fieldErrors.password}>{(p) => <Input {...p} type="password" autoComplete="new-password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />}</Field>
         <Field label="Họ và tên">{(p) => <Input {...p} maxLength={200} autoComplete="off" value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} />}</Field>
-        <Field label="Vai trò" hint="PlatformAdmin được cấp theo quy trình riêng, không chọn ở đây.">{(p) => <Combobox {...p} value={String(form.role)} onChange={(value) => setForm({ ...form, role: Number(value) as UserRole })} options={roleOptions} groupLabel="Vai trò" />}</Field>
-        {form.role === 1 && <Field label="Tổ chức" required error={fieldErrors.organizationId}>{(p) => <Combobox {...p} value={form.organizationId} onChange={(value) => setForm({ ...form, organizationId: value })} options={orgOptions} placeholder="Chọn tổ chức" searchPlaceholder="Tìm theo tên hoặc slug…" groupLabel="Tổ chức đang hoạt động" emptyText="Không có tổ chức phù hợp" loading={organizations.loading && !organizations.data} />}</Field>}
+        <Field label="Vai trò" hint="Quyền quản trị FET3D được cấp riêng, không chọn ở đây.">{(p) => <Combobox {...p} value={String(form.role)} onChange={(value) => setForm({ ...form, role: Number(value) as UserRole })} options={roleOptions} groupLabel="Vai trò" />}</Field>
+        {form.role === 1 && <Field label="Tổ chức" required error={fieldErrors.organizationId}>{(p) => <Combobox {...p} value={form.organizationId} onChange={(value) => setForm({ ...form, organizationId: value })} options={orgOptions} placeholder="Chọn tổ chức" searchPlaceholder="Tìm theo tên tổ chức…" groupLabel="Tổ chức đang hoạt động" emptyText="Không có tổ chức phù hợp" loading={organizations.loading && !organizations.data} />}</Field>}
         {formError && <Alert tone="danger">{formError}</Alert>}
       </form>
     </Modal>

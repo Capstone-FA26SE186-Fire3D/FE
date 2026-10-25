@@ -115,7 +115,7 @@ export function validateParameters(capability: CapabilityOption | undefined, val
     return out;
   }
   const known = new Map(capability.fields.map((field) => [field.name, field]));
-  for (const key of Object.keys(values)) if (!known.has(key)) out.push({ code: "FIELD_UNKNOWN", name: key, message: "Tham số không có trong năng lực đã chọn." });
+  for (const key of Object.keys(values)) if (!known.has(key)) out.push({ code: "FIELD_UNKNOWN", name: key, message: "Tham số không có trong khả năng đã chọn." });
   for (const field of capability.fields) {
     const item = values[field.name];
     if (item === undefined) {
@@ -136,7 +136,7 @@ export function validateParameters(capability: CapabilityOption | undefined, val
       out.push({ code: "TYPE_INVALID", name: field.name, message: "Phải là đúng/sai." });
       continue;
     }
-    if (field.enum && !field.enum.some((option) => option === item)) out.push({ code: "PARAMETER_NOT_ALLOWED", name: field.name, message: "Giá trị không nằm trong danh sách năng lực cho phép." });
+    if (field.enum && !field.enum.some((option) => option === item)) out.push({ code: "PARAMETER_NOT_ALLOWED", name: field.name, message: "Giá trị không nằm trong danh sách khả năng này cho phép." });
   }
   return out;
 }

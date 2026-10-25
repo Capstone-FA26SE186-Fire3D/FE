@@ -135,12 +135,12 @@ export function setCapabilityCommand(draft: JsonObject, id: number, index: numbe
     const params = makeSetPatch(draft, ["objects", index, "parameters"], undefined);
     if (params) patches.push(params);
   }
-  return build(id, patches, { label: capability ? "Chọn năng lực" : "Bỏ năng lực", at: now, selectBefore: at(index), selectAfter: at(index) });
+  return build(id, patches, { label: capability ? "Chọn khả năng" : "Bỏ khả năng", at: now, selectBefore: at(index), selectAfter: at(index) });
 }
 
 export function pinGeometryCommand(draft: JsonObject, id: number, pin: GeometryPin, now: number, selection: V1Selection): V1Command | null {
   const patch = makeSetPatch(draft, ["geometry"], { artifactId: pin.artifactId, sha256Hash: pin.sha256Hash });
-  return build(id, patch ? [patch] : [], { label: "Ghim lại Geometry hiện tại", at: now, selectBefore: selection, selectAfter: selection });
+  return build(id, patch ? [patch] : [], { label: "Gắn lại mô hình 3D mới nhất", at: now, selectBefore: selection, selectAfter: selection });
 }
 
 /** Append an item to an array field (objectives, criteria). */

@@ -29,7 +29,7 @@ test.describe("public list", () => {
     await expect(cards(page)).toHaveCount(2);
     await expect(cards(page).first()).toContainText("Bài mới");
     for (const hidden of ["Bài nháp", "Bài ẩn", "Bài xóa"]) await expect(page.getByText(hidden)).toHaveCount(0);
-    await expect(page.getByRole("searchbox", { name: "Tìm bài Learn" })).toBeVisible();
+    await expect(page.getByRole("searchbox", { name: "Tìm bài học" })).toBeVisible();
     await expect(page.getByText("sẽ được bổ sung khi máy chủ hỗ trợ")).toHaveCount(0);
     expect(backend.calls.every((call) => !call.headers.authorization)).toBe(true); // anonymous reads
   });
@@ -166,7 +166,7 @@ test.describe("reader", () => {
     await expect(page).toHaveTitle("Đọc đầy đủ — FET3D");
     await expect(page.locator('meta[name="description"]')).toHaveAttribute("content", "Tóm tắt thay cho video khi không nhúng được.");
     await page.goto("/learn");
-    await expect(page).toHaveTitle("Learn — FET3D");
+    await expect(page).toHaveTitle("Bài học — FET3D");
   });
 
   test("Hidden shows the unavailable message, Deleted/Unpublished/unknown show not found, a bad slug is a 404 page", async ({ page }) => {

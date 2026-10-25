@@ -27,7 +27,7 @@ test.describe("admin commerce (mock)", () => {
     await expect(page.getByRole("row", { name: /BLD-12 .*500\.000/ }).first()).toContainText("tokens");
     await expect(page.getByRole("row", { name: /BLD-12 .*500\.000/ }).first()).toContainText("Đủ điều kiện bán");
     const legacy = page.getByRole("row", { name: /OLD-1/ });
-    await expect(legacy).toContainText("gói cũ (v1)");
+    await expect(legacy).toContainText("gói cũ");
     await expect(legacy).toContainText("Không bán được");
   });
 
@@ -42,16 +42,16 @@ test.describe("admin commerce (mock)", () => {
     await page.getByLabel(/Đơn giá/).fill("12.5");
     await page.getByRole("button", { name: "Lưu gói" }).click();
     await expect(page.getByText("Đơn giá là số nguyên VND không âm.")).toBeVisible();
-    await expect(page.getByText("Gói v7 chỉ có thời hạn 6 hoặc 12 tháng.")).toBeVisible();
+    await expect(page.getByText("Gói chỉ có thời hạn 6 hoặc 12 tháng.")).toBeVisible();
     await expect(page.getByText("Số học viên mỗi kỳ là số nguyên lớn hơn 0.")).toBeVisible();
     await page.getByLabel(/Đơn giá/).fill("750000");
     await page.getByLabel(/Thời hạn \(tháng\)/).click();
     await page.getByRole("option", { name: "12 tháng" }).click();
     await page.getByLabel("Học viên mỗi kỳ").fill("80");
-    await page.getByLabel("Quota AI kèm gói").fill("2500");
+    await page.getByLabel("Hạn mức AI kèm gói").fill("2500");
     await page.getByRole("button", { name: "Lưu gói" }).click();
-    await expect(page.getByText("Gói có quota phải chọn phiên bản chính sách quota.")).toBeVisible();
-    await page.getByLabel("Phiên bản chính sách quota").click();
+    await expect(page.getByText("Gói có hạn mức AI phải chọn phiên bản chính sách hạn mức.")).toBeVisible();
+    await page.getByLabel("Phiên bản chính sách hạn mức").click();
     await page.getByRole("option", { name: /tokens/ }).first().click();
     await page.getByRole("button", { name: "Lưu gói" }).click();
     await expect(page.getByRole("row", { name: /Gói mới/ })).toContainText("750.000");
@@ -66,9 +66,9 @@ test.describe("admin commerce (mock)", () => {
     await mockBilling(page, mock);
     await page.goto("/admin/commerce?tab=packages");
     await expect(page.getByText("Chưa có gói dịch vụ", { exact: true })).toBeVisible();
-    await expect(page.getByText("Chưa có chính sách quota", { exact: true })).toBeVisible();
-    await page.getByRole("tab", { name: "Chính sách quota" }).click();
-    await expect(page.getByText("Chưa có chính sách quota", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Chưa có chính sách hạn mức", { exact: true })).toBeVisible();
+    await page.getByRole("tab", { name: "Chính sách hạn mức" }).click();
+    await expect(page.getByText("Chưa có chính sách hạn mức", { exact: true }).first()).toBeVisible();
     await expect(page.getByText(/Không có chính sách hay số lượng mặc định/)).toBeVisible();
   });
 
@@ -78,16 +78,16 @@ test.describe("admin commerce (mock)", () => {
     await mockBilling(page, mock);
     await page.goto("/admin/commerce?tab=policies");
     await expect(quotaPolicyRows(page)).toContainText("tokens");
-    await expect(quotaPolicyRows(page)).toContainText("rollover: None");
+    await expect(quotaPolicyRows(page)).toContainText("Không cộng dồn sang kỳ sau");
     await expect(page.getByRole("button", { name: /Sửa|Xóa/ })).toHaveCount(0);
     // Immutable versions: the row is neither clickable nor has a "···" menu.
     await expect(quotaPolicyRows(page).getByRole("button")).toHaveCount(0);
     await page.getByRole("button", { name: "Tạo phiên bản", exact: true }).first().click();
-    await page.getByLabel("Đơn vị quota").fill("Tokens VN");
+    await page.getByLabel("Đơn vị hạn mức").fill("Tokens VN");
     await page.getByLabel("Hiệu lực từ").fill("2026-11-01T08:00");
     await page.getByRole("button", { name: "Tạo phiên bản" }).last().click();
     await expect(page.getByText(/Đơn vị gồm chữ thường/)).toBeVisible();
-    await page.getByLabel("Đơn vị quota").fill("credits");
+    await page.getByLabel("Đơn vị hạn mức").fill("credits");
     await page.getByLabel("Hiệu lực đến").fill("2026-10-01T08:00");
     await page.getByRole("button", { name: "Tạo phiên bản" }).last().click();
     await expect(page.getByText(/Thời điểm kết thúc phải sau thời điểm bắt đầu/)).toBeVisible();
@@ -192,7 +192,7 @@ test.describe("admin commerce (mock)", () => {
     await page.getByLabel(/Phí nâng cấp một lần/).fill("3000000");
     await page.getByRole("button", { name: "Phát hành báo giá" }).click();
     // The BE rejects a limit that is not higher than the current one: its message is shown, the form is kept.
-    await expect(page.getByText(/Learner limit must exceed the current limit/)).toBeVisible();
+    await expect(page.getByText(/Số học viên chưa hợp lệ/)).toBeVisible();
     await expect(page.getByLabel(/Phí nâng cấp một lần/)).toHaveValue("3000000");
     await page.getByLabel("Học viên sau nâng cấp").fill("200");
     await page.getByRole("button", { name: "Phát hành báo giá" }).click();
@@ -208,11 +208,11 @@ test.describe("admin commerce (mock)", () => {
     await mockBilling(page, mock);
     await page.goto(`/admin/commerce?tab=quotes&quotation=${ids.topUpQuote}`);
     await expect(page.getByText(/Tổ chức yêu cầu 500/)).toBeVisible();
-    await expect(page.getByLabel("Số lượng quota cấp")).toHaveValue("500");
+    await expect(page.getByLabel("Số lượng hạn mức cấp")).toHaveValue("500");
     await page.getByLabel("Điều khoản").fill("Điều khoản top-up");
     await page.getByRole("button", { name: "Phát hành báo giá" }).click();
-    await expect(page.getByText("Chọn phiên bản chính sách quota.")).toBeVisible();
-    await page.getByRole("combobox", { name: "Chính sách quota" }).click();
+    await expect(page.getByText("Chọn phiên bản chính sách hạn mức.")).toBeVisible();
+    await page.getByRole("combobox", { name: "Chính sách hạn mức" }).click();
     await page.getByRole("option", { name: /tokens/ }).first().click();
     await page.getByLabel(/Số tiền \(VND\)/).fill("200000");
     await page.getByLabel(/Hiệu lực từ/).fill("2027-01-05T08:00");
@@ -270,7 +270,7 @@ test.describe("admin commerce (mock)", () => {
     expect(callsTo(mock, "GET", "/api/admin/organizations/org-1/ai-quota")).toHaveLength(1);
     expect(callsTo(mock, "GET", "/api/admin/organizations/org-1/ai-quota/grants")).toHaveLength(1);
     expect(callsTo(mock, "GET", "/api/admin/organizations/org-1/ai-usage")).toHaveLength(1);
-    await expect(page.getByRole("button", { name: "Mua thêm quota (top-up)" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Nạp thêm hạn mức AI" })).toHaveCount(0);
   });
 });
 

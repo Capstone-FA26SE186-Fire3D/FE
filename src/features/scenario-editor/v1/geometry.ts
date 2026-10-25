@@ -57,7 +57,7 @@ export function parseFloorsV1(raw: unknown): { floors: FloorV1[]; problem: strin
     if (typeof elevationMeters !== "number" || !Number.isFinite(elevationMeters)) return { floors: [], problem: `Tầng ${id} thiếu cao độ.` };
     const problem = matrixProblem(transform);
     if (problem) return { floors: [], problem: `Tầng ${id}: ${problem}` };
-    if (ifcGlobalId !== undefined && ifcGlobalId !== null && (typeof ifcGlobalId !== "string" || !IFC_GLOBAL_ID_PATTERN.test(ifcGlobalId))) return { floors: [], problem: `Tầng ${id} có IFC GlobalId không hợp lệ.` };
+    if (ifcGlobalId !== undefined && ifcGlobalId !== null && (typeof ifcGlobalId !== "string" || !IFC_GLOBAL_ID_PATTERN.test(ifcGlobalId))) return { floors: [], problem: `Tầng ${id} có mã cấu kiện IFC không hợp lệ.` };
     ids.add(id);
     floors.push({ id, name: name as string, elevationMeters, ...(typeof ifcGlobalId === "string" ? { ifcGlobalId } : {}), transform: transform as number[] });
   }
@@ -65,13 +65,13 @@ export function parseFloorsV1(raw: unknown): { floors: FloorV1[]; problem: strin
 }
 
 export function parseSemanticMapping(raw: unknown, floorIds: ReadonlySet<string>): { entries: SemanticEntry[]; problem: string | null } {
-  if (!Array.isArray(raw)) return { entries: [], problem: "Mô hình chưa kèm ánh xạ ngữ nghĩa." };
+  if (!Array.isArray(raw)) return { entries: [], problem: "Mô hình chưa kèm danh sách cấu kiện." };
   const entries: SemanticEntry[] = [];
   for (const [index, item] of raw.entries()) {
     if (!isObject(item) || typeof item.ifcGlobalId !== "string" || !IFC_GLOBAL_ID_PATTERN.test(item.ifcGlobalId) || !text(item.nodeId) || typeof item.floorId !== "string" || !text(item.semanticType)) {
-      return { entries: [], problem: `Ánh xạ ngữ nghĩa #${index + 1} không đúng dạng.` };
+      return { entries: [], problem: `Cấu kiện #${index + 1} trong danh sách không đúng dạng.` };
     }
-    if (!floorIds.has(item.floorId)) return { entries: [], problem: `Ánh xạ ngữ nghĩa #${index + 1} trỏ tới tầng không có.` };
+    if (!floorIds.has(item.floorId)) return { entries: [], problem: `Cấu kiện #${index + 1} trong danh sách nằm ở tầng không có.` };
     entries.push({ ifcGlobalId: item.ifcGlobalId, nodeId: item.nodeId as string, floorId: item.floorId, semanticType: item.semanticType as string });
   }
   return { entries, problem: null };
@@ -82,15 +82,15 @@ export function parseGeometry(preview: PreviewLike | null | undefined): Geometry
   if (preview.status === "ReprocessRequired") return { kind: "reprocess" };
   if (!preview.artifactId || !preview.sha256Hash || preview.floors == null || preview.coordinateTransform == null) {
     // NotReady (no accepted artifact), or Ready without data: there is nothing to pin or place against.
-    return preview.status === "Ready" ? { kind: "invalid", reason: "Máy chủ báo Ready nhưng thiếu artifact, hash hoặc dữ liệu tọa độ." } : { kind: "not-ready" };
+    return preview.status === "Ready" ? { kind: "invalid", reason: "Hệ thống báo mô hình đã sẵn sàng nhưng thiếu dữ liệu tọa độ. Hãy thử tải lại." } : { kind: "not-ready" };
   }
-  if (!UUID_PATTERN.test(preview.artifactId)) return { kind: "invalid", reason: "Mã artifact Geometry không phải UUID." };
-  if (!SHA256_PATTERN.test(preview.sha256Hash)) return { kind: "invalid", reason: "Hash SHA-256 của artifact không hợp lệ." };
-  if (preview.schemaVersion && preview.schemaVersion !== SCHEMA_VERSION) return { kind: "invalid", reason: `Geometry khai báo schemaVersion ${preview.schemaVersion}, editor chỉ hỗ trợ ${SCHEMA_VERSION}.` };
+  if (!UUID_PATTERN.test(preview.artifactId)) return { kind: "invalid", reason: "Mã của mô hình 3D không hợp lệ." };
+  if (!SHA256_PATTERN.test(preview.sha256Hash)) return { kind: "invalid", reason: "Mã nội dung của mô hình 3D không hợp lệ." };
+  if (preview.schemaVersion && preview.schemaVersion !== SCHEMA_VERSION) return { kind: "invalid", reason: "Mô hình 3D dùng định dạng mà trình soạn chưa hỗ trợ." };
   if ((preview.units && preview.units !== "m") || (preview.upAxis && preview.upAxis !== "Y") || (preview.handedness && preview.handedness !== "right")) {
-    return { kind: "invalid", reason: "Geometry không dùng hệ tọa độ mét, Y-up, tay phải của contract." };
+    return { kind: "invalid", reason: "Mô hình 3D không dùng hệ tọa độ chuẩn (đơn vị mét, trục Y hướng lên)." };
   }
-  if (!isMatrix16(preview.coordinateTransform)) return { kind: "invalid", reason: `coordinateTransform: ${matrixProblem(preview.coordinateTransform)}` };
+  if (!isMatrix16(preview.coordinateTransform)) return { kind: "invalid", reason: `Phép đổi tọa độ của mô hình không hợp lệ: ${matrixProblem(preview.coordinateTransform)}` };
   const { floors, problem } = parseFloorsV1(preview.floors);
   if (problem) return { kind: "invalid", reason: problem };
   // The mapping is optional for pinning/placing (anchors need it); a malformed one is reported, an absent one means no anchors.
@@ -129,8 +129,8 @@ export function parseFloorsResponse(response: { status?: string | null; artifact
   if (!response) return { kind: "not-ready" };
   if (response.status === "ReprocessRequired") return { kind: "reprocess" };
   if (response.status !== "Ready") return { kind: "not-ready" };
-  if (!response.artifactId || !UUID_PATTERN.test(response.artifactId) || !response.sha256Hash || !SHA256_PATTERN.test(response.sha256Hash)) return { kind: "invalid", reason: "Thiếu artifact hoặc hash SHA-256 hợp lệ để ghim Geometry." };
-  if (response.schemaVersion && response.schemaVersion !== SCHEMA_VERSION) return { kind: "invalid", reason: `Geometry khai báo schemaVersion ${response.schemaVersion}.` };
+  if (!response.artifactId || !UUID_PATTERN.test(response.artifactId) || !response.sha256Hash || !SHA256_PATTERN.test(response.sha256Hash)) return { kind: "invalid", reason: "Thiếu mã hợp lệ của mô hình 3D để gắn vào bản nháp." };
+  if (response.schemaVersion && response.schemaVersion !== SCHEMA_VERSION) return { kind: "invalid", reason: "Mô hình 3D dùng định dạng mà trình soạn chưa hỗ trợ." };
   const { floors, problem } = parseFloorsV1(response.floors);
   if (problem) return { kind: "invalid", reason: problem };
   return { kind: "valid", pin: { artifactId: response.artifactId, sha256Hash: response.sha256Hash }, floors };

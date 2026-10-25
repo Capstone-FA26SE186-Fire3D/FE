@@ -23,7 +23,7 @@ import { formatCount } from "../format";
 
 const sum = (items: Array<{ count: number }>) => items.reduce((total, item) => total + item.count, 0);
 /** Role order of the "Tài khoản" hint (Figma "Học viên 61 · Tổ chức 22 · Admin 1"). */
-const roleOrder: Array<[role: string, label: string]> = [["Trainee", "Học viên"], ["OrganizationUser", "Tổ chức"], ["PlatformAdmin", "Admin"]];
+const roleOrder: Array<[role: string, label: string]> = [["Trainee", "Học viên"], ["OrganizationUser", "Tổ chức"], ["PlatformAdmin", "Quản trị FET3D"]];
 
 /** One server total read with page size 1 (only `total`/`totalCount` is used). Null while unknown or when the read failed. */
 function useTotal(key: string, load: (signal: AbortSignal) => Promise<number>, enabled: boolean) {
@@ -138,21 +138,21 @@ export function AdminOverview() {
     <PageHeader
       eyebrow="Xử lý công việc"
       title="Tổng quan hệ thống"
-      description="Việc cần xử lý ở trên cùng; nhật ký audit chuyển sang trang Hỗ trợ & audit."
+      description="Việc cần xử lý ở trên cùng; nhật ký thao tác nằm ở trang Hỗ trợ & nhật ký."
       breadcrumbs={[{ label: "Quản trị" }, { label: "Tổng quan" }]}
     />
 
     <div className="adm-tiles" role="group" aria-label="Việc cần xử lý">
       <ActionTile testId="tile-reviews" href={routes.adminReviews} icon={ClipboardCheck} tone="warning" label="Duyệt kịch bản" value={reviews.value} loading={reviews.loading} hint="chờ duyệt" />
-      <ActionTile testId="tile-support" href={routes.adminSupport} icon={LifeBuoy} tone="danger" label="Hỗ trợ" value={tickets.value} loading={tickets.loading} hint={urgent.value === null ? "ticket mở" : `ticket mở · ${formatCount(urgent.value)} khẩn`} />
+      <ActionTile testId="tile-support" href={routes.adminSupport} icon={LifeBuoy} tone="danger" label="Hỗ trợ" value={tickets.value} loading={tickets.loading} hint={urgent.value === null ? "yêu cầu đang mở" : `yêu cầu đang mở · ${formatCount(urgent.value)} khẩn`} />
       <ActionTile testId="tile-payments" href={`${routes.adminCommerce}?tab=payments`} icon={CreditCard} tone="success" label="Đối soát thanh toán" value={reconcile.value} loading={reconcile.loading} hint="cần đối soát" />
-      <ActionTile testId="tile-learn" href={routes.adminLearn} icon={BookOpen} tone="info" label="Learn chưa xuất bản" value={unpublished.value} loading={unpublished.loading} hint="bài nháp" />
+      <ActionTile testId="tile-learn" href={routes.adminLearn} icon={BookOpen} tone="info" label="Bài học chưa xuất bản" value={unpublished.value} loading={unpublished.loading} hint="bài nháp" />
     </div>
 
     <div className="adm-okpis" role="group" aria-label="Tổng quan hệ thống">
-      <SystemKpi testId="kpi-organizations" label="Tổ chức" value={organizationsTotal} loading={systemLoading} hint={organizationsActive === null ? "Ảnh chụp hiện tại" : `${formatCount(organizationsActive)} đang hoạt động`} />
-      <SystemKpi testId="kpi-accounts" label="Tài khoản" value={accountsTotal} loading={systemLoading} hint={accountsHint ?? "Ảnh chụp hiện tại"} />
-      <SystemKpi testId="kpi-sessions" label="Phiên 30 ngày" value={training.data?.plays ?? null} loading={training.loading && !training.data && training.error === undefined} spark={sessionsSpark} sparkColor={seriesColor.plays} hint="Lượt chơi toàn hệ thống" />
+      <SystemKpi testId="kpi-organizations" label="Tổ chức" value={organizationsTotal} loading={systemLoading} hint={organizationsActive === null ? "Số liệu hiện tại" : `${formatCount(organizationsActive)} đang hoạt động`} />
+      <SystemKpi testId="kpi-accounts" label="Tài khoản" value={accountsTotal} loading={systemLoading} hint={accountsHint ?? "Số liệu hiện tại"} />
+      <SystemKpi testId="kpi-sessions" label="Lượt chơi 30 ngày" value={training.data?.plays ?? null} loading={training.loading && !training.data && training.error === undefined} spark={sessionsSpark} sparkColor={seriesColor.plays} hint="Toàn hệ thống" />
       <SystemKpi testId="kpi-payments" label="Thanh toán 30 ngày" value={paymentsTotal} loading={revenue.loading && !revenue.data && revenue.error === undefined} spark={paymentsSpark} sparkColor={seriesColor.revenue} hint={paymentsHint} />
     </div>
 
@@ -160,7 +160,7 @@ export function AdminOverview() {
       variant="platform"
       sectionHeading
       title="Báo cáo theo kỳ"
-      description="Vận hành, huấn luyện của học viên và doanh thu toàn hệ thống lấy trực tiếp từ Fire3D API."
+      description="Vận hành, huấn luyện của học viên và doanh thu của toàn hệ thống FET3D."
       breadcrumbs={[]}
       onOperations={setOperations}
     />

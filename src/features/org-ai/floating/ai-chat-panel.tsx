@@ -42,14 +42,14 @@ function QuotaOut({ limit, operation }: { limit: AiOperationLimit | null; operat
     <div className="ai-quota-out-card" role="alert">
       <AlertCircle size={18} aria-hidden="true" />
       <div>
-        <strong>{noPolicy ? "Chưa có chính sách AI cho thao tác này" : limit.availableUnits <= 0 ? "Quota AI đã hết" : "Quota AI không đủ cho một yêu cầu"}</strong>
+        <strong>{noPolicy ? "Chưa có chính sách AI cho thao tác này" : limit.availableUnits <= 0 ? "Hạn mức AI đã hết" : "Hạn mức AI không đủ cho một yêu cầu"}</strong>
         <p>{noPolicy
-          ? `PlatformAdmin chưa bật chính sách AI đang hiệu lực cho ${operationLabel(operation).toLowerCase()} nên yêu cầu chưa được gửi và không có quota nào bị giữ.`
-          : `Mỗi yêu cầu cần giữ chỗ ${limit.estimatedReserve != null ? formatQuota(limit.estimatedReserve, unit) : "một phần quota"}, tổ chức còn ${formatQuota(limit.availableUnits, unit)}. Hết quota thì chặn yêu cầu tính phí mới; không có nợ trả sau. Nạp thêm quota để tiếp tục.`}</p>
+          ? `Quản trị FET3D chưa bật chính sách AI cho ${operationLabel(operation).toLowerCase()} nên yêu cầu chưa được gửi và không có hạn mức nào bị giữ.`
+          : `Mỗi yêu cầu cần giữ chỗ ${limit.estimatedReserve != null ? formatQuota(limit.estimatedReserve, unit) : "một phần hạn mức"}, tổ chức còn ${formatQuota(limit.availableUnits, unit)}. Hết hạn mức thì yêu cầu tính phí mới bị chặn; không có nợ trả sau. Nạp thêm hạn mức để tiếp tục.`}</p>
       </div>
     </div>
-    {!noPolicy && <Button asChild><Link href={BILLING_AI_HREF} data-testid="ai-topup-link">Nạp quota</Link></Button>}
-    <div className="ai-composer-box is-locked" aria-hidden="true"><span className="ai-composer-locked">{noPolicy ? "Chưa có chính sách — nhập bị khoá" : "Đã hết quota — nhập bị khoá"}</span><span className="ai-send is-disabled"><Send size={14} aria-hidden="true" /></span></div>
+    {!noPolicy && <Button asChild><Link href={BILLING_AI_HREF} data-testid="ai-topup-link">Nạp thêm hạn mức</Link></Button>}
+    <div className="ai-composer-box is-locked" aria-hidden="true"><span className="ai-composer-locked">{noPolicy ? "Chưa có chính sách — chưa nhập được" : "Đã hết hạn mức — chưa nhập được"}</span><span className="ai-send is-disabled"><Send size={14} aria-hidden="true" /></span></div>
   </div>;
 }
 
@@ -95,10 +95,10 @@ export function AiChatPanel({ context, variant, onClose, onToggleExpand, onApply
   const blocked: AiOperationLimit | null | undefined = phase.kind === "blocked" && !phase.message ? phase.limit : limit !== undefined && !canSubmitWith(limit) ? limit : undefined;
   const units = quota.data?.units ?? [];
   const quotaLine = blocked !== undefined && blocked?.policyActive
-    ? { text: blocked.availableUnits <= 0 ? "Quota đã hết" : "Quota không đủ cho một yêu cầu", tone: "danger" as const }
+    ? { text: blocked.availableUnits <= 0 ? "Hạn mức đã hết" : "Hạn mức không đủ cho một yêu cầu", tone: "danger" as const }
     : quota.data
-      ? { text: units.length ? units.map((unit) => `Còn ${formatQuota(unit.available, unit.quotaUnit)}`).join(" · ") : "Chưa có quota AI", tone: "dim" as const }
-      : quota.error !== undefined ? { text: "Chưa đọc được quota", tone: "dim" as const } : { text: "Đang đọc quota…", tone: "dim" as const };
+      ? { text: units.length ? units.map((unit) => `Còn ${formatQuota(unit.available, unit.quotaUnit)}`).join(" · ") : "Chưa có hạn mức AI", tone: "dim" as const }
+      : quota.error !== undefined ? { text: "Chưa đọc được hạn mức", tone: "dim" as const } : { text: "Đang đọc hạn mức…", tone: "dim" as const };
 
   const trimmed = text.trim();
   const maxChars = limit?.maxInputChars ?? null;
@@ -143,7 +143,7 @@ export function AiChatPanel({ context, variant, onClose, onToggleExpand, onApply
         {messages.map((message) => (message.role === "user"
           ? <UserMessage key={message.id} message={message} />
           : <AssistantMessage key={message.id} message={message} accessToken={accessToken} onSettled={noteSettled} onApply={onApply} />))}
-        {working && <div className="ai-msg ai-msg--assistant ai-msg--pending" data-testid="ai-chat-pending"><Spinner size={16} /><span>{phase.kind === "checking" ? "Đang kiểm tra quota…" : "Đang gửi…"}</span></div>}
+        {working && <div className="ai-msg ai-msg--assistant ai-msg--pending" data-testid="ai-chat-pending"><Spinner size={16} /><span>{phase.kind === "checking" ? "Đang kiểm tra hạn mức…" : "Đang gửi…"}</span></div>}
         {(phase.kind === "failed" || phase.kind === "unknown" || (phase.kind === "blocked" && phase.message)) && <div className="ai-system">
           <SubmitStatus phase={phase} operation={mode} onRetry={() => { if (phase.kind === "failed") { dismissPhase(); input.current?.focus(); } else retry(); }} onLook={lookRecent} onTrack={track} />
           <button type="button" className="ai-action" onClick={dismissPhase}>Bỏ qua</button>

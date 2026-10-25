@@ -43,13 +43,13 @@ export function EmptyDraftPanel({ accessToken, buildingId, scenarioId, draftId, 
 
   return <div className="se-start" data-testid="empty-draft">
     <h1>Khởi tạo bản nháp</h1>
-    <p>Bản nháp này còn trống. Bản nháp mới dùng contract <code>fet3d.editor/1</code>: ghim Geometry của revision rồi đặt đối tượng trên mô hình.</p>
-    <Panel title="Geometry của revision" description="Đối tượng được đặt theo tọa độ cục bộ của từng tầng nên cần Geometry hợp lệ.">
+    <p>Bản nháp này còn trống. Hãy gắn bản nháp với mô hình 3D của bản IFC rồi đặt đối tượng trên mô hình.</p>
+    <Panel title="Mô hình 3D của bản IFC" description="Đối tượng được đặt theo tọa độ của từng tầng nên cần mô hình 3D hợp lệ.">
       <div className="ops-stack">
         <FloorsStatus reading={reading} loading={floors.loading} error={floors.error} reload={floors.reload} buildingId={buildingId} revisionId={revisionId} />
         {error && <Alert tone="danger" title="Khởi tạo thất bại">{error}</Alert>}
         <div className="ops-actions">
-          <Button type="button" onClick={() => void initialize()} disabled={reading?.kind !== "valid" || busy} data-testid="initialize-draft">{busy ? "Đang khởi tạo…" : "Khởi tạo bản nháp theo fet3d.editor/1"}</Button>
+          <Button type="button" onClick={() => void initialize()} disabled={reading?.kind !== "valid" || busy} data-testid="initialize-draft">{busy ? "Đang khởi tạo…" : "Khởi tạo bản nháp trên mô hình 3D"}</Button>
           <Button asChild variant="quiet"><Link href={`${routes.workspaceBuildings}/${buildingId}/scenarios/${scenarioId}`}>Chọn bản nháp khác</Link></Button>
         </div>
       </div>
