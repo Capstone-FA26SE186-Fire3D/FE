@@ -121,7 +121,7 @@ function EnterpriseDetail({ accessToken, requestId, orgName, onChanged, onOpenQu
       <dt>Tổ chức</dt><dd>{orgName}</dd>
       <dt>Liên hệ</dt><dd>{request.contactName} · {request.contactEmail}{request.contactPhone ? ` · ${request.contactPhone}` : ""}</dd>
       <dt>Gửi lúc</dt><dd>{formatDateTime(request.createdAt)}{request.closedAt ? ` · đóng ${formatDateTime(request.closedAt)}` : ""}</dd>
-      <dt>Phụ trách</dt><dd data-testid="enterprise-assignee">{request.assignedTo ? (mine ? "Đang do bạn phụ trách" : `Đang phân công cho ${request.assignedTo.slice(0, 8)}`) : "Chưa phân công"}{request.closeReason ? ` · lý do đóng: ${request.closeReason}` : ""}</dd>
+      <dt>Phụ trách</dt><dd data-testid="enterprise-assignee">{request.assignedTo ? (mine ? "Đang do bạn phụ trách" : "Đang do quản trị viên khác phụ trách") : "Chưa phân công"}{request.closeReason ? ` · lý do đóng: ${request.closeReason}` : ""}</dd>
     </dl>
     {request.notes && <p className="bill-wrap" style={{ margin: 0, whiteSpace: "pre-wrap" }}>{request.notes}</p>}
     {request.quotationId && <Alert tone="success" title="Đã tạo báo giá cho yêu cầu này" action={<Button size="sm" variant="secondary" className="mt-3" onClick={() => onOpenQuotation(request.quotationId as string)}>Mở báo giá</Button>}>Báo giá ở trạng thái nháp cho tới khi bạn phát hành; chưa có thanh toán hay dịch vụ.</Alert>}
@@ -157,7 +157,7 @@ function EnterpriseDetail({ accessToken, requestId, orgName, onChanged, onOpenQu
     <Modal open={panel === "close"} onOpenChange={(open) => { if (!open && busy === null) setPanel(null); }} size="sm" className="ops-dialog--danger" title="Đóng yêu cầu?" description="Kết thúc xử lý, không hoàn tác. Báo giá và thanh toán liên quan không bị hủy; không cấp dịch vụ."
       footer={<><Button variant="quiet" onClick={() => setPanel(null)} disabled={busy !== null}>Giữ mở</Button><Button variant="danger" onClick={confirmClose} disabled={busy !== null}>{busy === "close" ? "Đang đóng…" : "Đóng yêu cầu"}</Button></>}>
       <div className="ops-stack">
-        <Field label="Lý do đóng" required error={fieldError && panel === "close" ? fieldError : undefined} hint="Chỉ PlatformAdmin thấy lý do.">{(p) => <Textarea {...p} maxLength={1000} value={reason} onChange={(event) => { setReason(event.target.value); setFieldError(""); }} />}</Field>
+        <Field label="Lý do đóng" required error={fieldError && panel === "close" ? fieldError : undefined} hint="Chỉ quản trị FET3D thấy lý do.">{(p) => <Textarea {...p} maxLength={1000} value={reason} onChange={(event) => { setReason(event.target.value); setFieldError(""); }} />}</Field>
         {error && <Alert tone="danger" title="Chưa đóng được">{error}</Alert>}
       </div>
     </Modal>
@@ -298,9 +298,9 @@ export function EnterpriseAdminSection({ accessToken }: { accessToken: string })
       empty={<EmptyState icon={Mail} title="Chưa có yêu cầu liên hệ" description="Yêu cầu của tổ chức cần số lượng lớn sẽ hiện ở đây." />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
-    <p className="bill-hint">Bấm hàng để xử lý trong ngăn bên phải; menu “···” đổi trạng thái ngay trên danh sách (If-Match theo phiên bản).</p>
+    <p className="bill-hint">Bấm hàng để xử lý trong ngăn bên phải; menu “···” đổi trạng thái ngay trên danh sách.</p>
 
-    <Drawer open={Boolean(requestId)} onOpenChange={(open) => { if (!open) setParams({ request: null }); }} size="lg" data-testid="enterprise-drawer" title="Xử lý yêu cầu doanh nghiệp" description="Thay đổi dùng phiên bản (If-Match); nếu có người khác vừa sửa, bạn được báo và nội dung đang nhập được giữ.">
+    <Drawer open={Boolean(requestId)} onOpenChange={(open) => { if (!open) setParams({ request: null }); }} size="lg" data-testid="enterprise-drawer" title="Xử lý yêu cầu doanh nghiệp" description="Nếu có người khác vừa sửa yêu cầu, bạn sẽ được báo và nội dung đang nhập vẫn được giữ.">
       {requestId && <EnterpriseDetail key={requestId} accessToken={accessToken} requestId={requestId} orgName={selected ? orgName[selected.organizationId] ?? selected.organizationId.slice(0, 8) : "Tổ chức"} onChanged={list.reload} onOpenQuotation={(id) => setParams({ tab: "quotes", quotation: id, request: null, page: null })} />}
     </Drawer>
 

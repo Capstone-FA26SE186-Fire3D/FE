@@ -197,7 +197,7 @@ test.describe("list: empty, loading, errors", () => {
     await expect(empty).toContainText("Bạn chưa có lượt tập nào");
     await expect(empty).toContainText("Quét mã QR");
     await expect(empty.getByRole("link", { name: "Xem trang ứng dụng" })).toHaveAttribute("href", "/download");
-    await expect(empty.getByRole("link", { name: "Đọc bài trong Learn" })).toHaveAttribute("href", "/learn");
+    await expect(empty.getByRole("link", { name: "Đọc bài học" })).toHaveAttribute("href", "/learn");
     await expect(page.getByTestId("history-filtered-empty")).toHaveCount(0);
 
     backend.add({ status: "Completed", mode: "Learn", startedAt: at(12), result: { outcome: "NotAssessed", reason: "MODE_NOT_ASSESSED", scorePercent: null, criteria: null, metrics: {} } });
@@ -230,7 +230,7 @@ test.describe("list: empty, loading, errors", () => {
     await page.reload();
     const alert = page.getByRole("alert").filter({ hasText: "Không tải được lịch sử lượt tập" });
     await expect(alert).toBeVisible();
-    await expect(alert).toContainText("mã lỗi: INTERNAL");
+    await expect(alert).toContainText("Mã: INTERNAL");
     await expect(rows(page)).toHaveCount(0);
     await page.getByRole("button", { name: "Thử lại" }).click();
     await expect(rows(page)).toHaveCount(10);
@@ -362,7 +362,7 @@ test.describe("detail drawer: result", () => {
     await expect(drawer.getByTestId("detail-result-status")).toContainText("Không chấm điểm");
     await expect(drawer.getByTestId("result-outcome")).toContainText("Chế độ này không chấm đạt hoặc chưa đạt.");
     await expect(drawer.getByTestId("result-score")).toContainText("Chưa có");
-    await expect(drawer.getByTestId("no-criteria")).toContainText("Máy chủ không trả tiêu chí chi tiết");
+    await expect(drawer.getByTestId("no-criteria")).toContainText("Lượt này không có tiêu chí chấm chi tiết");
     await expect(drawer.getByTestId("criterion")).toHaveCount(0);
     await expect(drawer.getByTestId("metrics")).toContainText("Quãng đường di chuyển");
     await expect(drawer).toContainText("Học (Learn)");
@@ -473,7 +473,7 @@ test.describe("detail drawer: result", () => {
     await page.keyboard.press("Escape");
     backend.failNext("GET", new RegExp(`/${ids.notPassed}/result$`), { status: 500, json: { title: "boom", status: 500, code: "INTERNAL" } });
     await openDetail(page, ids.notPassed);
-    await expect(drawer.getByRole("alert").filter({ hasText: "mã lỗi: INTERNAL" })).toBeVisible();
+    await expect(drawer.getByRole("alert").filter({ hasText: "Mã: INTERNAL" })).toBeVisible();
     await drawer.getByRole("button", { name: "Thử lại" }).click();
     await expect(drawer.getByTestId("detail-result-status")).toContainText("Chưa đạt");
   });

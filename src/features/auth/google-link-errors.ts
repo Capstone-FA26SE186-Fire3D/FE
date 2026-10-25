@@ -38,11 +38,11 @@ export function linkGoogleProblem(error: unknown): GoogleLinkProblem {
     }
     case "INVALID_FIREBASE_TOKEN": return { message: "Xác thực Google không hợp lệ hoặc đã hết hạn. Bấm liên kết để đăng nhập Google lại." };
     case "UNAUTHORIZED": return { message: "Phiên đăng nhập không còn hiệu lực. Hãy đăng nhập lại rồi thử liên kết.", needsLogin: true };
-    case "LOCAL_PASSWORD_REQUIRED": return { message: "Tài khoản này chưa có mật khẩu Fire3D nên không dùng được bước liên kết. Hãy đặt mật khẩu sau khi xác thực Google.", reload: true };
+    case "LOCAL_PASSWORD_REQUIRED": return { message: "Tài khoản này chưa có mật khẩu FET3D nên không dùng được bước liên kết. Hãy đặt mật khẩu sau khi xác thực Google.", reload: true };
     case "EMAIL_NOT_VERIFIED": return { message: "Email của tài khoản chưa được xác minh. Hoàn tất xác minh email rồi liên kết Google." };
     case "ACCOUNT_CHANGED": return { message: "Mật khẩu hoặc tài khoản vừa thay đổi. Đăng nhập lại rồi thử liên kết.", needsLogin: true };
-    case "GOOGLE_ALREADY_LINKED": return { message: "Tài khoản Google này đã được liên kết với một tài khoản Fire3D khác. Dùng tài khoản Google khác hoặc đăng nhập tài khoản kia." };
-    case "GOOGLE_ACCOUNT_REPLACEMENT_FORBIDDEN": return { message: "Tài khoản của bạn đã liên kết với một tài khoản Google khác. Fire3D không cho thay thế tài khoản Google đã liên kết.", reload: true };
+    case "GOOGLE_ALREADY_LINKED": return { message: "Tài khoản Google này đã được liên kết với một tài khoản FET3D khác. Dùng tài khoản Google khác hoặc đăng nhập tài khoản kia." };
+    case "GOOGLE_ACCOUNT_REPLACEMENT_FORBIDDEN": return { message: "Tài khoản của bạn đã liên kết với một tài khoản Google khác. FET3D không cho thay thế tài khoản Google đã liên kết.", reload: true };
     case "PASSWORD_RESET_PENDING": return { message: "Đang có yêu cầu khôi phục mật khẩu chưa hoàn tất. Hoàn tất khôi phục rồi liên kết Google." };
     case "GOOGLE_PROVIDER_UNAVAILABLE": return { message: `Dịch vụ xác minh Google tạm thời không khả dụng.${waitText(retryAfterSeconds)}`, retryAfterSeconds };
     default:

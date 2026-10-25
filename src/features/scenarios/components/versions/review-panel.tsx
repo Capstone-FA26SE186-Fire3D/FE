@@ -15,7 +15,7 @@ import { useToast } from "@/components/ui/toast";
 import { approvalGate, describeError, type DescribedError } from "../../version-readiness";
 import type { ScenarioVersionDetail, VersionReview } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
-import { SupportCode } from "./support-code";
+import { SupportCode } from "@/components/ui/support-code";
 import { formatDateTime } from "./version-content";
 
 /**
@@ -75,7 +75,7 @@ export function ReviewPanel({ accessToken, version, review, canSubmit, onSubmitt
       <div className="ver-card-head">
         <div>
           <h2 id="ver-review-title" className="ver-card-title">Duyệt nội dung bởi quản trị FET3D</h2>
-          <p className="ver-card-sub">Cổng độc lập với build: có thể gửi duyệt trước khi package build xong.</p>
+          <p className="ver-card-sub">Việc duyệt không phụ thuộc dựng gói: có thể gửi duyệt trước khi dựng gói xong.</p>
         </div>
         <StatusBadge tone={gate.tone}>{gate.label}</StatusBadge>
       </div>
@@ -125,7 +125,7 @@ export function ReviewPanel({ accessToken, version, review, canSubmit, onSubmitt
           <div><dt>Quyết định lúc</dt><dd>{frozen.decidedAt ? formatDateTime(frozen.decidedAt) : "Chưa có"}</dd></div>
           
         </dl>}
-        {frozen && <details className="ver-support"><summary>Thông tin cho bộ phận hỗ trợ</summary><span>Mã duyệt: <code className="ver-hash" data-testid="review-id">{frozen.reviewId}</code></span></details>}
+        {frozen && <details className="support-code"><summary>Thông tin cho bộ phận hỗ trợ</summary><span>Mã duyệt: <code className="ver-hash" data-testid="review-id">{frozen.reviewId}</code></span></details>}
         {frozen?.reason && <div className="ver-reason"><p>Lý do từ chối</p><p data-testid="review-reason">{frozen.reason}</p></div>}
         {status === "approved" && <Alert tone="success" title="Nội dung đã được duyệt">Cổng duyệt đạt. Phát hành vẫn cần kết quả kỹ thuật và dịch vụ đang hiệu lực.</Alert>}
         {!submitted && <p className="ver-note">Phiên bản này chưa được gửi duyệt.</p>}

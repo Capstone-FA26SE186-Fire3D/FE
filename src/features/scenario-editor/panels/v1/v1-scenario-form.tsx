@@ -46,11 +46,11 @@ export function V1ScenarioForm({ draft, issues, actions, catalog, rubricCatalog 
     <Group title="Thông tin kịch bản" testId="group-info">
       <TextField label="Tên kịch bản" maxLength={LIMITS.nameMax} value={readString(draft, "name")} error={at("$.name")} data-testid="field-name" hint="1–255 ký tự." onCommit={optionalText("name", "Sửa tên")} />
       {catalog.loading ? <Skeleton style={{ height: 42 }} /> : catalog.error
-        ? <Alert tone="danger" title="Không tải được danh mục runtime" action={<Button type="button" size="sm" variant="secondary" onClick={catalog.reload}>Thử lại</Button>} />
+        ? <Alert tone="danger" title="Không tải được danh sách phiên bản ứng dụng" action={<Button type="button" size="sm" variant="secondary" onClick={catalog.reload}>Thử lại</Button>} />
         : versions.length === 0
-          ? <Alert tone="warning" title="Danh mục runtime đang trống"><span data-testid="runtime-empty">Chưa có runtime nào được công bố nên chưa chọn được phiên bản runtime. Quản trị viên cần cấu hình runtime và capabilityContracts; editor không tự tạo.</span></Alert>
-          : <Field label="Phiên bản runtime" required error={at("$.runtimeVersion")} hint="Chọn từ danh mục do máy chủ công bố; năng lực của đối tượng lấy theo runtime này.">
-            {(props) => <Select {...props} data-testid="field-runtime" value={runtimeVersion} onChange={(event) => actions.setField(["runtimeVersion"], event.target.value || undefined, "Chọn runtime", false)}>
+          ? <Alert tone="warning" title="Chưa có phiên bản ứng dụng nào"><span data-testid="runtime-empty">Chưa có phiên bản ứng dụng nào được công bố nên chưa chọn được. Quản trị FET3D cần cấu hình thêm; trình soạn không tự tạo.</span></Alert>
+          : <Field label="Phiên bản ứng dụng" required error={at("$.runtimeVersion")} hint="Chọn từ danh sách hệ thống công bố; khả năng của đối tượng lấy theo phiên bản này.">
+            {(props) => <Select {...props} data-testid="field-runtime" value={runtimeVersion} onChange={(event) => actions.setField(["runtimeVersion"], event.target.value || undefined, "Chọn phiên bản ứng dụng", false)}>
               <option value="">Chọn…</option>
               {runtimeVersion && !versions.includes(runtimeVersion) && <option value={runtimeVersion}>{runtimeVersion} (không có trong danh mục)</option>}
               {versions.map((version) => <option key={version} value={version}>{version}</option>)}
@@ -97,19 +97,19 @@ export function RubricGroup({ draft, issues, actions, catalog, pathPrefix = "$" 
   const criteria = rubric && Array.isArray(rubric.criteria) ? rubric.criteria : [];
   const view = catalog.view;
 
-  return <Group title="Rubric chấm điểm" description="Chỉ số lấy từ danh mục máy chủ (do máy chủ tính từ dữ liệu người học). Hệ thống không đặt sẵn ngưỡng đạt, trọng số hay tiêu chí." testId="group-rubric">
+  return <Group title="Rubric chấm điểm" description="Chỉ số lấy từ danh mục của hệ thống (hệ thống tính từ dữ liệu người học). Hệ thống không đặt sẵn ngưỡng đạt, trọng số hay tiêu chí." testId="group-rubric">
     {catalog.loading && <Skeleton style={{ height: 42 }} />}
     {!catalog.loading && catalog.error && <Alert tone="danger" title="Không tải được danh mục rubric" action={<Button type="button" size="sm" variant="secondary" onClick={catalog.reload}>Thử lại</Button>}>Cần danh mục để chọn chỉ số đúng; hiện chưa thêm được tiêu chí.</Alert>}
-    {!catalog.loading && !catalog.error && view && view.metrics.length === 0 && <Alert tone="warning" title="Danh mục rubric chưa có chỉ số nào"><span data-testid="rubric-catalog-empty">Máy chủ chưa công bố chỉ số nào nên chưa thể chọn chỉ số cho tiêu chí. Quản trị viên cần cấu hình danh mục rubric ở máy chủ; giao diện không tự tạo chỉ số.</span></Alert>}
+    {!catalog.loading && !catalog.error && view && view.metrics.length === 0 && <Alert tone="warning" title="Danh mục rubric chưa có chỉ số nào"><span data-testid="rubric-catalog-empty">Hệ thống chưa công bố chỉ số nào nên chưa thể chọn chỉ số cho tiêu chí. Quản trị FET3D cần cấu hình danh mục rubric; giao diện không tự tạo chỉ số.</span></Alert>}
     {at("$.rubric") && <span className="ops-field-error" role="alert">{at("$.rubric")}</span>}
     {!rubric && view && <div><Button type="button" variant="secondary" size="sm" data-testid="add-rubric" onClick={() => actions.setField(["rubric"], { schema_version: view.defaultSchemaVersion, criteria: [] }, "Thêm rubric", false)}><Plus size={14} aria-hidden="true" /> Thêm rubric</Button></div>}
     {rubric && <>
       <div className="se-coord-grid">
-        <Field label="Phiên bản schema rubric" required error={at("$.rubric.schema_version")} hint='Chuỗi do danh mục máy chủ công bố (ví dụ "1"); số 1, "v1" hay "1.0" không phải bí danh.'>
+        <Field label="Phiên bản định dạng rubric" required error={at("$.rubric.schema_version")} hint="Chọn đúng giá trị trong danh sách; không nhập cách viết khác.">
           {(props) => {
             const current = typeof rubric.schema_version === "string" ? rubric.schema_version : "";
             const supported = view?.supportedSchemaVersions ?? [];
-            return <Select {...props} data-testid="rubric-schema" value={current} onChange={(event) => actions.setField(["rubric", "schema_version"], event.target.value || undefined, "Chọn schema_version", false)}>
+            return <Select {...props} data-testid="rubric-schema" value={current} onChange={(event) => actions.setField(["rubric", "schema_version"], event.target.value || undefined, "Chọn phiên bản định dạng rubric", false)}>
               <option value="">Chọn…</option>
               {current && !supported.includes(current) && <option value={current}>{current} (không được hỗ trợ)</option>}
               {supported.map((version) => <option key={version} value={version}>{version}</option>)}

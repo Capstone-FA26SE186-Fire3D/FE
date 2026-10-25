@@ -88,7 +88,7 @@ export function PostsTab({ accessToken, onOpen, onCreate }: { accessToken: strin
         const intent = { op: "publish-version", versionId: version.data.id, etag: version.etag };
         const result = await learnAdminApi.publishVersion(accessToken, version.data.id, version.etag, commandKey(intent));
         commandDone(intent);
-        toast.notify({ tone: "success", title: "Đã xuất bản", description: `v${version.data.versionNumber} của ${result.data.slug}` });
+        toast.notify({ tone: "success", title: "Đã xuất bản", description: `Phiên bản ${version.data.versionNumber} của bài “${result.data.slug}”` });
       } else {
         const etag = etagFor(action.post.revision);
         const intent = { op: action.op, postId: action.post.id, etag };
@@ -127,7 +127,7 @@ export function PostsTab({ accessToken, onOpen, onCreate }: { accessToken: strin
   return <>
     {list.error !== undefined && <Alert tone="danger" className="mb-4" title="Không tải được danh sách bài" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{describeLearnError(list.error).message}</Alert>}
     <DataTable
-      caption="Danh sách bài Learn"
+      caption="Danh sách bài học"
       data-testid="learn-posts-table"
       columns={columns}
       rows={items}
@@ -137,9 +137,9 @@ export function PostsTab({ accessToken, onOpen, onCreate }: { accessToken: strin
       rowMenu={rowMenu}
       rowTone={(post) => (post.publicationStatus === "Deleted" ? "muted" : undefined)}
       toolbar={<>
-        <TableSearch value={search} onChange={setSearch} label="Tìm bài" placeholder="Tìm theo tiêu đề hoặc slug (trang đang xem)" />
+        <TableSearch value={search} onChange={setSearch} label="Tìm bài" placeholder="Tìm theo tiêu đề hoặc đường dẫn rút gọn (trang đang xem)" />
         <FilterChips label="Bộ lọc bài">
-          <FilterChip label="Loại" value={kind} onChange={(value) => setKind((LEARN_KINDS as readonly string[]).includes(value) ? (value as LearnKind) : "")} options={LEARN_KINDS.map((value) => ({ value, label: kindLabel[value] }))} hint="Máy chủ chưa có bộ lọc theo loại: chỉ áp dụng cho trang đang xem." />
+          <FilterChip label="Loại" value={kind} onChange={(value) => setKind((LEARN_KINDS as readonly string[]).includes(value) ? (value as LearnKind) : "")} options={LEARN_KINDS.map((value) => ({ value, label: kindLabel[value] }))} hint="Lọc theo loại chỉ áp dụng cho trang đang xem." />
           <FilterChip label="Trạng thái" value={status} onChange={(value) => setParams({ status: value })} options={POST_STATUSES.map((value) => ({ value, label: postStatusView[value].label }))} />
         </FilterChips>
       </>}
@@ -147,8 +147,8 @@ export function PostsTab({ accessToken, onOpen, onCreate }: { accessToken: strin
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
     <p className="learn-list-note" style={{ marginTop: 10 }}>
-      Bấm hàng để sửa nhanh tiêu đề, tóm tắt và tình huống; menu “···” xuất bản, ẩn, xóa mềm hoặc khôi phục; chỉnh sửa đầy đủ (nội dung, phiên bản) mở trình soạn.
-      {(kind || needle) && ` Máy chủ chưa có bộ lọc theo loại hay tìm kiếm: đang áp dụng cho ${loaded.length} bài của trang đang mở; bài chưa có bản xuất bản không có loại.`}
+      Bấm hàng để sửa nhanh tiêu đề, tóm tắt và tình huống; menu “···” xuất bản, ẩn, xóa hoặc khôi phục; chỉnh sửa đầy đủ (nội dung, phiên bản) mở trình soạn.
+      {(kind || needle) && ` Tìm kiếm và lọc theo loại chỉ áp dụng cho ${loaded.length} bài của trang đang mở; bài chưa xuất bản lần nào thì chưa có loại.`}
     </p>
 
     {quick && <QuickEditDrawer key={quick} accessToken={accessToken} postId={quick} fallbackName={quickPost ? titleOf(quickPost) : "Sửa nhanh"} onClose={() => setParams({ quick: null, page })} onOpenEditor={onOpen} onChanged={list.reload} />}

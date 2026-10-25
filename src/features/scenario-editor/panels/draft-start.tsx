@@ -58,24 +58,24 @@ export function DraftStart({ accessToken, buildingId, scenarioId, onOpen }: { ac
 
   return <div className="se-start">
     <h1>Soạn kịch bản</h1>
-    <p>Tiếp tục một bản nháp đã lưu của kịch bản, hoặc tạo bản mới trên một revision IFC.</p>
+    <p>Tiếp tục một bản nháp đã lưu của kịch bản, hoặc tạo bản mới trên một bản IFC.</p>
     <Panel title="Bản nháp đã lưu" description="Danh sách do máy chủ trả, bản lưu gần nhất trước. Mở lại được sau khi tải lại trang hoặc đổi máy.">
       {drafts.loading && !drafts.data ? <div role="status"><Skeleton style={{ height: 42 }} /></div>
         : drafts.error ? <Alert tone="danger" title="Không tải được danh sách bản nháp" action={<Button type="button" size="sm" variant="secondary" onClick={drafts.reload}>Thử lại</Button>} />
           : (drafts.data?.items.length ?? 0) === 0 ? <EmptyState icon={FolderOpen} title="Chưa có bản nháp nào" description="Tạo bản nháp đầu tiên ở bên dưới." />
             : <ul className="ops-stack" aria-label="Bản nháp đã lưu" style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {drafts.data?.items.map((draft) => <li key={draft.id} className="ops-actions" style={{ justifyContent: "space-between" }}>
-                <span>#{draft.draftNumber} · {new Date(draft.updatedAt).toLocaleString("vi-VN")}{draft.lastEditedByName ? " · " + draft.lastEditedByName : ""}{draft.schemaVersion ? " · " + draft.schemaVersion : " · chưa theo fet3d.editor/1"}{draft.id === scenario.data?.currentDraftId ? " · hiện tại" : ""}</span>
+                <span>#{draft.draftNumber} · {new Date(draft.updatedAt).toLocaleString("vi-VN")}{draft.lastEditedByName ? " · " + draft.lastEditedByName : ""}{draft.schemaVersion ? "" : " · bản nháp cũ"}{draft.id === scenario.data?.currentDraftId ? " · hiện tại" : ""}</span>
                 <Button type="button" size="sm" variant={draft.id === scenario.data?.currentDraftId ? "primary" : "secondary"} onClick={() => onOpen(draft.id)} data-testid={"open-draft-" + draft.id}><FolderOpen size={16} aria-hidden="true" /> Mở bản nháp</Button>
               </li>)}
             </ul>}
     </Panel>
-    <Panel title="Tạo bản nháp mới" description="Bản nháp mới theo fet3d.editor/1 ghim Geometry của revision IFC đã chọn.">
+    <Panel title="Tạo bản nháp mới" description="Bản nháp mới được gắn với mô hình 3D của bản IFC đã chọn.">
       {revisions.loading && !revisions.data ? <div role="status"><Skeleton style={{ height: 42 }} /></div>
-        : revisions.error ? <Alert tone="danger" title="Không tải được danh sách revision" action={<Button type="button" size="sm" variant="secondary" onClick={revisions.reload}>Thử lại</Button>} />
-          : items.length === 0 ? <EmptyState icon={FilePlus2} title="Công trình chưa có revision IFC" description="Tải lên và xử lý một mô hình IFC trước khi tạo bản nháp kịch bản." />
+        : revisions.error ? <Alert tone="danger" title="Không tải được danh sách bản IFC" action={<Button type="button" size="sm" variant="secondary" onClick={revisions.reload}>Thử lại</Button>} />
+          : items.length === 0 ? <EmptyState icon={FilePlus2} title="Công trình chưa có bản IFC nào" description="Tải lên và xử lý một mô hình IFC trước khi tạo bản nháp kịch bản." />
             : <form className="ops-stack" onSubmit={create}>
-              <Field label="Revision IFC" required>
+              <Field label="Bản IFC" required>
                 {(props) => <Select {...props} value={selected} onChange={(event) => setRevisionId(event.target.value)}>
                   {items.map((revision) => <option key={revision.id} value={revision.id}>{revision.versionLabel} · {revisionLabel(revision.status).label}</option>)}
                 </Select>}
@@ -83,7 +83,7 @@ export function DraftStart({ accessToken, buildingId, scenarioId, onOpen }: { ac
               {selected && selectedStatus && <RevisionStatusNote status={selectedStatus} buildingId={buildingId} revisionId={selected} />}
               {selected && <FloorsStatus reading={geometry} loading={floors.loading} error={floors.error} reload={floors.reload} buildingId={buildingId} revisionId={selected} />}
               {error && <Alert tone="danger" title="Tạo bản nháp thất bại">{error}</Alert>}
-              <div><Button type="submit" disabled={creating || geometry?.kind !== "valid"} data-testid="create-draft" title={geometry?.kind === "valid" ? undefined : "Cần Geometry hợp lệ của revision này"}>{creating ? "Đang tạo…" : "Tạo bản nháp"}</Button></div>
+              <div><Button type="submit" disabled={creating || geometry?.kind !== "valid"} data-testid="create-draft" title={geometry?.kind === "valid" ? undefined : "Cần mô hình 3D hợp lệ của bản IFC này"}>{creating ? "Đang tạo…" : "Tạo bản nháp"}</Button></div>
             </form>}
     </Panel>
   </div>;

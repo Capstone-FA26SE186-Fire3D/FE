@@ -3,7 +3,7 @@ import type { Issue } from "../store/validation";
 import { findCapability, findRuntime, validateParameters, type RuntimeOption } from "./catalog";
 import {
   CAPABILITY_REQUIRED_KINDS, ID_PATTERN, IFC_GLOBAL_ID_PATTERN, LIMITS, OBJECT_KINDS, RUBRIC_OPERATORS, SCHEMA_VERSION, SEMVER_PATTERN, SHA256_PATTERN,
-  TRAINING_MODES, UUID_PATTERN, type GeometryPin, type ObjectKind,
+  KIND_META, MODE_LABEL, TRAINING_MODES, UUID_PATTERN, type GeometryPin, type ObjectKind,
 } from "./contract";
 import type { GeometryInfo } from "./geometry";
 import { quaternionLength, type Quat, type Vec3 } from "./matrix";
@@ -116,7 +116,7 @@ const OBJECT_KEYS = new Set(["id", "kind", "placement", "anchorId", "capability"
 const CRITERION_KEYS = new Set(["id", "metric", "mandatory", "weight", "threshold", "operator", "description"]);
 
 function unknownKeys(value: JsonObject, allowed: Set<string>, path: string, out: Issue[]) {
-  for (const key of Object.keys(value)) if (!allowed.has(key)) out.push(issue("FIELD_UNKNOWN", `${path}.${key}`, "Trường không thuộc fet3d.editor/1."));
+  for (const key of Object.keys(value)) if (!allowed.has(key)) out.push(issue("FIELD_UNKNOWN", `${path}.${key}`, "Trường này không có trong định dạng bản nháp."));
 }
 
 /**
@@ -126,7 +126,7 @@ function unknownKeys(value: JsonObject, allowed: Set<string>, path: string, out:
  */
 export function shapeIssues(draft: JsonObject): Issue[] {
   const out: Issue[] = [];
-  if (draft.schemaVersion !== SCHEMA_VERSION) return [issue("VALUE_UNSUPPORTED", "$.schemaVersion", `Chỉ hỗ trợ ${SCHEMA_VERSION}.`)];
+  if (draft.schemaVersion !== SCHEMA_VERSION) return [issue("VALUE_UNSUPPORTED", "$.schemaVersion", "Định dạng bản nháp chưa được hỗ trợ.")];
   unknownKeys(draft, ROOT_KEYS, "$", out);
   if (draft.name !== undefined && !printable(draft.name, LIMITS.nameMax)) out.push(issue("STRING_INVALID", "$.name", `Dùng 1–${LIMITS.nameMax} ký tự.`));
   if (draft.geometry !== undefined) {
@@ -134,11 +134,11 @@ export function shapeIssues(draft: JsonObject): Issue[] {
     if (!isObject(geometry)) out.push(issue("TYPE_INVALID", "$.geometry", "Phải là một đối tượng."));
     else {
       unknownKeys(geometry, new Set(["artifactId", "sha256Hash"]), "$.geometry", out);
-      if (typeof geometry.artifactId !== "string" || !UUID_PATTERN.test(geometry.artifactId)) out.push(issue("STRING_FORMAT_INVALID", "$.geometry.artifactId", "Dùng UUID của artifact Geometry đã được chấp nhận."));
-      if (typeof geometry.sha256Hash !== "string" || !SHA256_PATTERN.test(geometry.sha256Hash)) out.push(issue("STRING_FORMAT_INVALID", "$.geometry.sha256Hash", "Dùng hash SHA-256 gồm 64 ký tự thường."));
+      if (typeof geometry.artifactId !== "string" || !UUID_PATTERN.test(geometry.artifactId)) out.push(issue("STRING_FORMAT_INVALID", "$.geometry.artifactId", "Cần mã của mô hình 3D đã đạt kiểm tra."));
+      if (typeof geometry.sha256Hash !== "string" || !SHA256_PATTERN.test(geometry.sha256Hash)) out.push(issue("STRING_FORMAT_INVALID", "$.geometry.sha256Hash", "Mã nội dung của mô hình 3D không hợp lệ."));
     }
   }
-  if (draft.runtimeVersion !== undefined && (typeof draft.runtimeVersion !== "string" || !SEMVER_PATTERN.test(draft.runtimeVersion))) out.push(issue("STRING_FORMAT_INVALID", "$.runtimeVersion", "Phiên bản runtime dạng x.y.z."));
+  if (draft.runtimeVersion !== undefined && (typeof draft.runtimeVersion !== "string" || !SEMVER_PATTERN.test(draft.runtimeVersion))) out.push(issue("STRING_FORMAT_INVALID", "$.runtimeVersion", "Phiên bản ứng dụng có dạng x.y.z (ví dụ 1.2.0)."));
   const range = (key: "timeLimitSeconds" | "replanIntervalSeconds", min: number, max: number) => {
     const value = draft[key];
     if (value === undefined) return;
@@ -156,7 +156,7 @@ export function shapeIssues(draft: JsonObject): Issue[] {
       unknownKeys(policy, new Set(["allowedModes"]), "$.modePolicy", out);
       if (policy.allowedModes === undefined) out.push(issue("FIELD_REQUIRED", "$.modePolicy.allowedModes", "Cần danh sách chế độ."));
       else {
-        unique(policy.allowedModes, "$.modePolicy.allowedModes", TRAINING_MODES.length, (item) => typeof item === "string" && (TRAINING_MODES as readonly string[]).includes(item), out, `Dùng một trong: ${TRAINING_MODES.join(", ")}.`);
+        unique(policy.allowedModes, "$.modePolicy.allowedModes", TRAINING_MODES.length, (item) => typeof item === "string" && (TRAINING_MODES as readonly string[]).includes(item), out, `Dùng một trong: ${TRAINING_MODES.map((mode) => MODE_LABEL[mode]).join(", ")}.`);
         if (Array.isArray(policy.allowedModes) && policy.allowedModes.length === 0) out.push(issue("FIELD_REQUIRED", "$.modePolicy.allowedModes", "Cần ít nhất một chế độ."));
       }
     }
@@ -171,7 +171,7 @@ export function shapeIssues(draft: JsonObject): Issue[] {
 function rubricShape(rubric: Json, out: Issue[]) {
   if (!isObject(rubric)) { out.push(issue("TYPE_INVALID", "$.rubric", "Phải là một đối tượng.")); return; }
   unknownKeys(rubric, new Set(["schema_version", "pass_threshold", "criteria"]), "$.rubric", out);
-  if (rubric.schema_version !== undefined && rubric.schema_version !== "1") out.push(issue("RUBRIC_SCHEMA_VERSION_UNSUPPORTED", "$.rubric.schema_version", 'schema_version phải là chuỗi "1".'));
+  if (rubric.schema_version !== undefined && rubric.schema_version !== "1") out.push(issue("RUBRIC_SCHEMA_VERSION_UNSUPPORTED", "$.rubric.schema_version", "Phiên bản định dạng rubric chưa được hỗ trợ."));
   if (!finite(rubric.pass_threshold)) out.push(issue(rubric.pass_threshold === undefined ? "FIELD_REQUIRED" : "NUMBER_INVALID", "$.rubric.pass_threshold", "Cần ngưỡng đạt (số)."));
   if (!Array.isArray(rubric.criteria)) { out.push(issue(rubric.criteria === undefined ? "FIELD_REQUIRED" : "TYPE_INVALID", "$.rubric.criteria", "Cần danh sách tiêu chí.")); return; }
   if (rubric.criteria.length > LIMITS.criteriaMax) { out.push(issue("ARRAY_TOO_LARGE", "$.rubric.criteria", `Tối đa ${LIMITS.criteriaMax} tiêu chí.`)); return; }
@@ -203,7 +203,7 @@ function objectsShape(objects: Json, out: Issue[]) {
     if (typeof item.id !== "string" || !ID_PATTERN.test(item.id)) out.push(issue(item.id === undefined ? "FIELD_REQUIRED" : "STRING_FORMAT_INVALID", `${path}.id`, "Mã đối tượng gồm chữ, số và _ . : - (tối đa 128 ký tự)."));
     else if (ids.has(item.id)) out.push(issue("ID_DUPLICATE", `${path}.id`, "Mã đối tượng phải duy nhất trong bản nháp."));
     else ids.add(item.id);
-    if (typeof item.kind !== "string" || !(OBJECT_KINDS as readonly string[]).includes(item.kind)) out.push(issue(item.kind === undefined ? "FIELD_REQUIRED" : "VALUE_UNSUPPORTED", `${path}.kind`, `Loại phải là một trong: ${OBJECT_KINDS.join(", ")}.`));
+    if (typeof item.kind !== "string" || !(OBJECT_KINDS as readonly string[]).includes(item.kind)) out.push(issue(item.kind === undefined ? "FIELD_REQUIRED" : "VALUE_UNSUPPORTED", `${path}.kind`, `Loại phải là một trong: ${OBJECT_KINDS.map((kind) => KIND_META[kind].label).join(", ")}.`));
     if (item.label !== undefined && !printable(item.label, LIMITS.labelMax)) out.push(issue("STRING_INVALID", `${path}.label`, `Nhãn dùng 1–${LIMITS.labelMax} ký tự.`));
     placementShape(item.placement, `${path}.placement`, out);
     if (item.anchorId !== undefined && (typeof item.anchorId !== "string" || !IFC_GLOBAL_ID_PATTERN.test(item.anchorId))) out.push(issue("STRING_FORMAT_INVALID", `${path}.anchorId`, "Neo là IFC GlobalId gồm 22 ký tự."));
@@ -212,8 +212,8 @@ function objectsShape(objects: Json, out: Issue[]) {
       if (!isObject(capability)) out.push(issue("TYPE_INVALID", `${path}.capability`, "Phải là một đối tượng."));
       else {
         unknownKeys(capability, new Set(["id", "version"]), `${path}.capability`, out);
-        if (typeof capability.id !== "string" || !ID_PATTERN.test(capability.id)) out.push(issue("STRING_FORMAT_INVALID", `${path}.capability.id`, "Mã năng lực không hợp lệ."));
-        if (typeof capability.version !== "string" || !SEMVER_PATTERN.test(capability.version)) out.push(issue("STRING_FORMAT_INVALID", `${path}.capability.version`, "Phiên bản năng lực dạng x.y.z."));
+        if (typeof capability.id !== "string" || !ID_PATTERN.test(capability.id)) out.push(issue("STRING_FORMAT_INVALID", `${path}.capability.id`, "Mã khả năng không hợp lệ."));
+        if (typeof capability.version !== "string" || !SEMVER_PATTERN.test(capability.version)) out.push(issue("STRING_FORMAT_INVALID", `${path}.capability.version`, "Phiên bản khả năng có dạng x.y.z."));
       }
     }
     if (item.parameters !== undefined && !isObject(item.parameters)) out.push(issue("TYPE_INVALID", `${path}.parameters`, "Tham số phải là một đối tượng."));
@@ -262,8 +262,8 @@ export type ReferenceContext = {
 export function completenessIssues(draft: JsonObject, context: ReferenceContext): Issue[] {
   const out: Issue[] = [];
   const need = (key: string, present: boolean, message: string) => { if (!present) out.push(issue("FIELD_REQUIRED", `$.${key}`, message)); };
-  need("geometry", readGeometryPin(draft) !== null, "Cần ghim artifact Geometry đã được chấp nhận.");
-  need("runtimeVersion", typeof draft.runtimeVersion === "string", "Chọn phiên bản runtime từ danh mục.");
+  need("geometry", readGeometryPin(draft) !== null, "Cần gắn bản nháp với mô hình 3D đã đạt kiểm tra.");
+  need("runtimeVersion", typeof draft.runtimeVersion === "string", "Chọn phiên bản ứng dụng từ danh sách.");
   need("timeLimitSeconds", draft.timeLimitSeconds !== undefined, "Nhập thời gian tối đa (giây).");
   need("learningObjectives", Array.isArray(draft.learningObjectives) && draft.learningObjectives.length > 0, "Nhập ít nhất một mục tiêu học tập.");
   need("learnerInstructions", typeof draft.learnerInstructions === "string", "Nhập hướng dẫn cho người học.");
@@ -272,40 +272,40 @@ export function completenessIssues(draft: JsonObject, context: ReferenceContext)
   else if (Array.isArray(rubric.criteria)) {
     if (rubric.criteria.length === 0) out.push(issue("FIELD_REQUIRED", "$.rubric.criteria", "Cần ít nhất một tiêu chí."));
     rubric.criteria.forEach((criterion, index) => {
-      if (context.metrics && isObject(criterion) && typeof criterion.metric === "string" && !context.metrics.has(criterion.metric)) out.push(issue("RUBRIC_METRIC_UNSUPPORTED", `$.rubric.criteria[${index}].metric`, "Dùng chỉ số do máy chủ tính (danh mục rubric)."));
+      if (context.metrics && isObject(criterion) && typeof criterion.metric === "string" && !context.metrics.has(criterion.metric)) out.push(issue("RUBRIC_METRIC_UNSUPPORTED", `$.rubric.criteria[${index}].metric`, "Chọn chỉ số có trong danh mục rubric của hệ thống."));
     });
   }
 
   const objects = readObjects(draft);
   const runtime = context.runtimes && typeof draft.runtimeVersion === "string" ? findRuntime(context.runtimes, draft.runtimeVersion) : undefined;
-  if (!objects.some((object) => object.kind === "Spawn")) out.push(issue("SPAWN_REQUIRED", "$.objects", "Cần ít nhất một điểm xuất phát (Spawn)."));
-  if (!objects.some((object) => object.kind === "Goal")) out.push(issue("GOAL_REQUIRED", "$.objects", "Cần ít nhất một mục tiêu (Goal)."));
+  if (!objects.some((object) => object.kind === "Spawn")) out.push(issue("SPAWN_REQUIRED", "$.objects", "Cần ít nhất một điểm xuất phát."));
+  if (!objects.some((object) => object.kind === "Goal")) out.push(issue("GOAL_REQUIRED", "$.objects", "Cần ít nhất một điểm đến."));
   const geometry = context.geometry;
   for (const object of objects) {
     const base = `$.objects[${object.index}]`;
     if (object.kind === null) continue;
     if (object.kind === "BlockedElement" && !object.anchorId) out.push(issue("ANCHOR_REQUIRED", `${base}.anchorId`, "Cấu kiện bị chặn phải chọn một cấu kiện IFC."));
-    if ((CAPABILITY_REQUIRED_KINDS as readonly string[]).includes(object.kind) && !object.capability) out.push(issue("CAPABILITY_REQUIRED", `${base}.capability`, "Chọn năng lực runtime cho đối tượng này."));
+    if ((CAPABILITY_REQUIRED_KINDS as readonly string[]).includes(object.kind) && !object.capability) out.push(issue("CAPABILITY_REQUIRED", `${base}.capability`, "Chọn khả năng trong ứng dụng cho đối tượng này."));
     if (geometry) {
-      if (!geometry.floors.some((floor) => floor.id === object.floorId)) out.push(issue("FLOOR_NOT_FOUND", `${base}.placement.floorId`, "Tầng không có trong Geometry đã ghim."));
+      if (!geometry.floors.some((floor) => floor.id === object.floorId)) out.push(issue("FLOOR_NOT_FOUND", `${base}.placement.floorId`, "Tầng không có trong mô hình 3D đã gắn."));
       if (object.anchorId) {
         const entry = geometry.semantic.find((item) => item.ifcGlobalId === object.anchorId);
-        if (!entry) out.push(issue("ANCHOR_NOT_FOUND", `${base}.anchorId`, "Cấu kiện neo không có trong ánh xạ ngữ nghĩa của Geometry."));
+        if (!entry) out.push(issue("ANCHOR_NOT_FOUND", `${base}.anchorId`, "Cấu kiện neo không có trong mô hình 3D."));
         else if (entry.floorId !== object.floorId) out.push(issue("ANCHOR_FLOOR_MISMATCH", `${base}.anchorId`, "Cấu kiện neo nằm ở tầng khác."));
       }
     }
     if (object.capability && runtime) {
       const capability = findCapability(runtime, object.capability.id);
-      if (!capability) out.push(issue("CAPABILITY_NOT_SUPPORTED", `${base}.capability.id`, "Runtime đã chọn không công bố năng lực này."));
-      else if (capability.version !== object.capability.version) out.push(issue("CAPABILITY_VERSION_MISMATCH", `${base}.capability.version`, `Runtime công bố phiên bản ${capability.version}.`));
-      else if (!capability.objectKinds.includes(object.kind)) out.push(issue("CAPABILITY_KIND_UNSUPPORTED", `${base}.capability.id`, "Năng lực không hỗ trợ loại đối tượng này."));
+      if (!capability) out.push(issue("CAPABILITY_NOT_SUPPORTED", `${base}.capability.id`, "Phiên bản ứng dụng đã chọn không có khả năng này."));
+      else if (capability.version !== object.capability.version) out.push(issue("CAPABILITY_VERSION_MISMATCH", `${base}.capability.version`, `Ứng dụng đang có phiên bản ${capability.version} của khả năng này.`));
+      else if (!capability.objectKinds.includes(object.kind)) out.push(issue("CAPABILITY_KIND_UNSUPPORTED", `${base}.capability.id`, "Khả năng này không dùng được cho loại đối tượng này."));
       else for (const problem of validateParameters(capability, object.parameters)) out.push(issue(problem.code, problem.name ? `${base}.parameters.${problem.name}` : `${base}.parameters`, problem.message));
     } else if (!object.capability && Object.keys(object.parameters).length > 0) {
-      out.push(issue("PARAMETERS_NOT_ALLOWED", `${base}.parameters`, "Không có năng lực thì không có tham số."));
+      out.push(issue("PARAMETERS_NOT_ALLOWED", `${base}.parameters`, "Chưa chọn khả năng thì không nhập tham số."));
     }
   }
   if (typeof draft.runtimeVersion === "string" && context.runtimes && !runtime) {
-    out.push(issue("RUNTIME_NOT_SUPPORTED", "$.runtimeVersion", "Phiên bản runtime không có trong danh mục đang hoạt động."));
+    out.push(issue("RUNTIME_NOT_SUPPORTED", "$.runtimeVersion", "Phiên bản ứng dụng không còn trong danh sách đang dùng."));
   }
   return out;
 }

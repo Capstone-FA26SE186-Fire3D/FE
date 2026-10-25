@@ -7,18 +7,18 @@ import { summarizeField } from "../apply";
 import { TEMPLATE_FIELDS, ignoredTemplateParts, templateFieldLabel } from "../payload";
 import { kindLabel, type LibraryVersion } from "../types";
 
-export const NO_CAPABILITY_NOTICE = "Metadata thiết bị không thêm khả năng cho runtime. Năng lực của đối tượng vẫn lấy từ danh mục runtime do máy chủ công bố.";
+export const NO_CAPABILITY_NOTICE = "Thông tin thiết bị không thêm khả năng cho ứng dụng. Năng lực của đối tượng vẫn lấy từ danh mục của ứng dụng FET3D.";
 
 function RubricTable({ rubric }: { rubric: unknown }) {
   const criteria = isObject(rubric) && Array.isArray(rubric.criteria) ? rubric.criteria.filter(isObject) : [];
   if (!isObject(rubric)) return null;
   return <div className="ops-stack" data-testid="rubric-view">
     <DetailList columns={3} items={[
-      { label: "schema_version", value: typeof rubric.schema_version === "string" ? <code>{`"${rubric.schema_version}"`}</code> : "—" },
+      { label: "Phiên bản tiêu chí", value: typeof rubric.schema_version === "string" ? <code>{`"${rubric.schema_version}"`}</code> : "—" },
       { label: "Ngưỡng đạt", value: typeof rubric.pass_threshold === "number" ? rubric.pass_threshold : "—" },
       { label: "Số tiêu chí", value: criteria.length },
     ]} />
-    {criteria.length > 0 && <Table caption="Tiêu chí của rubric">
+    {criteria.length > 0 && <Table caption="Tiêu chí chấm điểm">
       <thead><tr><th>Mã</th><th>Chỉ số</th><th>Toán tử</th><th>Ngưỡng</th><th>Trọng số</th><th>Bắt buộc</th></tr></thead>
       <tbody>{criteria.map((item, index) => <tr key={`${String(item.id)}-${index}`}>
         <td className="ops-cell-primary">{String(item.id ?? "")}</td><td>{String(item.metric ?? "")}</td><td>{String(item.operator ?? "")}</td><td>{String(item.threshold ?? "")}</td><td>{String(item.weight ?? "")}</td><td>{item.mandatory === true ? "Có" : "Không"}</td>
@@ -42,28 +42,28 @@ export function VersionPreview({ version, compact = false }: { version: LibraryV
       { label: "Phiên bản", value: <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>v{version.versionNumber}<StatusBadge tone={version.status === "Published" ? "success" : "warning"}>{version.status === "Published" ? "Đã xuất bản" : "Bản nháp"}</StatusBadge></span> },
       { label: "Xuất bản", value: formatDateTime(version.publishedAt) },
     ]} />
-    {!compact && <div><p className="ops-field-hint" style={{ margin: "0 0 4px" }}>Mã băm nội dung (bất biến khi đã xuất bản)</p><HashValue value={version.payloadHash || "—"} label="Mã băm nội dung" /></div>}
+    {!compact && <details><summary className="ops-field-hint" style={{ margin: "0 0 4px", cursor: "pointer" }}>Mã nội dung (không đổi sau khi xuất bản)</summary><HashValue value={version.payloadHash || "—"} label="Mã nội dung" /></details>}
     {typeof payload.description === "string" && <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, overflowWrap: "anywhere" }}>{payload.description}</p>}
 
     {version.kind === "ScenarioTemplate" && <>
       <dl className="ops-stack" style={{ margin: 0 }}>
         {TEMPLATE_FIELDS.filter((field) => field !== "rubric" && state[field] !== undefined).map((field) => <div key={field}><dt className="ops-field-hint" style={{ margin: 0 }}>{templateFieldLabel[field]}</dt><dd style={{ margin: "2px 0 0", fontSize: 14, overflowWrap: "anywhere" }}>{summarizeField(field, state[field])}</dd></div>)}
       </dl>
-      {state.rubric !== undefined && <div><p className="ops-field-label" style={{ margin: "0 0 6px" }}>Rubric chấm điểm</p><RubricTable rubric={state.rubric} /></div>}
-      {ignored.length > 0 && <Alert tone="info" title="Phần không áp dụng">Template này còn mang {ignored.join(", ")}. Các phần đó phụ thuộc công trình cụ thể nên tổ chức không nhận khi áp dụng.</Alert>}
+      {state.rubric !== undefined && <div><p className="ops-field-label" style={{ margin: "0 0 6px" }}>Tiêu chí chấm điểm (rubric)</p><RubricTable rubric={state.rubric} /></div>}
+      {ignored.length > 0 && <Alert tone="info" title="Phần không áp dụng">Kịch bản mẫu này còn mang {ignored.join(", ")}. Các phần đó phụ thuộc công trình cụ thể nên tổ chức không nhận khi áp dụng.</Alert>}
     </>}
 
     {version.kind === "RubricSample" && <RubricTable rubric={payload.rubric} />}
 
     {version.kind === "Equipment" && <>
       {properties.length > 0 && <Table caption="Thuộc tính thiết bị"><thead><tr><th>Thuộc tính</th><th>Giá trị</th></tr></thead><tbody>{properties.map(([key, value]) => <tr key={key}><td className="ops-cell-primary">{key}</td><td>{String(value)}</td></tr>)}</tbody></Table>}
-      <Alert tone="info" title="Không thêm năng lực cho runtime">{NO_CAPABILITY_NOTICE}</Alert>
+      <Alert tone="info" title="Không thêm năng lực cho ứng dụng">{NO_CAPABILITY_NOTICE}</Alert>
     </>}
 
     <div>
-      <p className="ops-field-label" style={{ margin: "0 0 4px" }}>Năng lực runtime mẫu này yêu cầu</p>
+      <p className="ops-field-label" style={{ margin: "0 0 4px" }}>Năng lực mẫu này yêu cầu</p>
       {version.requiredCapabilities.length === 0
-        ? <p className="ops-field-hint" style={{ margin: 0 }}>Không khai báo. Danh sách này chưa được kiểm với Unity hay danh mục runtime.</p>
+        ? <p className="ops-field-hint" style={{ margin: 0 }}>Không khai báo năng lực nào.</p>
         : <ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc", fontSize: 14 }}>{version.requiredCapabilities.map((id) => <li key={id}><code>{id}</code></li>)}</ul>}
     </div>
   </div>;

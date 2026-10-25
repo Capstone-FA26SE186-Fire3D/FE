@@ -89,7 +89,7 @@ test.describe("/workspace/library (read only)", () => {
     const drawer = page.getByRole("dialog");
     // v2 drawer: the item name is the drawer title, the body holds the version details.
     await expect(drawer.getByRole("heading", { name: "Bình CO2 5 kg" })).toBeVisible();
-    await expect(drawer.getByTestId("version-preview")).toContainText("Không thêm năng lực cho runtime");
+    await expect(drawer.getByTestId("version-preview")).toContainText("Không thêm năng lực cho ứng dụng");
     await expect(drawer).toContainText("Áp dụng là sao chép");
     expect(backend.calls.filter((call) => call.path.startsWith("/api/admin"))).toEqual([]);
   });
@@ -112,7 +112,7 @@ test.describe("/workspace/library (read only)", () => {
 
     await page.getByRole("button", { name: "Xóa bộ lọc" }).click();
     await expect(page).not.toHaveURL(/q=/);
-    const capability = page.getByRole("combobox", { name: "Năng lực runtime yêu cầu" });
+    const capability = page.getByRole("combobox", { name: "Năng lực yêu cầu" });
     await capability.click();
     await page.getByRole("option", { name: "equipment.extinguisher" }).click();
     await expect(page).toHaveURL(/cap=equipment\.extinguisher/);
@@ -127,7 +127,7 @@ test.describe("/workspace/library (read only)", () => {
     await expect(page.getByRole("heading", { name: "Không có mẫu khớp bộ lọc" })).toBeVisible();
     await page.reload();
     await expect(page.getByLabel("Tìm mẫu")).toHaveValue("không-có-gì");
-    await expect(page.getByRole("combobox", { name: "Năng lực runtime yêu cầu" })).toContainText("Không yêu cầu năng lực");
+    await expect(page.getByRole("combobox", { name: "Năng lực yêu cầu" })).toContainText("Không yêu cầu năng lực");
   });
 
   test("deep link to an item that is not published (or was deactivated) says it is unavailable; the Draft is not leaked", async ({ page }) => {
@@ -186,7 +186,7 @@ test.describe("apply to the draft in the v1 editor", () => {
     await expect(group("learnerInstructions")).toHaveAttribute("data-status", "new");
     await expect(page.getByTestId("apply-template:learnerInstructions-fill")).toBeChecked();
     // spatial parts of the template are named as NOT applied
-    await expect(page.getByText("Template còn mang ghim Geometry, 1 đối tượng đặt trong không gian, runtimeVersion")).toBeVisible();
+    await expect(page.getByText("Template còn mang ghim mô hình, 1 đối tượng đặt trong không gian, phiên bản ứng dụng")).toBeVisible();
     await expect(page.getByTestId("apply-incoming-template:name")).not.toContainText("spawn");
 
     await page.getByTestId("apply-template:name-replace").check();
@@ -289,7 +289,7 @@ test.describe("apply to the draft in the v1 editor", () => {
       b.seedVersion("RUBRIC-LA", { name: "Rubric lạ", payload: { rubric: { ...RUBRIC, criteria: [{ ...RUBRIC.criteria[0], metric: "ten_metric_la" }] } }, publish: true });
     } });
     await choose(page, "RubricSample", "RUBRIC-LA");
-    await expect(page.getByTestId("apply-group-rubric")).toContainText("Chỉ số không có trong danh mục rubric: ten_metric_la");
+    await expect(page.getByTestId("apply-group-rubric")).toContainText("Chỉ số không có trong danh mục của hệ thống: ten_metric_la");
   });
 
   test("equipment: label only on the selected Equipment object; the capability stays the runtime's, shown as a hint; metadata is reference only", async ({ page }) => {
@@ -299,7 +299,7 @@ test.describe("apply to the draft in the v1 editor", () => {
     await page.getByTestId("library-item-BINH-CO2").click();
     await expect(page.getByTestId("apply-blocker")).toContainText("Chọn một đối tượng Thiết bị");
     await expect(page.getByTestId("apply-open")).toBeDisabled();
-    await expect(page.getByTestId("no-capability-notice")).toContainText("Năng lực của đối tượng vẫn lấy từ danh mục runtime");
+    await expect(page.getByTestId("no-capability-notice")).toContainText("Khả năng của đối tượng vẫn chọn từ danh sách của ứng dụng");
 
     await page.getByTestId("object-item-5").click(); // the Equipment object of the fixture (extinguisher, CO2)
     await tab(page, "Thư viện").click(); // the chosen sample and kind are kept across tabs
@@ -307,7 +307,7 @@ test.describe("apply to the draft in the v1 editor", () => {
     await expect(page.getByTestId("apply-group-equipment:label")).toHaveAttribute("data-status", "new");
     await expect(page.getByTestId("equipment-reference")).toContainText("Bình chữa cháy CO2.");
     await expect(page.getByTestId("equipment-reference")).toContainText("Khối lượng (kg)");
-    await expect(page.getByTestId("library-preview")).toContainText("Runtime của bản nháp chưa công bố năng lực: cover.nose");
+    await expect(page.getByTestId("library-preview")).toContainText("Phiên bản ứng dụng của bản nháp chưa hỗ trợ năng lực: cover.nose");
     await expect(page.getByTestId("apply-group-equipment:capability")).toHaveAttribute("data-status", "same"); // already equals the runtime's own entry
     await page.getByTestId("apply-open").click();
     await page.getByTestId("apply-confirm").click();
@@ -329,7 +329,7 @@ test.describe("apply to the draft in the v1 editor", () => {
     await page.getByTestId("object-item-5").click();
     await choose(page, "Equipment", "MAT-NA");
     await expect(page.getByTestId("apply-group-equipment:capability")).toHaveCount(0);
-    await expect(page.getByTestId("library-preview")).toContainText("chưa công bố năng lực: cover.nose");
+    await expect(page.getByTestId("library-preview")).toContainText("chưa hỗ trợ năng lực: cover.nose");
     await page.getByTestId("apply-open").click();
     await page.getByTestId("apply-confirm").click();
     await page.getByTestId("save").click();

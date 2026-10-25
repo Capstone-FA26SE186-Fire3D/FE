@@ -113,7 +113,7 @@ test.describe("list: filters and paging live in the URL", () => {
     // The server has no status filter: this one narrows the loaded page only and says so.
     await page.getByRole("button", { name: /^Trạng thái:/ }).click();
     await page.getByRole("option", { name: "Ngừng dùng", exact: true }).click();
-    await expect(page.getByText("Máy chủ chưa có bộ lọc trạng thái")).toBeVisible();
+    await expect(page.getByText("Bộ lọc trạng thái chỉ áp dụng cho")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Không có mục khớp bộ lọc." })).toBeVisible(); // EQ-21..23 are all active
     await page.getByRole("button", { name: /^Trạng thái:/ }).click();
     await page.getByRole("option", { name: "Đang dùng", exact: true }).click();
@@ -225,7 +225,7 @@ test.describe("rubric sample lifecycle", () => {
     await page.getByTestId("publish-version").click();
     await page.getByTestId("confirm-publish").click();
     // The v1 toast may still be on screen: look for the v2 one.
-    await expect(page.getByRole("status").filter({ hasText: "v2 · bất biến" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "v2 · từ giờ không sửa được nữa" })).toBeVisible();
     await backToItem(page);
     await expect(page.getByTestId("version-row-2")).toContainText("Đã xuất bản");
     await expect(drawer(page)).toContainText("v2 · Rubric cơ bản (bản 2)");
@@ -303,7 +303,7 @@ test.describe("rubric sample lifecycle", () => {
     await page.getByTestId("version-name").fill("Tên đang sửa");
     await page.getByTestId("save-version").click();
     const field = page.getByTestId("group-rubric");
-    await expect(field.getByRole("alert").filter({ hasText: "RUBRIC_SCHEMA_VERSION_UNSUPPORTED" })).toBeVisible();
+    await expect(field.getByRole("alert").filter({ hasText: "Phiên bản tiêu chí chấm điểm này không được hỗ trợ" })).toBeVisible();
     await expect(field.getByRole("alert")).toContainText('chuỗi, ví dụ "1"');
     await expect(page.getByTestId("version-name")).toHaveValue("Tên đang sửa");
     await expect(page.getByRole("alert").filter({ hasText: "Nội dung chưa đạt yêu cầu" }).getByText("$.payload.rubric.schema_version")).toBeVisible();
@@ -318,9 +318,9 @@ test.describe("rubric sample lifecycle", () => {
     await openItem(page, "RUBRIC-CU");
     await page.getByRole("button", { name: "Mở phiên bản 1" }).click();
     await expect(page.getByTestId("rubric-schema").locator("option:checked")).toHaveText('v1 (không được hỗ trợ)');
-    await expect(page.getByTestId("group-rubric").getByRole("alert")).toContainText('Danh mục rubric chỉ hỗ trợ: "1"');
+    await expect(page.getByTestId("group-rubric").getByRole("alert")).toContainText('Hệ thống chỉ hỗ trợ phiên bản tiêu chí: "1"');
     await page.getByTestId("rubric-schema").selectOption("1");
-    await expect(page.getByTestId("group-rubric").getByRole("alert").filter({ hasText: "Danh mục rubric chỉ hỗ trợ" })).toHaveCount(0);
+    await expect(page.getByTestId("group-rubric").getByRole("alert").filter({ hasText: "Hệ thống chỉ hỗ trợ phiên bản tiêu chí" })).toHaveCount(0);
   });
 
   test("a client-side problem the server would refuse holds the save back and says why (no round trip)", async ({ page }) => {
@@ -337,7 +337,7 @@ test.describe("rubric sample lifecycle", () => {
     const backend = await setup(page, (b) => { b.seedItem("RubricSample", "RUBRIC-TRONG"); b.rubricCatalog = { ...RUBRIC_CATALOG, metrics: [] }; });
     await openItem(page, "RUBRIC-TRONG");
     await page.getByTestId("new-version").click();
-    await expect(page.getByTestId("rubric-catalog-empty")).toContainText("Quản trị viên cần cấu hình danh mục rubric ở máy chủ");
+    await expect(page.getByTestId("rubric-catalog-empty")).toContainText("Quản trị FET3D cần cấu hình danh mục rubric");
     await page.getByTestId("add-rubric").click();
     await page.getByTestId("add-criterion").click();
     await expect(page.getByTestId("criterion-0-metric").locator("option")).toHaveCount(1); // only "Chọn…"
@@ -359,7 +359,7 @@ test.describe("equipment and template payloads", () => {
     await openItem(page, "MAT-NA-LOC-KHOI");
     // The row menu also starts a version (`?version=new`).
     await page.getByTestId("new-version").click();
-    await expect(page.getByTestId("no-capability-notice")).toContainText("không thêm khả năng cho runtime");
+    await expect(page.getByTestId("no-capability-notice")).toContainText("không thêm khả năng cho ứng dụng");
     await page.getByTestId("version-name").fill("Mặt nạ lọc khói");
     await page.getByTestId("save-version").click();
     await expect(page.getByTestId("group-version").getByText("Nhập mô tả để tổ chức biết thiết bị này là gì.")).toBeVisible();
@@ -370,14 +370,14 @@ test.describe("equipment and template payloads", () => {
     await page.getByTestId("property-0").getByLabel("Kiểu giá trị").selectOption("number");
     await page.getByTestId("property-0-value").fill("120");
     await page.getByTestId("capabilities").getByRole("button", { name: "Thêm năng lực" }).click();
-    await page.getByRole("textbox", { name: "Năng lực runtime yêu cầu 1", exact: true }).fill("cover.nose");
+    await page.getByRole("textbox", { name: "Năng lực yêu cầu 1", exact: true }).fill("cover.nose");
     await page.getByTestId("save-version").click();
     await expect(page).toHaveURL(/version=[0-9a-f-]{36}/);
     expect(backend.callsTo("POST", /\/versions$/)[0].body).toEqual({ name: "Mặt nạ lọc khói", payload: { description: "Mặt nạ lọc khói dùng một lần.", properties: { "Khối lượng (g)": 120 } }, requiredCapabilities: ["cover.nose"] });
     expect(backend.calls.some((call) => /scenario-interactions|runtime/.test(call.path))).toBe(false);
     await page.getByTestId("publish-version").click();
     await page.getByTestId("confirm-publish").click();
-    await expect(page.getByTestId("version-preview")).toContainText("Không thêm năng lực cho runtime");
+    await expect(page.getByTestId("version-preview")).toContainText("Không thêm năng lực cho ứng dụng");
     await expect(page.getByTestId("version-preview")).toContainText("cover.nose");
     await backToItem(page);
     await expect(page.getByTestId("version-row-1")).toContainText("Đã xuất bản");
@@ -393,7 +393,7 @@ test.describe("equipment and template payloads", () => {
     await page.getByRole("button", { name: "Mở phiên bản 1" }).click();
     await expect(page.getByTestId("tpl-name")).toHaveValue("Sơ tán văn phòng");
     await expect(page.getByText("Phiên bản này còn mang phần không chỉnh sửa được ở đây")).toBeVisible();
-    await expect(page.getByText("Template chỉ mang nội dung phi không gian")).toBeVisible();
+    await expect(page.getByText("Kịch bản mẫu chỉ mang phần nội dung, không có vị trí")).toBeVisible();
     // no position / floor / object / geometry / runtime controls in this form
     await expect(page.getByTestId("scenario-form-v1")).toHaveCount(0);
     for (const label of ["Phiên bản runtime", "Hạt giống ngẫu nhiên", "Tầng", "Tọa độ"]) await expect(page.getByLabel(label)).toHaveCount(0);

@@ -8,7 +8,7 @@ for (const scheme of ["dark", "light"] as const) {
       await page.setViewportSize({ width, height: width === 1440 ? 900 : 760 });
       await page.addInitScript((mode) => { try { localStorage.setItem("fire3d-ops-theme", mode); } catch { /* ignore */ } }, scheme);
       await page.goto("/login");
-      await expect(page.getByRole("heading", { level: 1, name: "Đăng nhập Fire3D" })).toBeVisible();
+      await expect(page.getByRole("heading", { level: 1, name: "Đăng nhập FET3D" })).toBeVisible();
       await expect(page.locator(".ops-theme.login-theme")).toHaveAttribute("data-resolved-theme", scheme);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       if (width === 1440) await expect(page.getByText("Học bài, luyện tập, xem kết quả")).toBeVisible();

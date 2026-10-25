@@ -92,7 +92,7 @@ export function ReviewsModule() {
   const visible = useMemo(() => (needle ? items.filter((item) => stripAccents(`${item.scenarioName} ${item.organizationName} ${item.buildingName}`).includes(needle)) : items), [items, needle]);
 
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
-  if (user?.role !== 0) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin duyệt được kịch bản.</Alert>;
+  if (user?.role !== 0) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ quản trị FET3D duyệt được kịch bản.</Alert>;
 
   const totalCount = list.data?.totalCount ?? 0;
   const filtering = statusFilter !== "Submitted" || Boolean(organizationId);
@@ -121,14 +121,14 @@ export function ReviewsModule() {
     <PageHeader
       eyebrow="Xử lý công việc"
       title="Duyệt kịch bản"
-      description="Bấm một hàng để xem nội dung đóng băng, hash và readiness rồi duyệt hoặc từ chối."
+      description="Bấm một hàng để xem nội dung đã khóa và điều kiện kỹ thuật rồi duyệt hoặc từ chối."
       breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Duyệt kịch bản" }]}
       actions={<Button variant="quiet" onClick={reloadAll} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />{list.loading ? "Đang tải…" : "Tải lại"}</Button>}
     />
 
     <div className="adm-okpis adm-okpis--3" role="group" aria-label="Tổng theo trạng thái">
       <QueueKpi testId="kpi-submitted" label="Chờ duyệt" value={submitted.value} loading={submitted.loading} hint="Đã gửi, chưa quyết định" />
-      <QueueKpi testId="kpi-approved" label="Đã duyệt" value={approved.value} loading={approved.loading} hint="Tổng từ máy chủ, mọi thời điểm" />
+      <QueueKpi testId="kpi-approved" label="Đã duyệt" value={approved.value} loading={approved.loading} hint="Tổng mọi thời điểm" />
       <QueueKpi testId="kpi-rejected" label="Từ chối" value={rejected.value} loading={rejected.loading} hint="Kèm lý do bắt buộc" />
     </div>
 
@@ -175,7 +175,7 @@ export function ReviewsModule() {
       pagination={totalCount > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount, onPageChange: setPage } : undefined}
     />
     {organizations.error !== undefined && <p className="rev-note" role="status" style={{ marginTop: 8 }}>Không tải được danh sách tổ chức nên bộ lọc tổ chức chỉ giữ giá trị hiện tại. <Button size="sm" variant="quiet" onClick={organizations.reload}>Tải lại danh sách</Button></p>}
-    {list.data && totalCount > 0 && <p className="adm-note" role="status">Hiển thị {visible.length} trên {formatCount(totalCount)} · trạng thái và tổ chức lọc toàn bộ hàng chờ trên máy chủ; ô tìm chỉ lọc trang đang xem.</p>}
+    {list.data && totalCount > 0 && <p className="adm-note" role="status">Hiển thị {visible.length} trên {formatCount(totalCount)} · trạng thái và tổ chức lọc toàn bộ hàng chờ; ô tìm chỉ lọc trang đang xem.</p>}
 
     <ReviewDrawer
       key={reviewId}

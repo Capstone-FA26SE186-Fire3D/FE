@@ -15,6 +15,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Field, Input } from "@/components/ui/field";
 import { ChipPopover, FilterChip, FilterChips } from "@/components/ui/filter-chip";
 import { SkeletonDetail } from "@/components/ui/skeleton";
+import { SupportCode } from "@/components/ui/support-code";
 import { useToast } from "@/components/ui/toast";
 import { organizationsApi } from "@/features/organizations/api";
 import { billingApi, type LedgerKind } from "../api";
@@ -53,7 +54,7 @@ function PaymentDetail({ accessToken, checkoutId, paymentRequestId, onChanged }:
     setReconciling(true);
     try {
       await billingApi.reconcile(accessToken, checkoutId);
-      toast.notify({ tone: "success", title: "Đã yêu cầu đối soát", description: "Hệ thống xếp hàng thử lại các mục còn lỗi; không đổi số tiền, chữ ký hay cấp quyền thủ công. Kiểm tra lại trạng thái sau ít phút." });
+      toast.notify({ tone: "success", title: "Đã yêu cầu đối soát", description: "Hệ thống sẽ thử xử lý lại các mục còn lỗi; số tiền không đổi và không có gì được cấp thủ công. Kiểm tra lại trạng thái sau ít phút." });
       checkout.reload(); payment.reload(); onChanged();
     } catch (cause) {
       toast.notify({ tone: "danger", title: "Không gửi được yêu cầu đối soát", description: billingErrorText(cause) });
@@ -62,17 +63,18 @@ function PaymentDetail({ accessToken, checkoutId, paymentRequestId, onChanged }:
 
   return <div className="ops-stack" data-testid="payment-detail">
     {checkout.loading && !checkout.data && <SkeletonDetail rows={4} />}
-    {checkout.error !== undefined && <Alert tone="danger" title="Không đọc được checkout" action={<Button size="sm" variant="secondary" className="mt-3" onClick={checkout.reload}>Thử lại</Button>}>{billingErrorText(checkout.error)}</Alert>}
+    {checkout.error !== undefined && <Alert tone="danger" title="Không đọc được thông tin thanh toán" action={<Button size="sm" variant="secondary" className="mt-3" onClick={checkout.reload}>Thử lại</Button>}>{billingErrorText(checkout.error)}</Alert>}
     {checkout.data && <>
       <div className="bill-row"><PaymentStateBadges item={stateItem} />
         <Button variant="secondary" size="sm" onClick={() => void reconcile()} disabled={!allowed || reconciling} title={allowed ? undefined : "Không có mục nào cần đối soát"}><Wrench size={14} aria-hidden="true" />{reconciling ? "Đang gửi…" : "Yêu cầu đối soát"}</Button></div>
-      {!allowed && <p className="bill-dim" style={{ margin: 0 }}>Đối soát chỉ mở khi checkout cần đối soát hoặc đã nhận tiền nhưng kích hoạt chưa xong. Đối soát chỉ xếp hàng thử lại, không tự ghi “đã thanh toán”.</p>}
+      {!allowed && <p className="bill-dim" style={{ margin: 0 }}>Chỉ đối soát được khi liên kết thanh toán cần đối soát, hoặc đã nhận tiền nhưng dịch vụ chưa kích hoạt xong. Đối soát chỉ để hệ thống thử lại, không tự ghi “đã thanh toán”.</p>}
       <div className="bill-stats">
         <div className="ops-stat"><span>Số tiền theo báo giá</span><strong>{formatVnd(checkout.data.amount)}</strong><small>Đơn {checkout.data.orderCode}</small></div>
-        <div className="ops-stat"><span>Checkout</span><strong>{checkoutLabels[checkout.data.checkoutStatus]?.label ?? checkout.data.checkoutStatus}</strong>{checkout.data.errorCode && <small>{billingCodeMessage(checkout.data.errorCode) ?? `Mã lỗi: ${checkout.data.errorCode}`}</small>}</div>
+        <div className="ops-stat"><span>Liên kết thanh toán</span><strong>{checkoutLabels[checkout.data.checkoutStatus]?.label ?? "Không rõ"}</strong>{checkout.data.errorCode && <><small>{billingCodeMessage(checkout.data.errorCode) ?? "Liên kết thanh toán gặp sự cố. Hệ thống sẽ tự thử lại; nếu kéo dài hãy liên hệ hỗ trợ."}</small><SupportCode code={checkout.data.errorCode} /></>}</div>
         <div className="ops-stat"><span>Hết hạn liên kết</span><strong>{formatDateTime(checkout.data.expiresAt)}</strong></div>
       </div>
-      <p className="bill-dim bill-wrap" style={{ margin: 0 }}>Báo giá {quote.data?.data.quotationNumber ?? checkout.data.quotationId} · checkout {checkout.data.checkoutId}</p>
+      <p className="bill-dim bill-wrap" style={{ margin: 0 }}>Báo giá {quote.data?.data.quotationNumber ?? checkout.data.quotationId.slice(0, 8)}</p>
+      <SupportCode id={checkout.data.checkoutId} />
       {!paymentId && <Alert tone="warning" title="Chưa có bản ghi thanh toán">Liên kết PayOS chưa được ghi nhận nên chưa có trạng thái thanh toán hay kích hoạt.</Alert>}
     </>}
     {payment.error !== undefined && <Alert tone="danger" title="Không đọc được thanh toán" action={<Button size="sm" variant="secondary" className="mt-3" onClick={payment.reload}>Thử lại</Button>}>{billingErrorText(payment.error)}</Alert>}
@@ -92,7 +94,7 @@ function PaymentStatusDonut({ accessToken }: { accessToken: string }) {
   const byStatus = Object.fromEntries(counts.data ?? []);
   const slices = PAYMENT_STATUSES.map((status) => ({ key: status, label: paymentLabels[status]?.label ?? status, value: byStatus[status] ?? 0, color: toneColor[status] ?? "var(--info)" }));
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
-  return <ChartCard title="Thanh toán theo trạng thái" description="30 ngày gần nhất · yêu cầu thanh toán PayOS, số lượng từ máy chủ" height={170} loading={loading} empty={!loading && (failed || total === 0)} emptyText={failed ? "Chưa đọc được số lượng theo trạng thái" : "Chưa có yêu cầu thanh toán trong 30 ngày"} data-testid="payments-status-chart"
+  return <ChartCard title="Thanh toán theo trạng thái" description="30 ngày gần nhất · yêu cầu thanh toán PayOS" height={170} loading={loading} empty={!loading && (failed || total === 0)} emptyText={failed ? "Chưa đọc được số lượng theo trạng thái" : "Chưa có yêu cầu thanh toán trong 30 ngày"} data-testid="payments-status-chart"
     table={<table className="ops-table"><caption className="ops-sr-only">Thanh toán theo trạng thái</caption><thead><tr><th>Trạng thái</th><th>Số yêu cầu</th></tr></thead><tbody>{slices.map((slice) => <tr key={slice.key}><td>{slice.label}</td><td>{formatNumber(slice.value)}</td></tr>)}</tbody></table>}>
     <Donut slices={slices} center={{ value: formatNumber(total), caption: "yêu cầu" }} />
   </ChartCard>;
@@ -129,7 +131,7 @@ export function PaymentsSection({ accessToken }: { accessToken: string }) {
 
   const applyQuote = (close: () => void) => {
     const value = quoteDraft.trim();
-    if (value && !GUID.test(value)) { setQuoteError("Mã báo giá là GUID (36 ký tự)."); return; }
+    if (value && !GUID.test(value)) { setQuoteError("Mã báo giá chưa đúng. Dán đủ mã gồm 36 ký tự."); return; }
     setQuoteError("");
     setParams({ q: value || null });
     close();
@@ -150,7 +152,7 @@ export function PaymentsSection({ accessToken }: { accessToken: string }) {
     { key: "created", header: "Tạo lúc", width: 190, render: (item) => <CellTitle title={formatDateTime(item.createdAt)} sub={item.paidAt ? `Nhận tiền ${formatDateTime(item.paidAt)}` : undefined} /> },
     { key: "organization", header: "Tổ chức", width: 180, hideBelow: 1000, render: (item) => orgName[item.organizationId] ?? item.organizationId.slice(0, 8) },
     { key: "amount", header: "Số tiền", width: 170, align: "right", render: (item) => <CellTitle title={formatVnd(item.amount)} sub={item.provisioningLines > 0 ? `kích hoạt ${item.provisioningSucceeded}/${item.provisioningLines}` : "chưa có mục kích hoạt"} /> },
-    { key: "state", header: "Trạng thái", render: (item) => <><PaymentStateBadges item={item} />{item.checkoutError && <span className="ops-cell-sub">{billingCodeMessage(item.checkoutError) ?? item.checkoutError}</span>}</> },
+    { key: "state", header: "Trạng thái", render: (item) => <><PaymentStateBadges item={item} />{item.checkoutError && <span className="ops-cell-sub">{billingCodeMessage(item.checkoutError) ?? "Liên kết thanh toán gặp sự cố."}</span>}</> },
   ];
 
   const detailOpen = Boolean(openCheckout || openPayment);
@@ -159,14 +161,14 @@ export function PaymentsSection({ accessToken }: { accessToken: string }) {
 
     <div className="bill-row">
       <div role="radiogroup" aria-label="Loại danh sách" className="bill-segment">
-        <button type="button" role="radio" aria-checked={kind === "checkouts"} data-active={kind === "checkouts"} onClick={() => setParams({ kind: null, status: null })}>Checkout</button>
+        <button type="button" role="radio" aria-checked={kind === "checkouts"} data-active={kind === "checkouts"} onClick={() => setParams({ kind: null, status: null })}>Liên kết thanh toán</button>
         <button type="button" role="radio" aria-checked={kind === "requests"} data-active={kind === "requests"} onClick={() => setParams({ kind: "requests", status: null })}>Yêu cầu thanh toán</button>
       </div>
-      <p className="bill-muted" style={{ margin: 0 }}>Ba trạng thái tách biệt: checkout (liên kết), thanh toán (tiền, chỉ do PayOS xác nhận qua webhook) và kích hoạt (dịch vụ/quota đã cấp).</p>
+      <p className="bill-muted" style={{ margin: 0 }}>Ba trạng thái tách biệt: liên kết thanh toán, tiền (chỉ ghi nhận khi PayOS xác nhận) và kích hoạt (dịch vụ hoặc hạn mức AI đã cấp).</p>
     </div>
 
     <DataTable<PayosLedgerItem>
-      caption={kind === "checkouts" ? "Checkout PayOS" : "Yêu cầu thanh toán PayOS"}
+      caption={kind === "checkouts" ? "Liên kết thanh toán PayOS" : "Yêu cầu thanh toán PayOS"}
       data-testid="admin-ledger-table"
       columns={columns}
       rows={items}
@@ -184,7 +186,7 @@ export function PaymentsSection({ accessToken }: { accessToken: string }) {
           <FilterChip label="Trạng thái" value={status} onChange={(value) => setParams({ status: value })} options={statusOptions} />
           <ChipPopover label="Mã báo giá" value={quotationId ? `${quotationId.slice(0, 8)}…` : "tất cả"} active={Boolean(quotationId)} dataValue={quotationId} panelLabel="Lọc theo mã báo giá">
             {(close) => <div className="bill-chip-form">
-              <Field label="Mã báo giá" hint="GUID 36 ký tự." error={quoteError || undefined}>{(p) => <Input {...p} placeholder="GUID" value={quoteDraft} onChange={(event) => setQuoteDraft(event.target.value)} autoComplete="off" spellCheck={false} className="font-mono" />}</Field>
+              <Field label="Mã báo giá" hint="Mã đầy đủ gồm 36 ký tự." error={quoteError || undefined}>{(p) => <Input {...p} placeholder="Dán mã báo giá" value={quoteDraft} onChange={(event) => setQuoteDraft(event.target.value)} autoComplete="off" spellCheck={false} className="font-mono" />}</Field>
               <div className="bill-chip-actions">{quotationId && <Button type="button" size="sm" variant="quiet" onClick={() => { setQuoteDraft(""); setQuoteError(""); setParams({ q: null }); close(); }}>Bỏ</Button>}<Button type="button" size="sm" variant="secondary" onClick={() => applyQuote(close)}>Áp dụng</Button></div>
             </div>}
           </ChipPopover>
@@ -200,12 +202,12 @@ export function PaymentsSection({ accessToken }: { accessToken: string }) {
         {filtering && <Button variant="quiet" onClick={clearAll}>Xóa lọc</Button>}
         <Button variant="quiet" onClick={list.reload} disabled={list.loading} aria-label="Tải lại danh sách"><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
       </>}
-      empty={<EmptyState icon={CreditCard} title="Không có thanh toán" description={filtering ? "Không có bản ghi khớp bộ lọc. Nới bộ lọc hoặc xóa lọc." : "Chưa có checkout nào. Bản ghi xuất hiện khi tổ chức bắt đầu thanh toán một báo giá đã chấp nhận."} />}
+      empty={<EmptyState icon={CreditCard} title="Không có thanh toán" description={filtering ? "Không có bản ghi khớp bộ lọc. Nới bộ lọc hoặc xóa lọc." : "Chưa có lượt thanh toán nào. Bản ghi xuất hiện khi tổ chức bắt đầu thanh toán một báo giá đã chấp nhận."} />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
     <p className="bill-hint">Bấm hàng để mở chi tiết thanh toán trong ngăn bên phải; đối soát chỉ mở ở đơn đang kẹt.</p>
 
-    <Drawer open={detailOpen} onOpenChange={(open) => { if (!open) setParams({ checkout: null, payment: null }); }} size="lg" data-testid="payment-drawer" title="Chi tiết thanh toán" description="Trạng thái checkout, thanh toán và kích hoạt đọc trực tiếp từ hệ thống.">
+    <Drawer open={detailOpen} onOpenChange={(open) => { if (!open) setParams({ checkout: null, payment: null }); }} size="lg" data-testid="payment-drawer" title="Chi tiết thanh toán" description="Trạng thái liên kết, tiền và kích hoạt lấy trực tiếp từ hệ thống.">
       {detailOpen && <PaymentDetail key={`${openCheckout}:${openPayment}`} accessToken={accessToken} checkoutId={openCheckout} paymentRequestId={openPayment} onChanged={list.reload} />}
     </Drawer>
   </div>;

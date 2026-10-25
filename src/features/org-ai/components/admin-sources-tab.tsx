@@ -29,8 +29,8 @@ import styles from "../org-ai.module.css";
 
 const PAGE_SIZE = 20;
 const STATUS: Record<string, { label: string; tone: Tone }> = { Draft: { label: "Bản nháp", tone: "info" }, Approved: { label: "Đã duyệt", tone: "success" }, Retired: { label: "Đã ngừng dùng", tone: "neutral" } };
-const statusOf = (status: string) => STATUS[status] ?? { label: status, tone: "neutral" as Tone };
-const visibilityLabel = (visibility: string) => (visibility === "Common" ? "Dùng chung" : visibility === "Organization" ? "Riêng một tổ chức" : visibility);
+const statusOf = (status: string) => STATUS[status] ?? { label: "Không rõ", tone: "neutral" as Tone };
+const visibilityLabel = (visibility: string) => (visibility === "Common" ? "Dùng chung" : visibility === "Organization" ? "Riêng một tổ chức" : "Khác");
 const VISIBILITY_OPTIONS = [{ value: "Common", label: "Dùng chung (mọi tổ chức)" }, { value: "Organization", label: "Riêng một tổ chức" }];
 
 const VERSION_LABEL = /^[A-Za-z0-9._-]{1,100}$/;
@@ -70,7 +70,7 @@ export function validateSource(form: Form): { errors: Errors; input?: CreateKnow
   const title = plainText(form.title.trim(), 500);
   if (title) errors.title = title;
   if (!VERSION_LABEL.test(form.versionLabel.trim())) errors.versionLabel = "1–100 ký tự gồm chữ, số, dấu chấm, gạch ngang hoặc gạch dưới.";
-  if (!SHA256.test(form.sourceHash.trim().toLowerCase())) errors.sourceHash = "SHA-256 của tài liệu gồm 64 ký tự hex.";
+  if (!SHA256.test(form.sourceHash.trim().toLowerCase())) errors.sourceHash = "Mã nội dung phải gồm đúng 64 ký tự 0–9 hoặc a–f.";
   const uri = sourceUriProblem(form.sourceUri);
   if (uri) errors.sourceUri = uri;
   if (form.jurisdiction.trim()) { const problem = plainText(form.jurisdiction.trim(), 100); if (problem) errors.jurisdiction = problem; }
@@ -106,13 +106,13 @@ function SourceModal({ open, accessToken, organizations, onCreated, onClose }: {
 
   const hashFile = async (file: File | undefined) => {
     if (!file) return;
-    setHashing("Đang tính SHA-256…");
+    setHashing("Đang tính mã nội dung…");
     try {
       const hash = await sha256Hex(file);
       setForm((current) => ({ ...current, sourceHash: hash }));
       setHashing(`Đã tính từ “${file.name}” (${file.size.toLocaleString("vi-VN")} byte). Tệp không được tải lên.`);
     } catch (cause) {
-      setHashing(cause instanceof Error ? cause.message : "Không tính được SHA-256.");
+      setHashing(cause instanceof Error && /[à-ỹ]/i.test(cause.message) ? cause.message : "Không tính được mã nội dung. Hãy thử lại hoặc dán mã.");
     }
   };
 
@@ -144,7 +144,7 @@ function SourceModal({ open, accessToken, organizations, onCreated, onClose }: {
   return <Modal open={open} onOpenChange={(next) => { if (!next && !busy) onClose(); }} size="lg" title="Đăng ký nguồn tri thức" description="Một phiên bản của một tài liệu, ở trạng thái Bản nháp."
     footer={<><Button type="button" variant="quiet" onClick={onClose} disabled={busy}>Hủy</Button><Button type="submit" form={formId} disabled={busy} data-testid="source-create">{busy ? "Đang đăng ký…" : "Đăng ký nguồn"}</Button></>}>
     <form id={formId} className={styles.stack} onSubmit={submit} aria-label="Đăng ký nguồn tri thức" noValidate>
-      <Alert tone="info" title="Nguồn mới luôn ở trạng thái Bản nháp">Nguồn chỉ được AI trích dẫn sau khi bạn duyệt (Đã duyệt) và còn trong khoảng hiệu lực. Tài liệu gốc không được tải lên đây; hệ thống ghi mã băm SHA-256 và liên kết tham chiếu.</Alert>
+      <Alert tone="info" title="Nguồn mới luôn ở trạng thái Bản nháp">Nguồn chỉ được AI trích dẫn sau khi bạn duyệt (Đã duyệt) và còn trong khoảng hiệu lực. Tài liệu gốc không được tải lên đây; hệ thống chỉ lưu mã nội dung của tệp và liên kết tham chiếu.</Alert>
       <Field label="Phạm vi dùng" required error={show("$.visibility", "visibility")}>
         {(props) => <Combobox {...props} aria-label="Phạm vi dùng" value={form.visibility} onChange={pick("visibility")} options={VISIBILITY_OPTIONS} placeholder="Chọn…" groupLabel="Phạm vi" />}
       </Field>
@@ -156,10 +156,10 @@ function SourceModal({ open, accessToken, organizations, onCreated, onClose }: {
         <Field label="Nhãn phiên bản" required hint="Ví dụ năm ban hành hoặc số hiệu." error={show("$.versionLabel", "versionLabel")}>{(props) => <Input {...props} value={form.versionLabel} onChange={set("versionLabel")} autoComplete="off" />}</Field>
         <Field label="Phạm vi pháp lý/khu vực" error={show("$.jurisdiction", "jurisdiction")}>{(props) => <Input {...props} value={form.jurisdiction} onChange={set("jurisdiction")} maxLength={100} />}</Field>
       </div>
-      <Field label="SHA-256 của tài liệu" required hint="Dán mã 64 ký tự hex hoặc chọn tệp để tính ngay trong trình duyệt." error={show("$.sourceHash", "sourceHash")}>
+      <Field label="Mã nội dung (SHA-256) của tài liệu" required hint="Dán mã 64 ký tự hoặc chọn tệp bên dưới để tính ngay trong trình duyệt." error={show("$.sourceHash", "sourceHash")}>
         {(props) => <Input {...props} value={form.sourceHash} onChange={set("sourceHash")} autoComplete="off" spellCheck={false} className="font-mono" />}
       </Field>
-      <Field label="Tính SHA-256 từ tệp" hint={hashing ?? "Chỉ tính cục bộ; tệp không rời trình duyệt."}>
+      <Field label="Tính mã nội dung từ tệp" hint={hashing ?? "Chỉ tính cục bộ; tệp không rời trình duyệt."}>
         {(props) => <Input {...props} type="file" onChange={(event) => void hashFile(event.target.files?.[0])} />}
       </Field>
       <Field label="Liên kết tham chiếu (https)" hint="Không chứa tài khoản/mật khẩu. Tùy chọn." error={show("$.sourceUri", "sourceUri")}>{(props) => <Input {...props} type="url" value={form.sourceUri} onChange={set("sourceUri")} placeholder="https://" autoComplete="off" />}</Field>
@@ -167,7 +167,7 @@ function SourceModal({ open, accessToken, organizations, onCreated, onClose }: {
         <Field label="Hiệu lực từ" error={show("$.effectiveFrom", "effectiveFrom")}>{(props) => <Input {...props} type="datetime-local" value={form.effectiveFrom} onChange={set("effectiveFrom")} />}</Field>
         <Field label="Hiệu lực đến" error={show("$.effectiveUntil", "effectiveUntil")}>{(props) => <Input {...props} type="datetime-local" value={form.effectiveUntil} onChange={set("effectiveUntil")} />}</Field>
       </div>
-      {error !== undefined && <Alert tone="danger" title="Chưa đăng ký được nguồn">{aiErrorText(error)} Nội dung bạn nhập vẫn được giữ; bấm Đăng ký để thử lại với cùng khóa chống trùng.</Alert>}
+      {error !== undefined && <Alert tone="danger" title="Chưa đăng ký được nguồn">{aiErrorText(error)} Nội dung bạn nhập vẫn được giữ; bấm Đăng ký để thử lại (không tạo trùng).</Alert>}
     </form>
   </Modal>;
 }
@@ -212,14 +212,14 @@ function SourceDetail({ accessToken, id, orgName, onChanged }: { accessToken: st
       <dl className="ops-kv">
         <dt>Phạm vi dùng</dt><dd>{visibilityLabel(source.visibility)}{source.visibility === "Organization" ? ` · ${orgName(source.organizationId)}` : ""}</dd>
         <dt>Phiên bản</dt><dd>{source.versionLabel}</dd>
-        <dt>SHA-256</dt><dd className={styles.mono}>{source.sourceHash}</dd>
+        <dt>Mã nội dung</dt><dd className={styles.mono} title={source.sourceHash}>{source.sourceHash.slice(0, 12)}…</dd>
         <dt>Liên kết</dt><dd>{source.sourceUri ? <span className={styles.mono}>{source.sourceUri}</span> : "Không có"}</dd>
         <dt>Pháp lý/khu vực</dt><dd>{source.jurisdiction || "Không nêu"}</dd>
         <dt>Hiệu lực</dt><dd>{source.effectiveFrom ? formatDateTime(source.effectiveFrom) : "Ngay"} – {source.effectiveUntil ? formatDateTime(source.effectiveUntil) : "không giới hạn"}</dd>
         <dt>Duyệt lúc</dt><dd>{source.approvedAt ? formatDateTime(source.approvedAt) : "Chưa duyệt"}</dd>
         <dt>Tạo lúc</dt><dd>{formatDateTime(source.createdAt)}</dd>
-        <dt>Phiên bản bản ghi</dt><dd data-testid="source-revision">{source.revision}</dd>
-        {source.visibility === "Common" && <><dt>Learn dùng được</dt><dd>Bản nháp Learn: {source.canUseInDraft ? "được trích dẫn" : "chưa"} · xuất bản/RAG: {source.canPublishReference ? "chấp nhận" : "chưa"}</dd></>}
+        <dt>Lần cập nhật</dt><dd data-testid="source-revision">{source.revision}</dd>
+        {source.visibility === "Common" && <><dt>Dùng cho bài học</dt><dd>Bản nháp bài học: {source.canUseInDraft ? "được trích dẫn" : "chưa"} · bài đã xuất bản và AI: {source.canPublishReference ? "được dùng" : "chưa"}</dd></>}
       </dl>
 
       {stale && <Alert tone="warning" title="Nguồn đã thay đổi ở nơi khác" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reloadFresh} data-testid="source-reload">Tải bản mới</Button>}>
@@ -235,7 +235,7 @@ function SourceDetail({ accessToken, id, orgName, onChanged }: { accessToken: st
     </>}
 
     <Modal open={confirm !== null} onOpenChange={(open) => { if (!open && !busy) setConfirm(null); }} size="sm" title={confirm === "approve" ? "Duyệt nguồn tri thức?" : "Ngừng dùng nguồn tri thức?"}
-      description={confirm === "approve" ? "Sau khi duyệt, AI của tổ chức có thể trích dẫn nguồn trong khoảng hiệu lực." : "AI không còn trích dẫn nguồn này ở yêu cầu mới; bài Learn đã xuất bản không bị sửa."}
+      description={confirm === "approve" ? "Sau khi duyệt, AI của tổ chức có thể trích dẫn nguồn trong khoảng hiệu lực." : "AI không còn trích dẫn nguồn này ở yêu cầu mới; bài học đã xuất bản không bị sửa."}
       className={confirm === "retire" ? "ops-dialog--danger" : undefined}
       footer={<><Button type="button" variant="quiet" onClick={() => setConfirm(null)} disabled={busy}>Hủy</Button><Button type="button" variant={confirm === "retire" ? "danger" : "primary"} onClick={() => confirm && void run(confirm)} disabled={busy} data-testid="source-confirm">{busy ? "Đang gửi…" : "Xác nhận"}</Button></>}>
       <p className={styles.muted}>{source?.title} · phiên bản {source?.versionLabel}</p>
@@ -325,9 +325,9 @@ export function AdminSourcesTab({ accessToken }: { accessToken: string }) {
       empty={<EmptyState icon={filtering ? Search : BookMarked} title={filtering ? "Không có nguồn phù hợp." : "Chưa có nguồn tri thức nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Chưa có nguồn đã duyệt thì AI không có gì để trích dẫn. Đăng ký nguồn (bản nháp) rồi duyệt."} action={!filtering ? <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Đăng ký nguồn</Button> : undefined} />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
-    <p className={styles.hint}>Bấm hàng để xem chi tiết; menu “···” duyệt hoặc ngừng dùng theo phiên bản bản ghi (If-Match).</p>
+    <p className={styles.hint}>Bấm hàng để xem chi tiết; menu “···” để duyệt hoặc ngừng dùng nguồn.</p>
 
-    <Drawer open={sourceId !== ""} onOpenChange={(open) => { if (!open) setParams({ source: null }); }} size="md" data-testid="ai-source-drawer" title="Chi tiết nguồn tri thức" description="Duyệt hoặc ngừng dùng theo phiên bản bản ghi (If-Match).">
+    <Drawer open={sourceId !== ""} onOpenChange={(open) => { if (!open) setParams({ source: null }); }} size="md" data-testid="ai-source-drawer" title="Chi tiết nguồn tri thức" description="Xem thông tin, duyệt hoặc ngừng dùng nguồn.">
       {sourceId && <SourceDetail key={sourceId} accessToken={accessToken} id={sourceId} orgName={orgName} onChanged={list.reload} />}
     </Drawer>
 
@@ -335,9 +335,9 @@ export function AdminSourcesTab({ accessToken }: { accessToken: string }) {
 
     <ConfirmDialog open={quick !== null} onOpenChange={(open) => { if (!open && !quickBusy) setQuick(null); }} busy={quickBusy}
       title={quick?.operation === "approve" ? "Duyệt nguồn tri thức?" : "Ngừng dùng nguồn tri thức?"}
-      description={quick?.operation === "approve" ? "Sau khi duyệt, AI của tổ chức có thể trích dẫn nguồn trong khoảng hiệu lực." : "AI không còn trích dẫn nguồn này ở yêu cầu mới; bài Learn đã xuất bản không bị sửa."}
+      description={quick?.operation === "approve" ? "Sau khi duyệt, AI của tổ chức có thể trích dẫn nguồn trong khoảng hiệu lực." : "AI không còn trích dẫn nguồn này ở yêu cầu mới; bài học đã xuất bản không bị sửa."}
       tone={quick?.operation === "retire" ? "danger" : "primary"} confirmLabel={quick?.operation === "approve" ? "Duyệt nguồn" : "Ngừng dùng"} onConfirm={runQuick}>
-      <p className={styles.muted}>{quick?.source.title} · phiên bản {quick?.source.versionLabel} · bản ghi {quick?.source.revision}</p>
+      <p className={styles.muted}>{quick?.source.title} · phiên bản {quick?.source.versionLabel}</p>
     </ConfirmDialog>
   </div>;
 }

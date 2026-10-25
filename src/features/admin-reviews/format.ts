@@ -6,7 +6,7 @@ export function statusLabel(status: string): string {
   if (status === "Submitted") return "Chờ duyệt";
   if (status === "Approved") return "Đã duyệt nội dung";
   if (status === "Rejected") return "Đã từ chối";
-  return status;
+  return "Không rõ";
 }
 
 export function statusTone(status: string): Tone {
@@ -31,8 +31,8 @@ export function shortId(id: string | null | undefined): string {
 }
 
 export function outcomeLabel(outcome: string | null): string {
-  if (!outcome) return "Chưa có kết quả QA";
-  if (outcome === "Passed") return "QA đạt (Passed)";
-  if (outcome === "Failed") return "QA không đạt (Failed)";
-  return outcome;
+  if (!outcome) return "Chưa có kết quả kiểm tra tự động";
+  if (outcome === "Passed") return "Kiểm tra tự động đạt";
+  if (outcome === "Failed") return "Kiểm tra tự động không đạt";
+  return "Chưa rõ kết quả kiểm tra";
 }

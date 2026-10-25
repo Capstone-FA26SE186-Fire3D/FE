@@ -28,15 +28,15 @@ export function LegacyBanner({ accessToken, buildingId, scenarioId, revisionId, 
   const reading = floors.reading;
   const canCreate = reading?.kind === "valid";
 
-  return <Alert tone="warning" title="Bản nháp cũ (chưa theo fet3d.editor/1)">
+  return <Alert tone="warning" title="Bản nháp cũ (chưa soạn trên mô hình 3D)">
     <div className="ops-stack" data-testid="legacy-banner">
       <p style={{ margin: 0 }}>Tọa độ của bản nháp này không có khung tham chiếu hay đơn vị được khai báo nên <strong>không được tự chuyển đổi</strong>. Bạn vẫn sửa được theo cấu trúc cũ; lưu sẽ không đổi nó sang cấu trúc mới.</p>
       {reading?.kind === "reprocess" && revisionId ? <ReprocessGuide buildingId={buildingId} revisionId={revisionId} />
         : revisionId ? <FloorsStatus reading={reading} loading={floors.loading} error={floors.error} reload={floors.reload} buildingId={buildingId} revisionId={revisionId} /> : null}
       <div>
         <Button type="button" variant="secondary" size="sm" disabled={!canCreate} onClick={() => setOpen(true)} data-testid="create-v1-draft"
-          title={canCreate ? undefined : "Cần Geometry hợp lệ theo fet3d.editor/1 của revision này"}>
-          <FilePlus2 size={14} aria-hidden="true" /> Tạo bản nháp mới theo fet3d.editor/1
+          title={canCreate ? undefined : "Cần mô hình 3D hợp lệ của bản IFC này"}>
+          <FilePlus2 size={14} aria-hidden="true" /> Tạo bản nháp mới trên mô hình 3D
         </Button>
       </div>
     </div>
@@ -81,8 +81,8 @@ function ConvertDialog({ accessToken, buildingId, scenarioId, revisionId, pin, d
 
   const href = created ? `${routes.workspaceBuildings}/${buildingId}/scenarios/${scenarioId}?draft=${encodeURIComponent(created.id)}` : "";
 
-  return <Modal open onOpenChange={(next) => { if (!next) onClose(); }} title="Tạo bản nháp mới theo fet3d.editor/1"
-    description="Bản nháp mới ghim Geometry hiện tại của revision. Bản nháp cũ giữ nguyên, không bị ghi đè."
+  return <Modal open onOpenChange={(next) => { if (!next) onClose(); }} title="Tạo bản nháp mới trên mô hình 3D"
+    description="Bản nháp mới được gắn với mô hình 3D hiện tại của bản IFC. Bản nháp cũ giữ nguyên, không bị ghi đè."
     footer={created
       ? <Button asChild><Link href={href} data-testid="open-new-draft">Mở bản nháp mới</Link></Button>
       : <><Button type="button" variant="quiet" onClick={onClose}>Hủy</Button><Button type="button" onClick={() => void create()} disabled={creating} data-testid="confirm-create-v1">{creating ? "Đang tạo…" : "Tạo bản nháp mới"}</Button></>}>
@@ -96,11 +96,11 @@ function ConvertDialog({ accessToken, buildingId, scenarioId, revisionId, pin, d
             <label className="se-check"><input type="checkbox" checked={chosen.has(item.key)} onChange={() => toggle(item.key)} data-testid={`carry-${item.key}`} /> {item.label} <small className="ops-field-hint">({item.summary})</small></label>
           </li>)}
         </ul>
-        <p className="ops-field-hint">Chỉ những mục đã hợp lệ theo schema mới được đề nghị. Rubric cũ dùng schema_version khác &quot;1&quot; phải nhập lại.</p>
+        <p className="ops-field-hint">Chỉ những mục đã đúng định dạng mới được đề nghị. Rubric cũ theo định dạng khác phải nhập lại.</p>
       </fieldset>}
       {error && <Alert tone="danger" title="Tạo bản nháp thất bại">{error}</Alert>}
       {created && <Alert tone="success" title={created.initialized ? "Đã tạo bản nháp mới" : "Đã tạo bản nháp, chưa khởi tạo xong"}>
-        {created.initialized ? "Bản nháp mới đã ghim Geometry. Mở nó để đặt đối tượng." : "Mở bản nháp mới rồi bấm “Khởi tạo” để ghim Geometry; không có gì bị mất."}
+        {created.initialized ? "Bản nháp mới đã gắn với mô hình 3D. Mở nó để đặt đối tượng." : "Mở bản nháp mới rồi bấm “Khởi tạo” để gắn mô hình 3D; không có gì bị mất."}
       </Alert>}
     </div>
   </Modal>;

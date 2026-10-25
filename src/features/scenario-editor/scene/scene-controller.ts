@@ -288,9 +288,9 @@ export class EditorSceneController {
       response = await fetch(url, { signal, credentials: "omit" });
     } catch (cause) {
       if (signal.aborted) throw cause;
-      throw new ModelLoadError("Không tải được tệp mô hình (lỗi mạng hoặc bị chặn CORS).");
+      throw new ModelLoadError("Không tải được mô hình 3D. Kiểm tra mạng rồi thử lại.");
     }
-    if (!response.ok) throw new ModelLoadError(`Máy chủ lưu trữ trả mã ${response.status} khi tải mô hình.`, response.status);
+    if (!response.ok) throw new ModelLoadError("Kho lưu trữ chưa trả được tệp mô hình 3D. Hãy thử tải lại.", response.status);
     const total = Number(response.headers.get("content-length")) || 0;
     const reader = response.body?.getReader();
     let buffer: ArrayBuffer;
@@ -316,7 +316,7 @@ export class EditorSceneController {
     try {
       gltf = await new GLTFLoader().parseAsync(buffer, "");
     } catch {
-      throw new ModelLoadError("Tệp mô hình không phải GLB hợp lệ hoặc dùng nén chưa được hỗ trợ (Draco/Meshopt/KTX2).");
+      throw new ModelLoadError("Tệp mô hình 3D bị hỏng hoặc ở định dạng chưa hỗ trợ. Hãy xử lý lại tệp IFC hoặc liên hệ hỗ trợ.");
     }
     if (this.disposed || signal.aborted) {
       disposeObject3D(gltf.scene);

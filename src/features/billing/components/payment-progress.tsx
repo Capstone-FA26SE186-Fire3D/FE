@@ -7,6 +7,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge, type Tone } from "@/components/ui/status-badge";
+import { SupportCode } from "@/components/ui/support-code";
 import { billingApi } from "../api";
 import { billingCodeMessage, billingErrorText } from "../errors";
 import { formatDateTime, formatVnd } from "../format";
@@ -40,7 +41,7 @@ export function summarizePayment(payment: PayosPayment): PaymentSummary {
     case "Failed":
       return { tone: "danger", title: "Thanh toán không thành công", detail: "Chưa có khoản tiền nào được ghi nhận. Thử tạo lại thanh toán.", final: true };
     default:
-      return { tone: "info", title: `Trạng thái thanh toán: ${payment.paymentStatus}`, detail: "Trang tự cập nhật khi có thay đổi.", final: false };
+      return { tone: "info", title: "Đang cập nhật trạng thái thanh toán", detail: "Trang tự cập nhật khi có thay đổi.", final: false };
   }
 }
 
@@ -50,7 +51,7 @@ function Dot({ state }: { state: StepState }) {
 }
 
 function lineBadge(line: ProvisioningLine) {
-  const item = provisioningLabels[line.status] ?? { label: line.status, tone: "neutral" as Tone };
+  const item = provisioningLabels[line.status] ?? { label: "Không rõ", tone: "neutral" as Tone };
   return <StatusBadge tone={item.tone}>{item.label}</StatusBadge>;
 }
 
@@ -67,14 +68,14 @@ export function PaymentStatusView({ payment, buildingNames }: { payment: PayosPa
       <li className="bill-step" data-state="done"><Dot state="done" /><div><h4>Chấp nhận báo giá</h4><p>Số tiền theo báo giá: {formatVnd(payment.amount)}</p></div></li>
       <li className="bill-step" data-state={paymentState}><Dot state={paymentState} /><div>
         <h4>Thanh toán qua PayOS</h4>
-        <p>{paid ? `Đã ghi nhận ${payment.paidAt ? `lúc ${formatDateTime(payment.paidAt)}` : ""}${payment.transactionStatus ? ` · giao dịch ${payment.transactionStatus}` : ""}` : summary.title}</p>
+        <p>{paid ? `Đã ghi nhận ${payment.paidAt ? `lúc ${formatDateTime(payment.paidAt)}` : ""}` : summary.title}</p>
       </div></li>
       <li className="bill-step" data-state={provisioningState}><Dot state={provisioningState} /><div>
-        <h4>Kích hoạt dịch vụ (từng công trình hoặc quota AI)</h4>
+        <h4>Kích hoạt dịch vụ (từng công trình hoặc hạn mức AI)</h4>
         <p>{!paid ? "Bắt đầu sau khi PayOS xác nhận thanh toán." : payment.provisioningStatus === "Succeeded" ? "Hoàn tất cho mọi mục trong báo giá." : "Chưa hoàn tất: chưa xem là đã có dịch vụ."}</p>
         {payment.items.length > 0 && <ul aria-label="Trạng thái kích hoạt theo mục">
           {payment.items.map((line) => <li key={line.quotationItemId} data-testid="provisioning-line" data-line-status={line.status}>
-            <span>{line.buildingId === null ? "Quota AI trả trước (top-up)" : buildingNames[line.buildingId] ?? `Công trình ${line.buildingId.slice(0, 8)}`}{line.errorCode && <small className="bill-dim" style={{ display: "block" }}>{billingCodeMessage(line.errorCode) ?? `Mã lỗi: ${line.errorCode}`}</small>}</span>
+            <span>{line.buildingId === null ? "Hạn mức AI nạp thêm" : buildingNames[line.buildingId] ?? `Công trình ${line.buildingId.slice(0, 8)}`}{line.errorCode && <small className="bill-dim" style={{ display: "block" }}>{billingCodeMessage(line.errorCode) ?? "Mục này chưa kích hoạt được. Hệ thống sẽ tự thử lại; nếu kéo dài hãy liên hệ hỗ trợ."}</small>}{line.errorCode && <SupportCode code={line.errorCode} />}</span>
             {lineBadge(line)}
           </li>)}
         </ul>}

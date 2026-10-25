@@ -77,13 +77,13 @@ test.describe("IFC progress view", () => {
     });
     await expect(step(page, "upload")).toHaveAttribute("data-state", "done");
     await expect(step(page, "quarantine")).toHaveAttribute("data-state", "skipped");
-    await expect(step(page, "quarantine")).toContainText("Pending");
+    await expect(step(page, "quarantine")).toContainText("Chưa có kết quả kiểm tra tệp");
     await expect(step(page, "geometry")).toHaveAttribute("data-state", "active");
-    await expect(step(page, "geometry")).toContainText("lần chạy #2");
+    await expect(step(page, "geometry")).toContainText("lượt xử lý thứ 2");
     await expect(step(page, "geometry")).toContainText("bước Tạo lưới di chuyển");
     await expect(step(page, "qa")).toHaveAttribute("data-state", "todo");
     await expect(step(page, "exit")).toHaveCount(0);
-    await expect(next(page)).toContainText("Đang dựng hình học");
+    await expect(next(page)).toContainText("Đang dựng mô hình 3D");
     await expect(next(page).getByRole("button")).toHaveCount(0);
   });
 
@@ -91,8 +91,8 @@ test.describe("IFC progress view", () => {
     await open(page, { revisions: [rev("Uploaded")], jobStatus: "Failed" });
     await expect(step(page, "geometry")).toHaveAttribute("data-state", "error");
     await expect(next(page)).toContainText("Xử lý IFC thất bại");
-    await next(page).getByRole("button", { name: "Chạy lại job thất bại" }).click();
-    await expect(page.getByRole("dialog", { name: "Chạy lại job thất bại?" })).toBeVisible();
+    await next(page).getByRole("button", { name: "Chạy lại lượt xử lý bị lỗi" }).click();
+    await expect(page.getByRole("dialog", { name: "Chạy lại lượt xử lý bị lỗi?" })).toBeVisible();
     await expect(page.getByLabel("Lý do chạy lại")).toBeVisible();
     await page.getByRole("button", { name: "Hủy" }).click();
     await next(page).getByRole("button", { name: "Tải lên IFC mới" }).click();
@@ -122,9 +122,9 @@ test.describe("IFC progress view", () => {
     // Per-issue next step from the QA guide (Issue chip of the "Kỹ thuật" sub-tab).
     await page.getByTestId("ifc-sub-technical").click();
     await expect(page.getByTestId("details-tab-issues")).toHaveAttribute("aria-pressed", "true");
-    const exitRow = page.getByTestId("issue-row").filter({ has: page.getByText("IFC_EXIT_UNKNOWN") });
+    const exitRow = page.locator('[data-testid="issue-row"][data-code="IFC_EXIT_UNKNOWN"]');
     await expect(exitRow.getByTestId("issue-action")).toHaveAttribute("data-action", "equipment");
-    const editorRow = page.getByTestId("issue-row").filter({ has: page.getByText("IFC_NO_FIRE_EQUIPMENT") });
+    const editorRow = page.locator('[data-testid="issue-row"][data-code="IFC_NO_FIRE_EQUIPMENT"]');
     await editorRow.getByTestId("issue-action").click();
     await expect(page).toHaveURL(/tab=scenarios/);
   });
@@ -136,12 +136,12 @@ test.describe("IFC progress view", () => {
     await expect(step(page, "exit")).toHaveCount(0);
     await expect(next(page)).toContainText("Mô hình cần sửa");
     await expect(next(page)).toContainText("tải lên IFC mới");
-    // Leave the technical details on "Nhật ký", go back to the progress view: "Xem issue QA" must land on the Issue chip.
+    // Leave the technical details on "Nhật ký", go back to the progress view: "Xem các vấn đề" must land on the Vấn đề chip.
     await page.getByTestId("ifc-sub-technical").click();
     await page.getByRole("button", { name: "Nhật ký", exact: true }).click();
     await expect(page.getByRole("button", { name: "Nhật ký", exact: true })).toHaveAttribute("aria-pressed", "true");
     await page.getByTestId("ifc-sub-progress").click();
-    await next(page).getByRole("button", { name: "Xem issue QA" }).click();
+    await next(page).getByRole("button", { name: "Xem các vấn đề" }).click();
     await expect(page).toHaveURL(/sub=technical/);
     await expect(page.getByTestId("details-tab-issues")).toHaveAttribute("aria-pressed", "true");
     await page.getByTestId("issue-row").getByTestId("issue-action").click(); // IFC_NO_SPACES → re-upload
@@ -152,7 +152,7 @@ test.describe("IFC progress view", () => {
     await open(page, { revisions: [rev("ReadyForScenario")], jobStatus: "Succeeded", issues: [issue("IFC_SPACE_UNNAMED", "Warning")] });
     for (const id of ["upload", "quarantine", "geometry", "qa", "ready"]) await expect(step(page, id)).toHaveAttribute("data-state", "done");
     await expect(next(page)).toContainText("Sẵn sàng soạn kịch bản");
-    await expect(next(page)).toContainText("còn 1 cảnh báo không chặn");
+    await expect(next(page)).toContainText("còn 1 cảnh báo, không ảnh hưởng");
     await next(page).getByRole("button", { name: "Soạn kịch bản" }).click();
     await expect(page).toHaveURL(/tab=scenarios/);
     await expect(page).toHaveURL(/revision=rev-2/);
@@ -162,14 +162,14 @@ test.describe("IFC progress view", () => {
   test("Rejected, rejected file and Superseded each get explicit guidance", async ({ page }) => {
     await open(page, { revisions: [newer, rev("Superseded")], jobStatus: "Succeeded" }, "/workspace/buildings/building-1?tab=ifc&revision=rev-2");
     await expect(step(page, "ready")).toHaveAttribute("data-state", "skipped");
-    await expect(next(page)).toContainText("Revision đã được thay thế");
-    await next(page).getByRole("button", { name: "Xem revision mới nhất" }).click();
+    await expect(next(page)).toContainText("Bản IFC đã được thay thế");
+    await next(page).getByRole("button", { name: "Xem bản IFC mới nhất" }).click();
     await expect(page).toHaveURL(/revision=rev-3/);
 
     await page.unrouteAll({ behavior: "ignoreErrors" });
     await open(page, { revisions: [rev("Rejected")], jobStatus: "Succeeded" });
     await expect(step(page, "ready")).toHaveAttribute("data-state", "error");
-    await expect(next(page)).toContainText("Revision bị từ chối");
+    await expect(next(page)).toContainText("Bản IFC bị từ chối");
     await expect(next(page).getByRole("button")).toHaveText(["Tải lên IFC mới"]);
 
     await page.unrouteAll({ behavior: "ignoreErrors" });
@@ -191,15 +191,15 @@ test.describe("IFC progress view", () => {
   test("a failing /qa is surfaced, not read as “no QA yet”", async ({ page }) => {
     await open(page, { revisions: [rev("NeedsFix")], jobStatus: "Succeeded", qa: { status: 500, body: { title: "boom" } } });
     await expect(step(page, "qa")).toHaveAttribute("data-state", "error");
-    await expect(next(page)).toContainText("Không tải được kết quả QA");
-    await expect(page.getByRole("button", { name: "Tải lại kết quả QA" })).toBeVisible();
-    await expect(page.getByText("QA đạt", { exact: true })).toHaveCount(0);
+    await expect(next(page)).toContainText("Không tải được kết quả kiểm tra");
+    await expect(page.getByRole("button", { name: "Tải lại kết quả kiểm tra" })).toBeVisible();
+    await expect(page.getByText("Kiểm tra đạt", { exact: true })).toHaveCount(0);
   });
 
   test("preview: NotReady is checked again every 5s; ReprocessRequired explains the re-upload", async ({ page }) => {
     const previewUrl = "/workspace/buildings/building-1?tab=ifc&sub=preview";
     const calls = await open(page, { revisions: [rev("Uploaded")], jobStatus: "Running" }, previewUrl);
-    await expect(page.getByText("Preview chưa sẵn sàng")).toBeVisible();
+    await expect(page.getByText("Xem trước 3D chưa sẵn sàng")).toBeVisible();
     await expect.poll(() => calls.preview, { timeout: 12_000 }).toBeGreaterThanOrEqual(2);
 
     await page.unrouteAll({ behavior: "ignoreErrors" });

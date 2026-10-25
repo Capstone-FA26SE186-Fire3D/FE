@@ -64,14 +64,14 @@ test.describe("Organization AI page: history", () => {
     await page.keyboard.press("Escape");
     await expect(drawer(page)).toHaveCount(0);
     await expect(page).not.toHaveURL(/request=/);
-    await page.getByRole("tab", { name: "Quota & giới hạn" }).click();
+    await page.getByRole("tab", { name: "Hạn mức & giới hạn" }).click();
     await expect(page).toHaveURL(/tab=quota/);
     await expect(page).not.toHaveURL(/status=/);
     await expect(page.getByTestId("ai-rail-quota")).toContainText("900");
     await expect(page.getByTestId("ai-rail-quota")).toContainText("Đã cấp");
     await expect(page.getByTestId("ai-limit-row")).toHaveCount(2);
     await expect(page.getByTestId("ai-limit-row").first()).toContainText("50 tokens");
-    await expect(page.getByRole("link", { name: "Nạp quota AI" })).toHaveAttribute("href", "/workspace/billing?tab=ai");
+    await expect(page.getByRole("link", { name: "Nạp thêm hạn mức AI" })).toHaveAttribute("href", "/workspace/billing?tab=ai");
   });
 
   test("history empty, filtered-empty and error states", async ({ page }) => {
@@ -149,7 +149,7 @@ test.describe("Organization AI page: saved proposals", () => {
     await expect(preview).toContainText("Sơ tán do báo cháy tầng 2");
     await expect(preview).toContainText("Nhận biết tín hiệu báo cháy");
     await expect(page.getByTestId("ai-draft-notes")).toContainText("Cần kiểm tra lại vị trí");
-    await expect(page.getByTestId("ai-draft-objects")).toContainText("Neo BIM (IFC GlobalId) 1hOSvn6df7F8_7GcBWlRGQ");
+    await expect(page.getByTestId("ai-draft-objects")).toContainText("Gắn phần tử IFC 1hOSvn6df7F8_7GcBWlRGQ");
     await expect(page.getByTestId("ai-status")).toHaveText("Hoàn tất");
     await expect(page.getByText("Cần bạn chỉnh sửa trước khi dùng")).toBeVisible();
     await expect(page.getByTestId("ai-citation")).toContainText("QCVN 06:2022/BXD");

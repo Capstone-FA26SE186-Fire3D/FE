@@ -93,8 +93,8 @@ export function OrganizationDetail({ id, accessToken, onLoaded, onSaved }: { id:
     if (inFlight.current || !edits || !dirty) return;
     const found: FieldErrors = {};
     if (pending.name !== undefined && (!pending.name || pending.name.length > 200)) found.name = "Tên tổ chức dài từ 1 đến 200 ký tự.";
-    if (pending.address !== undefined && (!pending.address || pending.address.length > 500)) found.address = organization.address ? "Địa chỉ không được để trống (tối đa 500 ký tự); API không cho xóa trắng." : "Địa chỉ dài từ 1 đến 500 ký tự.";
-    if (pending.phoneNumber !== undefined && !pending.phoneNumber) found.phoneNumber = "Số điện thoại không được để trống; API không cho xóa trắng.";
+    if (pending.address !== undefined && (!pending.address || pending.address.length > 500)) found.address = organization.address ? "Địa chỉ không được để trống (tối đa 500 ký tự). Địa chỉ đã có thì chỉ sửa được, không xóa trống được." : "Địa chỉ dài từ 1 đến 500 ký tự.";
+    if (pending.phoneNumber !== undefined && !pending.phoneNumber) found.phoneNumber = "Số điện thoại không được để trống. Số đã có thì chỉ sửa được, không xóa trống được.";
     setErrors(found);
     if (found.name || found.address || found.phoneNumber) return;
     if (!etag) { setFormError("Chưa có phiên bản hồ sơ để đối chiếu. Hãy tải lại rồi lưu lại."); return; }
@@ -142,14 +142,14 @@ export function OrganizationDetail({ id, accessToken, onLoaded, onSaved }: { id:
       { label: "Địa chỉ", value: dash(organization.address) },
       { label: "Số điện thoại", value: dash(organization.phoneNumber) },
       ...(hasCounts ? [{ label: "Quy mô", value: `${organization.buildingCount ?? "—"} công trình · ${organization.accountCount ?? "—"} tài khoản` }] : []),
-      { label: "Mã tổ chức", value: <span className="adm-mono">{organization.id}</span> },
+      { label: "Mã định danh", value: <span className="adm-mono" title={organization.id}>{organization.id.slice(0, 8)}…</span> },
       { label: "Tạo lúc", value: formatDate(organization.createdAt) },
       { label: "Cập nhật", value: formatDate(organization.updatedAt) },
     ]} />}
 
     {edits && <form onSubmit={submit} noValidate className="ops-stack" aria-label="Sửa hồ sơ tổ chức">
       {staleEtag !== null && <Alert tone="warning" title={reloaded ? "Đã tải bản mới nhất" : "Hồ sơ vừa được thay đổi ở nơi khác"} action={!reloaded && <Button type="button" size="sm" variant="secondary" className="mt-3" onClick={reload} disabled={loading}>{loading ? "Đang tải…" : "Tải bản mới để đối chiếu"}</Button>}>
-        {reloaded ? `Máy chủ hiện: ${organization.name} · ${dash(organization.address)} · ${dash(organization.phoneNumber)}. Nội dung bạn nhập vẫn được giữ; kiểm tra rồi bấm Lưu để áp dụng, hoặc Hủy để bỏ.` : "Nội dung bạn nhập được giữ nguyên, chưa ghi đè gì. Tải bản mới để đối chiếu rồi lưu lại."}
+        {reloaded ? `Bản mới nhất: ${organization.name} · ${dash(organization.address)} · ${dash(organization.phoneNumber)}. Nội dung bạn nhập vẫn được giữ; kiểm tra rồi bấm Lưu để áp dụng, hoặc Hủy để bỏ.` : "Nội dung bạn nhập được giữ nguyên, chưa ghi đè gì. Tải bản mới để đối chiếu rồi lưu lại."}
       </Alert>}
       <Field label="Tên tổ chức" required error={errors.name}>{(p) => <Input {...p} maxLength={200} value={shown.name} onChange={(event) => setEdits({ ...edits, name: event.target.value })} />}</Field>
       <Field label="Địa chỉ" error={errors.address}>{(p) => <Input {...p} maxLength={500} value={shown.address} onChange={(event) => setEdits({ ...edits, address: event.target.value })} />}</Field>
@@ -165,7 +165,7 @@ export function OrganizationDetail({ id, accessToken, onLoaded, onSaved }: { id:
     <div className="ops-actions" aria-label="Liên kết tổ chức">
       <Button asChild size="sm" variant="secondary"><Link href={buildingsHref(organization.id)}><Building2 size={14} aria-hidden="true" />Xem công trình</Link></Button>
       <Button asChild size="sm" variant="secondary"><Link href={`${routes.adminOrganizations}/${organization.id}/analytics`}><BarChart3 size={14} aria-hidden="true" />Xem báo cáo</Link></Button>
-      <Button asChild size="sm" variant="secondary"><Link href={ownersHref(organization.id)}><UserPlus size={14} aria-hidden="true" />Tạo OrganizationUser</Link></Button>
+      <Button asChild size="sm" variant="secondary"><Link href={ownersHref(organization.id)}><UserPlus size={14} aria-hidden="true" />Tạo tài khoản tổ chức</Link></Button>
     </div>
   </div>;
 }

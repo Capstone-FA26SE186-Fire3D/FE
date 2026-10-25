@@ -137,7 +137,7 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
     await rowAction(page, /^Sửa thông tin/);
     await editDialog(page).getByLabel("Tên công trình", { exact: true }).fill("Tên của tôi");
     await page.getByRole("button", { name: "Lưu thay đổi" }).click();
-    await expect(page.getByText(/Thiếu phiên bản công trình \(If-Match\)/)).toBeVisible();
+    await expect(page.getByText(/Chưa xác định được bản thông tin công trình đang sửa/)).toBeVisible();
     await expect(page.getByLabel("Tên công trình", { exact: true })).toHaveValue("Tên của tôi");
   });
 

@@ -159,7 +159,7 @@ export default function EditorViewport({ ref, markers, selection, tool, placeKin
     const run = async () => {
       if (expired && autoRefreshes.current < MAX_AUTO_REFRESH) {
         autoRefreshes.current += 1;
-        publishStatus({ phase: "error", message: "Liên kết tải mô hình đã hết hạn. Đang lấy liên kết mới…", expired: true });
+        publishStatus({ phase: "error", message: "Liên kết tải mô hình 3D đã hết hạn. Đang lấy liên kết mới…", expired: true });
         latest.current.onUrlExpired();
         return;
       }
@@ -177,11 +177,11 @@ export default function EditorViewport({ ref, markers, selection, tool, placeKin
         const isExpired = cause instanceof ModelLoadError && cause.status !== undefined && EXPIRED_STATUSES.has(cause.status);
         if (isExpired && autoRefreshes.current < MAX_AUTO_REFRESH) {
           autoRefreshes.current += 1;
-          publishStatus({ phase: "error", message: "Liên kết tải mô hình đã hết hạn. Đang lấy liên kết mới…", expired: true });
+          publishStatus({ phase: "error", message: "Liên kết tải mô hình 3D đã hết hạn. Đang lấy liên kết mới…", expired: true });
           latest.current.onUrlExpired();
           return;
         }
-        publishStatus({ phase: "error", message: cause instanceof Error ? cause.message : "Không tải được mô hình.", expired: isExpired });
+        publishStatus({ phase: "error", message: cause instanceof Error ? cause.message : "Không tải được mô hình 3D.", expired: isExpired });
       }
     };
     void run();
@@ -190,11 +190,11 @@ export default function EditorViewport({ ref, markers, selection, tool, placeKin
 
   return <div className="se-viewport" data-model-state={status.phase}>
     <div ref={hostRef} className="se-canvas-host" role="application" aria-label="Khung nhìn 3D. Dùng chuột hoặc cảm ứng để xoay, kéo để di chuyển, cuộn để thu phóng; danh sách đối tượng bên cạnh là cách chọn bằng bàn phím." />
-    {status.phase === "loading" && <div className="se-overlay-chip" role="status"><Skeleton style={{ width: 14, height: 14, borderRadius: 999 }} /> Đang tải mô hình{status.progress !== null ? ` ${Math.round(status.progress * 100)}%` : "…"}</div>}
+    {status.phase === "loading" && <div className="se-overlay-chip" role="status"><Skeleton style={{ width: 14, height: 14, borderRadius: 999 }} /> Đang tải mô hình 3D{status.progress !== null ? ` ${Math.round(status.progress * 100)}%` : "…"}</div>}
     {status.phase === "error" && !lost && <div className="se-overlay-card" role="alert">
       <TriangleAlert size={20} aria-hidden="true" />
-      <div><strong>{status.expired ? "Liên kết tải mô hình đã hết hạn" : "Không tải được mô hình"}</strong><p>{status.message}</p></div>
-      <Button type="button" variant="secondary" size="sm" onClick={() => { autoRefreshes.current = 0; latest.current.onUrlExpired(); }}><RotateCcw size={14} aria-hidden="true" /> Tải lại mô hình</Button>
+      <div><strong>{status.expired ? "Liên kết tải mô hình 3D đã hết hạn" : "Không tải được mô hình 3D"}</strong><p>{status.message}</p></div>
+      <Button type="button" variant="secondary" size="sm" onClick={() => { autoRefreshes.current = 0; latest.current.onUrlExpired(); }}><RotateCcw size={14} aria-hidden="true" /> Tải lại</Button>
     </div>}
     {unsupported && <div className="se-overlay-full" role="alert">
       <TriangleAlert size={28} aria-hidden="true" />
@@ -207,6 +207,6 @@ export default function EditorViewport({ ref, markers, selection, tool, placeKin
       <p>Trình duyệt đã thu hồi GPU (thường do thiếu bộ nhớ hoặc quá nhiều tab 3D). Nội dung bản nháp không bị ảnh hưởng. Khung nhìn tự khôi phục nếu trình duyệt cho phép, hoặc bạn có thể tạo lại ngay.</p>
       <Button type="button" onClick={() => { setLost(false); setRemount((value) => value + 1); }}><RotateCcw size={16} aria-hidden="true" /> Tạo lại khung nhìn</Button>
     </div>}
-    {!model && !unsupported && status.phase === "none" && <div className="se-overlay-hint">Chưa có mô hình để hiển thị — vẫn có thể đặt đối tượng theo tọa độ.</div>}
+    {!model && !unsupported && status.phase === "none" && <div className="se-overlay-hint">Chưa có mô hình 3D để hiển thị — vẫn có thể đặt đối tượng theo tọa độ.</div>}
   </div>;
 }

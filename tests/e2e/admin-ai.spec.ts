@@ -55,7 +55,7 @@ test.describe("Admin AI: requests and reconcile", () => {
     await open(page, mock, `/admin/ai?request=${stuck.requestId}`);
     await expect(page.getByTestId("ai-status")).toHaveText("Chờ đối soát");
     await page.getByTestId("ai-reconcile").click();
-    await expect(page.getByRole("dialog", { name: "Đối soát yêu cầu AI?" })).toContainText("Chỉ lên lịch tra cứu");
+    await expect(page.getByRole("dialog", { name: "Đối soát yêu cầu AI?" })).toContainText("Chỉ lên lịch hỏi lại nhà cung cấp");
     expect(calls(mock, "POST", `/api/admin/ai/requests/${stuck.requestId}/reconcile`)).toHaveLength(0);
     await page.getByTestId("ai-reconcile-confirm").click();
     await expect(page.getByText("Đã lên lịch tra cứu").first()).toBeVisible();
@@ -112,7 +112,7 @@ test.describe("Admin AI: requests and reconcile", () => {
   test("an organization account has no access to the admin AI area", async ({ page }) => {
     const mock = newAiMock();
     await open(page, mock, "/admin/ai", owner);
-    await expect(page.getByText("Chỉ PlatformAdmin có thể truy cập khu quản trị.")).toBeVisible();
+    await expect(page.getByText("Chỉ quản trị FET3D được vào khu quản trị.")).toBeVisible();
     expect(calls(mock, "GET", "/api/admin/ai/requests")).toHaveLength(0);
   });
 });
@@ -126,10 +126,10 @@ test.describe("Admin AI: policies", () => {
     await expect(policyRows(page)).toContainText("tokens");
     await page.getByTestId("policy-new").click();
     const form = page.getByRole("form", { name: "Tạo chính sách AI" });
-    for (const label of ["Đơn vị quota", "Giữ chỗ mỗi yêu cầu", "Số ký tự đầu vào tối đa", "Số nguồn tối đa", "Hiệu lực từ", "Hiệu lực đến"]) await expect(form.getByLabel(label)).toHaveValue("");
+    for (const label of ["Đơn vị hạn mức", "Giữ chỗ mỗi yêu cầu", "Số ký tự đầu vào tối đa", "Số nguồn tối đa", "Hiệu lực từ", "Hiệu lực đến"]) await expect(form.getByLabel(label)).toHaveValue("");
     // The operation combobox has no preset either: it still shows its placeholder.
     await expect(form.getByLabel("Thao tác")).toHaveAttribute("data-placeholder", "true");
-    await expect(form).toContainText("Chính sách bất biến");
+    await expect(form).toContainText("Không sửa được sau khi tạo");
 
     await page.getByTestId("policy-create").click();
     await expect(form.getByText("Chọn thao tác.")).toBeVisible();
@@ -137,18 +137,18 @@ test.describe("Admin AI: policies", () => {
     expect(calls(mock, "POST", "/api/admin/ai/policies")).toHaveLength(0);
 
     await form.getByLabel("Thao tác").click();
-    await page.getByRole("option", { name: /\(ScenarioDraft\)/ }).click();
-    await form.getByLabel("Đơn vị quota").fill("Tokens");
+    await page.getByRole("option", { name: "Đề xuất kịch bản", exact: true }).click();
+    await form.getByLabel("Đơn vị hạn mức").fill("Tokens");
     await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("0");
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("20001");
     await form.getByLabel("Số nguồn tối đa").fill("101");
     await page.getByTestId("policy-create").click();
-    await expect(form.getByText(/Chữ thường, bắt đầu bằng chữ cái/)).toBeVisible();
+    await expect(form.getByText(/Chữ thường không dấu, bắt đầu bằng chữ cái/)).toBeVisible();
     await expect(form.getByText("Số nguyên từ 1 đến 20.000.")).toBeVisible();
     await expect(form.getByText("Số nguyên từ 1 đến 100.", { exact: true })).toBeVisible();
     expect(calls(mock, "POST", "/api/admin/ai/policies")).toHaveLength(0);
 
-    await form.getByLabel("Đơn vị quota").fill("tokens");
+    await form.getByLabel("Đơn vị hạn mức").fill("tokens");
     await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("120");
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("6000");
     await form.getByLabel("Số nguồn tối đa").fill("12");
@@ -168,8 +168,8 @@ test.describe("Admin AI: policies", () => {
     await page.getByTestId("policy-new").click();
     const form = page.getByRole("form", { name: "Tạo chính sách AI" });
     await form.getByLabel("Thao tác").click();
-    await page.getByRole("option", { name: /\(Answer\)/ }).click();
-    await form.getByLabel("Đơn vị quota").fill("tokens");
+    await page.getByRole("option", { name: "Hỏi đáp", exact: true }).click();
+    await form.getByLabel("Đơn vị hạn mức").fill("tokens");
     await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("10");
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("100");
     await form.getByLabel("Số nguồn tối đa").fill("5");
@@ -213,18 +213,18 @@ test.describe("Admin AI: knowledge sources", () => {
     await page.getByRole("option", { name: "Dùng chung (mọi tổ chức)" }).click();
     await form.getByLabel("Tiêu đề").fill("Nghị định 136/2020/NĐ-CP");
     await form.getByLabel("Nhãn phiên bản").fill("2020");
-    await form.getByLabel("SHA-256 của tài liệu").fill("abc");
+    await form.getByLabel("Mã nội dung (SHA-256) của tài liệu").fill("abc");
     await form.getByLabel("Liên kết tham chiếu (https)").fill("http://example.gov.vn/nd136");
     await page.getByTestId("source-create").click();
     await expect(form.getByText("Chỉ nhận liên kết https.")).toBeVisible();
-    await expect(form.getByText("SHA-256 của tài liệu gồm 64 ký tự hex.")).toBeVisible();
+    await expect(form.getByText("Mã nội dung phải gồm đúng 64 ký tự 0–9 hoặc a–f.")).toBeVisible();
     await form.getByLabel("Liên kết tham chiếu (https)").fill("https://user:secret@example.gov.vn/nd136");
     await page.getByTestId("source-create").click();
     await expect(form.getByText("Liên kết không được chứa tài khoản hoặc mật khẩu.")).toBeVisible();
     expect(calls(mock, "POST", "/api/admin/knowledge-sources")).toHaveLength(0);
 
     await form.getByLabel("Liên kết tham chiếu (https)").fill("https://example.gov.vn/nd136");
-    await form.getByLabel("SHA-256 của tài liệu").fill("C".repeat(64));
+    await form.getByLabel("Mã nội dung (SHA-256) của tài liệu").fill("C".repeat(64));
     await page.getByTestId("source-create").click();
     await expect(page.getByTestId("source-detail")).toContainText("Nghị định 136/2020/NĐ-CP");
     await expect(page.getByTestId("source-status")).toHaveText("Bản nháp");
@@ -239,9 +239,9 @@ test.describe("Admin AI: knowledge sources", () => {
     await open(page, mock, "/admin/ai?tab=sources");
     await page.getByTestId("source-new").click();
     const form = page.getByRole("form", { name: "Đăng ký nguồn tri thức" });
-    await form.getByLabel("Tính SHA-256 từ tệp").setInputFiles({ name: "doc.txt", mimeType: "text/plain", buffer: Buffer.from("abc") });
+    await form.getByLabel("Tính mã nội dung từ tệp").setInputFiles({ name: "doc.txt", mimeType: "text/plain", buffer: Buffer.from("abc") });
     // SHA-256("abc")
-    await expect(form.getByLabel("SHA-256 của tài liệu")).toHaveValue("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    await expect(form.getByLabel("Mã nội dung (SHA-256) của tài liệu")).toHaveValue("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     expect(mock.calls.filter((call) => call.method === "POST")).toHaveLength(0);
   });
 

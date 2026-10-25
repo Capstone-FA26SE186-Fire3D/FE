@@ -25,7 +25,7 @@ test.describe("organization AI quota (mock)", () => {
     await expect(units.first()).toContainText("Không cộng dồn sang kỳ sau");
     const grants = page.getByTestId("quota-grants").locator("tbody tr");
     await expect(grants.nth(0)).toContainText("Gói công trình");
-    await expect(grants.nth(1)).toContainText("Top-up trả trước");
+    await expect(grants.nth(1)).toContainText("Nạp thêm trả trước");
     await expect(grants.nth(1)).toContainText("Chưa đến kỳ");
     await expect(grants.nth(2)).toContainText("Nâng cấp");
     await expect(grants.nth(2)).toContainText("Đã hết hạn");
@@ -47,12 +47,12 @@ test.describe("organization AI quota (mock)", () => {
     await mockBilling(page, mock);
     await page.goto("/workspace/billing?tab=ai");
     const blocked = page.getByTestId("quota-exhausted");
-    await expect(blocked).toContainText("Quota AI đã hết");
+    await expect(blocked).toContainText("Hạn mức AI đã hết");
     await expect(blocked).toContainText("tokens");
     await expect(blocked).toContainText("không tính vượt mức và không ghi nợ");
     await expect(page.getByTestId("quota-available")).toHaveText("0");
-    await blocked.getByRole("button", { name: "Mua thêm quota (top-up)" }).click();
-    await expect(page.getByRole("radio", { name: "Quota AI", exact: true })).toHaveAttribute("aria-checked", "true");
+    await blocked.getByRole("button", { name: "Nạp thêm hạn mức AI" }).click();
+    await expect(page.getByRole("radio", { name: "Hạn mức AI", exact: true })).toHaveAttribute("aria-checked", "true");
     await expect(page.getByLabel("Số lượng muốn mua")).toBeVisible();
   });
 
@@ -61,8 +61,8 @@ test.describe("organization AI quota (mock)", () => {
     await signIn(page, owner);
     await mockBilling(page, mock);
     await page.goto("/workspace/billing?tab=ai");
-    await expect(page.getByTestId("quota-exhausted")).toContainText("Chưa có quota AI");
-    await expect(page.getByText("Chưa có lần cấp quota nào")).toBeVisible();
+    await expect(page.getByTestId("quota-exhausted")).toContainText("Chưa có hạn mức AI");
+    await expect(page.getByText("Chưa có lần cấp hạn mức nào")).toBeVisible();
     await expect(page.getByText("Chưa có lượt dùng AI")).toBeVisible();
   });
 
@@ -74,10 +74,10 @@ test.describe("organization AI quota (mock)", () => {
     await page.route("https://pay.payos.test/**", (route) => route.fulfill({ contentType: "text/html", body: "<html><body>PayOS</body></html>" }));
     await page.goto("/workspace/billing?tab=ai");
     await expect(page.getByTestId("quota-exhausted")).toBeVisible();
-    await page.getByRole("button", { name: "Mua thêm quota (top-up)" }).first().click();
+    await page.getByRole("button", { name: "Nạp thêm hạn mức AI" }).first().click();
     await page.getByLabel("Số lượng muốn mua").fill("500");
-    await page.getByRole("button", { name: "Tạo báo giá top-up" }).click();
-    await expect(page.getByTestId("topup-snapshot")).toContainText("Chờ PlatformAdmin chốt khi phát hành");
+    await page.getByRole("button", { name: "Tạo báo giá nạp thêm" }).click();
+    await expect(page.getByTestId("topup-snapshot")).toContainText("Chờ quản trị FET3D chốt khi phát hành");
     const draftPost = callsTo(mock, "POST", "/api/billing/quotations")[0];
     expect(draftPost.body).toEqual({ purpose: "AIQuotaTopUp", topUp: { requestedQuotaUnits: 500 } });
     expect(draftPost.headers["idempotency-key"]).toBeTruthy();
@@ -102,7 +102,7 @@ test.describe("organization AI quota (mock)", () => {
     await page.goto("/workspace/billing/return?status=PAID");
     const status = page.getByTestId("payment-status");
     await expect(status).toHaveAttribute("data-provisioning-status", "Pending");
-    await expect(page.getByTestId("provisioning-line")).toContainText("Quota AI trả trước (top-up)");
+    await expect(page.getByTestId("provisioning-line")).toContainText("Hạn mức AI nạp thêm");
     await expect(status).not.toContainText("Đã thanh toán và kích hoạt dịch vụ");
     expect(mock.quota.grants).toHaveLength(0);
 
@@ -112,8 +112,8 @@ test.describe("organization AI quota (mock)", () => {
     mock.payment = paymentFixture({ quotationId: id, amount: 200000, provisioningStatus: "Succeeded", items: [{ quotationItemId: id, buildingId: null, status: "Succeeded", entitlementId: null, errorCode: null }] });
     await expect(status).toContainText("Đã thanh toán và kích hoạt dịch vụ", { timeout: 15_000 });
     await page.keyboard.press("Escape");
-    await page.getByRole("tab", { name: "Quota AI" }).click();
-    await expect(page.getByTestId("quota-grant").first()).toContainText("Top-up trả trước");
+    await page.getByRole("tab", { name: "Hạn mức AI" }).click();
+    await expect(page.getByTestId("quota-grant").first()).toContainText("Nạp thêm trả trước");
     await expect(page.getByTestId("topup-quotations").locator("tbody tr").first()).toBeVisible();
   });
 
@@ -125,8 +125,8 @@ test.describe("organization AI quota (mock)", () => {
     await signIn(page, owner);
     await mockBilling(page, mock);
     await page.goto("/workspace/billing?tab=ai");
-    await expect(page.getByText("Không tải được số dư quota AI")).toBeVisible();
-    await expect(page.getByText("Không tải được lịch sử cấp quota")).toBeVisible();
+    await expect(page.getByText("Không tải được số dư hạn mức AI")).toBeVisible();
+    await expect(page.getByText("Không tải được lịch sử cấp hạn mức")).toBeVisible();
     await expect(page.getByText(/không có quyền thực hiện thao tác này/i).first()).toBeVisible();
     await page.getByRole("button", { name: "Thử lại" }).first().click();
     await expect(page.getByTestId("quota-available")).toHaveText("650");
@@ -209,7 +209,7 @@ for (const theme of ["light", "dark"] as const) {
         await page.screenshot({ path: testInfo.outputPath(`${url.replace(/\W+/g, "-")}-${theme}-${width}.png`), fullPage: true });
       }
       await page.goto("/workspace/billing?tab=ai");
-      await page.getByRole("button", { name: "Mua thêm quota (top-up)" }).first().click();
+      await page.getByRole("button", { name: "Nạp thêm hạn mức AI" }).first().click();
       await page.getByLabel("Số lượng muốn mua").fill("500");
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       await page.screenshot({ path: testInfo.outputPath(`topup-drawer-${theme}-${width}.png`) });

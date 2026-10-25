@@ -46,7 +46,7 @@ export const scenarioEditorApi = {
   async getDraft(accessToken: string, draftId: string, signal?: AbortSignal): Promise<LoadedDraft> {
     const response = await apiClient.requestWithMeta<DraftResponse>(`/api/scenario-drafts/${draftId}`, { headers: auth(accessToken), signal });
     const etag = draftEtag(response.headers, response.data.version);
-    if (!etag) throw new Error("Máy chủ không trả ETag cho bản nháp.");
+    if (!etag) throw new Error("Chưa xác định được phiên bản của bản nháp. Hãy tải lại trang.");
     return { draft: response.data, etag };
   },
   /**

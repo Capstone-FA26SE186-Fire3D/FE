@@ -174,7 +174,7 @@ test("412 keeps the typed content, offers a field-level comparison and never ove
   await expect(list).toContainText("Cả hai cùng sửa");
   await expect(list).toContainText("Chỉ máy chủ sửa");
   await expect(list).toContainText("Chỉ bạn sửa");
-  await expect(list).toContainText("$.scoringConfig.timeLimitSeconds");
+  await expect(list).toContainText("Chấm điểm › Thời gian tối đa");
   expect(mock.puts).toHaveLength(0);
 
   // keep my instructions, take the server routes (the default for server-only changes), apply (still unsaved)
@@ -215,10 +215,10 @@ test("428 and 400 (INVALID_IF_MATCH) are reported precisely and content is kept"
   await open(page, mock);
   await page.getByTestId("add-spawn").click();
   await page.getByTestId("save").click();
-  await expect(page.getByRole("alert").filter({ hasText: "Thiếu If-Match" })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "Bản nháp cần tải lại trước khi lưu" })).toBeVisible();
   await expect(status(page)).toHaveText("Lỗi khi lưu");
   await page.getByRole("button", { name: "Thử lại", exact: true }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "INVALID_IF_MATCH" })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "Bản nháp cần tải lại trước khi lưu" })).toBeVisible();
   await page.getByRole("button", { name: "Thử lại", exact: true }).click();
   await expect(status(page)).toHaveText("Đã lưu");
   expect(((mock.puts[0].body as { spawnPoints: unknown[] }).spawnPoints)).toHaveLength(2);
@@ -243,11 +243,11 @@ test("persistent download failure stops auto-refreshing and offers a manual retr
   await open(page, mock, { waitModel: false });
   const card = page.locator(".se-overlay-card");
   await expect(card).toBeVisible({ timeout: 15_000 });
-  await expect(card).toContainText("403");
+  await expect(card).toContainText("Kho lưu trữ chưa trả được tệp mô hình");
   await expect.poll(() => mock.previewCalls).toBe(3); // initial + 2 automatic refreshes, then it stops
   await page.waitForTimeout(500);
   expect(mock.previewCalls).toBe(3);
-  await card.getByRole("button", { name: "Tải lại mô hình" }).click();
+  await card.getByRole("button", { name: "Tải lại", exact: true }).click();
   await expect(page.getByTestId("model-info")).toBeVisible({ timeout: 15_000 });
   expect(mock.previewCalls).toBe(4);
 });
@@ -256,7 +256,7 @@ test("NotReady preview: editor stays usable, light polling picks the model up, m
   const mock = newMock({ previewQueue: ["not-ready", "ready"] });
   await open(page, mock, { waitModel: false });
   await expect(page.getByText("Mô hình 3D chưa sẵn sàng")).toBeVisible();
-  await expect(page.getByText("Trạng thái revision: Đang xử lý")).toBeVisible();
+  await expect(page.getByText("Trạng thái bản IFC: Đang xử lý")).toBeVisible();
   await page.getByTestId("add-spawn").click(); // placing by coordinates needs no model
   await expect(page.getByTestId("spawn-list").getByRole("button")).toHaveCount(2);
   await expect(page.getByTestId("floors-empty")).toBeVisible();
@@ -339,8 +339,8 @@ test("validate saves first, merges server issues with client issues and jumps to
   expect(mock.validateCalls).toBe(1);
   const items = page.getByTestId("issue-item");
   await expect(items).toHaveCount(2);
-  await expect(items.first()).toContainText("HAZARD_TYPE_REQUIRED");
-  await expect(items.first()).toContainText("Máy chủ");
+  await expect(items.first()).toHaveAttribute("data-code", "HAZARD_TYPE_REQUIRED");
+  await expect(items.first()).toContainText("Hệ thống");
   await items.first().click();
   await expect(page.getByTestId("hazard-id")).toHaveValue("hazard-2");
   await expect(hazardItem(page, "hazard-2")).toHaveAttribute("aria-pressed", "true");
@@ -435,8 +435,8 @@ test("client validation flags an empty rubric/objectives without presetting any 
   mock.state = { spawnPoints: [], hazards: [] }; // a freshly created draft body
   await open(page, mock);
   await page.getByTestId("tab-issues").click();
-  const text = await page.getByTestId("issues-panel").innerText();
-  for (const code of ["SPAWN_REQUIRED", "TIME_LIMIT_INVALID", "ROUTE_REQUIRED", "LEARNING_OBJECTIVES_REQUIRED", "LEARNER_INSTRUCTIONS_REQUIRED", "RUBRIC_REQUIRED"]) expect(text).toContain(code);
+  const codes = await page.getByTestId("issues-panel").getByTestId("issue-item").evaluateAll((items) => items.map((item) => item.getAttribute("data-code")));
+  for (const code of ["SPAWN_REQUIRED", "TIME_LIMIT_INVALID", "ROUTE_REQUIRED", "LEARNING_OBJECTIVES_REQUIRED", "LEARNER_INSTRUCTIONS_REQUIRED", "RUBRIC_REQUIRED"]) expect(codes).toContain(code);
   await page.getByRole("tab", { name: "Kịch bản" }).click();
   await expect(page.getByTestId("rubric-threshold")).toHaveValue("");
   await expect(page.getByTestId("time-limit")).toHaveValue("");
@@ -453,11 +453,11 @@ test("legacy draft: banner says so, goals / NPC / blocked / equipment are v1-onl
   await open(page, mock);
   await expect(page.getByTestId("scenario-editor")).toHaveAttribute("data-draft-mode", "legacy");
   const banner = page.getByTestId("legacy-banner");
-  await expect(page.getByText("Bản nháp cũ (chưa theo fet3d.editor/1)")).toBeVisible();
+  await expect(page.getByText("Bản nháp cũ (chưa soạn trên mô hình 3D)")).toBeVisible();
   await expect(banner).toContainText("không được tự chuyển đổi");
   await page.getByRole("tab", { name: "Loại khác" }).click();
   const kinds = page.getByTestId("legacy-kinds");
-  await expect(kinds).toContainText("Chỉ có trong fet3d.editor/1");
+  await expect(kinds).toContainText("Chỉ có khi soạn trên mô hình 3D");
   await expect(page.getByTestId("scenario-editor")).not.toContainText("BE #54");
   await expect(page.getByTestId("playtest")).toHaveAttribute("href", `/workspace/buildings/${BUILDING_ID}/scenarios/${SCENARIO_ID}/versions?tab=playtest`);
   await expect(page.getByTestId("playtest")).not.toContainText("Chờ BE");
@@ -546,7 +546,7 @@ test("no ?draft=: the server's draft list survives a reload, marks the current d
   const list = page.getByRole("list", { name: "Bản nháp đã lưu" });
   await expect(list.getByRole("listitem")).toHaveCount(2);
   await expect(list.getByRole("listitem").first()).toContainText("hiện tại");
-  await expect(list.getByRole("listitem").nth(1)).toContainText("chưa theo fet3d.editor/1");
+  await expect(list.getByRole("listitem").nth(1)).toContainText("bản nháp cũ");
   await page.reload();
   await expect(list.getByRole("listitem")).toHaveCount(2);
   await page.getByTestId(`open-draft-${DRAFT_ID}`).click();

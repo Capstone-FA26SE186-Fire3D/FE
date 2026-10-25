@@ -103,7 +103,7 @@ export function OrganizationsAdmin() {
     const normalizedSlug = slug.trim().toLowerCase();
     const found: CreateErrors = {};
     if (!normalizedName || normalizedName.length > 200) found.name = "Tên tổ chức dài từ 1 đến 200 ký tự.";
-    if (!slugPattern.test(normalizedSlug) || normalizedSlug.length > 100) found.slug = "Slug chỉ gồm chữ thường, số và dấu gạch ngang (tối đa 100 ký tự).";
+    if (!slugPattern.test(normalizedSlug) || normalizedSlug.length > 100) found.slug = "Đường dẫn rút gọn chỉ gồm chữ thường không dấu, số và dấu gạch ngang (tối đa 100 ký tự).";
     setErrors(found);
     if (found.name || found.slug) return;
     setSubmitState("busy");
@@ -111,7 +111,7 @@ export function OrganizationsAdmin() {
     try {
       const created = await organizationsApi.create(accessToken, { name: normalizedName, slug: normalizedSlug });
       setSubmitState("done");
-      toast.notify({ tone: "success", title: "Đã tạo tổ chức", description: `${created.name}. Hãy tạo OrganizationUser owner để bắt đầu quản lý công trình.` });
+      toast.notify({ tone: "success", title: "Đã tạo tổ chức", description: `${created.name}. Hãy tạo tài khoản chủ tổ chức để bắt đầu quản lý công trình.` });
       list.reload();
       window.setTimeout(() => {
         setCreating(false);
@@ -121,8 +121,8 @@ export function OrganizationsAdmin() {
       }, 600);
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 409) {
-        setErrors({ slug: "Slug này đã được dùng (kể cả bởi tổ chức đã xóa). Hãy chọn slug khác." });
-        setFormError("Không tạo được tổ chức vì slug bị trùng.");
+        setErrors({ slug: "Đường dẫn rút gọn này đã được dùng (kể cả bởi tổ chức đã xóa). Hãy chọn đường dẫn khác." });
+        setFormError("Không tạo được tổ chức vì đường dẫn rút gọn bị trùng.");
       } else if (cause instanceof ApiError && cause.fieldErrors.length) {
         setErrors({ name: cause.fieldMessage("name"), slug: cause.fieldMessage("slug") });
         setFormError("Máy chủ từ chối dữ liệu. Kiểm tra các trường được đánh dấu.");
@@ -152,7 +152,7 @@ export function OrganizationsAdmin() {
   };
 
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
-  if (user?.role !== 0) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin có thể quản lý tổ chức.</Alert>;
+  if (user?.role !== 0) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ quản trị FET3D có thể quản lý tổ chức.</Alert>;
 
   const listed = items.find((organization) => organization.id === selectedId);
   const shown = detailOrg?.id === selectedId ? detailOrg : listed;
@@ -202,14 +202,14 @@ export function OrganizationsAdmin() {
           <FilterChip label="Trạng thái" value={active} onChange={(value) => setParams({ status: value })} options={[{ value: "true", label: "Hoạt động" }, { value: "false", label: "Vô hiệu" }]} />
         </FilterChips>
       </>}
-      empty={<EmptyState icon={filtering ? Search : Landmark} title={filtering ? "Không có tổ chức phù hợp." : "Chưa có tổ chức"} description={filtering ? "Thử đổi từ khóa hoặc bộ lọc." : "Tạo tổ chức đầu tiên, sau đó cấp OrganizationUser owner."} action={!filtering ? <Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo tổ chức</Button> : undefined} />}
+      empty={<EmptyState icon={filtering ? Search : Landmark} title={filtering ? "Không có tổ chức phù hợp." : "Chưa có tổ chức"} description={filtering ? "Thử đổi từ khóa hoặc bộ lọc." : "Tạo tổ chức đầu tiên, sau đó tạo tài khoản chủ tổ chức."} action={!filtering ? <Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo tổ chức</Button> : undefined} />}
       pagination={totalCount > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount, onPageChange: setPage } : undefined}
     />
     {list.data && totalCount > 0 && <p className="ops-field-hint" style={{ margin: "10px 0 0" }} role="status">Hiển thị {items.length} trên {formatCount(totalCount)} · bộ lọc áp dụng toàn bộ danh sách.</p>}
 
     <Drawer open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) closeDetail(); }} side={phone ? "bottom" : "right"} size="md" data-testid="organization-drawer"
       title={shown?.name ?? "Thông tin tổ chức"}
-      description={shown ? `slug ${shown.slug} · tạo ${formatDate(shown.createdAt)}` : "Hồ sơ, quy mô và các thao tác quản trị của tổ chức."}
+      description={shown ? `Đường dẫn rút gọn: ${shown.slug} · tạo ${formatDate(shown.createdAt)}` : "Hồ sơ, quy mô và các thao tác quản trị của tổ chức."}
       eyebrow={shown ? organizationStatusChip(shown) : undefined}
       footer={<>
         <Button variant="ghost" onClick={closeDetail}>Đóng</Button>
@@ -220,14 +220,14 @@ export function OrganizationsAdmin() {
       {selectedId && accessToken && <OrganizationDetail key={`${selectedId}:${detailVersion}`} id={selectedId} accessToken={accessToken} onLoaded={setDetailOrg} onSaved={list.reload} />}
     </Drawer>
 
-    <Modal open={creating} onOpenChange={(open) => { if (!open && !saving) setCreating(false); }} size="md" title="Tạo tổ chức" description="Slug là định danh URL, không đổi được sau khi tạo."
+    <Modal open={creating} onOpenChange={(open) => { if (!open && !saving) setCreating(false); }} size="md" title="Tạo tổ chức" description="Đường dẫn rút gọn là tên tổ chức trong địa chỉ web, không đổi được sau khi tạo."
       footer={<>
         <Button type="button" variant="ghost" onClick={() => setCreating(false)} disabled={saving}>Hủy</Button>
         <SubmitButton type="submit" form={formId} state={submitState} doneLabel="Đã tạo">Tạo tổ chức</SubmitButton>
       </>}>
       <form id={formId} onSubmit={submit} noValidate className="ops-stack">
         <Field label="Tên tổ chức" required error={errors.name}>{(p) => <Input {...p} maxLength={200} autoComplete="organization" placeholder="Ví dụ: Trường An Toàn" value={name} onChange={(event) => { const value = event.target.value; setName(value); if (!slugEdited) setSlug(slugify(value)); }} />}</Field>
-        <Field label="Slug tổ chức" required hint="Chỉ dùng chữ thường, số và dấu gạch ngang." error={errors.slug}>{(p) => <Input {...p} maxLength={100} placeholder="truong-an-toan" value={slug} onChange={(event) => { setSlugEdited(true); setSlug(slugify(event.target.value)); }} />}</Field>
+        <Field label="Đường dẫn rút gọn" required hint="Chỉ dùng chữ thường, số và dấu gạch ngang." error={errors.slug}>{(p) => <Input {...p} maxLength={100} placeholder="truong-an-toan" value={slug} onChange={(event) => { setSlugEdited(true); setSlug(slugify(event.target.value)); }} />}</Field>
         {formError && <Alert tone="danger">{formError}</Alert>}
       </form>
     </Modal>
@@ -235,10 +235,10 @@ export function OrganizationsAdmin() {
     <ConfirmDialog open={toggling !== null} onOpenChange={(open) => { if (!open) setToggling(null); }} busy={toggleBusy}
       tone={toggling?.isActive ? "danger" : "primary"}
       title={toggling?.isActive ? "Vô hiệu hóa tổ chức?" : "Kích hoạt tổ chức?"}
-      description={toggling ? (toggling.isActive ? `${toggling.name} sẽ bị khóa: mọi phiên đăng nhập của OrganizationUser thuộc tổ chức bị thu hồi và họ không đăng nhập lại được cho tới khi tổ chức được kích hoạt.` : `${toggling.name} sẽ hoạt động trở lại. Người dùng cần đăng nhập lại; phiên cũ không được khôi phục.`) : undefined}
+      description={toggling ? (toggling.isActive ? `${toggling.name} sẽ bị khóa: mọi tài khoản của tổ chức bị đăng xuất và họ không đăng nhập lại được cho tới khi tổ chức được kích hoạt.` : `${toggling.name} sẽ hoạt động trở lại. Người dùng cần đăng nhập lại; phiên cũ không được khôi phục.`) : undefined}
       confirmLabel={toggling?.isActive ? "Vô hiệu hóa" : "Kích hoạt"}
       onConfirm={confirmToggle}>
-      {toggleError ? <Alert tone="danger">{toggleError}</Alert> : <p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>Thao tác này được ghi nhận trong nhật ký audit.</p>}
+      {toggleError ? <Alert tone="danger">{toggleError}</Alert> : <p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>Thao tác này được ghi vào nhật ký thao tác.</p>}
     </ConfirmDialog>
   </>;
 }

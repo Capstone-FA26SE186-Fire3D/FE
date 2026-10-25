@@ -1,6 +1,6 @@
 "use client";
 
-import { SupportCode } from "@/features/scenarios/components/versions/support-code";
+import { SupportCode } from "@/components/ui/support-code";
 import { Ban, FlaskConical, Play, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -14,7 +14,6 @@ import { SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge, type Tone } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
 import { formatDateTime } from "@/features/scenarios/components/versions/version-content";
-import { shortHash } from "@/features/scenarios/version-readiness";
 
 import "./playtest.css";
 import { playtestApi } from "../api";
@@ -74,19 +73,17 @@ function PackageChecklist({ watch, buildHref }: { watch: PlaytestPackageWatch; b
 
 function Facts({ playtest }: { playtest: PlaytestStatus }) {
   const pkg = playtest.package;
-  return <dl className="ver-dl" data-testid="playtest-facts">
-    <dt>Mã playtest</dt><dd className="ver-hash">{playtest.id}</dd>
+  return <div data-testid="playtest-facts"><dl className="ver-dl">
     <dt>Tạo lúc</dt><dd>{formatDateTime(playtest.createdAt)}</dd>
-    <dt>Package ghim</dt><dd className="ver-hash">#{shortHash(pkg.packageHash, 12)} · {pkg.buildTarget}</dd>
-    <dt>Manifest</dt><dd className="ver-hash">#{shortHash(pkg.manifestHash, 12)} · protocol {pkg.protocolVersion} · schema {pkg.manifestSchemaVersion}</dd>
-    {playtest.runtimeVersion && <><dt>Runtime</dt><dd>{playtest.runtimeVersion}</dd></>}
+    <dt>Gói đang dùng</dt><dd>Gói chạy thử · {pkg.buildTarget}</dd>
+    {playtest.runtimeVersion && <><dt>Phiên bản ứng dụng</dt><dd>{playtest.runtimeVersion}</dd></>}
     {playtest.startedAt && <><dt>Bắt đầu</dt><dd>{formatDateTime(playtest.startedAt)}</dd></>}
-    {playtest.grant && <><dt>Mã khởi chạy</dt><dd>Thế hệ {playtest.grant.generation}, hết hạn {formatDateTime(playtest.grant.expiresAt)}</dd></>}
+    {playtest.grant && <><dt>Mã mở bài</dt><dd>Lần cấp thứ {playtest.grant.generation}, hết hạn {formatDateTime(playtest.grant.expiresAt)}</dd></>}
     {playtest.launchedAt && <><dt>Khởi chạy lúc</dt><dd>{formatDateTime(playtest.launchedAt)}</dd></>}
     {playtest.lastHeartbeatAt && <><dt>Tín hiệu cuối</dt><dd>{formatDateTime(playtest.lastHeartbeatAt)}</dd></>}
     {playtest.launchedAt && <><dt>Đã đồng bộ</dt><dd>{playtest.acknowledgedSequence} sự kiện</dd></>}
     {playtest.endedAt && <><dt>Kết thúc</dt><dd>{formatDateTime(playtest.endedAt)}</dd></>}
-  </dl>;
+  </dl><SupportCode id={playtest.id} /></div>;
 }
 
 function CancelModal({ open, onOpenChange, playtest, accessToken, onCancelled, onTerminal }: {
@@ -124,11 +121,11 @@ function CancelModal({ open, onOpenChange, playtest, accessToken, onCancelled, o
   return <Modal
     open={open}
     onOpenChange={(next) => { if (!busy) { onOpenChange(next); if (!next) setError(null); } }}
-    title="Hủy playtest này?"
+    title="Hủy lượt chạy thử này?"
     description="Lượt chạy thử sẽ dừng và không mở lại được."
     footer={<>
       <Button variant="quiet" onClick={() => onOpenChange(false)} disabled={busy}>Giữ lại</Button>
-      <Button variant="danger" onClick={() => void confirm()} disabled={busy}>{busy ? "Đang hủy…" : "Hủy playtest"}</Button>
+      <Button variant="danger" onClick={() => void confirm()} disabled={busy}>{busy ? "Đang hủy…" : "Hủy chạy thử"}</Button>
     </>}
   >
     <p className="ver-note">{started
@@ -156,10 +153,10 @@ function PlaytestSession({ accessToken, playtestId, canAct, versionId, onForget,
     if (failure) {
       return <Alert tone="danger" title={failure.title} action={<div className="ver-actions-row mt-3">
         <Button size="sm" variant="secondary" onClick={watch.refresh}>Thử lại</Button>
-        <Button size="sm" variant="quiet" onClick={onForget}>Bỏ playtest này</Button>
+        <Button size="sm" variant="quiet" onClick={onForget}>Bỏ lượt chạy thử này</Button>
       </div>}><ErrorLine error={failure} /></Alert>;
     }
-    return <SkeletonRows rows={4} label="Đang tải playtest…" />;
+    return <SkeletonRows rows={4} label="Đang tải lượt chạy thử…" />;
   }
 
   const view = describeStatus(playtest);
@@ -168,9 +165,9 @@ function PlaytestSession({ accessToken, playtestId, canAct, versionId, onForget,
 
   return <div className="ops-stack" data-testid="playtest-session">
     {failure && <Alert tone={watch.fatal ? "danger" : "warning"} title={watch.fatal ? failure.title : "Dữ liệu có thể đã cũ"} action={<Button size="sm" variant="secondary" className="mt-3" onClick={watch.refresh}>Tải lại</Button>}>
-      {watch.fatal ? <ErrorLine error={failure} /> : <>Không làm mới được trạng thái playtest; đang hiển thị lần đọc gần nhất và sẽ thử lại. <ErrorLine error={failure} /></>}
+      {watch.fatal ? <ErrorLine error={failure} /> : <>Không làm mới được trạng thái lượt chạy thử; đang hiển thị lần đọc gần nhất và sẽ thử lại. <ErrorLine error={failure} /></>}
     </Alert>}
-    {foreign && <Alert tone="warning" title="Lượt chạy thử này thuộc phiên bản khác" action={onOpenVersion ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => onOpenVersion(playtest.scenarioVersionId)}>Mở phiên bản đó</Button> : undefined}>Playtest {shortHash(playtest.id, 8)} ghim package của một phiên bản khác với phiên bản đang xem.</Alert>}
+    {foreign && <Alert tone="warning" title="Lượt chạy thử này thuộc phiên bản khác" action={onOpenVersion ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => onOpenVersion(playtest.scenarioVersionId)}>Mở phiên bản đó</Button> : undefined}>Lượt chạy thử này dùng gói của một phiên bản khác với phiên bản đang xem.</Alert>}
 
     <div className="pt-status" data-testid="playtest-status" data-status={playtest.status}>
       <div className="ver-actions-row">
@@ -189,11 +186,11 @@ function PlaytestSession({ accessToken, playtestId, canAct, versionId, onForget,
     <Facts playtest={playtest} />
 
     <div className="ver-actions-row">
-      {canAct && canCancel(playtest) && <Button variant="quiet" onClick={() => setCancelOpen(true)}><Ban size={16} aria-hidden="true" />Hủy playtest</Button>}
-      {!canAct && !terminal && <p className="ver-note">Chỉ OrganizationUser của công trình mới hủy được playtest.</p>}
-      {!terminal && !canCancel(playtest) && <p className="ver-note">Máy chủ không cho phép phiên này hủy playtest.</p>}
+      {canAct && canCancel(playtest) && <Button variant="quiet" onClick={() => setCancelOpen(true)}><Ban size={16} aria-hidden="true" />Hủy chạy thử</Button>}
+      {!canAct && !terminal && <p className="ver-note">Chỉ tài khoản tổ chức của công trình mới hủy được lượt chạy thử.</p>}
+      {!terminal && !canCancel(playtest) && <p className="ver-note">Lượt chạy thử này hiện không hủy được từ trang web.</p>}
       <Button variant="quiet" onClick={watch.refresh}><RefreshCw size={16} aria-hidden="true" />Tải lại trạng thái</Button>
-      {terminal && <Button variant="secondary" onClick={onForget}><Play size={16} aria-hidden="true" />Tạo playtest mới</Button>}
+      {terminal && <Button variant="secondary" onClick={onForget}><Play size={16} aria-hidden="true" />Tạo lượt chạy thử mới</Button>}
     </div>
 
     <CancelModal
@@ -201,7 +198,7 @@ function PlaytestSession({ accessToken, playtestId, canAct, versionId, onForget,
       onOpenChange={setCancelOpen}
       playtest={playtest}
       accessToken={accessToken}
-      onCancelled={(status) => { watch.apply(status); toast.notify({ tone: "info", title: "Đã hủy playtest" }); }}
+      onCancelled={(status) => { watch.apply(status); toast.notify({ tone: "info", title: "Đã hủy lượt chạy thử" }); }}
       onTerminal={() => { watch.refresh(); toast.notify({ tone: "warning", title: "Lượt chạy thử đã kết thúc", description: "Đã tải lại trạng thái mới nhất." }); }}
     />
   </div>;
@@ -240,7 +237,7 @@ export function PlaytestPanel({ accessToken, version, packageWatch, canPlaytest,
       const payload = { revisionId: version.revisionId, scenarioVersionId: version.id };
       const created = await playtestApi.prepare(accessToken, version.scenarioId, version.buildingId, payload, key.keyFor({ scenarioId: version.scenarioId, ...payload }));
       key.done();
-      toast.notify({ tone: "success", title: "Đã chuẩn bị playtest", description: "Chưa bắt đầu và chưa trừ lượt dùng thử." });
+      toast.notify({ tone: "success", title: "Đã chuẩn bị lượt chạy thử", description: "Chưa bắt đầu và chưa trừ lượt dùng thử." });
       onPlaytestIdChange(created.id);
     } catch (cause) {
       const view = describePlaytestError(cause);

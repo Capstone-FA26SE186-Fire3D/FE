@@ -31,14 +31,14 @@ function Kpis({ accessToken }: { accessToken: string }) {
   const units = quota.data?.units ?? [];
   return <div className={styles.kpis} data-testid="ai-kpis">
     <div className="ops-kpi">
-      <span className="ops-kpi-label">Quota còn lại</span>
+      <span className="ops-kpi-label">Hạn mức còn lại</span>
       <div className="ops-kpi-row"><span className="ops-kpi-value" data-testid="ai-kpi-quota">{quota.data ? (units.length ? units.map((unit) => formatQuota(unit.available, unit.quotaUnit)).join(" · ") : "0") : quota.error !== undefined ? "—" : "…"}</span></div>
-      <span className="ops-kpi-hint">Gộp từ gói công trình và top-up đã thanh toán · <Link href={BILLING_AI_HREF}>Nạp quota</Link></span>
+      <span className="ops-kpi-hint">Gộp từ gói công trình và các lần nạp thêm đã thanh toán · <Link href={BILLING_AI_HREF}>Nạp thêm</Link></span>
     </div>
     <div className="ops-kpi">
       <span className="ops-kpi-label">Cần đối soát</span>
       <div className="ops-kpi-row"><span className="ops-kpi-value" data-testid="ai-kpi-reconcile">{reconcile.data ? formatNumber(reconcile.data.total) : reconcile.error !== undefined ? "—" : "…"}</span></div>
-      <span className="ops-kpi-hint">Yêu cầu quá thời gian chờ, PlatformAdmin tra theo mã yêu cầu</span>
+      <span className="ops-kpi-hint">Yêu cầu quá thời gian chờ; quản trị FET3D sẽ kiểm tra lại</span>
     </div>
   </div>;
 }

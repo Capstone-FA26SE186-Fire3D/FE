@@ -15,7 +15,7 @@ import { useToast } from "@/components/ui/toast";
 import { changedTopLevelKeys, describeError, type DescribedError } from "../../version-readiness";
 import type { DraftForSnapshot, DraftValidation } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
-import { SupportCode } from "./support-code";
+import { SupportCode } from "@/components/ui/support-code";
 import { formatDateTime } from "./version-content";
 
 type LoadedDraft = { draft: DraftForSnapshot; eTag: string };
@@ -160,7 +160,7 @@ export function SnapshotDrawer({ open, onOpenChange, accessToken, scenarioId, in
   // Why the primary button is off, shown next to it instead of leaving a dimmed button unexplained.
   const snapshotHint = busy === "load" ? "Đang tải bản nháp…"
     : conflict ? "Chọn bản nháp để dùng ở phần đối chiếu trước."
-    : !loaded ? (draftItems.length === 0 && drafts.data ? "Chưa có draft để tạo phiên bản." : error ? "Chưa tải được bản nháp: bấm “Tải bản nháp” để thử lại." : "Cần tải bản nháp trước.")
+    : !loaded ? (draftItems.length === 0 && drafts.data ? "Chưa có bản nháp để tạo phiên bản." : error ? "Chưa tải được bản nháp: bấm “Tải bản nháp” để thử lại." : "Cần tải bản nháp trước.")
     : "";
 
   return <Modal
@@ -178,7 +178,7 @@ export function SnapshotDrawer({ open, onOpenChange, accessToken, scenarioId, in
         {drafts.data && draftItems.length === 0 && <p className="ver-note">Kịch bản này chưa có bản nháp. {editorHref ? <a href={editorHref} style={{ color: "var(--ember)" }}>Mở trình soạn để tạo bản nháp</a> : "Hãy tạo bản nháp ở trình soạn kịch bản."}</p>}
         {draftItems.length > 0 && <Field label="Bản nháp" required hint="Danh sách do máy chủ trả, bản lưu gần nhất trước.">
           {(p) => <Select {...p} value={trimmed} onChange={(event) => { setDraftId(event.target.value); setLoaded(null); setConflict(null); setValidation(null); setError(null); }}>
-            {!draftItems.some((item) => item.id === trimmed) && trimmed && <option value={trimmed}>Draft theo liên kết ({trimmed.slice(0, 8)}…)</option>}
+            {!draftItems.some((item) => item.id === trimmed) && trimmed && <option value={trimmed}>Bản nháp từ liên kết</option>}
             {draftItems.map((item) => <option key={item.id} value={item.id}>{"#" + item.draftNumber + " · " + formatDateTime(item.updatedAt) + (item.lastEditedByName ? " · " + item.lastEditedByName : "") + (item.id === preferredDraftId ? " · hiện tại" : "")}</option>)}
           </Select>}
         </Field>}
@@ -197,7 +197,7 @@ export function SnapshotDrawer({ open, onOpenChange, accessToken, scenarioId, in
           {validation && <StatusBadge tone={validation.isValid ? "success" : "danger"}>{validation.isValid ? "Bản nháp hợp lệ" : `${validation.issues.length} vấn đề`}</StatusBadge>}
         </div>
         {validation && !validation.isValid && <ul className="ver-list" aria-label="Vấn đề của bản nháp">
-          {validation.issues.map((issue, index) => <li key={`${issue.code}-${index}`}>{issue.message}<small className="ver-code-hint">{issue.code} · {issue.path}</small></li>)}
+          {validation.issues.map((issue, index) => <li key={`${issue.code}-${index}`}>{issue.message}<SupportCode code={issue.code} id={issue.path} /></li>)}
         </ul>}
       </fieldset>}
 

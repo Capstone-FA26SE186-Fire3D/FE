@@ -3,12 +3,12 @@ import type { Tone } from "@/components/ui/status-badge";
 
 import type { AiRequest, AiRequestStatus, AiResultType } from "./types";
 
-const OPERATION: Record<string, string> = { ScenarioDraft: "Đề xuất kịch bản", Answer: "Hỏi đáp", TraineeAnswer: "Hỏi đáp của Trainee" };
-export const operationLabel = (operation: string) => OPERATION[operation] ?? operation;
-const AUDIENCE: Record<string, string> = { organization: "Tổ chức", trainee: "Trainee" };
-export const audienceLabel = (audience: string) => AUDIENCE[audience] ?? audience;
+const OPERATION: Record<string, string> = { ScenarioDraft: "Đề xuất kịch bản", Answer: "Hỏi đáp", TraineeAnswer: "Hỏi đáp của học viên" };
+export const operationLabel = (operation: string) => OPERATION[operation] ?? "Thao tác khác";
+const AUDIENCE: Record<string, string> = { organization: "Tổ chức", trainee: "Học viên" };
+export const audienceLabel = (audience: string) => AUDIENCE[audience] ?? "Khác";
 const CONFIDENCE: Record<string, string> = { low: "Thấp", medium: "Trung bình", high: "Cao" };
-export const confidenceLabel = (value: string) => CONFIDENCE[value] ?? value;
+export const confidenceLabel = (value: string) => CONFIDENCE[value] ?? "Không rõ";
 
 const STATUS: Record<AiRequestStatus, { label: string; tone: Tone }> = {
   Accepted: { label: "Đang chờ xử lý", tone: "pending" },
@@ -26,7 +26,7 @@ const RESULT_TYPE: Record<AiResultType, { label: string; tone: Tone }> = {
   RejectedBySafetyGate: { label: "Bị cổng an toàn từ chối", tone: "danger" },
 };
 
-export const resultTypeLabel = (resultType: string) => RESULT_TYPE[resultType as AiResultType]?.label ?? resultType;
+export const resultTypeLabel = (resultType: string) => RESULT_TYPE[resultType as AiResultType]?.label ?? "Kết quả khác";
 
 /**
  * Badge of a request. A Succeeded request that produced no content (InsufficientEvidence, RejectedBySafetyGate) shows
@@ -36,7 +36,7 @@ const badge = (status: string, resultType?: string | null) => {
   if (status === "Succeeded" && (resultType === "InsufficientEvidence" || resultType === "RejectedBySafetyGate")) return RESULT_TYPE[resultType];
   return STATUS[status as AiRequestStatus];
 };
-export const statusLabel = (status: string, resultType?: string | null) => badge(status, resultType)?.label ?? status;
+export const statusLabel = (status: string, resultType?: string | null) => badge(status, resultType)?.label ?? "Trạng thái khác";
 export const statusTone = (status: string, resultType?: string | null): Tone => badge(status, resultType)?.tone ?? "neutral";
 
 /** States the service may still change by itself: poll these, stop on anything else. NeedsReconcile waits for an admin, not for polling. */
@@ -56,22 +56,22 @@ const FAILURE: Record<string, string> = {
   AI_RESULT_INVALID: "Kết quả của dịch vụ AI không đúng cấu trúc nên bị giữ lại, không hiển thị.",
   AI_CITATION_INVALID: "Kết quả trích dẫn nguồn không hợp lệ nên bị giữ lại, không hiển thị.",
   AI_USAGE_INVALID: "Số liệu sử dụng do dịch vụ AI báo không hợp lệ.",
-  AI_USAGE_EXCEEDS_RESERVATION: "Mức sử dụng vượt phần quota đã giữ chỗ nên không được chấp nhận.",
+  AI_USAGE_EXCEEDS_RESERVATION: "Mức sử dụng vượt phần hạn mức đã giữ chỗ nên không được chấp nhận.",
   AI_REQUEST_NOT_RECEIVED: "Dịch vụ AI xác nhận chưa nhận được yêu cầu này.",
-  AI_SOURCE_HASH_MISMATCH: "Tài liệu nguồn đã thay đổi so với bản được ghim (mã băm không khớp) nên dịch vụ AI không dùng được.",
+  AI_SOURCE_HASH_MISMATCH: "Tài liệu nguồn đã thay đổi so với bản được ghim nên dịch vụ AI không dùng được.",
   AI_SOURCE_UNAVAILABLE: "Dịch vụ AI không đọc được tài liệu nguồn đã ghim.",
-  AI_REVISION_NOT_PINNED: "Dịch vụ AI không nhận được revision mô hình đã ghim cho đề xuất.",
-  AI_BIM_ANCHOR_INVALID: "Đề xuất neo vào phần tử không thuộc revision mô hình đã ghim nên bị giữ lại.",
-  AI_REVISION_STALE: "Revision mô hình đã mất hình học được chấp nhận trong lúc xử lý nên đề xuất bị giữ lại.",
+  AI_REVISION_NOT_PINNED: "Dịch vụ AI không nhận được bản IFC đã ghim cho đề xuất.",
+  AI_BIM_ANCHOR_INVALID: "Đề xuất gắn vào phần tử không thuộc bản IFC đã ghim nên bị giữ lại.",
+  AI_REVISION_STALE: "Bản IFC đã ghim không còn dùng được trong lúc xử lý nên đề xuất bị giữ lại.",
 };
-export const failureText = (code: string | null | undefined) => (code ? FAILURE[code] ?? `Mã lỗi: ${code}` : undefined);
+export const failureText = (code: string | null | undefined) => (code ? FAILURE[code] ?? "Dịch vụ AI gặp lỗi chưa xác định." : undefined);
 
 export const SOURCE_KIND_LABEL: Record<string, string> = {
   KnowledgeSource: "Tri thức chuẩn (đã duyệt)",
   LibraryVersion: "Thư viện tổ chức",
-  LearnPost: "Bài Learn",
+  LearnPost: "Bài học",
 };
-export const sourceKindLabel = (kind: string) => SOURCE_KIND_LABEL[kind] ?? kind;
+export const sourceKindLabel = (kind: string) => SOURCE_KIND_LABEL[kind] ?? "Nguồn khác";
 
 /** `422 CONTENT_INVALID` carries `issues[{code,path,message}]` (not ProblemDetails `errors`). */
 export function issueMessages(error: unknown): Array<{ code: string; path: string; message: string }> {
@@ -96,28 +96,28 @@ export function fieldIssue(error: unknown, path: string): string | undefined {
 }
 
 const CODE: Record<string, string> = {
-  AI_PROVIDER_UNAVAILABLE: "Dịch vụ AI chưa được bật hoặc chưa cấu hình ở môi trường này. Chưa có quota nào bị giữ.",
-  AI_POLICY_UNAVAILABLE: "Chưa có chính sách AI đang hiệu lực cho thao tác này. Hãy báo PlatformAdmin cấu hình chính sách trước.",
-  AI_QUOTA_EXHAUSTED: "Quota AI của tổ chức không đủ cho yêu cầu này. Hệ thống không tính vượt mức; hãy mua top-up trả trước rồi thử lại.",
+  AI_PROVIDER_UNAVAILABLE: "Dịch vụ AI chưa được bật hoặc chưa cấu hình ở môi trường này. Chưa có hạn mức nào bị giữ.",
+  AI_POLICY_UNAVAILABLE: "Chưa có chính sách AI đang hiệu lực cho thao tác này. Hãy báo quản trị FET3D cấu hình chính sách trước.",
+  AI_QUOTA_EXHAUSTED: "Hạn mức AI của tổ chức không đủ cho yêu cầu này. Hệ thống không tính vượt mức; hãy nạp thêm hạn mức (trả trước) rồi thử lại.",
   AI_INPUT_TOO_LARGE: "Nội dung dài hơn giới hạn của chính sách AI hiện hành. Hãy rút gọn rồi gửi lại.",
   AI_TOO_MANY_SOURCES: "Chọn quá nhiều nguồn so với chính sách AI hiện hành. Hãy bỏ bớt nguồn.",
-  AI_NO_SOURCES: "Chưa có nguồn nào đủ điều kiện để trả lời. Nguồn tri thức cần được PlatformAdmin duyệt trước.",
+  AI_NO_SOURCES: "Chưa có nguồn nào đủ điều kiện để trả lời. Nguồn tri thức cần được quản trị FET3D duyệt trước.",
   AI_SOURCE_NOT_ALLOWED: "Có nguồn không còn đủ điều kiện (đã hết hiệu lực hoặc không thuộc tổ chức). Tải lại danh sách nguồn rồi chọn lại.",
   AI_RECONCILE_NOT_ALLOWED: "Chỉ yêu cầu đang ở trạng thái Chờ đối soát mới đối soát được. Trạng thái đã thay đổi; hãy tải lại.",
   AI_POLICY_OVERLAP: "Khoảng hiệu lực chồng lên một chính sách khác của cùng thao tác. Chọn khoảng không giao nhau.",
-  AI_REVISION_NOT_READY: "Công trình chưa có revision mô hình sẵn sàng cho kịch bản (hình học đã được chấp nhận, QA đạt). Hoàn tất xử lý IFC trước.",
+  AI_REVISION_NOT_READY: "Công trình chưa có bản IFC sẵn sàng cho kịch bản (mô hình đã được chấp nhận và đạt kiểm tra tự động). Hoàn tất xử lý IFC trước.",
   AI_DAILY_QUOTA_EXHAUSTED: "Bạn đã dùng hết lượt hỏi AI hôm nay. Lượt mới có lại vào đầu ngày hôm sau.",
-  AI_BLOCKED_DURING_ASSESSMENT: "AI tạm khóa khi bạn đang có một bài đánh giá (Assessment) đang chạy. Hoàn tất bài rồi hỏi lại.",
-  AI_CONTEXT_NOT_FOUND: "Nội dung bạn hỏi kèm (bài Learn, bài tập huấn hoặc kết quả) không còn truy cập được.",
+  AI_BLOCKED_DURING_ASSESSMENT: "AI tạm khóa khi bạn đang có một bài đánh giá đang làm dở. Hoàn tất bài rồi hỏi lại.",
+  AI_CONTEXT_NOT_FOUND: "Nội dung bạn hỏi kèm (bài học, bài tập huấn hoặc kết quả) không còn truy cập được.",
   KNOWLEDGE_SOURCE_EXISTS: "Nguồn này (cùng phiên bản và nội dung) đã được đăng ký.",
   KNOWLEDGE_SOURCE_STATE_CONFLICT: "Trạng thái nguồn đã thay đổi nên không thực hiện được thao tác này. Hãy tải lại.",
   PRECONDITION_FAILED: "Nguồn vừa được thay đổi ở nơi khác (phiên bản không còn khớp). Hãy tải bản mới rồi thao tác lại.",
-  PRECONDITION_REQUIRED: "Thiếu phiên bản (If-Match). Tải lại dữ liệu rồi thử lại.",
-  INVALID_IF_MATCH: "Phiên bản (ETag) không đúng định dạng. Tải lại dữ liệu rồi thử lại.",
+  PRECONDITION_REQUIRED: "Thiếu thông tin phiên bản. Tải lại dữ liệu rồi thử lại.",
+  INVALID_IF_MATCH: "Thông tin phiên bản không hợp lệ. Tải lại dữ liệu rồi thử lại.",
   IDEMPOTENCY_KEY_CONFLICT: "Khóa chống gửi trùng đã được dùng cho nội dung khác. Tải lại trang để tạo khóa mới.",
   IDEMPOTENCY_KEY_REQUIRED: "Yêu cầu thiếu khóa chống gửi trùng. Tải lại trang rồi thử lại.",
   NOT_FOUND: "Không tìm thấy mục này trong phạm vi của bạn (có thể đã bị xóa hoặc thuộc tổ chức khác).",
-  VALIDATION_ERROR: "Tham số chưa hợp lệ.",
+  VALIDATION_ERROR: "Thông tin nhập chưa hợp lệ.",
   CONTENT_INVALID: "Nội dung chưa hợp lệ. Kiểm tra các trường được đánh dấu.",
 };
 
@@ -127,7 +127,7 @@ export function aiErrorText(error: unknown, fallback = "Không hoàn tất đư�
   if (error.code && CODE[error.code] && error.code !== "CONTENT_INVALID") return CODE[error.code];
   switch (error.status) {
     case 401: return "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.";
-    case 402: return "Cần thanh toán hoặc kích hoạt quota trước khi dùng tiếp. Mở Quota AI để mua top-up.";
+    case 402: return "Cần nạp thêm hoặc kích hoạt hạn mức AI trước khi dùng tiếp.";
     case 403: return "Bạn không có quyền thực hiện thao tác này.";
     case 404: return CODE.NOT_FOUND;
     case 409: return error.message || "Thao tác xung đột với trạng thái hiện tại. Tải lại rồi thử lại.";

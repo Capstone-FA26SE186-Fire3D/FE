@@ -17,7 +17,7 @@ import type { ScenarioVersionDetail, VersionIssue, VersionReadiness } from "../.
 import { scenarioVersionsApi } from "../../versions-api";
 import { formatDateTime } from "./version-content";
 import { jobStatusText, jobTone } from "./package-build-panel";
-import { SupportCode } from "./support-code";
+import { SupportCode } from "@/components/ui/support-code";
 
 const SEVERITIES = ["Critical", "Error", "Warning", "Info"] as const;
 const severityTone: Record<string, Tone> = { critical: "danger", error: "danger", warning: "warning", info: "info" };
@@ -175,7 +175,7 @@ export function ReadinessPanel({ accessToken, version, jobs, readiness, canAct, 
       <Panel title="Chốt gói phát hành" description="Bạn xác nhận dùng đúng gói vừa kiểm tra đạt này khi tạo bản phát hành. Đây không phải duyệt nội dung: phần đó do quản trị FET3D làm ở tab Gửi duyệt." bodyClassName="ops-stack">
         {confirmedId && <Alert tone="success" title="Đã chốt gói">
           Tab Phát hành sẽ dùng đúng gói này. Muốn đổi gói, hãy tạo phiên bản mới và dựng lại.
-          <details className="ver-support"><summary>Thông tin cho bộ phận hỗ trợ</summary><span>Mã chốt: <code className="ver-hash" data-testid="confirm-review-id">{confirmedId}</code></span></details>
+          <details className="support-code"><summary>Thông tin cho bộ phận hỗ trợ</summary><span>Mã chốt: <code className="ver-hash" data-testid="confirm-review-id">{confirmedId}</code></span></details>
         </Alert>}
         {verdict?.kind === "failed" && <Alert tone="danger" title="Kiểm tra chưa đạt nên chưa chốt được">
           {verdict.blockingIssues.length ? `Có ${verdict.blockingIssues.length} lỗi chặn.` : "Lần kiểm tra mới nhất không đạt."} Sửa nội dung trong trình soạn, tạo phiên bản mới rồi dựng lại gói.

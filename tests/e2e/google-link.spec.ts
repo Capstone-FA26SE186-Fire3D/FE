@@ -110,7 +110,7 @@ test.describe("link Google", () => {
     await page.goto("/login?notice=google-linked");
     await expect(page.getByRole("status").filter({ hasText: "Google đã được liên kết" })).toContainText("đăng nhập lại");
     await page.goto("/login?notice=password-set");
-    await expect(page.getByRole("status").filter({ hasText: "Mật khẩu Fire3D đã được đặt" })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Mật khẩu FET3D đã được đặt" })).toBeVisible();
     await page.goto("/login?notice=unknown");
     await expect(page.getByRole("status")).toHaveCount(0);
   });
@@ -134,7 +134,7 @@ test.describe("link Google", () => {
   });
 
   for (const [uid, text] of [
-    ["uid-other", "đã được liên kết với một tài khoản Fire3D khác"],
+    ["uid-other", "đã được liên kết với một tài khoản FET3D khác"],
     ["uid-replace", "không cho thay thế"],
     ["uid-reset", "yêu cầu khôi phục mật khẩu chưa hoàn tất"],
     ["uid-invalid", "Xác thực Google không hợp lệ hoặc đã hết hạn"],
@@ -315,7 +315,7 @@ test.describe("layout on the real profile page", () => {
           await expect(section).toBeVisible();
           await expect(section.getByText(label === "google-only" ? "Chỉ đăng nhập bằng Google" : label === "linked" ? "Đã liên kết Google" : "Chưa liên kết Google", { exact: true })).toBeVisible();
           // The build may or may not carry a public Firebase config (.env): only when it does not, the Google button is locked with an explanation.
-          if (label !== "linked" && (await section.getByText("Google chưa được cấu hình").count()) > 0) await expect(section.getByRole("button", { name: /Xác thực Google/ })).toBeDisabled();
+          if (label !== "linked" && (await section.getByText("Chưa bật đăng nhập Google").count()) > 0) await expect(section.getByRole("button", { name: /Xác thực Google/ })).toBeDisabled();
           expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
           await section.scrollIntoViewIfNeeded();
           await page.screenshot({ path: testInfo.outputPath(`google-${label}-${scheme}-${width}.png`) });

@@ -70,7 +70,7 @@ function SidebarContent({ area, pathname, collapsed, onNavigate, onToggleCollaps
             <Link className="ops-nav-link" href={item.href} prefetch={false} aria-current={active ? "page" : undefined} aria-label={item.label} title={collapsed ? item.label : undefined} onClick={onNavigate} data-tour={item.href === "/workspace/buildings" ? "nav-buildings" : undefined}>
               {active && <m.span layoutId={`${idPrefix}-active`} className="ops-nav-active" transition={{ type: "spring", stiffness: 500, damping: 40 }} />}
               <Icon size={20} strokeWidth={1.75} aria-hidden="true" style={{ position: "relative" }} />
-              <span className="ops-nav-text"><span style={{ position: "relative" }}>{item.label}</span>{item.status === "pending-be" && <StatusBadge tone="warning" style={{ position: "relative" }}>Chờ BE</StatusBadge>}{counts[item.href] ? <span className="ops-nav-count" aria-label={`${counts[item.href]} việc cần xử lý`}>{counts[item.href]}</span> : null}</span>
+              <span className="ops-nav-text"><span style={{ position: "relative" }}>{item.label}</span>{item.status === "pending-be" && <StatusBadge tone="warning" style={{ position: "relative" }}>Sắp có</StatusBadge>}{counts[item.href] ? <span className="ops-nav-count" aria-label={`${counts[item.href]} việc cần xử lý`}>{counts[item.href]}</span> : null}</span>
             </Link>
             {openBuilding && !collapsed && <SidebarMiniStepper buildingId={openBuilding} />}
           </div>;

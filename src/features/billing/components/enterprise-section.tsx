@@ -154,7 +154,7 @@ export function EnterpriseSection({ accessToken, defaultEmail, defaultName, onOp
         <div className="bill-row"><strong>{request.requestedBuildingCount} công trình{request.requestedDurationMonths ? ` · ${request.requestedDurationMonths} tháng` : ""}</strong><EnterpriseStatusBadge status={request.status} /></div>
         <p className="bill-muted bill-wrap">{request.contactName} · {request.contactEmail}{request.contactPhone ? ` · ${request.contactPhone}` : ""}<br />Gửi {formatDateTime(request.createdAt)}{request.closedAt ? ` · đóng ${formatDateTime(request.closedAt)}` : ""}</p>
         {request.notes && <p className="bill-wrap" style={{ margin: 0, whiteSpace: "pre-wrap" }}>{request.notes}</p>}
-        {request.quotationId && <Alert tone="success" title="Đã có báo giá cho yêu cầu này" action={onOpenQuotation ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => onOpenQuotation(request.quotationId as string)}>Mở báo giá</Button> : undefined}>PlatformAdmin soạn báo giá nháp; bạn xem, chấp nhận và thanh toán sau khi báo giá được phát hành.</Alert>}
+        {request.quotationId && <Alert tone="success" title="Đã có báo giá cho yêu cầu này" action={onOpenQuotation ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => onOpenQuotation(request.quotationId as string)}>Mở báo giá</Button> : undefined}>Quản trị FET3D soạn báo giá nháp; bạn xem, chấp nhận và thanh toán sau khi báo giá được phát hành.</Alert>}
         {request.status === "Closed" && <Alert tone="info" title="Yêu cầu đã đóng">Báo giá và thanh toán đã tạo (nếu có) không bị hủy. Gửi yêu cầu mới nếu cần hỗ trợ thêm.</Alert>}
         <EnterpriseResponses accessToken={accessToken} scope="mine" requestId={request.id} />
       </div>}

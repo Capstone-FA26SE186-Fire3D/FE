@@ -114,15 +114,15 @@ export function ReviewDrawer({ open, reviewId, accessToken, summary, onChanged, 
             <dl className="rev-dl">
               <dt>Người gửi</dt><dd><AccountRef id={data.review.submittedBy} /></dd>
               <dt>Gửi lúc</dt><dd>{formatDateTime(data.review.submittedAt)}</dd>
-              <dt>Hash nội dung</dt><dd><HashValue value={data.review.contentHash} label="Hash nội dung" /></dd>
-              <dt>Hash rubric</dt><dd><HashValue value={data.review.rubricHash} label="Hash rubric" /></dd>
-              <dt>Mã phiên bản</dt><dd className="rev-hash">{data.review.scenarioVersionId}</dd>
-              <dt>Mã bản duyệt</dt><dd className="rev-hash">{data.review.reviewId}</dd>
+              <dt>Mã nội dung kịch bản</dt><dd><HashValue value={data.review.contentHash} label="Mã nội dung kịch bản" /></dd>
+              <dt>Mã nội dung tiêu chí chấm</dt><dd><HashValue value={data.review.rubricHash} label="Mã nội dung tiêu chí chấm (rubric)" /></dd>
+              <dt>Mã phiên bản</dt><dd className="rev-hash" title={data.review.scenarioVersionId}>{shortId(data.review.scenarioVersionId)}</dd>
+              <dt>Mã bản duyệt</dt><dd className="rev-hash" title={data.review.reviewId}>{shortId(data.review.reviewId)}</dd>
             </dl>
           </section>
 
           <ReadinessStrip readiness={data.readiness} />
-          {pending && !decidedHere && <p className="rev-note">Quyết định áp dụng cho đúng hash nội dung và hash rubric ở trên. Duyệt hoặc từ chối đều <strong>không đổi được</strong>; sửa nội dung luôn tạo phiên bản mới.</p>}
+          {pending && !decidedHere && <p className="rev-note">Quyết định áp dụng cho đúng nội dung có mã ở trên. Duyệt hoặc từ chối đều <strong>không đổi được</strong>; sửa nội dung luôn tạo phiên bản mới.</p>}
 
           <GateSeparation summary={data.review} readiness={data.readiness} />
           <ReviewContent detail={data} />
@@ -130,7 +130,7 @@ export function ReviewDrawer({ open, reviewId, accessToken, summary, onChanged, 
 
           {(!pending || decidedHere) && <section className="rev-decision" aria-label="Quyết định nội dung">
             <h3>Quyết định</h3>
-            <p className="rev-note" data-testid="decision-result">{data.review.status === "Approved" ? "Nội dung và rubric của phiên bản này đã được duyệt." : data.review.status === "Rejected" ? "Phiên bản này đã bị từ chối. Tổ chức cần sửa và gửi phiên bản mới." : "Đang cập nhật trạng thái từ máy chủ…"} Quyết định đã bất biến.</p>
+            <p className="rev-note" data-testid="decision-result">{data.review.status === "Approved" ? "Nội dung và tiêu chí chấm điểm của phiên bản này đã được duyệt." : data.review.status === "Rejected" ? "Phiên bản này đã bị từ chối. Tổ chức cần sửa và gửi phiên bản mới." : "Đang cập nhật trạng thái từ máy chủ…"} Quyết định không đổi được nữa.</p>
             {data.review.decidedAt && <dl className="rev-dl" style={{ marginTop: 10 }}>
               <dt>Người quyết định</dt><dd><AccountRef id={data.review.decidedBy} /></dd>
               <dt>Thời điểm quyết định</dt><dd>{formatDateTime(data.review.decidedAt)}</dd>

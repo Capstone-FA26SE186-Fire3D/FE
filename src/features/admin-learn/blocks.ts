@@ -101,7 +101,7 @@ export function checkBlocks(blocks: EditorBlock[]): BlockIssue[] {
       case "paragraph": if (!wire.text) add(index, "text", "Nhập nội dung đoạn văn (tối đa 5000 ký tự)."); else if (String(wire.text).length > 5000) add(index, "text", "Đoạn văn tối đa 5000 ký tự."); break;
       case "callout": if (!wire.text) add(index, "text", "Nhập nội dung ghi chú (tối đa 2000 ký tự)."); break;
       case "list": if (!(wire.items as string[]).length) add(index, "items", "Danh sách cần ít nhất một mục (tối đa 50)."); break;
-      case "image": if (!wire.url) add(index, "url", "Nhập đường dẫn ảnh https."); if (!wire.alt) add(index, "alt", "Thêm mô tả ảnh (alt) cho người đọc màn hình."); break;
+      case "image": if (!wire.url) add(index, "url", "Nhập đường dẫn ảnh https."); if (!wire.alt) add(index, "alt", "Thêm mô tả ảnh cho người dùng trình đọc màn hình."); break;
       case "video": if (!wire.url) add(index, "url", "Nhập liên kết video."); break;
       // Unknown block types are not judged here: they are sent unchanged and the backend names the problem.
     }

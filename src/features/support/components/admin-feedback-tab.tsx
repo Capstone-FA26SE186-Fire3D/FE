@@ -108,7 +108,7 @@ function FeedbackDetail({ id, accessToken, onChanged }: { id: string; accessToke
       <dt>Đã xem lúc</dt><dd>{formatDateTime(feedback.reviewedAt)}</dd>
     </dl>
     {staleEtag !== null && <Alert tone="warning" title={reloaded ? "Đã tải bản mới nhất" : "Phản hồi vừa được cập nhật ở nơi khác"} action={!reloaded && <Button size="sm" variant="secondary" className="mt-3" onClick={reload} disabled={loading}>{loading ? "Đang tải…" : "Tải bản mới để đối chiếu"}</Button>}>
-      {reloaded ? `Máy chủ hiện: ${feedbackStatusLabel(feedback.status)}. Lựa chọn của bạn vẫn được giữ nếu còn hợp lệ; kiểm tra rồi bấm Lưu.` : "Lựa chọn của bạn được giữ nguyên, chưa ghi đè gì. Tải bản mới để đối chiếu rồi lưu lại."}
+      {reloaded ? `Bản mới nhất: ${feedbackStatusLabel(feedback.status)}. Lựa chọn của bạn vẫn được giữ nếu còn hợp lệ; kiểm tra rồi bấm Lưu.` : "Lựa chọn của bạn được giữ nguyên, chưa ghi đè gì. Tải bản mới để đối chiếu rồi lưu lại."}
     </Alert>}
     {saveError && <Alert tone="danger">{saveError}</Alert>}
     <Field label="Trạng thái xử lý" hint="Phản hồi đi theo thứ tự Mới gửi → Đã xem → Đã đóng.">
@@ -194,7 +194,7 @@ export function AdminFeedbackTab({ accessToken }: { accessToken: string }) {
     />
     <p className={styles.hint}>Bấm một hàng để xem người gửi và đổi trạng thái; menu “···” đi bước tiếp theo ngay trên danh sách.</p>
 
-    <PendingBox title="Chưa có từ backend" items={["Tệp đính kèm: API phản hồi chỉ nhận văn bản thuần.", "Thông báo email/push khi phản hồi được xử lý."]} />
+    <PendingBox title="Tính năng sắp có" items={["Tệp đính kèm: hiện phản hồi chỉ nhận nội dung chữ.", "Thông báo qua email hoặc điện thoại khi phản hồi được xử lý."]} />
 
     <Drawer open={Boolean(feedbackId)} onOpenChange={(value) => { if (!value) setParams({ feedback: null, page }); }} size="md" data-testid="admin-feedback-drawer" title="Chi tiết phản hồi" description="Xem người gửi, đánh dấu đã xem hoặc đóng phản hồi.">
       {feedbackId && <FeedbackDetail key={feedbackId} id={feedbackId} accessToken={accessToken} onChanged={list.reload} />}

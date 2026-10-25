@@ -338,3 +338,10 @@ button { cursor: pointer; }
   .organization-main .admin-card { padding: 18px; }
   .organization-main .admin-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Error codes and ids, folded away from the message (components/ui/support-code.tsx). */
+.support-code { margin-top: 6px; color: var(--dim); font-size: 12px; }
+.support-code > summary { width: fit-content; cursor: pointer; }
+.support-code > summary:hover { color: var(--muted); }
+.support-code[open] { display: grid; gap: 4px; }
+.support-code code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; user-select: all; }

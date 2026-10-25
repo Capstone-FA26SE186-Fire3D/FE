@@ -21,10 +21,10 @@ export function AdminQuotaSection({ accessToken }: { accessToken: string }) {
   const items = organizations.data?.items ?? [];
 
   return <div className="ops-stack">
-    <p className="bill-muted">Xem quota AI trả trước dùng chung của một tổ chức: số dư theo đơn vị, các lần cấp và lượt dùng. Chỉ đọc; quota chỉ tăng khi thanh toán gói hoặc top-up được kích hoạt.</p>
+    <p className="bill-muted">Xem hạn mức AI trả trước dùng chung của một tổ chức: số dư theo đơn vị, các lần cấp và lượt dùng. Chỉ đọc; hạn mức chỉ tăng khi thanh toán gói hoặc lượt nạp thêm được kích hoạt.</p>
     {organizations.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tổ chức" action={<Button size="sm" variant="secondary" className="mt-3" onClick={organizations.reload}>Thử lại</Button>}>{billingErrorText(organizations.error)}</Alert>}
     <Field label="Tổ chức" className="bill-toolbar-pick">{(p) => <Combobox {...p} aria-label="Tổ chức" value={organizationId} onChange={(value) => setParams({ org: value })} options={items.map((item) => ({ value: item.id, label: item.name }))} placeholder="Chọn tổ chức" searchPlaceholder="Tìm tổ chức" groupLabel="Tổ chức" loading={organizations.loading && !organizations.data} clearable />}</Field>
-    {!organizationId && <EmptyState icon={Gauge} title="Chọn một tổ chức" description="Số dư, lịch sử cấp và lượt dùng quota AI của tổ chức sẽ hiện ở đây." />}
+    {!organizationId && <EmptyState icon={Gauge} title="Chọn một tổ chức" description="Số dư, lịch sử cấp và lượt dùng hạn mức AI của tổ chức sẽ hiện ở đây." />}
     {organizationId && <AiQuotaView key={organizationId} accessToken={accessToken} organizationId={organizationId} />}
   </div>;
 }

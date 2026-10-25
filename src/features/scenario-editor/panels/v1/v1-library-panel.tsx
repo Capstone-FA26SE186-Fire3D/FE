@@ -95,10 +95,10 @@ function Preview({ version, draft, object, runtimeVersion, runtimes, rubric, app
     {plan.ignored.length > 0 && <Alert tone="info" title="Không áp dụng">Template còn mang {plan.ignored.join(", ")}; các phần phụ thuộc công trình này không được sao chép. Đối tượng và vị trí do bạn đặt trên mô hình của mình.</Alert>}
     {plan.notes.map((note) => <p key={note} className="ops-field-hint" style={{ margin: 0 }}>{note}</p>)}
     {plan.reference.length > 0 && <div className="ops-stack" style={{ gap: 4 }} data-testid="equipment-reference">
-      <span className="ops-field-label">Metadata tham khảo</span>
+      <span className="ops-field-label">Thông tin tham khảo</span>
       <dl style={{ margin: 0, display: "grid", gap: 4 }}>{plan.reference.map((row, index) => <div key={`${row.label}-${index}`}><dt className="ops-field-hint" style={{ margin: 0 }}>{row.label}</dt><dd style={{ margin: 0, fontSize: 13, overflowWrap: "anywhere" }}>{row.value}</dd></div>)}</dl>
     </div>}
-    {version.kind === "Equipment" && <Alert tone="info" title="Không thêm năng lực cho runtime"><span data-testid="no-capability-notice">Thiết bị này chỉ cung cấp metadata. Năng lực của đối tượng vẫn lấy từ danh mục runtime do máy chủ công bố.</span></Alert>}
+    {version.kind === "Equipment" && <Alert tone="info" title="Không thêm khả năng mới cho ứng dụng"><span data-testid="no-capability-notice">Mẫu thiết bị này chỉ cung cấp thông tin tham khảo. Khả năng của đối tượng vẫn chọn từ danh sách của ứng dụng.</span></Alert>}
 
     <div className="ops-actions">
       <Button type="button" disabled={changes.length === 0} onClick={() => setConfirming(true)} data-testid="apply-open">{changes.length === 0 ? "Không có thay đổi để áp dụng" : "Xem lại và áp dụng"}</Button>

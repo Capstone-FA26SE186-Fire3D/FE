@@ -30,7 +30,7 @@ import { LoadingBlock } from "@/components/ui/spinner";
 const PAGE_SIZE = 100;
 const NO_CAPABILITY = "none";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const USE_AS_TEMPLATE_HINT = "“Dùng làm mẫu” chỉ bật khi trình soạn kịch bản nhận tham số libraryItem. Mở một công trình, vào trình soạn và chọn thẻ Thư viện để áp dụng.";
+const USE_AS_TEMPLATE_HINT = "“Dùng làm mẫu” chỉ dùng được bên trong trình soạn kịch bản. Mở một công trình, vào trình soạn và chọn thẻ Thư viện để áp dụng.";
 
 function ItemDrawer({ accessToken, itemId, onClose }: { accessToken: string; itemId: string; onClose: () => void }) {
   const query = useAsyncData(`library-org-item:${itemId}`, (signal) => libraryApi.getItem(accessToken, itemId, signal), true, { keepPrevious: false });
@@ -38,7 +38,7 @@ function ItemDrawer({ accessToken, itemId, onClose }: { accessToken: string; ite
   const version = item?.latestPublished ?? null;
   const view = query.error !== undefined && !item ? describeLibraryError(query.error) : null;
   return <Drawer open onOpenChange={(open) => { if (!open) onClose(); }} size="md" title={version?.name ?? (item ? item.code : "Mẫu thư viện")} description={item ? `${kindLabel[item.kind]} · ${item.code}` : "Chỉ xem. Áp dụng vào kịch bản trong trình soạn thảo, thẻ Thư viện."}
-    eyebrow={version ? <><StatusBadge tone="success">Đã xuất bản · v{version.versionNumber}</StatusBadge>{version.requiredCapabilities.length > 0 && <StatusBadge tone="warning">Yêu cầu năng lực runtime</StatusBadge>}</> : undefined}
+    eyebrow={version ? <><StatusBadge tone="success">Đã xuất bản · v{version.versionNumber}</StatusBadge>{version.requiredCapabilities.length > 0 && <StatusBadge tone="warning">Có yêu cầu năng lực</StatusBadge>}</> : undefined}
     data-testid="org-item-drawer"
     footer={<>
       <Button variant="quiet" onClick={onClose}>Đóng</Button>
@@ -66,7 +66,7 @@ function ItemCard({ item, onOpen }: { item: LibraryItem; onOpen: () => void }) {
         <p className="org-lib-sub">{kindLabel[item.kind]} · <code className="org-lib-code">{item.code}</code></p>
       </div>
     </div>
-    <div className="org-lib-chips" aria-label="Năng lực runtime yêu cầu">
+    <div className="org-lib-chips" aria-label="Năng lực yêu cầu">
       {shown.length === 0 ? <span className="org-lib-chip" data-empty>Không yêu cầu năng lực</span> : shown.map((id) => <span key={id} className="org-lib-chip">{id}</span>)}
       {capabilities.length > shown.length && <span className="org-lib-chip">+{capabilities.length - shown.length}</span>}
     </div>
@@ -106,7 +106,7 @@ export function LibraryBrowser() {
     ...capabilities.map((value) => ({ value, label: value, group: "Trong trang đã tải" })),
   ];
 
-  const header = <PageHeader title="Thư viện mẫu" description="Kịch bản mẫu, tiêu chí chấm mẫu và thiết bị game đã được runtime hỗ trợ. Chỉ để tham khảo và dùng làm điểm xuất phát; bạn vẫn tự soạn được." eyebrow="Huấn luyện" breadcrumbs={[{ label: "Thư viện mẫu" }]} />;
+  const header = <PageHeader title="Thư viện mẫu" description="Kịch bản mẫu, tiêu chí chấm mẫu và thiết bị game đã được ứng dụng FET3D hỗ trợ. Chỉ để tham khảo và dùng làm điểm xuất phát; bạn vẫn tự soạn được." eyebrow="Huấn luyện" breadcrumbs={[{ label: "Thư viện mẫu" }]} />;
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
 
   return <div className="org">
@@ -116,7 +116,7 @@ export function LibraryBrowser() {
         items={[{ value: "all", label: "Tất cả", "data-testid": "filter-kind-all" }, ...LIBRARY_KINDS.map((value) => ({ value, label: kindLabel[value], count: kind === value && list.data ? list.data.total : undefined, "data-testid": `filter-kind-${value}` }))]} />
       <div className="org-lib-filters" role="search" aria-label="Lọc thư viện">
         <TableSearch value={searchText} onChange={setSearchText} label="Tìm mẫu" placeholder="Tìm theo mã hoặc tên mẫu" />
-        <Combobox aria-label="Năng lực runtime yêu cầu" className="org-lib-cap" value={capability} onChange={(value) => setParams({ cap: value })} options={capabilityOptions} placeholder="Năng lực: Tất cả" searchPlaceholder="Tìm năng lực…" data-testid="filter-capability" />
+        <Combobox aria-label="Năng lực yêu cầu" className="org-lib-cap" value={capability} onChange={(value) => setParams({ cap: value })} options={capabilityOptions} placeholder="Năng lực: Tất cả" searchPlaceholder="Tìm năng lực…" data-testid="filter-capability" />
         {narrowed && <Button variant="quiet" onClick={() => { setSearchText(""); setParams({ q: null, cap: null }); }}>Xóa bộ lọc</Button>}
       </div>
     </div>
@@ -134,7 +134,7 @@ export function LibraryBrowser() {
     {list.data && !items.length && <EmptyState icon={kind || narrowed ? Search : Library} title={narrowed && loaded.length ? "Không có mẫu khớp bộ lọc" : kind ? "Chưa có mẫu thuộc loại này" : "Thư viện chưa có mẫu nào"} description={narrowed && loaded.length ? "Thử đổi hoặc xóa bộ lọc." : "Chưa có mẫu nào được xuất bản. Bạn vẫn soạn kịch bản đầy đủ bằng tay; quản trị hệ thống sẽ bổ sung mẫu khi có."} />}
     {(list.data?.total ?? 0) > PAGE_SIZE && <Pagination page={page} pageSize={PAGE_SIZE} totalCount={list.data?.total ?? 0} onPageChange={setPage} disabled={list.loading} />}
 
-    <p className="org-lib-note">{USE_AS_TEMPLATE_HINT} Thêm thiết bị vào thư viện không tự bổ sung khả năng gameplay: chỉ những đối tượng mà runtime đang hỗ trợ mới đặt được.</p>
+    <p className="org-lib-note">{USE_AS_TEMPLATE_HINT} Thêm thiết bị vào thư viện không tự bổ sung khả năng gameplay: chỉ những đối tượng mà ứng dụng FET3D đang hỗ trợ mới đặt được.</p>
 
     {selected && UUID.test(selected) && accessToken && <ItemDrawer accessToken={accessToken} itemId={selected} onClose={() => setParams({ item: null })} />}
   </div>;

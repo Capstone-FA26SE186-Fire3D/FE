@@ -92,7 +92,7 @@ test.describe("IFC equipment candidates", () => {
     await expect(page.getByTestId("equipment-row").nth(1)).toContainText("Đã đổi loại (door.exit)");
     // QA guidance in Vietnamese (on the "Kỹ thuật" sub-tab) points to this step.
     await page.getByTestId("ifc-sub-technical").click();
-    await expect(page.getByTestId("issue-row").filter({ hasText: "IFC_EXIT_UNKNOWN" }).getByTestId("issue-guidance")).toContainText("Chọn một cửa có sẵn làm lối thoát");
+    await expect(page.locator('[data-testid="issue-row"][data-code="IFC_EXIT_UNKNOWN"]').getByTestId("issue-guidance")).toContainText("Chọn một cửa có sẵn làm lối thoát");
   });
 
   test("a long door list: the unsaved exit choice is saved from the warning itself and the save bar stays in view", async ({ page }) => {
@@ -118,7 +118,7 @@ test.describe("IFC equipment candidates", () => {
     const state: State = { version: 4, status: "ReadyForScenario", exitRequired: false, items: [candidate("ifc:A", DOOR_A, "door.standard", "IfcDoor"), candidate("ifc:E", EXT, "extinguisher.portable", "IfcFlowTerminal", 0.6, { suggestedDecision: { decision: "Rejected", catalogKey: null, fromRevisionId: "rev-0" } })], patches: [], failNext412: true };
     await setup(page, state);
     await page.goto(ifcUrl("equipment"));
-    await expect(page.getByTestId("equipment-suggestion")).toContainText("Gợi ý từ revision trước: Đã loại bỏ");
+    await expect(page.getByTestId("equipment-suggestion")).toContainText("Gợi ý từ bản IFC trước: Đã loại bỏ");
     await page.getByLabel(`Đổi loại ${DOOR_A}`).selectOption("door.standard");
     await page.getByRole("button", { name: `Loại bỏ ${EXT}` }).click();
     await page.getByTestId("equipment-save").click();
@@ -134,7 +134,7 @@ test.describe("IFC equipment candidates", () => {
     const state: State = { version: 0, status: "ReadyForScenario", exitRequired: false, items: [], patches: [] };
     await setup(page, state, [{ id: "i-2", revisionId: "rev-1", validationRunId: "run-1", processingAttemptId: "att-1", artifactId: null, issueCode: "IFC_EXCESSIVE_VOIDS", severity: "Warning", status: "Open", message: "Opening could not be cut.", evidence: {}, ifcGlobalIds: [DOOR_A, DOOR_B], isCurrentAttempt: true, createdAt: "2026-10-02T00:00:00Z" }]);
     await page.goto(ifcUrl("technical"));
-    const row = page.getByTestId("issue-row").filter({ hasText: "IFC_EXCESSIVE_VOIDS" });
+    const row = page.locator('[data-testid="issue-row"][data-code="IFC_EXCESSIVE_VOIDS"]');
     await expect(row).toContainText("Không cắt được lỗ cửa");
     await expect(row.getByTestId("issue-guidance")).toContainText("Kiểm tra cửa và tường");
     await expect(row).toContainText(DOOR_A);
@@ -142,7 +142,7 @@ test.describe("IFC equipment candidates", () => {
     await row.getByTestId("issue-highlight").click();
     await expect(page).toHaveURL(/sub=preview/);
     await expect(page.getByTestId("preview-highlight-ids")).toContainText(`${DOOR_A}, ${DOOR_B}`);
-    await page.getByRole("toolbar", { name: "Thao tác preview" }).getByRole("button", { name: "Bỏ đánh dấu cấu kiện" }).click();
+    await page.getByRole("toolbar", { name: "Thao tác xem trước 3D" }).getByRole("button", { name: "Bỏ đánh dấu cấu kiện" }).click();
     await expect(page.getByTestId("preview-highlight-ids")).toHaveCount(0);
   });
 
@@ -151,7 +151,7 @@ test.describe("IFC equipment candidates", () => {
     await setup(page, state);
     await page.route("**/api/revisions/rev-1/equipment-candidates", (route) => route.fulfill({ status: 409, contentType: "application/problem+json", body: JSON.stringify({ status: 409, title: "x", code: "EQUIPMENT_CANDIDATES_UNAVAILABLE" }) }));
     await page.goto(ifcUrl("equipment"));
-    await expect(page.getByTestId("equipment-panel")).toContainText("Chưa có hình học được chấp nhận");
+    await expect(page.getByTestId("equipment-panel")).toContainText("Mô hình chưa qua kiểm tra tự động");
   });
 });
 
@@ -193,7 +193,7 @@ test.describe("BIM facts of spaces", () => {
     ];
     await page.route("**/api/revisions/rev-1/bim-facts?*", (route) => route.fulfill({ json: { items, totalCount: items.length, page: 1, pageSize: 20 } }));
     await page.goto(ifcUrl("technical"));
-    await page.getByRole("button", { name: "BIM facts", exact: true }).click(); // chip tab of the Kỹ thuật sub-tab
+    await page.getByRole("button", { name: "Thông tin BIM", exact: true }).click(); // chip tab of the Kỹ thuật sub-tab
     const rows = page.getByTestId("fact-row");
     await expect(rows).toHaveCount(6);
     // Grouped by GlobalId, then Name, LongName, Category.
@@ -218,7 +218,7 @@ test.describe("BIM facts of spaces", () => {
     const items = [{ id: "f-1", revisionId: "rev-1", ifcGlobalId: DOOR_B, entityType: "IfcDoor", propertyPath: "Dimensions.Height", value: null, sourceHash: "c".repeat(64), qualityFlags: [{ code: "NEW_FLAG", severity: "Info" }, "MissingValue"], createdAt: "2026-10-17T00:00:00Z" }];
     await page.route("**/api/revisions/rev-1/bim-facts?*", (route) => route.fulfill({ json: { items, totalCount: 1, page: 1, pageSize: 20 } }));
     await page.goto(ifcUrl("technical"));
-    await page.getByRole("button", { name: "BIM facts", exact: true }).click(); // chip tab of the Kỹ thuật sub-tab
+    await page.getByRole("button", { name: "Thông tin BIM", exact: true }).click(); // chip tab of the Kỹ thuật sub-tab
     await expect(page.getByTestId("fact-flag")).toHaveText(["NEW_FLAG", "Thiếu giá trị (MissingValue)"]);
     await expect(page.getByTestId("fact-row")).toContainText("IfcDoor");
     await expect(page.getByTestId("facts-unnamed")).toHaveCount(0);

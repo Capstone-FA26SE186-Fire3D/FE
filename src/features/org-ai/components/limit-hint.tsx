@@ -27,7 +27,7 @@ export function LimitHint({ limit }: { limit: AiOperationLimit | null | undefine
   return <p className={styles.dim} data-testid="ai-limit-hint">
     Mỗi yêu cầu giữ chỗ khoảng {limit.estimatedReserve != null ? formatQuota(limit.estimatedReserve, unit) : "—"}; tổ chức còn {formatQuota(limit.availableUnits, unit)}
     {limit.maxSources ? `; tối đa ${limit.maxSources} nguồn` : ""}.
-    {!limit.canSubmit && " Không đủ cho một yêu cầu: cần mua thêm quota trước khi gửi."}
+    {!limit.canSubmit && " Không đủ cho một yêu cầu: cần nạp thêm hạn mức trước khi gửi."}
   </p>;
 }
 

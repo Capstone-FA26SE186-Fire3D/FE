@@ -37,12 +37,12 @@ function errorMessage(error: unknown, fallback: string) {
 export function describeSaveError(error: unknown): { message: string; conflict: boolean } {
   if (error instanceof ApiError) {
     if (error.status === 412) return { conflict: true, message: "Bản nháp đã được thay đổi ở nơi khác. Nội dung bạn đang nhập vẫn được giữ nguyên." };
-    if (error.status === 428) return { conflict: false, message: "Thiếu If-Match: chưa có ETag của bản nháp. Hãy tải lại bản nháp." };
-    if (error.status === 400 && error.code === "INVALID_IF_MATCH") return { conflict: false, message: "ETag của bản nháp không hợp lệ (INVALID_IF_MATCH). Hãy tải lại bản nháp." };
-    if (error.status === 400) return { conflict: false, message: `Máy chủ từ chối dữ liệu${error.code ? ` (${error.code})` : ""}: ${error.fieldErrors[0]?.message ?? "kiểm tra lại nội dung bản nháp."}` };
+    if (error.status === 428) return { conflict: false, message: "Bản nháp cần tải lại trước khi lưu. Hãy tải lại bản nháp." };
+    if (error.status === 400 && error.code === "INVALID_IF_MATCH") return { conflict: false, message: "Bản nháp cần tải lại trước khi lưu. Hãy tải lại bản nháp." };
+    if (error.status === 400) return { conflict: false, message: `Bản nháp có chỗ chưa hợp lệ: ${error.fieldErrors[0]?.message ?? "kiểm tra lại nội dung bản nháp."}` };
     if (error.status === 401 || error.status === 403) return { conflict: false, message: "Phiên đăng nhập hết hạn hoặc không còn quyền sửa bản nháp này." };
     if (error.status === 404) return { conflict: false, message: "Bản nháp không còn tồn tại hoặc không thuộc tổ chức của bạn." };
-    return { conflict: false, message: describeApiError(error, `Không thể lưu (mã ${error.status}).`) };
+    return { conflict: false, message: describeApiError(error, "Không lưu được bản nháp. Hãy thử lại.") };
   }
   return { conflict: false, message: describeApiError(error, "Không thể lưu bản nháp.") };
 }

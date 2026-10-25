@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 test("login screen uses a Fire3D password session and keeps Google optional", async ({ page }) => {
   await page.goto("/login");
 
-  await expect(page.getByText("Đăng nhập Fire3D")).toBeVisible();
+  await expect(page.getByText("Đăng nhập FET3D")).toBeVisible();
   await expect(page.getByText("Tài khoản trải nghiệm")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Tiếp tục với Google" })).toBeVisible();
 });
@@ -74,8 +74,8 @@ test("login displays the backend ProblemDetails message unchanged", async ({ pag
   await page.getByLabel("Mật khẩu", { exact: true }).fill("safe-password-123");
   await page.getByRole("button", { name: "Đăng nhập" }).click();
 
-  await expect(page.getByText("Thông báo từ Fire3D")).toBeVisible();
-  await expect(page.getByRole("alert", { name: "Lỗi xác thực" })).toContainText("Verify your email before signing in.");
+  await expect(page.getByText("Thông báo từ FET3D")).toBeVisible();
+  await expect(page.getByRole("alert", { name: "Lỗi xác thực" })).toContainText("Hãy xác minh email trước khi đăng nhập.");
   await expect
     .poll(() => page.locator(".form-message").evaluate((node) => node.previousElementSibling?.id))
     .toBe("auth-note");
@@ -215,10 +215,10 @@ test("registration presents an existing-email response and returns to login", as
   await page.getByLabel("Xác nhận mật khẩu", { exact: true }).fill("123456");
   await page.getByRole("button", { name: "Gửi mã OTP" }).click();
 
-  await expect(page.getByRole("alert", { name: "Lỗi xác thực" })).toContainText("Email already exists.");
+  await expect(page.getByRole("alert", { name: "Lỗi xác thực" })).toContainText("Email này đã được đăng ký.");
   await expect(page.getByRole("tab", { name: "Đăng nhập" })).toBeVisible();
   await page.getByRole("tab", { name: "Đăng nhập" }).click();
-  await expect(page.getByRole("heading", { name: "Đăng nhập Fire3D" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Đăng nhập FET3D" })).toBeVisible();
 });
 
 test("registration fields reflect the backend password and username limits", async ({ page }) => {

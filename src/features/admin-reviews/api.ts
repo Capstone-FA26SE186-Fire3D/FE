@@ -58,31 +58,31 @@ export type DecisionFailure = { kind: "retry" | "reload" | "fix"; message: strin
 
 export function describeDecisionError(error: unknown): DecisionFailure {
   if (!(error instanceof ApiError)) {
-    return { kind: "retry", message: "Không kết nối được tới máy chủ hoặc chưa nhận được phản hồi. Quyết định có thể đã được ghi: bấm Thử lại sẽ gửi cùng mã thao tác nên không bị ghi hai lần." };
+    return { kind: "retry", message: "Không kết nối được tới máy chủ hoặc chưa nhận được phản hồi. Quyết định có thể đã được ghi: bấm Thử lại an toàn, không bị ghi hai lần." };
   }
   const code = error.code;
   switch (code) {
     case "CONTENT_REVIEW_NOT_PENDING": return { kind: "reload", code, message: "Bản này không còn ở trạng thái chờ duyệt: đã có quyết định (quyết định không đổi được). Đang tải lại trạng thái hiện tại." };
-    case "CONTENT_HASH_MISMATCH": return { kind: "reload", code, message: "Hash không khớp nội dung đã đóng băng của phiên bản. Đang tải lại chi tiết; hãy xem lại rồi quyết định lại." };
+    case "CONTENT_HASH_MISMATCH": return { kind: "reload", code, message: "Nội dung phiên bản không khớp với bản đang xem. Đang tải lại chi tiết; hãy xem lại rồi quyết định lại." };
     case "IDEMPOTENCY_KEY_CONFLICT": return { kind: "reload", code, message: "Mã thao tác đã được dùng cho một quyết định khác. Đang tải lại trạng thái hiện tại." };
-    case "SCENARIO_SNAPSHOT_REQUIRED": return { kind: "reload", code, message: "Phiên bản chưa có snapshot kịch bản/rubric hợp lệ nên chưa quyết định được." };
+    case "SCENARIO_SNAPSHOT_REQUIRED": return { kind: "reload", code, message: "Phiên bản chưa có nội dung kịch bản và tiêu chí chấm điểm hợp lệ nên chưa quyết định được." };
     default: break;
   }
-  if (error.status === 409) return { kind: "reload", code, message: `Quyết định bị từ chối do trạng thái hiện tại${code ? ` (${code})` : ""}. Đang tải lại để hiển thị trạng thái đúng.` };
+  if (error.status === 409) return { kind: "reload", code, message: "Quyết định không ghi được ở trạng thái hiện tại. Đang tải lại để hiển thị trạng thái đúng." };
   if (error.status === 401) return { kind: "reload", code, message: "Phiên đăng nhập đã hết hạn hoặc bị thu hồi. Đăng nhập lại rồi mở lại bản duyệt; không có quyết định nào được ghi từ phản hồi này." };
-  if (error.status === 403) return { kind: "reload", code, message: "Chỉ PlatformAdmin được duyệt hoặc từ chối kịch bản." };
+  if (error.status === 403) return { kind: "reload", code, message: "Chỉ quản trị FET3D được duyệt hoặc từ chối kịch bản." };
   if (error.status === 404) return { kind: "reload", code, message: "Không tìm thấy phiên bản này (không thuộc phạm vi truy cập hoặc tổ chức/công trình đã bị vô hiệu hóa)." };
   if (error.status === 400) {
     const reason = error.fieldMessage("reason");
     const hash = error.fieldMessage("contentHash") ?? error.fieldMessage("rubricHash");
-    if (hash) return { kind: "reload", code, message: "Hash do máy chủ trả về bị từ chối. Đang tải lại chi tiết." };
+    if (hash) return { kind: "reload", code, message: "Mã nội dung không còn khớp. Đang tải lại chi tiết." };
     return { kind: "fix", code, reason, message: reason ?? "Dữ liệu chưa hợp lệ. Kiểm tra lại lý do rồi gửi lại." };
   }
   if (error.isRateLimited) {
     const wait = error.retryAfterSeconds ? ` Thử lại sau ${error.retryAfterSeconds} giây.` : " Thử lại sau ít phút.";
-    return { kind: "retry", code, message: `Máy chủ đang bận.${wait} Thử lại dùng cùng mã thao tác.` };
+    return { kind: "retry", code, message: `Máy chủ đang bận.${wait} Thử lại sẽ không ghi quyết định hai lần.` };
   }
-  return { kind: "retry", code, message: `Không ghi được quyết định${code ? ` (${code})` : ""}. Nội dung bạn nhập vẫn được giữ lại; thử lại dùng cùng mã thao tác nên không bị ghi hai lần.` };
+  return { kind: "retry", code, message: "Không ghi được quyết định. Nội dung bạn nhập vẫn được giữ lại; bấm thử lại an toàn, không bị ghi hai lần." };
 }
 
 export type ReadFailure = { title: string; message: string; denied: boolean };
@@ -91,11 +91,11 @@ export type ReadFailure = { title: string; message: string; denied: boolean };
 export function describeReadError(error: unknown, what: "queue" | "detail"): ReadFailure {
   const title = what === "queue" ? "Không tải được hàng chờ duyệt" : "Không mở được bản duyệt";
   if (error instanceof ApiError) {
-    if (error.status === 401) return { title: "Phiên đăng nhập đã hết hạn", message: "Đăng nhập lại bằng tài khoản PlatformAdmin để xem hàng chờ duyệt.", denied: true };
-    if (error.status === 403) return { title: "Không có quyền truy cập", message: "Chỉ PlatformAdmin xem và quyết định được bản duyệt kịch bản.", denied: true };
+    if (error.status === 401) return { title: "Phiên đăng nhập đã hết hạn", message: "Đăng nhập lại bằng tài khoản quản trị FET3D để xem hàng chờ duyệt.", denied: true };
+    if (error.status === 403) return { title: "Không có quyền truy cập", message: "Chỉ quản trị FET3D xem và quyết định được bản duyệt kịch bản.", denied: true };
     if (error.status === 404) return { title: "Không tìm thấy bản duyệt", message: "Bản duyệt không tồn tại hoặc không còn truy cập được (tổ chức/công trình đã bị vô hiệu hóa). Quay lại hàng chờ để chọn bản khác.", denied: true };
     if (error.isRateLimited) return { title, message: error.retryAfterSeconds ? `Máy chủ đang bận, thử lại sau ${error.retryAfterSeconds} giây.` : "Máy chủ đang bận, thử lại sau ít phút.", denied: false };
-    return { title, message: `${error.code ? `Mã lỗi: ${error.code}. ` : ""}${error.status >= 500 ? "Máy chủ gặp sự cố." : error.message}`.trim(), denied: false };
+    return { title, message: error.message, denied: false };
   }
   return { title, message: "Không kết nối được tới máy chủ. Kiểm tra kết nối rồi thử lại.", denied: false };
 }

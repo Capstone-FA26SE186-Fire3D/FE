@@ -71,14 +71,14 @@ function Editor({ accessToken, revisionId, snapshot }: { accessToken: string; re
       setBaseVersion(saved.version);
       setSavedItems(payload);
       setConflict(null);
-      toast.notify({ tone: "success", title: "Đã lưu annotation", description: `Phiên bản ${saved.version}.` });
+      toast.notify({ tone: "success", title: "Đã lưu ghi chú", description: `Phiên bản ${saved.version}.` });
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 412) {
         // Keep what the user typed; fetch the newer version so they can compare.
         setLoadingLatest(true);
-        try { setConflict(await buildingsApi.getAnnotations(accessToken, revisionId)); } catch { setConflict(null); setError("Annotation đã bị người khác thay đổi và không tải được bản mới. Nội dung của bạn vẫn được giữ lại."); } finally { setLoadingLatest(false); }
+        try { setConflict(await buildingsApi.getAnnotations(accessToken, revisionId)); } catch { setConflict(null); setError("Ghi chú vừa được người khác thay đổi nhưng chưa tải được bản mới. Nội dung của bạn vẫn được giữ lại."); } finally { setLoadingLatest(false); }
       } else {
-        setError(describeApiError(cause, "Không thể lưu annotation. Nội dung bạn nhập vẫn được giữ lại."));
+        setError(describeApiError(cause, "Không thể lưu ghi chú. Nội dung bạn nhập vẫn được giữ lại."));
       }
     } finally {
       saving.current = false;
@@ -102,31 +102,31 @@ function Editor({ accessToken, revisionId, snapshot }: { accessToken: string; re
   };
 
   return <div className="ops-stack">
-    {conflict && <Alert tone="warning" title="Annotation đã được người khác cập nhật (phiên bản mới hơn)" action={<div className="ops-actions" style={{ marginTop: 12 }}>
+    {conflict && <Alert tone="warning" title="Ghi chú vừa được người khác cập nhật" action={<div className="ops-actions" style={{ marginTop: 12 }}>
       <Button size="sm" variant="secondary" onClick={useRemote}>Dùng bản mới (bỏ thay đổi của tôi)</Button>
       <Button size="sm" variant="quiet" onClick={keepMine}>Giữ bản của tôi để ghi đè</Button>
     </div>}>
-      Nội dung bạn đang soạn vẫn được giữ nguyên. Bản mới có {conflict.data.items.length} annotation (phiên bản {conflict.version}); chọn một hướng xử lý trước khi lưu lại.
+      Nội dung bạn đang soạn vẫn được giữ nguyên. Bản mới có {conflict.data.items.length} ghi chú (phiên bản {conflict.version}); chọn một hướng xử lý trước khi lưu lại.
       {conflict.data.items.length > 0 && <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>{conflict.data.items.slice(0, 5).map((item) => <li key={item.id}>{item.label} <span className="ops-mono">({item.ifcGlobalId})</span></li>)}{conflict.data.items.length > 5 && <li>… và {conflict.data.items.length - 5} mục khác</li>}</ul>}
     </Alert>}
     {loadingLatest && <p className="ops-muted" role="status">Đang tải bản mới nhất…</p>}
     {error && <Alert tone="danger">{error}</Alert>}
 
-    {rows.length === 0 ? <EmptyState icon={MessageSquarePlus} title="Chưa có annotation" description="Gắn ghi chú vào cấu kiện theo IFC GlobalId. Annotation nằm ngoài hình học và không thay đổi mô hình." action={<Button variant="secondary" onClick={() => { setRows([{ id: newIdempotencyKey(), ifcGlobalId: "", label: "", note: null }]); }}><Plus size={16} aria-hidden="true" />Thêm annotation</Button>} /> : <div>
+    {rows.length === 0 ? <EmptyState icon={MessageSquarePlus} title="Chưa có ghi chú" description="Gắn ghi chú vào cấu kiện bằng mã cấu kiện IFC (GlobalId). Ghi chú được lưu riêng và không thay đổi mô hình." action={<Button variant="secondary" onClick={() => { setRows([{ id: newIdempotencyKey(), ifcGlobalId: "", label: "", note: null }]); }}><Plus size={16} aria-hidden="true" />Thêm ghi chú</Button>} /> : <div>
       {rows.map((row, index) => {
         const e = showErrors ? errors.get(row.id) : undefined;
         return <div className="ops-annotation-row" key={row.id}>
-          <Field label={`IFC GlobalId #${index + 1}`} required error={e?.ifcGlobalId}>{(p) => <Input {...p} className="ops-mono" value={row.ifcGlobalId} maxLength={300} onChange={(event) => update(row.id, { ifcGlobalId: event.target.value })} />}</Field>
+          <Field label={`Mã cấu kiện IFC #${index + 1}`} required error={e?.ifcGlobalId}>{(p) => <Input {...p} className="ops-mono" value={row.ifcGlobalId} maxLength={300} onChange={(event) => update(row.id, { ifcGlobalId: event.target.value })} />}</Field>
           <Field label={`Nhãn #${index + 1}`} required error={e?.label}>{(p) => <Input {...p} value={row.label} maxLength={220} onChange={(event) => update(row.id, { label: event.target.value })} />}</Field>
-          <Field label={`Ghi chú #${index + 1}`} error={e?.note}>{(p) => <Textarea {...p} rows={1} style={{ minHeight: 42, padding: "10px 12px" }} value={row.note ?? ""} maxLength={2100} onChange={(event) => update(row.id, { note: event.target.value })} />}</Field>
-          <Button variant="quiet" size="icon" aria-label={`Xóa annotation ${index + 1}`} onClick={() => { setRows((current) => current.filter((item) => item.id !== row.id)); }}><Trash2 size={16} aria-hidden="true" /></Button>
+          <Field label={`Nội dung #${index + 1}`} error={e?.note}>{(p) => <Textarea {...p} rows={1} style={{ minHeight: 42, padding: "10px 12px" }} value={row.note ?? ""} maxLength={2100} onChange={(event) => update(row.id, { note: event.target.value })} />}</Field>
+          <Button variant="quiet" size="icon" aria-label={`Xóa ghi chú ${index + 1}`} onClick={() => { setRows((current) => current.filter((item) => item.id !== row.id)); }}><Trash2 size={16} aria-hidden="true" /></Button>
         </div>;
       })}
     </div>}
 
     <div className="ops-actions">
-      <Button variant="secondary" disabled={rows.length >= MAX_ITEMS || busy} onClick={() => { setRows((current) => [...current, { id: newIdempotencyKey(), ifcGlobalId: "", label: "", note: null }]); }}><Plus size={16} aria-hidden="true" />Thêm annotation</Button>
-      <Button onClick={() => void save()} disabled={busy || !dirty || conflict !== null}><Save size={16} aria-hidden="true" />{busy ? "Đang lưu…" : "Lưu annotation"}</Button>
+      <Button variant="secondary" disabled={rows.length >= MAX_ITEMS || busy} onClick={() => { setRows((current) => [...current, { id: newIdempotencyKey(), ifcGlobalId: "", label: "", note: null }]); }}><Plus size={16} aria-hidden="true" />Thêm ghi chú</Button>
+      <Button onClick={() => void save()} disabled={busy || !dirty || conflict !== null}><Save size={16} aria-hidden="true" />{busy ? "Đang lưu…" : "Lưu ghi chú"}</Button>
       <span className="ops-muted">{rows.length}/{MAX_ITEMS} · phiên bản {baseVersion}{dirty ? " · có thay đổi chưa lưu" : ""}</span>
     </div>
   </div>;
@@ -140,14 +140,14 @@ export function AnnotationsPanel({ accessToken, revisionId }: { accessToken: str
 function RevisionAnnotations({ accessToken, revisionId }: { accessToken: string; revisionId: string }) {
   const annotations = useAsyncData(`annotations:${revisionId}`, async (signal) => {
     const snapshot = await buildingsApi.getAnnotations(accessToken, revisionId, signal);
-    if (snapshot.revisionId !== revisionId) throw new Error("Annotation trả về không thuộc revision đang chọn. Hãy thử tải lại.");
+    if (snapshot.revisionId !== revisionId) throw new Error("Ghi chú tải về không thuộc bản IFC đang chọn. Hãy thử tải lại.");
     return snapshot;
   });
   const { data, error, loading, reload } = annotations;
 
-  return <Panel title="Annotation overlay" description="Ghi chú bám theo IFC GlobalId, tách khỏi hình học. Lưu bằng phiên bản (If-Match) để không ghi đè thay đổi mới hơn.">
-    {loading && !data && <SkeletonRows rows={3} label="Đang tải annotation…" />}
-    {error !== undefined && !data && <Alert tone="danger" title="Không tải được annotation" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reload}>Thử lại</Button>}>{describeApiError(error, "Hãy thử lại sau.")}</Alert>}
+  return <Panel title="Ghi chú trên mô hình" description="Ghi chú gắn vào từng cấu kiện và được lưu riêng, không thay đổi mô hình. Nếu người khác vừa sửa, bạn sẽ được hỏi trước khi ghi đè.">
+    {loading && !data && <SkeletonRows rows={3} label="Đang tải ghi chú…" />}
+    {error !== undefined && !data && <Alert tone="danger" title="Không tải được ghi chú" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reload}>Thử lại</Button>}>{describeApiError(error, "Hãy thử lại sau.")}</Alert>}
     {data && <Editor key={revisionId} accessToken={accessToken} revisionId={revisionId} snapshot={data} />}
   </Panel>;
 }

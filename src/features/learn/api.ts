@@ -88,9 +88,9 @@ export const learnApi = {
 export function describeReadError(error: unknown): { status: number | null; title: string; message: string } {
   if (error instanceof ApiError) {
     if (error.status === 404) return { status: 404, title: "Không tìm thấy bài", message: "Bài này không tồn tại hoặc chưa được công khai." };
-    if (error.status === 410) return { status: 410, title: "Bài tạm thời không hiển thị", message: "Bài này đang được ẩn khỏi trang công khai. Bạn có thể xem các bài khác trong Learn." };
+    if (error.status === 410) return { status: 410, title: "Bài tạm thời không hiển thị", message: "Bài này đang được ẩn khỏi trang công khai. Bạn có thể xem các bài khác trong thư viện bài học." };
     if (error.isRateLimited) return { status: error.status, title: "Máy chủ đang bận", message: error.retryAfterSeconds ? `Thử lại sau ${error.retryAfterSeconds} giây.` : "Thử lại sau ít phút." };
-    return { status: error.status, title: "Không tải được nội dung", message: `Máy chủ trả lỗi${error.code ? ` (${error.code})` : ` ${error.status}`}. Hãy thử lại.` };
+    return { status: error.status, title: "Không tải được nội dung", message: `${error.message} Hãy thử lại.` };
   }
   return { status: null, title: "Không kết nối được tới máy chủ", message: "Hãy kiểm tra kết nối rồi thử lại." };
 }

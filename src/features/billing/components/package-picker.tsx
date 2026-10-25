@@ -45,7 +45,7 @@ export function PackagePicker({ packages, value, onChange, disabled, isOptionDis
             <span className="bill-price">{formatVnd(item.unitPrice)}<small> / tháng / công trình</small></span>
             <small>Thời hạn {item.durationMonths} tháng · mã {item.code}</small>
             <small>{item.learnerLimit != null ? `${formatNumber(item.learnerLimit)} học viên mỗi kỳ` : "Chưa nêu số học viên"}</small>
-            {item.aiQuotaUnits != null && item.aiQuotaUnits > 0 && <small>Quota AI trả trước: {formatNumber(item.aiQuotaUnits)} đơn vị</small>}
+            {item.aiQuotaUnits != null && item.aiQuotaUnits > 0 && <small>Hạn mức AI trả trước: {formatNumber(item.aiQuotaUnits)} đơn vị</small>}
             {item.description && <small>{item.description}</small>}
             {reason && <small style={{ color: "var(--warning)" }}>{reason}</small>}
           </label>;

@@ -18,6 +18,7 @@ import type { PayosCheckout, PayosLedgerItem, PayosPayment, Quotation, WithEtag 
 import { PaymentProgress } from "./payment-progress";
 import { CheckoutHistory } from "./payment-states";
 import { QuotationCancel } from "./quotation-cancel";
+import { quotationStatus } from "./quotation-snapshot";
 import "../billing.css";
 
 const TERMINAL: string[] = ["Cancelled", "Expired", "Failed", "Completed"];
@@ -189,7 +190,7 @@ function CheckoutFlow({ accessToken, quotation, etag, canPurchase, returnTo, res
   };
 
   if (quotation.status === "Draft") {
-    return <Alert tone="info" title="Đang chờ PlatformAdmin phát hành">Bạn chưa thể chấp nhận hoặc thanh toán. Khi báo giá được phát hành, trạng thái ở đây đổi thành “Đã phát hành” và có nút chấp nhận.<Button size="sm" variant="secondary" className="mt-3" onClick={onReload}><RefreshCw size={14} aria-hidden="true" />Tải lại trạng thái</Button></Alert>;
+    return <Alert tone="info" title="Đang chờ quản trị FET3D phát hành">Bạn chưa thể chấp nhận hoặc thanh toán. Khi báo giá được phát hành, trạng thái ở đây đổi thành “Đã phát hành” và có nút chấp nhận.<Button size="sm" variant="secondary" className="mt-3" onClick={onReload}><RefreshCw size={14} aria-hidden="true" />Tải lại trạng thái</Button></Alert>;
   }
 
   if (quotation.status === "Issued") {
@@ -208,8 +209,8 @@ function CheckoutFlow({ accessToken, quotation, etag, canPurchase, returnTo, res
   const rows = history.data?.items ?? [];
   if (!isAccepted) {
     return <div className="ops-stack">
-      <Alert tone="info" title="Báo giá không còn hiệu lực">Trạng thái {quotation.status}. Hãy tạo báo giá mới nếu vẫn cần mua dịch vụ.</Alert>
-      {quotation.status === "Cancelled" && known?.paymentStatus === "Paid" && <Alert tone="warning" title="Có khoản tiền đã nhận cho báo giá đã hủy">Dịch vụ không được kích hoạt cho báo giá đã hủy và tiền không tự hoàn lại. PlatformAdmin sẽ đối soát; hãy liên hệ hỗ trợ kèm số báo giá.</Alert>}
+      <Alert tone="info" title="Báo giá không còn hiệu lực">Trạng thái: {quotationStatus[quotation.status]?.label.toLowerCase() ?? "không rõ"}. Hãy tạo báo giá mới nếu vẫn cần mua dịch vụ.</Alert>
+      {quotation.status === "Cancelled" && known?.paymentStatus === "Paid" && <Alert tone="warning" title="Có khoản tiền đã nhận cho báo giá đã hủy">Dịch vụ không được kích hoạt cho báo giá đã hủy và tiền không tự hoàn lại. Quản trị FET3D sẽ đối soát; hãy liên hệ hỗ trợ kèm số báo giá.</Alert>}
       <CheckoutHistory rows={rows} />
     </div>;
   }
@@ -223,10 +224,10 @@ function CheckoutFlow({ accessToken, quotation, etag, canPurchase, returnTo, res
     {history.error !== undefined && !history.data && <Alert tone="warning" title="Chưa đọc được lịch sử thanh toán của báo giá" action={<Button size="sm" variant="secondary" className="mt-3" onClick={history.reload}>Thử lại</Button>}>{billingErrorText(history.error)}</Alert>}
     {!discovering && !live && !paymentRequestId && <>
       {!canPurchase
-        ? <Alert tone="info" title="Chỉ tài khoản tổ chức thanh toán">PlatformAdmin có thể xem trạng thái nhưng không tạo thanh toán thay tổ chức.</Alert>
+        ? <Alert tone="info" title="Chỉ tài khoản tổ chức thanh toán">Quản trị FET3D có thể xem trạng thái nhưng không tạo thanh toán thay tổ chức.</Alert>
         : notPayable
           ? <Alert tone="warning" title="Báo giá đã hết hạn">Không thể tạo thanh toán mới từ báo giá quá hạn. Hãy yêu cầu báo giá mới.</Alert>
-          : <Alert tone="success" title="Đã chấp nhận · sẵn sàng thanh toán">Số tiền do máy chủ xác định theo báo giá: <strong>{formatVnd(quotation.totalAmount)}</strong>. Bạn sẽ được chuyển sang trang PayOS; sau khi thanh toán, quay lại đây để xem tiến trình kích hoạt.</Alert>}
+          : <Alert tone="success" title="Đã chấp nhận · sẵn sàng thanh toán">Số tiền theo báo giá: <strong>{formatVnd(quotation.totalAmount)}</strong>. Bạn sẽ được chuyển sang trang PayOS; sau khi thanh toán, quay lại đây để xem tiến trình kích hoạt.</Alert>}
       {payError && <Alert tone="danger" title="Chưa tạo được thanh toán">{payError}</Alert>}
       {canPurchase && !notPayable && <div className="ops-actions"><Button onClick={() => void startCheckout()} disabled={starting || redirecting}><CreditCard size={16} aria-hidden="true" />{starting ? "Đang tạo liên kết…" : payError ? "Thử lại thanh toán" : "Thanh toán qua PayOS"}</Button></div>}
     </>}

@@ -10,15 +10,15 @@ export const LIBRARY_KINDS = ["ScenarioTemplate", "RubricSample", "Equipment"] a
 export type LibraryKind = (typeof LIBRARY_KINDS)[number];
 
 export const kindLabel: Record<LibraryKind, string> = {
-  ScenarioTemplate: "Template kịch bản",
-  RubricSample: "Rubric mẫu",
+  ScenarioTemplate: "Kịch bản mẫu",
+  RubricSample: "Tiêu chí chấm mẫu",
   Equipment: "Thiết bị",
 };
 
 export const kindHint: Record<LibraryKind, string> = {
-  ScenarioTemplate: "Nội dung phi không gian của kịch bản: tên, mục tiêu, hướng dẫn, thời gian, chế độ, rubric.",
-  RubricSample: "Rubric mẫu theo schema_version của máy chủ; chỉ số lấy từ danh mục rubric.",
-  Equipment: "Mô tả và thuộc tính hiển thị của thiết bị. Không thêm năng lực cho runtime.",
+  ScenarioTemplate: "Phần nội dung của kịch bản: tên, mục tiêu, hướng dẫn, thời gian, chế độ, tiêu chí chấm điểm (không gồm vị trí trên mô hình).",
+  RubricSample: "Bộ tiêu chí chấm điểm (rubric) mẫu; chỉ số lấy từ danh mục chỉ số của hệ thống.",
+  Equipment: "Mô tả và thuộc tính hiển thị của thiết bị. Không thêm năng lực cho ứng dụng.",
 };
 
 export const isKind = (value: unknown): value is LibraryKind => (LIBRARY_KINDS as readonly string[]).includes(value as string);

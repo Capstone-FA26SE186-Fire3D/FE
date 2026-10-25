@@ -64,7 +64,7 @@ export function NewPostModal({ accessToken, onClose, onCreated }: { accessToken:
     try {
       const result = await learnAdminApi.createPost(accessToken, input, commandKey(intent));
       commandDone(intent);
-      toast.notify({ tone: "success", title: publishNow ? "Đã tạo và xuất bản bài" : "Đã tạo bản nháp", description: `${result.data.slug} · ${result.etag}` });
+      toast.notify({ tone: "success", title: publishNow ? "Đã tạo và xuất bản bài" : "Đã tạo bản nháp", description: result.data.slug });
       onCreated(result.data.id);
     } catch (cause) {
       const view = describeLearnError(cause);
@@ -89,14 +89,14 @@ export function NewPostModal({ accessToken, onClose, onCreated }: { accessToken:
         </Alert>}
         {showIssues && (clientIssues.length > 0 || checkSlug(slug)) && <Alert tone="danger" title="Còn điểm cần sửa trước khi tạo bài"><ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc" }}>{checkSlug(slug) && <li>{checkSlug(slug)}</li>}{clientIssues.map((issue, index) => <li key={`${issue.path}-${index}`}>{issue.message}</li>)}</ul></Alert>}
         <ContentFields accessToken={accessToken} form={form} onChange={setKindBlocks} readOnly={false} busy={busy} issues={shown} compact
-          slugField={<Field label="Slug (đường dẫn)" required hint="Chữ thường không dấu, số và dấu gạch ngang. Không đổi được sau khi tạo." error={showIssues || error?.code === "SLUG_EXISTS" ? slugProblem : undefined}>
+          slugField={<Field label="Đường dẫn rút gọn" required hint="Chữ thường không dấu, số và dấu gạch ngang. Không đổi được sau khi tạo." error={showIssues || error?.code === "SLUG_EXISTS" ? slugProblem : undefined}>
             {(p) => <Input {...p} maxLength={180} value={slug} onChange={(event) => { setSlug(event.target.value.toLowerCase()); if (error?.code === "SLUG_EXISTS") setError(null); }} />}
           </Field>} />
         <fieldset disabled={busy} className="ops-stack" style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
           {paragraph && <Field label="Đoạn mở đầu" required hint="Khối đoạn văn đầu tiên của bài (văn bản thuần). Thêm tiêu đề phụ, danh sách, ảnh và video trong trình soạn." error={issueFor("$.blocks[0].text") ?? issueFor("$.blocks")}>
             {(p) => <Textarea {...p} rows={4} maxLength={5000} value={text(paragraph.fields.text)} onChange={(event) => setBlock(updateFields(paragraph, { text: event.target.value }))} />}
           </Field>}
-          {video && <Field label="Liên kết video" required hint="Liên kết đầy đủ từ YouTube, Facebook hoặc TikTok (https). Máy chủ kiểm tra và chuẩn hóa khi tạo bài." error={issueFor(`$.blocks[${videoIndex}].url`)}>
+          {video && <Field label="Liên kết video" required hint="Liên kết đầy đủ từ YouTube, Facebook hoặc TikTok (https). Hệ thống kiểm tra liên kết khi tạo bài." error={issueFor(`$.blocks[${videoIndex}].url`)}>
             {(p) => <Input {...p} inputMode="url" value={text(video.fields.url)} onChange={(event) => setBlock(updateFields(video, { url: event.target.value }))} />}
           </Field>}
           <label className="learn-toggle">

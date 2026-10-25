@@ -191,7 +191,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
           }
           etag = fresh.etag;
         }
-        if (!etag) { setFormError("Không đọc được phiên bản công trình (ETag). Hãy tải lại trang rồi thử lại."); return; }
+        if (!etag) { setFormError("Chưa xác định được bản thông tin công trình đang sửa. Hãy tải lại trang rồi thử lại."); return; }
         await buildingsApi.update(accessToken, dialog.id, buildingFormToInput(form, editing ?? undefined), etag, scopedOrgId);
         setDialog(null);
         setConflict(null);
@@ -234,7 +234,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
           return;
         }
       }
-      if (!etag) { setArchiveNotice("Không đọc được phiên bản công trình (ETag). Hãy tải lại trang rồi thử lại."); return; }
+      if (!etag) { setArchiveNotice("Chưa xác định được bản thông tin công trình đang sửa. Hãy tải lại trang rồi thử lại."); return; }
       await buildingsApi.archive(accessToken, archiving.id, etag, scopedOrgId);
       toast.notify({ tone: "success", title: "Đã lưu trữ công trình", description: archiving.name });
       setArchiving(null);
@@ -264,7 +264,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
 
   if (blocked) {
     return <><PageHeader title="Công trình" description="Quản lý công trình và các phiên bản mô hình IFC của tổ chức." />
-      <Alert tone="warning" title="Tài khoản chưa thuộc tổ chức nào">Hãy liên hệ PlatformAdmin để được gắn vào một tổ chức trước khi quản lý công trình.</Alert></>;
+      <Alert tone="warning" title="Tài khoản chưa thuộc tổ chức nào">Hãy liên hệ quản trị FET3D để được thêm vào một tổ chức trước khi quản lý công trình.</Alert></>;
   }
 
   const pageDescription = isAdmin
@@ -283,7 +283,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
       <PageHeader title="Công trình" description={pageDescription} breadcrumbs={crumbs} />
       {organizationSelect}
       {organizations.error !== undefined && <Alert tone="danger" title="Không tải được danh sách tổ chức" action={<RetryButton error={organizations.error} onRetry={organizations.reload} />}>Hãy thử lại sau.</Alert>}
-      <EmptyState icon={Building2} title="Chọn tổ chức để xem công trình" description="Công trình thuộc về từng tổ chức. PlatformAdmin cần chọn tổ chức trước khi xem hoặc tạo công trình." action={<Button asChild variant="secondary"><Link href={routes.adminOrganizations}>Mở danh sách tổ chức</Link></Button>} />
+      <EmptyState icon={Building2} title="Chọn tổ chức để xem công trình" description="Công trình thuộc về từng tổ chức. Hãy chọn tổ chức trước khi xem hoặc tạo công trình." action={<Button asChild variant="secondary"><Link href={routes.adminOrganizations}>Mở danh sách tổ chức</Link></Button>} />
     </>;
   }
 
@@ -372,7 +372,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
       onOpenChange={(open) => { if (!open) setArchiving(null); }}
       tone="danger"
       title="Lưu trữ công trình?"
-      description={archiving ? `“${archiving.name}” sẽ rời khỏi danh sách đang dùng. Không thể hoàn tác: BE không có thao tác khôi phục. Dữ liệu IFC và kịch bản không bị xóa.` : undefined}
+      description={archiving ? `“${archiving.name}” sẽ rời khỏi danh sách đang dùng. Không thể hoàn tác: hệ thống chưa hỗ trợ khôi phục. Dữ liệu IFC và kịch bản không bị xóa.` : undefined}
       confirmLabel="Lưu trữ"
       busy={archiveBusy}
       onConfirm={confirmArchive}

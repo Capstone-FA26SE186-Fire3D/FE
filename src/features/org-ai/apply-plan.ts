@@ -45,8 +45,8 @@ const FIELD_DEFS: Array<{ key: string; label: string; defaultOn: boolean; note?:
   { key: "learnerInstructions", label: "Hướng dẫn cho người học", defaultOn: true },
   { key: "timeLimitSeconds", label: "Giới hạn thời gian (giây)", defaultOn: false, note: "Quyết định của tổ chức; chọn có chủ ý." },
   { key: "modePolicy", label: "Chế độ huấn luyện cho phép", defaultOn: false, note: "Quyết định của tổ chức; chọn có chủ ý." },
-  { key: "rubric", label: "Rubric và ngưỡng đạt", defaultOn: false, note: "Ngưỡng đạt do tổ chức quyết định; metric được kiểm tra theo catalog sau khi áp dụng." },
-  { key: "runtimeVersion", label: "Phiên bản runtime", defaultOn: false, note: "Đổi runtime làm thay đổi năng lực hợp lệ của đối tượng." },
+  { key: "rubric", label: "Tiêu chí chấm điểm (rubric) và ngưỡng đạt", defaultOn: false, note: "Ngưỡng đạt do tổ chức quyết định; chỉ số được kiểm tra theo danh mục sau khi áp dụng." },
+  { key: "runtimeVersion", label: "Phiên bản ứng dụng", defaultOn: false, note: "Đổi phiên bản ứng dụng làm thay đổi khả năng hợp lệ của đối tượng." },
   { key: "randomSeed", label: "Hạt giống ngẫu nhiên", defaultOn: false },
   { key: "replanIntervalSeconds", label: "Chu kỳ lập lại lộ trình (giây)", defaultOn: false },
 ];
@@ -73,15 +73,15 @@ export function readProposalNotes(result: unknown): string | null {
 }
 
 function objectReason(object: JsonObject, existingIds: Set<string>, seen: Set<string>, floorIds: Set<string> | null, geometryMatches: boolean): string | undefined {
-  if (!geometryMatches) return "Đề xuất không ghim cùng Geometry với bản nháp này nên tọa độ không áp dụng được.";
-  if (!floorIds) return "Chưa có Geometry hợp lệ của bản nháp để kiểm tra tầng.";
+  if (!geometryMatches) return "Đề xuất không dùng cùng bản mô hình với bản nháp này nên tọa độ không áp dụng được.";
+  if (!floorIds) return "Bản nháp chưa có mô hình hợp lệ để kiểm tra tầng.";
   const id = object.id;
   if (typeof id !== "string" || !ID_PATTERN.test(id)) return "Mã đối tượng không hợp lệ.";
   if (existingIds.has(id) || seen.has(id)) return "Bản nháp đã có đối tượng cùng mã.";
   if (typeof object.kind !== "string" || !(OBJECT_KINDS as readonly string[]).includes(object.kind)) return "Loại đối tượng không được hỗ trợ.";
   const placement = object.placement;
   if (!isObject(placement)) return "Thiếu vị trí.";
-  if (typeof placement.floorId !== "string" || !floorIds.has(placement.floorId)) return "Tầng không có trong Geometry của bản nháp.";
+  if (typeof placement.floorId !== "string" || !floorIds.has(placement.floorId)) return "Tầng không có trong mô hình của bản nháp.";
   const position = placement.position;
   const rotation = placement.rotation;
   if (!isObject(position) || !finite(position.x) || !finite(position.y) || !finite(position.z)) return "Tọa độ không hợp lệ.";

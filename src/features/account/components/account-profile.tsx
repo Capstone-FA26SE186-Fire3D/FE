@@ -24,7 +24,7 @@ import { organizationsApi } from "@/features/organizations/api";
 import type { OrganizationProfile } from "@/features/organizations/types";
 import { keepEdits } from "@/utils/keep-edits";
 
-const roleNames = ["Quản trị nền tảng", "Người dùng tổ chức", "Học viên"];
+const roleNames = ["Quản trị FET3D", "Tài khoản tổ chức", "Học viên"];
 const supportedAvatarTypes = ["image/jpeg", "image/png", "image/webp"];
 const maxAvatarBytes = 5 * 1024 * 1024;
 
@@ -56,7 +56,7 @@ function problemOf(error: unknown, fieldNames: string[]): FormProblem {
   if (error instanceof ApiError) {
     const fields = Object.fromEntries(fieldNames.map((name) => [name, error.fieldMessage(name)]));
     if (error.isPreconditionFailed) return { message: "Hồ sơ vừa được thay đổi ở nơi khác nên chưa lưu. Nội dung bạn nhập vẫn được giữ lại.", fields, stale: true };
-    if (error.status === 428) return { message: "Chưa có phiên bản hồ sơ để đối chiếu. Hãy tải lại rồi lưu lại.", fields, stale: true };
+    if (error.status === 428) return { message: "Hồ sơ chưa tải xong nên chưa lưu được. Hãy tải lại trang rồi lưu lại.", fields, stale: true };
     if (error.status === 429) return { message: error.retryAfterSeconds ? `Thao tác quá nhanh. Thử lại sau ${error.retryAfterSeconds} giây.` : "Thao tác quá nhanh. Hãy thử lại sau ít phút.", fields, stale: false };
     // Session lost, no permission, not found and server errors get the shared Vietnamese wording, never the raw English title.
     const generic = error.status === 401 || error.status === 403 || error.status === 404 || error.status >= 500;
@@ -138,7 +138,7 @@ export function AccountProfile() {
   // Until the first load finishes the fields stay locked, so late data cannot overwrite what someone already typed.
   const initialLoad = !initialized;
   const displayUser = profile ?? user;
-  const displayName = displayUser?.fullName?.trim() || displayUser?.email || "Tài khoản Fire3D";
+  const displayName = displayUser?.fullName?.trim() || displayUser?.email || "Tài khoản FET3D";
   const initials = useMemo(() => displayName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(), [displayName]);
 
   const saveProfile = async (event: FormEvent<HTMLFormElement>) => {
@@ -180,7 +180,7 @@ export function AccountProfile() {
     event.target.value = "";
     if (!file || !accessToken || !profile || !profileEtag) return;
     if (!supportedAvatarTypes.includes(file.type) || file.size > maxAvatarBytes) {
-      setProblem("avatar", { message: "Ảnh đại diện phải là JPEG, PNG hoặc WebP và không vượt quá 5 MiB.", fields: {}, stale: false });
+      setProblem("avatar", { message: "Ảnh đại diện phải là JPEG, PNG hoặc WebP và không vượt quá 5 MB.", fields: {}, stale: false });
       return;
     }
     setBusy("avatar", true); setProblem("avatar");
@@ -231,7 +231,7 @@ export function AccountProfile() {
   const fieldError = (key: FormKey, name: string) => problems[key]?.fields[name];
 
   return <div style={{ maxWidth: 760 }}>
-    <PageHeader title="Tài khoản của bạn" description="Cập nhật thông tin cá nhân, tổ chức và bảo mật. Email, vai trò và quyền truy cập do Fire3D quản lý." />
+    <PageHeader title="Tài khoản của bạn" description="Cập nhật thông tin cá nhân, tổ chức và bảo mật. Email, vai trò và quyền truy cập do FET3D quản lý." />
     <div className="ops-stack">
       {loadError && <Alert tone="danger" title="Không tải được hồ sơ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={() => void loadProfile()}>Thử lại</Button>}>{loadError}</Alert>}
 
@@ -254,7 +254,7 @@ export function AccountProfile() {
         </dl>
       </Panel>
 
-      <Panel title="Thông tin cá nhân" description="Các trường này dùng ETag để không ghi đè thay đổi từ nơi khác.">
+      <Panel title="Thông tin cá nhân" description="Họ tên, tên người dùng và thông tin liên hệ của bạn.">
         <form onSubmit={saveProfile} noValidate className="ops-stack"><fieldset disabled={initialLoad} className="ops-fieldset" style={{ minWidth: 0 }}>
           <div className="ops-form-grid">
             <Field label="Họ và tên" required error={fieldError("profile", "fullName")}>{(p) => <Input {...p} required maxLength={200} value={profileForm.fullName} onChange={(event) => setProfileForm((value) => ({ ...value, fullName: event.target.value }))} />}</Field>
@@ -269,7 +269,7 @@ export function AccountProfile() {
         </fieldset></form>
       </Panel>
 
-      {displayUser?.role === 1 && <Panel title="Hồ sơ tổ chức" description="Chỉ người dùng tổ chức hiện tại mới có thể cập nhật thông tin của tổ chức mình.">
+      {displayUser?.role === 1 && <Panel title="Hồ sơ tổ chức" description="Chỉ tài khoản của tổ chức này mới cập nhật được thông tin tổ chức.">
         <form onSubmit={saveOrganization} noValidate className="ops-stack"><fieldset disabled={initialLoad} className="ops-fieldset" style={{ minWidth: 0 }}>
           <div className="ops-form-grid">
             <Field label="Tên tổ chức" required error={fieldError("organization", "name")} className="ops-span-all">{(p) => <Input {...p} required maxLength={200} value={organizationForm.name} onChange={(event) => setOrganizationForm((value) => ({ ...value, name: event.target.value }))} />}</Field>
@@ -281,7 +281,7 @@ export function AccountProfile() {
         </fieldset></form>
       </Panel>}
 
-      {displayUser?.hasLocalLogin !== false && <Panel title="Bảo mật" description="Đổi mật khẩu sẽ thu hồi mọi phiên Fire3D, sau đó bạn sẽ đăng nhập lại.">
+      {displayUser?.hasLocalLogin !== false && <Panel title="Bảo mật" description="Sau khi đổi mật khẩu, bạn sẽ bị đăng xuất khỏi mọi thiết bị và cần đăng nhập lại.">
         <form onSubmit={changePassword} noValidate className="ops-stack">
           <Field label="Mật khẩu hiện tại" required error={fieldError("password", "currentPassword")}>{(p) => <PasswordInput {...p} className="ops-input" visibilityLabel="mật khẩu hiện tại" autoComplete="current-password" required maxLength={128} value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} />}</Field>
           <Field label="Mật khẩu mới" required error={passwordErrors.newPassword ?? fieldError("password", "newPassword")}>{(p) => <PasswordInput {...p} className="ops-input" visibilityLabel="mật khẩu mới" autoComplete="new-password" required minLength={6} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} />}</Field>

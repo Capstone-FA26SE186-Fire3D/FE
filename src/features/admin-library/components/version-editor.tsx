@@ -125,7 +125,7 @@ export function VersionEditor({ accessToken, item, version, seed, onCreated, onC
       applyServerVersion(result);
       setConflict(null);
       onChanged();
-      toast.notify({ tone: "success", title: "Đã lưu bản nháp", description: `v${result.data.versionNumber} · ETag ${result.etag}` });
+      toast.notify({ tone: "success", title: "Đã lưu bản nháp", description: `Phiên bản ${result.data.versionNumber}` });
     } catch (cause) {
       fail(cause);
     } finally {
@@ -144,7 +144,7 @@ export function VersionEditor({ accessToken, item, version, seed, onCreated, onC
       applyServerVersion(result);
       setPublishing(false);
       onChanged();
-      toast.notify({ tone: "success", title: "Đã xuất bản phiên bản", description: `v${result.data.versionNumber} · bất biến từ bây giờ` });
+      toast.notify({ tone: "success", title: "Đã xuất bản phiên bản", description: `v${result.data.versionNumber} · từ giờ không sửa được nữa` });
     } catch (cause) {
       const view = describeLibraryError(cause);
       setPublishError(view);
@@ -171,15 +171,15 @@ export function VersionEditor({ accessToken, item, version, seed, onCreated, onC
   return <section className="ops-stack" aria-label={title} data-testid="version-editor">
     <Panel title={title} description={`${kindLabel[kind]} · mục ${item.code}`}
       actions={<>
-        {current && <StatusBadge tone={readOnly ? "success" : "warning"}>{readOnly ? "Đã xuất bản (bất biến)" : "Bản nháp"}</StatusBadge>}
-        {isNew && <StatusBadge tone="info">Chưa lưu lên máy chủ</StatusBadge>}
+        {current && <StatusBadge tone={readOnly ? "success" : "warning"}>{readOnly ? "Đã xuất bản (không sửa được)" : "Bản nháp"}</StatusBadge>}
+        {isNew && <StatusBadge tone="info">Chưa lưu</StatusBadge>}
         {dirty && !readOnly && <StatusBadge tone="warning">Chưa lưu</StatusBadge>}
         {!readOnly && <Button disabled={busy || (!dirty && !isNew)} onClick={() => void save()} data-testid="save-version"><Save size={16} aria-hidden="true" />{busy ? "Đang lưu…" : isNew ? "Tạo bản nháp" : "Lưu bản nháp"}</Button>}
         {current && !readOnly && <Button variant="secondary" disabled={busy || publishReasons.length > 0} onClick={() => { setPublishError(null); setPublishing(true); }} data-testid="publish-version"><Send size={16} aria-hidden="true" />Xuất bản</Button>}
         <Button variant="quiet" onClick={onClose}>Đóng</Button>
       </>}
       bodyClassName="ops-stack">
-      {readOnly && current && <Alert tone="info" title="Phiên bản đã xuất bản không sửa được" action={<Button size="sm" className="mt-3" onClick={() => onFork(null, current.data)} data-testid="new-from-published"><FilePlus2 size={16} aria-hidden="true" />Tạo phiên bản mới từ v{current.data.versionNumber}</Button>}>Muốn thay đổi nội dung, tạo một phiên bản Draft mới rồi xuất bản. Các kịch bản đã áp dụng mẫu này trước đó không bị đổi.</Alert>}
+      {readOnly && current && <Alert tone="info" title="Phiên bản đã xuất bản không sửa được" action={<Button size="sm" className="mt-3" onClick={() => onFork(null, current.data)} data-testid="new-from-published"><FilePlus2 size={16} aria-hidden="true" />Tạo phiên bản mới từ v{current.data.versionNumber}</Button>}>Muốn thay đổi nội dung, tạo một phiên bản nháp mới rồi xuất bản. Các kịch bản đã áp dụng mẫu này trước đó không bị đổi.</Alert>}
       {!item.isActive && <Alert tone="warning" title="Mục đang ngừng dùng">Tổ chức không thấy mục này trong danh sách chọn cho tới khi được dùng lại. Các phiên bản đã xuất bản vẫn đọc được theo mã phiên bản.</Alert>}
       {error && <Alert tone={error.kind === "stale" ? "warning" : "danger"} title={error.title}><ErrorBody view={error} /></Alert>}
       {conflict && <Alert tone="warning" title="Đối chiếu với bản mới nhất trên máy chủ" action={<div className="ops-actions" style={{ marginTop: 10 }}>
@@ -200,7 +200,7 @@ export function VersionEditor({ accessToken, item, version, seed, onCreated, onC
       : <PayloadFields kind={kind} form={form} setForm={(update) => setForm(update)} issues={shown} rubricCatalog={rubricCatalog} disabled={busy} />}
 
     {publishing && <Modal open onOpenChange={(open) => { if (!open && !busy) setPublishing(false); }} title="Xuất bản phiên bản này?"
-      description="Phiên bản trở thành bản công khai cho mọi tổ chức và bất biến. Muốn sửa tiếp phải tạo phiên bản mới."
+      description="Phiên bản trở thành bản công khai cho mọi tổ chức và không sửa được nữa. Muốn sửa tiếp phải tạo phiên bản mới."
       footer={<>
         <Button variant="quiet" disabled={busy} onClick={() => setPublishing(false)}>Hủy</Button>
         {publishError?.kind === "stale"

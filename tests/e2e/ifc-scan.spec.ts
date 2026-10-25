@@ -68,7 +68,7 @@ test("shows a local-only IFC workspace", async ({ page }) => {
   await page.goto("/demo/ifc");
   await expect(page.getByRole("heading", { name: "Quét mô hình IFC" })).toBeVisible();
   await expect(page.getByLabel("Chọn tệp IFC")).toHaveAttribute("accept", ".ifc");
-  await expect(page.getByText("File chỉ được xử lý trong trình duyệt này.")).toBeVisible();
+  await expect(page.getByText("Tệp chỉ được xử lý trong trình duyệt này.")).toBeVisible();
   await expect(page.getByRole("toolbar", { name: "Công cụ xem mô hình" })).toBeVisible();
   await expect(page.getByText("Kéo thả tệp IFC vào đây")).toBeVisible();
 });

@@ -32,14 +32,14 @@ export type ImportPlan = {
 };
 
 export const SKIP_LABEL: Record<ImportSkip, string> = {
-  "not-decided": "Chưa có quyết định (đề xuất từ revision trước không được tự áp dụng)",
+  "not-decided": "Chưa có quyết định (gợi ý từ bản IFC trước không được tự áp dụng)",
   rejected: "Đã loại bỏ",
   present: "Đã có trong bản nháp (cùng cấu kiện neo)",
-  duplicate: "Trùng GlobalId với thiết bị khác trong danh sách",
-  "capability-missing": "Runtime của bản nháp không có năng lực này cho Thiết bị",
-  "anchor-missing": "Geometry không có GlobalId này trong semantic mapping",
+  duplicate: "Trùng cấu kiện với thiết bị khác trong danh sách",
+  "capability-missing": "Phiên bản ứng dụng của bản nháp không có khả năng này cho Thiết bị",
+  "anchor-missing": "Mô hình 3D không có cấu kiện này",
   "floor-missing": "Không xác định được tầng",
-  "floor-mismatch": "Tầng của thiết bị khác tầng của cấu kiện trong Geometry",
+  "floor-mismatch": "Tầng của thiết bị khác tầng của cấu kiện trong mô hình 3D",
   "position-invalid": "Tọa độ không hợp lệ",
   limit: `Bản nháp đã đạt tối đa ${LIMITS.objectsMax} đối tượng`,
 };

@@ -12,7 +12,7 @@ export function ForgotPasswordForm() {
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault(); setError(""); setMessage("");
-    try { await requestPasswordReset(email); setMessage("Đã gửi yêu cầu. Hãy kiểm tra kênh do quản trị viên Fire3D hướng dẫn."); }
+    try { await requestPasswordReset(email); setMessage("Đã gửi yêu cầu. Hãy kiểm tra kênh do quản trị viên FET3D hướng dẫn."); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Không thể gửi yêu cầu. Vui lòng thử lại."); }
   };
 

@@ -81,8 +81,8 @@ test("previews decided equipment, adds it as ONE undoable step with anchor, capa
   await expect(dialog).toContainText("Cần điền tham số bắt buộc");
   const skipped = dialog.getByTestId("equipment-import-skip-row");
   await expect(skipped).toHaveCount(3);
-  await expect(skipped.filter({ hasText: "extinguisher.portable" })).toContainText("Runtime của bản nháp không có năng lực này");
-  await expect(skipped.filter({ hasText: gid("8ghost") })).toContainText("Geometry không có GlobalId này");
+  await expect(skipped.filter({ hasText: "extinguisher.portable" })).toContainText("Phiên bản ứng dụng của bản nháp không có khả năng này");
+  await expect(skipped.filter({ hasText: gid("8ghost") })).toContainText("Mô hình 3D không có cấu kiện này");
   await expect(skipped.filter({ hasText: SPACE_L2 })).toContainText("Tầng của thiết bị khác tầng");
   // A suggestion from an earlier revision and a Rejected decision are never added.
   await expect(dialog.getByTestId("equipment-import-undecided")).toContainText("2 thiết bị chưa được xác nhận hoặc đã bị loại bỏ");
@@ -128,20 +128,20 @@ test("explains why nothing can be added: no runtime chosen, no accepted geometry
   const dialog = page.getByTestId("equipment-import");
 
   await page.getByTestId("import-equipment").click();
-  await expect(dialog).toContainText("Chọn runtime trước");
+  await expect(dialog).toContainText("Chọn phiên bản ứng dụng trước");
   await expect(page.getByTestId("equipment-import-confirm")).toBeDisabled();
   await page.getByRole("button", { name: "Đóng", exact: true }).last().click();
 
   equipment.status = 409;
   equipment.body = { status: 409, title: "No accepted geometry.", code: "EQUIPMENT_CANDIDATES_UNAVAILABLE" };
   await page.getByTestId("import-equipment").click();
-  await expect(dialog).toContainText("Revision chưa có hình học được chấp nhận");
+  await expect(dialog).toContainText("Bản IFC chưa có mô hình 3D đạt kiểm tra");
   await page.getByRole("button", { name: "Đóng", exact: true }).last().click();
 
   equipment.status = undefined;
   equipment.body = view([], { metadataAvailable: false });
   await page.getByTestId("import-equipment").click();
-  await expect(dialog).toContainText("Worker chưa gửi dữ liệu thiết bị");
+  await expect(dialog).toContainText("Chưa có dữ liệu thiết bị");
   await expect(page.getByTestId("equipment-import-confirm")).toBeDisabled();
   expect(mock.puts).toHaveLength(0);
 });

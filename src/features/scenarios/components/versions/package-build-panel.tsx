@@ -20,7 +20,7 @@ import { describeError, isJobSucceeded, isJobTerminal, shortHash, type Described
 import type { PackageKind, ScenarioVersionDetail } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
 import { scrollToSection } from "./scroll";
-import { SupportCode } from "./support-code";
+import { SupportCode } from "@/components/ui/support-code";
 import { formatDateTime } from "./version-content";
 
 const kindLabel: Record<string, string> = { ReleasePackage: "Gói phát hành", PlaytestPackage: "Gói chạy thử" };
@@ -55,7 +55,7 @@ function JobTimeline({ status }: { status: string }) {
     { id: "running", label: "Đang dựng", state: value === "queued" ? "todo" : value === "running" ? "current" : "done" },
     { id: "final", label: failed ? (value === "failed" ? "Dựng lỗi" : "Đã hủy") : "Dựng xong", state: value === "succeeded" ? "done" : failed ? "failed" : "todo" },
   ];
-  return <ol className="ver-timeline" aria-label="Tiến trình job">{steps.map((step) => <li key={step.id} data-state={step.state}>{step.label}</li>)}</ol>;
+  return <ol className="ver-timeline" aria-label="Tiến trình dựng gói">{steps.map((step) => <li key={step.id} data-state={step.state}>{step.label}</li>)}</ol>;
 }
 
 export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarted }: {
@@ -241,11 +241,11 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
           <dt>Bắt đầu</dt><dd>{formatDateTime(attempt?.startedAt)}</dd>
           <dt>Kết thúc</dt><dd>{formatDateTime(attempt?.finishedAt)}</dd>
         </dl>
-        <details className="ver-support">
+        <details className="support-code">
           <summary>Thông tin cho bộ phận hỗ trợ</summary>
           <span>Lượt dựng: <code className="ver-hash">{detail.job.id}</code></span>
           <span>Đầu vào: <code className="ver-hash">{shortHash(detail.inputHash, 20)}</code></span>
-          {attempt && <span>Máy dựng: <code className="ver-hash">{attempt.toolchainVersion} · {attempt.status}</code></span>}
+          {attempt && <span>Máy dựng: <code className="ver-hash">{attempt.toolchainVersion} · {jobStatusText(attempt.status)}</code></span>}
           {attempt?.outputHash && <span>Đầu ra: <code className="ver-hash">{shortHash(attempt.outputHash, 20)}</code></span>}
         </details>
         {!isJobTerminal(detail.job.status) && <Alert tone="info" title="Đang chờ kết quả">Gói chưa dựng xong. Trang tự cập nhật khi xong.</Alert>}

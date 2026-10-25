@@ -14,7 +14,7 @@ import { MobileMenu } from "./mobile-menu";
 const links = [
   { href: routes.home, label: "Khám phá" },
   { href: routes.organizations, label: "Dành cho tổ chức" },
-  { href: routes.learn, label: "Learn" },
+  { href: routes.learn, label: "Bài học" },
   { href: routes.about, label: "Về chúng tôi" },
 ];
 

@@ -77,7 +77,7 @@ export function ParticipationForm({ accessToken, buildingId, onVerified, onSessi
         setWait({ until: Date.now() + seconds * 1000, seconds });
         setError(cause.status === 429 ? "Bạn đã thử quá nhiều lần. Hãy đợi rồi nhập lại." : "Hệ thống đang bận. Hãy đợi một chút rồi thử lại.");
       } else if (cause.status === 403) {
-        setError("Chỉ tài khoản học viên (Trainee) mới nhập được mã tham gia.");
+        setError("Chỉ tài khoản học viên mới nhập được mã tham gia.");
       } else if (cause.status === 404) {
         setError("Không tìm thấy công trình. Mã QR có thể đã bị thay đổi; hãy quét lại.");
       } else {

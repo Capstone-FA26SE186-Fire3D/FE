@@ -154,7 +154,7 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
       setConflict(null);
       setSaveState("done");
       window.setTimeout(() => setSaveState("idle"), 1200);
-      toast.notify({ tone: "success", title: "Đã lưu bản nháp", description: `v${result.data.versionNumber} · ETag ${result.etag}` });
+      toast.notify({ tone: "success", title: "Đã lưu bản nháp", description: `Phiên bản ${result.data.versionNumber}` });
     } catch (cause) {
       setSaveState("idle");
       fail(cause, form);
@@ -192,7 +192,7 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
         commandDone(intent);
         setPost(result);
         try { applyVersion(await learnAdminApi.getVersion(accessToken, version.data.id)); } catch { onReload(); }
-        toast.notify({ tone: "success", title: "Đã xuất bản", description: `v${version.data.versionNumber} của ${result.data.slug} · bài ${postStatusView[result.data.publicationStatus].label.toLowerCase()}` });
+        toast.notify({ tone: "success", title: "Đã xuất bản", description: `Phiên bản ${version.data.versionNumber} của bài “${result.data.slug}” · bài ${postStatusView[result.data.publicationStatus].label.toLowerCase()}` });
       } else if (operation.kind === "lifecycle") {
         const intent = { op: operation.operation, postId: post.data.id, etag: post.etag };
         const result = await learnAdminApi.lifecycle(accessToken, post.data.id, operation.operation, post.etag, commandKey(intent));
@@ -256,7 +256,7 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
     <header className="learn-editor-head">
       <Button size="icon" variant="quiet" aria-label="Về danh sách" onClick={() => guard(onBack)}><ArrowLeft size={18} aria-hidden="true" /></Button>
       <div className="learn-editor-head-text">
-        <p className="learn-eyebrow">Learn CMS · {kindLabel[form.kind]}{version ? ` · v${version.data.versionNumber} (${versionStatusView[version.data.status].label.toLowerCase()})` : ""}</p>
+        <p className="learn-eyebrow">Bài học · {kindLabel[form.kind]}{version ? ` · v${version.data.versionNumber} (${versionStatusView[version.data.status].label.toLowerCase()})` : ""}</p>
         <h2>{title}</h2>
         <p className="learn-list-note">{post.data.slug}</p>
       </div>
@@ -283,7 +283,7 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
         Nội dung bạn đang sửa vẫn được giữ; “Giữ nội dung của tôi” lưu nó lên bản mới nhất ở lần lưu kế tiếp.
       </Alert>}
       {showIssues && clientIssues.length > 0 && !readOnly && <Alert tone="danger" title={`Còn ${clientIssues.length} điểm cần sửa trước khi lưu`}><ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc" }}>{clientIssues.map((issue, index) => <li key={`${issue.path}-${index}`}>{issue.message}</li>)}</ul></Alert>}
-      {showIssues && refusedVideo && <Alert tone="danger" title="Có liên kết video bị máy chủ từ chối">Sửa hoặc xóa khối video đó trước khi lưu.</Alert>}
+      {showIssues && refusedVideo && <Alert tone="danger" title="Có liên kết video không hợp lệ">Sửa hoặc xóa khối video đó trước khi lưu.</Alert>}
     </div>}
 
     {screen === "content" && <div className="learn-editor">
@@ -295,7 +295,7 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
             <BlockEditor blocks={form.blocks} disabled={readOnly} issues={shownIssues} checks={media.checks} onCheck={(blockId, url) => void media.check(blockId, url)} onChange={(blocks) => setForm((current) => ({ ...current, blocks }))} />
           </fieldset>
         </Panel>
-        <Panel title="Nguồn Common" description="Bản nháp có thể trích nguồn Common chưa duyệt; xuất bản cần mọi nguồn đã duyệt và còn hiệu lực." bodyClassName="ops-stack">
+        <Panel title="Nguồn trích dẫn" description="Bản nháp có thể trích nguồn dùng chung chưa duyệt; muốn xuất bản thì mọi nguồn phải đã duyệt và còn hiệu lực." bodyClassName="ops-stack">
           <SourcePicker accessToken={accessToken} selected={form.sources} flags={flags} known={known} disabled={readOnly || busy}
             onAdd={(source) => setForm((current) => current.sources.some((entry) => entry.sourceId === source.id && entry.role === "Reference") ? current : { ...current, sources: [...current.sources, { sourceId: source.id, role: "Reference", locator: {}, title: source.title, versionLabel: source.versionLabel }] })}
             onRemove={(index) => setForm((current) => ({ ...current, sources: current.sources.filter((_, position) => position !== index) }))}
