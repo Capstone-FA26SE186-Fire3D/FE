@@ -4,9 +4,9 @@
  */
 export function SupportCode({ code, id }: { code?: string; id?: string }) {
   if (!code && !id) return null;
-  return <details className="ver-support">
+  return <details className="support-code">
     <summary>Thông tin cho bộ phận hỗ trợ</summary>
-    {code && <span>Mã: <code className="ver-hash" data-testid="support-code">{code}</code></span>}
-    {id && <span>Định danh: <code className="ver-hash">{id}</code></span>}
+    {code && <span>Mã: <code data-testid="support-code">{code}</code></span>}
+    {id && <span>Định danh: <code>{id}</code></span>}
   </details>;
 }

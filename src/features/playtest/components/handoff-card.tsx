@@ -1,6 +1,6 @@
 "use client";
 
-import { SupportCode } from "@/features/scenarios/components/versions/support-code";
+import { SupportCode } from "@/components/ui/support-code";
 import { Copy, QrCode as QrIcon, RefreshCw } from "lucide-react";
 import { useState } from "react";
 

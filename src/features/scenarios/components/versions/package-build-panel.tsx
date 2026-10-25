@@ -20,7 +20,7 @@ import { describeError, isJobSucceeded, isJobTerminal, shortHash, type Described
 import type { PackageKind, ScenarioVersionDetail } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
 import { scrollToSection } from "./scroll";
-import { SupportCode } from "./support-code";
+import { SupportCode } from "@/components/ui/support-code";
 import { formatDateTime } from "./version-content";
 
 const kindLabel: Record<string, string> = { ReleasePackage: "Gói phát hành", PlaytestPackage: "Gói chạy thử" };
@@ -241,7 +241,7 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
           <dt>Bắt đầu</dt><dd>{formatDateTime(attempt?.startedAt)}</dd>
           <dt>Kết thúc</dt><dd>{formatDateTime(attempt?.finishedAt)}</dd>
         </dl>
-        <details className="ver-support">
+        <details className="support-code">
           <summary>Thông tin cho bộ phận hỗ trợ</summary>
           <span>Lượt dựng: <code className="ver-hash">{detail.job.id}</code></span>
           <span>Đầu vào: <code className="ver-hash">{shortHash(detail.inputHash, 20)}</code></span>

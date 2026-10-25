@@ -81,5 +81,5 @@ export function describeLibraryError(error: unknown): LibraryErrorView {
   if (error.status === 429 || error.status === 503) return { kind: "retry", code, title: "Máy chủ đang bận", message: error.retryAfterSeconds ? `Thử lại sau ${error.retryAfterSeconds} giây. Cùng mã thao tác sẽ được dùng lại.` : "Thử lại sau ít phút. Cùng mã thao tác sẽ được dùng lại.", issues };
   if (error.status === 409) return { kind: "conflict", code, title: "Trạng thái không cho phép", message: error.message, issues };
   if (error.status === 422 || error.status === 400) return { kind: "invalid", code, title: "Dữ liệu chưa hợp lệ", message: error.message, issues };
-  return { kind: "retry", code, title: "Không thể hoàn tất", message: `Máy chủ trả lỗi${code ? ` (${code})` : ` ${error.status}`}. Nội dung của bạn vẫn được giữ; thử lại sẽ dùng cùng mã thao tác.`, issues };
+  return { kind: "retry", code, title: "Không thể hoàn tất", message: error.status >= 500 ? "Máy chủ đang gặp lỗi. Nội dung của bạn vẫn được giữ; bấm thử lại an toàn, không bị ghi hai lần." : `${error.message} Nội dung của bạn vẫn được giữ.`, issues };
 }

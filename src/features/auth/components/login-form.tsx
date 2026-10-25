@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { CircleAlert } from "lucide-react";
+import { messageOf } from "@/api/describe-error";
 import { ApiError } from "@/api/types/common";
 import { Button } from "@/components/ui/button";
 import { LoadingBlock } from "@/components/ui/spinner";
@@ -31,7 +32,7 @@ function errorCode(error: unknown) {
 }
 
 function errorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
+  return messageOf(error, fallback);
 }
 
 function toFieldErrors(error: unknown): FieldErrors {

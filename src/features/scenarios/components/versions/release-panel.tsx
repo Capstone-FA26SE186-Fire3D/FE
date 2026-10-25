@@ -20,7 +20,7 @@ import type { ReleaseView } from "../../use-version-server-state";
 import { approvalGate, describeError, missingText, releaseGate, shortHash, type DescribedError } from "../../version-readiness";
 import type { ScenarioVersionDetail, VersionReadiness } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
-import { SupportCode } from "./support-code";
+import { SupportCode } from "@/components/ui/support-code";
 import { formatDateTime } from "./version-content";
 
 /** A publish that did not happen is a gate decision, not a failure of the release: it stays Built. */

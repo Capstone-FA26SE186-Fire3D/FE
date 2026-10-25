@@ -5,6 +5,7 @@ import { History, RefreshCw, SearchX } from "lucide-react";
 import { useEffect, useMemo, useRef } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
+import { SupportCode } from "@/components/ui/support-code";
 import { Alert } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -74,7 +75,7 @@ export function TrainingHistory({ accessToken, userId }: { accessToken: string; 
     body = null; // the field shows the problem; no request is sent
   } else if (failure) {
     body = <Alert tone="danger" title={failure.title} action={failure.retryable ? <Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}><RefreshCw size={16} aria-hidden="true" />Thử lại</Button> : undefined}>
-      {failure.message}{failure.code ? ` (mã lỗi: ${failure.code})` : ""}
+      {failure.message}<SupportCode code={failure.code} />
     </Alert>;
   } else if (!list.data) {
     body = <SkeletonRows rows={4} label="Đang tải lịch sử lượt tập…" />;

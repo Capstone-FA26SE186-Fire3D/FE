@@ -80,12 +80,12 @@ export function describeLearnError(error: unknown): LearnErrorView {
   if (error.status === 412) return { kind: "stale", code, title: "Đã có thay đổi ở nơi khác", message: "Phiên bản bạn mở không còn là bản mới nhất. Nội dung của bạn vẫn được giữ lại; tải bản mới để đối chiếu.", issues };
   if (error.status === 428 || code === "INVALID_IF_MATCH") return { kind: "stale", code, title: "Thiếu thông tin phiên bản", message: "Tải lại bài rồi thử lại.", issues };
   if (error.status === 401) return { kind: "denied", code, title: "Phiên đăng nhập đã hết hạn", message: "Đăng nhập lại. Nội dung đang nhập vẫn được giữ trong trang này.", issues };
-  if (error.status === 403) return { kind: "denied", code, title: "Không có quyền", message: "Chỉ PlatformAdmin được quản lý Learn.", issues };
+  if (error.status === 403) return { kind: "denied", code, title: "Không có quyền", message: "Chỉ quản trị FET3D được quản lý bài học.", issues };
   if (error.status === 404) return { kind: "notFound", code, title: "Không tìm thấy", message: "Bài hoặc phiên bản này không còn tồn tại.", issues };
   const known = code ? messages[code] : undefined;
   if (known) return { ...known, code, issues };
   if (error.status === 429 || error.status === 503) return { kind: "retry", code, title: "Máy chủ đang bận", message: error.retryAfterSeconds ? `Thử lại sau ${error.retryAfterSeconds} giây. Cùng mã thao tác sẽ được dùng lại.` : "Thử lại sau ít phút. Cùng mã thao tác sẽ được dùng lại.", issues };
   if (error.status === 409) return { kind: "conflict", code, title: "Trạng thái không cho phép", message: error.message, issues };
   if (error.status === 422 || error.status === 400) return { kind: "invalid", code, title: "Dữ liệu chưa hợp lệ", message: error.message, issues };
-  return { kind: "retry", code, title: "Không thể hoàn tất", message: `Máy chủ trả lỗi${code ? ` (${code})` : ` ${error.status}`}. Nội dung của bạn vẫn được giữ; thử lại sẽ dùng cùng mã thao tác.`, issues };
+  return { kind: "retry", code, title: "Không thể hoàn tất", message: error.status >= 500 ? "Máy chủ đang gặp lỗi. Nội dung của bạn vẫn được giữ; bấm thử lại an toàn, không bị ghi hai lần." : `${error.message} Nội dung của bạn vẫn được giữ.`, issues };
 }

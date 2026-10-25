@@ -1,6 +1,6 @@
 "use client";
 
-import { SupportCode } from "@/features/scenarios/components/versions/support-code";
+import { SupportCode } from "@/components/ui/support-code";
 import { Ban, FlaskConical, Play, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";

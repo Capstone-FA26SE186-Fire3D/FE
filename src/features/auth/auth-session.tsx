@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { resetCommandKeys } from "@/api/command-keys";
+import { messageOf } from "@/api/describe-error";
 import { ApiError } from "@/api/types/common";
 import { routes } from "@/configs/routes";
 import { clearPendingCheckout } from "@/features/billing/pending-payment";
@@ -48,9 +49,7 @@ const REFRESH_LEAD_MS = 60_000;
 const REFRESH_RETRY_MS = 30_000;
 
 function toMessage(error: unknown) {
-  if (error instanceof ApiError) return error.message;
-  if (error instanceof Error) return error.message;
-  return "Không thể hoàn tất xác thực. Vui lòng thử lại.";
+  return messageOf(error, "Không thể hoàn tất xác thực. Vui lòng thử lại.");
 }
 
 export function AuthSessionProvider({ children }: { children: ReactNode }) {

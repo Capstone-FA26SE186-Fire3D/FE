@@ -3,6 +3,7 @@
 import { RefreshCw } from "lucide-react";
 import { useCallback } from "react";
 import { useAsyncData } from "@/api/use-async-data";
+import { SupportCode } from "@/components/ui/support-code";
 import { Button } from "@/components/ui/button";
 import { describeFilterError, describeReadError, learnApi } from "../api";
 import { hasLearnFilters, learnQueryKey, type LearnFilterField } from "../query";
@@ -60,7 +61,8 @@ export function LearnBrowser() {
 
     {rejected && <div className="learn-state" role="alert">
       <h2>Bộ lọc không hợp lệ</h2>
-      <p>{rejected.messages.length ? rejected.messages.join(" ") : "Máy chủ từ chối một tham số trong đường dẫn."} Mã lỗi: {rejected.code}.</p>
+      <p>{rejected.messages.length ? rejected.messages.join(" ") : "Đường dẫn có một bộ lọc không hợp lệ."}</p>
+      <SupportCode code={rejected.code} />
       <Button variant="secondary" onClick={resetRejected}>{rejected.fields.length ? "Đặt lại tham số lỗi" : "Đặt lại bộ lọc"}</Button>
     </div>}
 

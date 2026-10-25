@@ -15,7 +15,7 @@ import { useToast } from "@/components/ui/toast";
 import { changedTopLevelKeys, describeError, type DescribedError } from "../../version-readiness";
 import type { DraftForSnapshot, DraftValidation } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
-import { SupportCode } from "./support-code";
+import { SupportCode } from "@/components/ui/support-code";
 import { formatDateTime } from "./version-content";
 
 type LoadedDraft = { draft: DraftForSnapshot; eTag: string };

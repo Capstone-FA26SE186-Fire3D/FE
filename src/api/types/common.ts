@@ -1,3 +1,5 @@
+import { friendlyFieldMessage, friendlyMessage } from "../error-text";
+
 export type ApiHttpMethod = "DELETE" | "GET" | "HEAD" | "PATCH" | "POST" | "PUT";
 
 export type ApiQueryValue = boolean | number | string | null | undefined;
@@ -5,7 +7,7 @@ export type ApiQueryParams = Record<string, ApiQueryValue | ApiQueryValue[]>;
 
 export type ApiErrorPayload = Record<string, unknown>;
 
-/** One validation problem: stable `code`, JSON path of the offending field, human `message`. */
+/** One validation problem: stable `code`, JSON path of the offending field, Vietnamese `message` (see `ApiError`). */
 export type ApiFieldError = { code: string; path: string; message: string };
 
 export type ApiRequestOptions = {
@@ -34,7 +36,13 @@ export type ApiResponse<T> = {
   status: number;
 };
 
+/**
+ * A failed request. `message` and every field `message` are user-facing Vietnamese (`error-text.ts`): screens may render
+ * them directly. The server's own (usually English) text is kept on `serverMessage` for logs and support.
+ */
 export class ApiError extends Error {
+  /** The message as the server (or the caller) wrote it, before translation. */
+  readonly serverMessage: string;
   readonly payload?: ApiErrorPayload;
   readonly status: number;
   readonly retryAfterSeconds?: number;
@@ -46,13 +54,14 @@ export class ApiError extends Error {
   readonly headers?: Headers;
 
   constructor(message: string, status: number, payload?: ApiErrorPayload, retryAfterSeconds?: number, code?: string, fieldErrors: ApiFieldError[] = [], headers?: Headers) {
-    super(message);
+    super(friendlyMessage(code, status, message, retryAfterSeconds));
     this.name = "ApiError";
+    this.serverMessage = message;
     this.payload = payload;
     this.status = status;
     this.retryAfterSeconds = retryAfterSeconds;
     this.code = code;
-    this.fieldErrors = fieldErrors;
+    this.fieldErrors = fieldErrors.map((item) => ({ ...item, message: friendlyFieldMessage(item.path, item.code, item.message) }));
     this.headers = headers;
   }
 

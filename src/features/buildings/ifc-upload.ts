@@ -126,7 +126,7 @@ const TRANSIENT_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 function fieldDetail(error: ApiError) {
   const first = error.fieldErrors[0];
-  return first ? `${first.path ? `${first.path}: ` : ""}${first.message}` : error.message;
+  return first?.message ?? error.message;
 }
 
 /** Maps whatever a stage threw (ApiError, storage failure, offline) to an `IfcUploadError`. */

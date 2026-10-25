@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SupportCode } from "@/components/ui/support-code";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/dialog";
@@ -90,7 +91,7 @@ export function DecisionDialog({ action, detail, accessToken, idempotency, reaso
       {rejecting && <Field label="Lý do từ chối" required hint={`${trimmedLength}/${REASON_MAX} ký tự · 1–${REASON_MAX} ký tự. Tổ chức đọc được lý do này.`} error={reasonError}>
         {(props) => <Textarea {...props} rows={5} value={reason} onChange={(event) => { onReasonChange(event.target.value); if (reasonError) setReasonError(undefined); }} disabled={busy} />}
       </Field>}
-      {failure && <Alert tone={retrying ? "warning" : "danger"} title={retrying ? "Chưa xác nhận được quyết định" : "Không ghi được quyết định"}>{failure.message}{failure.code ? ` (mã: ${failure.code})` : ""}</Alert>}
+      {failure && <Alert tone={retrying ? "warning" : "danger"} title={retrying ? "Chưa xác nhận được quyết định" : "Không ghi được quyết định"}>{failure.message}<SupportCode code={failure.code} /></Alert>}
     </div>
   </Modal>;
 }

@@ -31,7 +31,7 @@ export function VersionContent({ version }: { version: ScenarioVersionDetail }) 
         <dt>Thời gian làm bài</dt><dd>{version.timeLimitSeconds} giây</dd>
         <dt>Tạo lúc</dt><dd>{formatDateTime(version.createdAt)}</dd>
       </dl>
-      <details className="ver-support">
+      <details className="support-code">
         <summary>Thông tin cho bộ phận hỗ trợ</summary>
         <span>Mã phiên bản: <code className="ver-hash">{version.id}</code></span>
         <span>Mã nội dung: <code className="ver-hash" data-testid="scenario-hash">{version.scenarioHash}</code></span>

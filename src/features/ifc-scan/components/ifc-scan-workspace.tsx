@@ -47,9 +47,9 @@ const anchorLabels: Record<ScenarioAnchorKind, string> = { room: "không gian ng
 const phaseLabels = { parse: "Đang đọc cấu trúc IFC", geometry: "Đang dựng hình học", edges: "Đang dựng nét viền" } as const;
 
 function safeErrorMessage(error: unknown) {
-  // The IFC parser reports in English: lead with a Vietnamese explanation and keep its text only as a technical detail.
-  const detail = error instanceof Error && error.message ? ` Chi tiết kỹ thuật: ${error.message.slice(0, 200)}` : "";
-  return `Không thể đọc tệp IFC này. Kiểm tra tệp có đúng định dạng IFC và không bị hỏng, rồi thử lại.${detail}`;
+  // The IFC parser reports in English for developers: the console keeps it, the page explains in Vietnamese.
+  console.warn("IFC parse failed", error);
+  return "Không thể đọc tệp IFC này. Kiểm tra tệp có đúng định dạng IFC và không bị hỏng, rồi thử lại.";
 }
 
 function formatMetres(value: number) {

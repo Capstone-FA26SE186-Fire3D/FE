@@ -3,6 +3,7 @@
 import { RefreshCw, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef } from "react";
+import { SupportCode } from "@/components/ui/support-code";
 import { Alert } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/dialog";
@@ -112,7 +113,7 @@ function Body({ sessionId, known, onRefresh, onClose, accessToken }: { sessionId
     return <Alert tone="danger" title={failure.title} action={<div className="ops-actions mt-3">
       {failure.retryable && <Button size="sm" variant="secondary" onClick={reload}><RefreshCw size={16} aria-hidden="true" />Thử lại</Button>}
       <Button size="sm" variant="quiet" onClick={onClose}>Về danh sách</Button>
-    </div>}>{failure.message}{failure.code ? ` (mã lỗi: ${failure.code})` : ""}</Alert>;
+    </div>}>{failure.message}<SupportCode code={failure.code} /></Alert>;
   }
   if (!detail.data) return <SkeletonRows rows={4} label="Đang tải kết quả lượt tập…" />;
 
