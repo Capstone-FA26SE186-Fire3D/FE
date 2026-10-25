@@ -12,7 +12,7 @@ export const DialogRoot = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.Close;
 
-export type ModalSize = "sm" | "md" | "lg";
+export type ModalSize = "sm" | "md" | "lg" | "xl";
 export type DrawerSize = "sm" | "md" | "lg" | "xl";
 
 type SurfaceProps = {
@@ -67,7 +67,7 @@ function Surface(props: SurfaceKind) {
   return <DialogPrimitive.Portal container={container ?? undefined}><SurfaceContent {...props} /></DialogPrimitive.Portal>;
 }
 
-/** Centered modal for every create/edit form and confirmation. Focus is trapped and returned by Radix. sm 440 · md 520 · lg 720. */
+/** Centered modal for every create/edit form and confirmation. Focus is trapped and returned by Radix. sm 440 · md 520 · lg 720 · xl 880 (fixed height, for a record with its own sub-views). */
 export function Modal({ open, onOpenChange, size = "md", ...props }: SurfaceProps & { open: boolean; onOpenChange: (open: boolean) => void; size?: ModalSize }) {
   return <DialogRoot open={open} onOpenChange={onOpenChange}><Surface kind="dialog" size={size} {...props} /></DialogRoot>;
 }

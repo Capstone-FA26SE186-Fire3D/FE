@@ -19,7 +19,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * PlatformAdmin Organization Library over the real contract (BE#57/#69, FE#54), Admin v2 (Figma 53:1111). URL state: list
- * filters (`kind`, `page`, `q`, `state`), `?item=<id>` opens the item drawer over the list and `&version=<id|new>` the version
+ * filters (`kind`, `page`, `q`, `state`), `?item=<id>` opens the item popup over the list and `&version=<id|new>` the version
  * editor inside it. Role is checked in the client; the API enforces it on every call.
  */
 export function LibraryAdmin() {
