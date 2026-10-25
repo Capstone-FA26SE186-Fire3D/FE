@@ -75,7 +75,7 @@ export function ReviewPanel({ accessToken, version, review, canSubmit, onSubmitt
       <div className="ver-card-head">
         <div>
           <h2 id="ver-review-title" className="ver-card-title">Duyệt nội dung bởi quản trị FET3D</h2>
-          <p className="ver-card-sub">Cổng độc lập với build: có thể gửi duyệt trước khi package build xong.</p>
+          <p className="ver-card-sub">Việc duyệt không phụ thuộc dựng gói: có thể gửi duyệt trước khi dựng gói xong.</p>
         </div>
         <StatusBadge tone={gate.tone}>{gate.label}</StatusBadge>
       </div>

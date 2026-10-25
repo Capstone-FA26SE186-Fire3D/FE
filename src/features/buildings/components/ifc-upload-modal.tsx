@@ -77,7 +77,7 @@ export function IfcUploadModal({ open, onOpenChange, accessToken, buildingId, on
 
   const startLabel = status === "error" ? (error?.restart ? "Bắt đầu lại" : error?.fileStored ? "Gửi lại yêu cầu xử lý" : "Thử lại") : "Tải lên và xử lý";
 
-  return <Modal open={open} onOpenChange={close} size="md" title="Tải IFC mới" description="Mỗi lần tải tạo một revision mới. Tệp được kiểm tra SHA-256 trên máy bạn rồi tải thẳng lên kho lưu trữ." data-testid="ifc-upload-modal"
+  return <Modal open={open} onOpenChange={close} size="md" title="Tải IFC mới" description="Mỗi lần tải tạo một bản IFC mới. Tệp được kiểm tra ngay trên máy bạn rồi tải thẳng lên kho lưu trữ." data-testid="ifc-upload-modal"
     footer={<>
       <Button type="button" variant="ghost" onClick={() => close(false)} disabled={running}>{status === "done" ? "Đóng" : "Hủy"}</Button>
       {status === "done"
@@ -100,14 +100,14 @@ export function IfcUploadModal({ open, onOpenChange, accessToken, buildingId, on
         {fileProblem && <span className="ops-field-error" role="alert">{fileProblem}</span>}
       </div>
 
-      <Field label="Nhãn revision" required error={labelTooLong ? "Nhãn revision tối đa 100 ký tự." : undefined}>
+      <Field label="Tên bản IFC" required error={labelTooLong ? "Tên bản IFC tối đa 100 ký tự." : undefined}>
         {(p) => <Input {...p} maxLength={120} value={versionLabel} disabled={locked} placeholder="VD: IFC rev. 02 — tối đa 100 ký tự" onChange={(event) => flow.setVersionLabel(event.target.value)} />}
       </Field>
 
       <Stepper completed={completed} running={running} failedStep={status === "error" && error ? error.step : null} />
 
       {running && progress && <div className="ops-progress-row">
-        <label htmlFor={progressId}>{progress.stage === "hash" ? "Đang tính SHA-256 của tệp" : "Đang tải lên kho lưu trữ"}</label>
+        <label htmlFor={progressId}>{progress.stage === "hash" ? "Đang kiểm tra tệp" : "Đang tải lên kho lưu trữ"}</label>
         <progress id={progressId} max={100} value={Math.round(progress.fraction * 100)} />
         <span aria-hidden="true">{Math.round(progress.fraction * 100)}%</span>
       </div>}
@@ -119,7 +119,7 @@ export function IfcUploadModal({ open, onOpenChange, accessToken, buildingId, on
         {waitSeconds > 0 && ` Hệ thống yêu cầu chờ ${waitSeconds} giây trước khi thử lại.`}
       </Alert>}
       {notice && <Alert tone="info">{notice}</Alert>}
-      {status === "done" && <Alert tone="success" title="Đã gửi xử lý IFC">Yêu cầu đã được nhận (202), chưa phải đã xử lý xong. Tiến trình và kết quả QA hiển thị ở sub-tab Tiến trình và tự cập nhật.</Alert>}
+      {status === "done" && <Alert tone="success" title="Đã gửi xử lý IFC">Hệ thống đã nhận yêu cầu, nhưng mô hình chưa xử lý xong. Tiến trình và kết quả kiểm tra tự động hiển thị ở mục Tiến trình và tự cập nhật.</Alert>}
       {running && <p className="ops-muted"><Button type="button" size="sm" variant="quiet" onClick={flow.cancel}>Hủy tải lên</Button></p>}
     </form>
   </Modal>;

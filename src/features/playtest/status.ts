@@ -45,7 +45,7 @@ export function describeStatus(playtest: PlaytestStatus): StatusView {
     case "running": return { label: "Đang chạy trên thiết bị", tone: "info", detail: "Đang chơi trên điện thoại. Kết quả hiện khi chơi xong." };
     case "completed": return { label: "Đã hoàn tất", tone: "success", detail: "Điện thoại đã gửi kết quả. Lượt chạy thử không tính vào thống kê học viên." };
     case "cancelled": case "canceled": return { label: "Đã hủy", tone: "neutral", detail: "Lượt chạy thử đã dừng. Lượt dùng thử (nếu đã trừ) không được hoàn tự động." };
-    default: return { label: playtest.status, tone: "neutral", detail: "Trạng thái do hệ thống báo." };
+    default: return { label: "Không rõ trạng thái", tone: "neutral", detail: "Trạng thái do hệ thống báo." };
   }
 }
 

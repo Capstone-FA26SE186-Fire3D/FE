@@ -22,8 +22,8 @@ const MAX_POLLS = 24; // ~2 minutes of light polling, then a manual retry button
 
 function message(error: unknown) {
   if (error instanceof ApiError) {
-    if (error.status === 404) return "Không tìm thấy revision này trong công trình.";
-    if (error.status === 401 || error.status === 403) return "Không có quyền xem mô hình của revision này.";
+    if (error.status === 404) return "Không tìm thấy bản IFC này trong công trình.";
+    if (error.status === 401 || error.status === 403) return "Bạn không có quyền xem mô hình của bản IFC này.";
     return describeApiError(error, "Không tải được thông tin mô hình.");
   }
   return describeApiError(error, "Không tải được thông tin mô hình.");

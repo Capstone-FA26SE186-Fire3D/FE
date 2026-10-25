@@ -77,17 +77,17 @@ export function describeRubric(value: unknown): string {
   if (!isObject(value)) return NONE;
   const criteria = Array.isArray(value.criteria) ? value.criteria : [];
   const ids = criteria.flatMap((item) => (isObject(item) && typeof item.id === "string" ? [item.id] : []));
-  const parts = [typeof value.schema_version === "string" ? `schema_version "${value.schema_version}"` : "chưa có schema_version", typeof value.pass_threshold === "number" ? `ngưỡng đạt ${value.pass_threshold}` : "chưa có ngưỡng đạt", `${criteria.length} tiêu chí${ids.length ? ` (${clip(ids.join(", "), 60)})` : ""}`];
+  const parts = [typeof value.schema_version === "string" ? `phiên bản tiêu chí "${value.schema_version}"` : "chưa có phiên bản tiêu chí", typeof value.pass_threshold === "number" ? `ngưỡng đạt ${value.pass_threshold}` : "chưa có ngưỡng đạt", `${criteria.length} tiêu chí${ids.length ? ` (${clip(ids.join(", "), 60)})` : ""}`];
   return parts.join(" · ");
 }
 
 function rubricWarnings(rubric: unknown, context: Pick<ApplyContext, "metrics" | "schemaVersions">): string[] {
   const out: string[] = [];
   if (!isObject(rubric)) return out;
-  if (context.schemaVersions && typeof rubric.schema_version === "string" && !context.schemaVersions.includes(rubric.schema_version)) out.push(`schema_version "${rubric.schema_version}" không có trong danh mục rubric hiện tại; máy chủ có thể từ chối khi lưu hoặc kiểm tra.`);
+  if (context.schemaVersions && typeof rubric.schema_version === "string" && !context.schemaVersions.includes(rubric.schema_version)) out.push(`Phiên bản tiêu chí "${rubric.schema_version}" không còn được hỗ trợ; hệ thống có thể từ chối khi lưu hoặc kiểm tra.`);
   if (context.metrics && Array.isArray(rubric.criteria)) {
     const unknown = rubric.criteria.flatMap((item) => (isObject(item) && typeof item.metric === "string" && !context.metrics!.has(item.metric) ? [item.metric] : []));
-    if (unknown.length > 0) out.push(`Chỉ số không có trong danh mục rubric: ${[...new Set(unknown)].join(", ")}.`);
+    if (unknown.length > 0) out.push(`Chỉ số không có trong danh mục của hệ thống: ${[...new Set(unknown)].join(", ")}.`);
   }
   return out;
 }
@@ -146,21 +146,21 @@ function planTemplate(version: LibraryVersion, draft: JsonObject, context: Apply
       if (union.length > strings(current.allowedModes).length) merged = { value: { ...current, allowedModes: union }, note: "Hợp nhất giữ chế độ của bạn và thêm các chế độ chưa có." };
     } else if (field === "rubric" && isObject(current) && isObject(incoming)) {
       const result = mergedRubric(current, incoming);
-      if (result) merged = { value: result.value, note: `Hợp nhất giữ rubric của bạn và thêm ${result.added} tiêu chí chưa có${result.skipped > 0 ? `; ${result.skipped} tiêu chí trùng mã giữ bản của bạn` : ""}.` };
+      if (result) merged = { value: result.value, note: `Hợp nhất giữ tiêu chí của bạn và thêm ${result.added} tiêu chí chưa có${result.skipped > 0 ? `; ${result.skipped} tiêu chí trùng mã giữ bản của bạn` : ""}.` };
     }
     if (field === "rubric") warnings = rubricWarnings(incoming, context);
     groups.push(group(base, merged, warnings));
   }
   const ignored = ignoredTemplateParts(state);
-  return { groups, reference: [], notes: [], ignored, blocker: groups.length === 0 ? "Template này không có trường nào áp dụng được cho bản nháp." : null };
+  return { groups, reference: [], notes: [], ignored, blocker: groups.length === 0 ? "Kịch bản mẫu này không có trường nào áp dụng được cho bản nháp." : null };
 }
 
 function planRubric(version: LibraryVersion, draft: JsonObject, context: ApplyContext): ApplyPlan {
   const incoming = version.payload.rubric;
-  if (!isObject(incoming)) return { groups: [], reference: [], notes: [], ignored: [], blocker: "Rubric mẫu này không có nội dung áp dụng được." };
+  if (!isObject(incoming)) return { groups: [], reference: [], notes: [], ignored: [], blocker: "Mẫu tiêu chí chấm điểm này không có nội dung áp dụng được." };
   const current = draft.rubric;
   const result = isObject(current) ? mergedRubric(current, incoming) : null;
-  const merged = result ? { value: result.value as Json, note: `Hợp nhất giữ rubric của bạn và thêm ${result.added} tiêu chí chưa có${result.skipped > 0 ? `; ${result.skipped} tiêu chí trùng mã giữ bản của bạn` : ""}.` } : null;
+  const merged = result ? { value: result.value as Json, note: `Hợp nhất giữ tiêu chí của bạn và thêm ${result.added} tiêu chí chưa có${result.skipped > 0 ? `; ${result.skipped} tiêu chí trùng mã giữ bản của bạn` : ""}.` } : null;
   return { groups: [group({ id: "rubric", label: templateFieldLabel.rubric, field: "rubric", path: ["rubric"], current, incoming }, merged, rubricWarnings(incoming, context))], reference: [], notes: [], ignored: [], blocker: null };
 }
 
@@ -170,7 +170,7 @@ function planEquipment(version: LibraryVersion, context: ApplyContext): ApplyPla
   if (typeof payload.description === "string") reference.push({ label: "Mô tả", value: payload.description });
   if (isObject(payload.properties)) for (const [key, value] of Object.entries(payload.properties)) reference.push({ label: key, value: String(value) });
   const object = context.object;
-  if (!object || object.kind !== "Equipment") return { groups: [], reference, notes: [], ignored: [], blocker: "Chọn một đối tượng Thiết bị trong cây đối tượng hoặc khung nhìn để áp dụng metadata." };
+  if (!object || object.kind !== "Equipment") return { groups: [], reference, notes: [], ignored: [], blocker: "Chọn một đối tượng Thiết bị trong cây đối tượng hoặc khung nhìn để áp dụng thông tin thiết bị." };
 
   const groups: ApplyGroup[] = [];
   const labelBase = { id: "equipment:label", label: `Nhãn của ${object.id}`, path: ["objects", object.index, "label"] as Path };
@@ -178,15 +178,15 @@ function planEquipment(version: LibraryVersion, context: ApplyContext): ApplyPla
   const labelWrites = labelStatus === "same" ? {} : labelStatus === "new" ? { fill: [{ path: labelBase.path, value: version.name }] } : { replace: [{ path: labelBase.path, value: version.name }] };
   groups.push({ ...labelBase, status: labelStatus, current: object.label || NONE, incoming: version.name, options: labelStatus === "new" ? ["fill", "keep"] : labelStatus === "same" ? ["keep"] : ["keep", "replace"], defaultAction: labelStatus === "new" ? "fill" : "keep", writes: labelWrites, notes: labelStatus === "same" ? ["Nhãn đã giống mẫu."] : [], warnings: [] });
 
-  const notes: string[] = ["Mô tả và thuộc tính của thiết bị chỉ để tham khảo: hợp đồng fet3d.editor/1 không có trường lưu chúng trong kịch bản."];
+  const notes: string[] = ["Mô tả và thuộc tính của thiết bị chỉ để tham khảo: kịch bản không có chỗ lưu các thông tin này."];
   const required = version.requiredCapabilities;
   if (required.length > 0) {
     const offered = context.runtimeCapabilities;
-    if (!offered) notes.push(`Thiết bị yêu cầu năng lực: ${required.join(", ")}. Chọn phiên bản runtime (thẻ Kịch bản) để kiểm tra với danh mục runtime.`);
+    if (!offered) notes.push(`Thiết bị yêu cầu năng lực: ${required.join(", ")}. Chọn phiên bản ứng dụng (thẻ Kịch bản) để kiểm tra.`);
     else {
       const usable = required.flatMap((id) => offered.filter((item) => item.id === id && item.objectKinds.includes("Equipment")));
       const missing = required.filter((id) => !offered.some((item) => item.id === id));
-      if (missing.length > 0) notes.push(`Runtime của bản nháp chưa công bố năng lực: ${missing.join(", ")}. Mẫu không tự thêm năng lực cho runtime.`);
+      if (missing.length > 0) notes.push(`Phiên bản ứng dụng của bản nháp chưa hỗ trợ năng lực: ${missing.join(", ")}. Mẫu không tự thêm năng lực cho ứng dụng.`);
       const candidate = usable[0];
       if (candidate) {
         const status: GroupStatus = !object.capability ? "new" : object.capability.id === candidate.id && object.capability.version === candidate.version ? "same" : "different";
@@ -194,11 +194,11 @@ function planEquipment(version: LibraryVersion, context: ApplyContext): ApplyPla
         // Parameters belong to one capability: a different capability starts with none (same as the capability picker).
         if (object.capability?.id !== candidate.id) writes.push({ path: ["objects", object.index, "parameters"], value: undefined });
         groups.push({
-          id: "equipment:capability", label: "Năng lực runtime (gợi ý)", status,
-          current: object.capability ? `${object.capability.id}@${object.capability.version}` : NONE, incoming: `${candidate.id}@${candidate.version} (từ danh mục runtime)`,
+          id: "equipment:capability", label: "Năng lực (gợi ý)", status,
+          current: object.capability ? `${object.capability.id}@${object.capability.version}` : NONE, incoming: `${candidate.id}@${candidate.version} (từ danh mục của ứng dụng)`,
           options: status === "new" ? ["fill", "keep"] : status === "same" ? ["keep"] : ["keep", "replace"], defaultAction: "keep",
           writes: status === "same" ? {} : status === "new" ? { fill: writes } : { replace: writes },
-          notes: ["Chỉ chọn năng lực mà danh mục runtime đã công bố cho Thiết bị; tham số nhập sau ở thẻ Đối tượng."], warnings: [],
+          notes: ["Chỉ chọn năng lực mà ứng dụng đã hỗ trợ cho Thiết bị; tham số nhập sau ở thẻ Đối tượng."], warnings: [],
         });
       }
     }

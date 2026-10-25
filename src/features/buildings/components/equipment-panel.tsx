@@ -96,7 +96,7 @@ export function EquipmentPanel({ accessToken, revisionId, onChanged, onHighlight
       const result = await buildingsApi.saveEquipmentDecisions(accessToken, revisionId, items, current.etag);
       setSaved({ data: result.data, etag: result.etag ?? `"${result.data.version}"` });
       setDrafts({});
-      toast.notify({ tone: "success", title: "Đã lưu quyết định thiết bị", description: result.data.exitConfirmationRequired ? undefined : result.data.revisionStatus === "ReadyForScenario" ? "Revision đã sẵn sàng soạn kịch bản." : undefined });
+      toast.notify({ tone: "success", title: "Đã lưu quyết định thiết bị", description: result.data.exitConfirmationRequired ? undefined : result.data.revisionStatus === "ReadyForScenario" ? "Bản IFC đã sẵn sàng soạn kịch bản." : undefined });
       onChanged();
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 412) {
@@ -113,21 +113,21 @@ export function EquipmentPanel({ accessToken, revisionId, onChanged, onHighlight
 
   const unavailable = view.error instanceof ApiError && view.error.code === "EQUIPMENT_CANDIDATES_UNAVAILABLE";
 
-  return <Panel id="ifc-equipment" tabIndex={-1} title="Thiết bị phát hiện từ IFC" description="Worker đề xuất thiết bị PCCC, nguồn nước, cửa và thang máy từ IFC. Xác nhận, đổi loại hoặc loại bỏ; mô hình 3D của thiết bị luôn lấy từ thư viện dùng chung." actions={<Button size="sm" variant="quiet" onClick={() => { setSaved(null); setReload((value) => value + 1); }} disabled={view.loading || busy}><RefreshCw size={14} aria-hidden="true" />Tải lại</Button>}>
+  return <Panel id="ifc-equipment" tabIndex={-1} title="Thiết bị phát hiện từ IFC" description="Hệ thống đề xuất thiết bị PCCC, nguồn nước, cửa và thang máy đọc được từ IFC. Xác nhận, đổi loại hoặc loại bỏ; mô hình 3D của thiết bị luôn lấy từ thư viện dùng chung." actions={<Button size="sm" variant="quiet" onClick={() => { setSaved(null); setReload((value) => value + 1); }} disabled={view.loading || busy}><RefreshCw size={14} aria-hidden="true" />Tải lại</Button>}>
     <div className="ops-stack" data-testid="equipment-panel">
       {view.loading && !view.data && <SkeletonRows rows={3} label="Đang tải thiết bị…" />}
-      {unavailable && <Alert tone="info" title="Chưa có hình học được chấp nhận">Danh sách thiết bị có sau khi xử lý IFC xong và QA đạt (không còn lỗi Error/Critical).</Alert>}
+      {unavailable && <Alert tone="info" title="Mô hình chưa qua kiểm tra tự động">Danh sách thiết bị có sau khi xử lý IFC xong và mô hình qua kiểm tra tự động (không còn lỗi nghiêm trọng).</Alert>}
       {view.error !== undefined && !unavailable && <Alert tone="danger" title="Không tải được thiết bị" action={<Button size="sm" variant="secondary" className="mt-3" onClick={view.reload}>Thử lại</Button>}>{describeApiError(view.error, "Hãy thử lại sau.")}</Alert>}
       {conflict && <Alert tone="warning" title="Danh sách vừa được lưu ở nơi khác">Đã tải bản mới nhất. Các lựa chọn chưa lưu của bạn vẫn được giữ (đánh dấu “Chưa lưu”); xem lại rồi bấm lưu lần nữa.</Alert>}
 
       {data?.exitConfirmationRequired && <div data-testid="exit-step"><Alert tone="warning" title="Chọn cửa thoát ra ngoài" action={exitChosen && pending.length > 0 ? <Button type="button" size="sm" className="mt-3" onClick={() => void save()} disabled={busy} data-testid="exit-save">{busy ? "Đang lưu…" : "Lưu quyết định"}</Button> : undefined}>
-        QA không tìm thấy cửa thoát (IFC_EXIT_UNKNOWN) nên revision đang ở trạng thái Cần sửa. Chọn một cửa có sẵn làm lối thoát rồi lưu; không cần tải lại IFC.
-        {!exitAllowed && catalog.data && " Runtime hiện hành chưa hỗ trợ loại door.exit, nên chưa chọn được; hãy báo PlatformAdmin."}
-        {doors.length === 0 && " Worker không gửi cửa nào trong danh sách thiết bị; cần tải lại IFC có cửa (IfcDoor)."}
+        Kiểm tra tự động chưa tìm thấy cửa nào dẫn ra ngoài tòa nhà nên bản IFC đang ở trạng thái “Cần sửa mô hình”. Chọn một cửa có sẵn làm lối thoát rồi lưu; không cần tải lại IFC.
+        {!exitAllowed && catalog.data && " Hệ thống hiện chưa có loại thiết bị “cửa thoát” nên chưa chọn được; hãy báo quản trị FET3D."}
+        {doors.length === 0 && " Tệp IFC này không có cửa nào trong danh sách thiết bị; cần tải lên IFC có cửa (IfcDoor)."}
         {exitChosen && " Đã chọn ít nhất một cửa thoát nhưng chưa lưu: bấm “Lưu quyết định” thì cảnh báo này mới hết."}
       </Alert></div>}
 
-      {data && !data.metadataAvailable && <EmptyState icon={PackageSearch} title="Worker chưa gửi dữ liệu thiết bị" description="Revision này không có building_metadata. Đặt thiết bị trong trình soạn kịch bản." />}
+      {data && !data.metadataAvailable && <EmptyState icon={PackageSearch} title="Chưa có dữ liệu thiết bị" description="Bản IFC này không có thông tin thiết bị. Đặt thiết bị trong trình soạn kịch bản." />}
       {data && data.metadataAvailable && data.items.length === 0 && <EmptyState icon={PackageSearch} title="IFC không có thiết bị nào" description="Không phát hiện thiết bị PCCC hay nguồn nước. Đặt chúng trong trình soạn kịch bản khi soạn kịch bản." />}
 
       {data && data.items.length > 0 && <Table caption="Thiết bị phát hiện từ IFC" data-testid="equipment-table">
@@ -148,7 +148,7 @@ export function EquipmentPanel({ accessToken, revisionId, onChanged, onHighlight
                 {draft ? <StatusBadge tone="warning">Chưa lưu: {draft.decision === "Rejected" ? "loại bỏ" : draft.decision === "Retyped" ? `đổi sang ${draft.catalogKey}` : "xác nhận"}</StatusBadge>
                   : shown ? <StatusBadge tone={shown.tone}>{shown.label}{candidate.decision?.catalogKey ? ` (${candidate.decision.catalogKey})` : ""}</StatusBadge>
                   : <StatusBadge tone="neutral">Chưa quyết định</StatusBadge>}
-                {!candidate.decision && !draft && candidate.suggestedDecision && <span className="ops-cell-sub" data-testid="equipment-suggestion">Gợi ý từ revision trước: {DECISION[candidate.suggestedDecision.decision]?.label ?? candidate.suggestedDecision.decision}{candidate.suggestedDecision.catalogKey ? ` (${candidate.suggestedDecision.catalogKey})` : ""} <Button type="button" size="sm" variant="quiet" onClick={() => set(candidate, { decision: candidate.suggestedDecision!.decision as EquipmentDecisionKind, catalogKey: candidate.suggestedDecision!.catalogKey ?? "" })}>Dùng gợi ý</Button></span>}
+                {!candidate.decision && !draft && candidate.suggestedDecision && <span className="ops-cell-sub" data-testid="equipment-suggestion">Gợi ý từ bản IFC trước: {DECISION[candidate.suggestedDecision.decision]?.label ?? candidate.suggestedDecision.decision}{candidate.suggestedDecision.catalogKey ? ` (${candidate.suggestedDecision.catalogKey})` : ""} <Button type="button" size="sm" variant="quiet" onClick={() => set(candidate, { decision: candidate.suggestedDecision!.decision as EquipmentDecisionKind, catalogKey: candidate.suggestedDecision!.catalogKey ?? "" })}>Dùng gợi ý</Button></span>}
               </td>
               <td>
                 <div className="ops-actions" style={{ flexWrap: "wrap", whiteSpace: "nowrap" }}>

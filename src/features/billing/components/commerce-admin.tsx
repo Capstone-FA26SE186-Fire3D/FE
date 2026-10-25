@@ -42,15 +42,15 @@ function LookupModal({ open, onClose, onFound }: { open: boolean; onClose: () =>
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const id = value.trim();
-    if (!GUID.test(id)) { setError("Nhập mã checkout dạng GUID (36 ký tự)."); return; }
+    if (!GUID.test(id)) { setError("Mã chưa đúng. Dán đủ mã lượt thanh toán gồm 36 ký tự."); return; }
     setError("");
     setValue("");
     onFound(id);
   };
-  return <Modal open={open} onOpenChange={(next) => { if (!next) onClose(); }} size="sm" title="Tra cứu checkout" description="Dán mã checkout từ tổ chức, nhật ký hoặc hỗ trợ; chi tiết mở trong ngăn bên phải."
+  return <Modal open={open} onOpenChange={(next) => { if (!next) onClose(); }} size="sm" title="Tra cứu thanh toán" description="Dán mã lượt thanh toán (từ tổ chức, nhật ký thao tác hoặc bộ phận hỗ trợ); chi tiết mở trong ngăn bên phải."
     footer={<><Button type="button" variant="quiet" onClick={onClose}>Hủy</Button><Button type="submit" form={formId}><Search size={16} aria-hidden="true" />Tra cứu</Button></>}>
     <form id={formId} onSubmit={submit} noValidate>
-      <Field label="Tra cứu theo mã checkout" error={error || undefined}>{(p) => <Input {...p} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" value={value} onChange={(event) => setValue(event.target.value)} autoComplete="off" spellCheck={false} className="font-mono" />}</Field>
+      <Field label="Mã lượt thanh toán" error={error || undefined}>{(p) => <Input {...p} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" value={value} onChange={(event) => setValue(event.target.value)} autoComplete="off" spellCheck={false} className="font-mono" />}</Field>
     </form>
   </Modal>;
 }
@@ -75,7 +75,7 @@ export function CommerceAdmin() {
   const stuckCount = stuck.data?.totalCount ?? 0;
 
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
-  if (user?.role !== 0 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin có thể quản lý thương mại.</Alert>;
+  if (user?.role !== 0 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ quản trị FET3D có thể quản lý thương mại.</Alert>;
 
   const clearTabParams = () => Object.fromEntries(TAB_PARAMS.map((key) => [key, null]));
   const changeTab = (value: string) => {
@@ -84,22 +84,22 @@ export function CommerceAdmin() {
   };
 
   return <>
-    <PageHeader eyebrow="Thương mại" title="Dịch vụ và thanh toán" description="Gói dịch vụ, chính sách quota, giảm giá, báo giá và thanh toán PayOS. Số tiền, kỳ và điều khoản là bản chụp do hệ thống trả." breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Thương mại" }]}
-      actions={<Button variant="secondary" onClick={() => setLookup(true)}><Search size={16} aria-hidden="true" />Tra cứu checkout</Button>} />
-    {stuckCount > 0 && <div className="adm-banner"><Alert tone="warning" title={`${formatCount(stuckCount)} thanh toán cần đối soát`} action={<Button size="sm" variant="secondary" className="mt-3" onClick={() => setParams({ ...clearTabParams(), tab: null, status: "NeedsReconcile" })}>Xem đơn cần đối soát</Button>}>Chỉ webhook hợp lệ từ nhà cung cấp mới cấp dịch vụ. Trang trả về chỉ điều hướng người dùng, không cấp quyền.</Alert></div>}
+    <PageHeader eyebrow="Thương mại" title="Dịch vụ và thanh toán" description="Gói dịch vụ, chính sách hạn mức AI, giảm giá, báo giá và thanh toán PayOS. Số tiền, kỳ và điều khoản giữ đúng như lúc phát hành báo giá." breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Thương mại" }]}
+      actions={<Button variant="secondary" onClick={() => setLookup(true)}><Search size={16} aria-hidden="true" />Tra cứu thanh toán</Button>} />
+    {stuckCount > 0 && <div className="adm-banner"><Alert tone="warning" title={`${formatCount(stuckCount)} thanh toán cần đối soát`} action={<Button size="sm" variant="secondary" className="mt-3" onClick={() => setParams({ ...clearTabParams(), tab: null, status: "NeedsReconcile" })}>Xem đơn cần đối soát</Button>}>Dịch vụ chỉ được cấp khi PayOS xác nhận đã nhận tiền. Việc người dùng quay lại từ trang PayOS không tự cấp dịch vụ.</Alert></div>}
     <KpiRow label="Tổng quan thanh toán" columns={3}>
-      <KpiTile label="Đơn 30 ngày" value={formatCount(orders.data?.totalCount)} loading={orders.loading && !orders.data} hint="Checkout tạo trong kỳ, từ máy chủ" />
-      <KpiTile label="Đã nhận tiền 30 ngày" value={formatCount(paid.data?.totalCount)} loading={paid.loading && !paid.data} hint="Yêu cầu thanh toán Paid (webhook hợp lệ)" />
-      <KpiTile label="Cần đối soát" value={formatCount(stuck.data?.totalCount)} loading={stuck.loading && !stuck.data} tone={stuckCount > 0 ? "warning" : undefined} hint="Checkout chờ reconcile" />
+      <KpiTile label="Đơn 30 ngày" value={formatCount(orders.data?.totalCount)} loading={orders.loading && !orders.data} hint="Lượt thanh toán tạo trong 30 ngày" />
+      <KpiTile label="Đã nhận tiền 30 ngày" value={formatCount(paid.data?.totalCount)} loading={paid.loading && !paid.data} hint="Yêu cầu thanh toán đã được PayOS xác nhận" />
+      <KpiTile label="Cần đối soát" value={formatCount(stuck.data?.totalCount)} loading={stuck.loading && !stuck.data} tone={stuckCount > 0 ? "warning" : undefined} hint="Lượt thanh toán đang chờ đối soát" />
     </KpiRow>
     <SubTabs label="Thương mại" value={tab} onValueChange={changeTab} items={[
       { value: "payments", label: "Thanh toán" },
       { value: "packages", label: "Gói dịch vụ" },
-      { value: "policies", label: "Chính sách quota" },
+      { value: "policies", label: "Chính sách hạn mức" },
       { value: "discounts", label: "Giảm giá" },
       { value: "quotes", label: "Báo giá" },
       { value: "enterprise", label: "Liên hệ" },
-      { value: "quota", label: "Quota AI" },
+      { value: "quota", label: "Hạn mức AI" },
     ]}>
       <div className="ops-subtabs-content">
         {tab === "payments" && <PaymentsSection accessToken={accessToken} />}

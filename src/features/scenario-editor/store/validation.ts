@@ -25,7 +25,7 @@ function validatePosition(value: unknown, path: string, out: Issue[]) {
 }
 
 function validateRubric(rubric: unknown, out: Issue[]) {
-  const required = () => out.push(issue("RUBRIC_REQUIRED", "$.rubric", "Cần schema_version, ngưỡng đạt (số) và ít nhất một tiêu chí."));
+  const required = () => out.push(issue("RUBRIC_REQUIRED", "$.rubric", "Cần phiên bản định dạng rubric, ngưỡng đạt (số) và ít nhất một tiêu chí."));
   if (!isObject(rubric) || !text(rubric.schema_version) || !finite(rubric.pass_threshold) || !Array.isArray(rubric.criteria) || rubric.criteria.length === 0) {
     required();
     return;
@@ -36,7 +36,7 @@ function validateRubric(rubric: unknown, out: Issue[]) {
     const ok = c !== null && text(c.id) && text(c.metric) && typeof c.mandatory === "boolean" && finite(c.weight) && c.weight >= 0
       && finite(c.threshold) && (c.operator === "gte" || c.operator === "lte" || c.operator === "eq") && !ids.has(c.id as string);
     if (c && text(c.id)) ids.add(c.id);
-    if (!ok) out.push(issue("RUBRIC_CRITERION_INVALID", `$.rubric.criteria[${index}]`, "Mỗi tiêu chí cần id duy nhất, metric, cờ bắt buộc, trọng số ≥ 0, toán tử gte/lte/eq và ngưỡng số."));
+    if (!ok) out.push(issue("RUBRIC_CRITERION_INVALID", `$.rubric.criteria[${index}]`, "Mỗi tiêu chí cần mã riêng, chỉ số đo, cho biết có bắt buộc không, trọng số ≥ 0, phép so sánh và ngưỡng là số."));
   });
 }
 
@@ -93,7 +93,7 @@ export function validateDraftState(draft: JsonObject): Issue[] {
   }
   const capabilities = draft.requiredCapabilities;
   if (Array.isArray(capabilities) && (capabilities.some((item) => !text(item)) || new Set(capabilities).size !== capabilities.length)) {
-    out.push(issue("CAPABILITIES_INVALID", "$.requiredCapabilities", "Năng lực runtime không được trống hoặc trùng."));
+    out.push(issue("CAPABILITIES_INVALID", "$.requiredCapabilities", "Khả năng bắt buộc không được để trống hoặc trùng nhau."));
   }
   return out;
 }

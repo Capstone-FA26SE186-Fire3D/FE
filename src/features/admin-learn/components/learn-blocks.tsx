@@ -20,7 +20,7 @@ function VideoFields({ block, onChange, check, onCheck }: { block: EditorBlock; 
   const current = check && check.url === url.trim() ? check : undefined;
   const savedProvider = text(block.fields.provider);
   return <>
-    <Field label="Liên kết video" required hint="Liên kết đầy đủ từ YouTube, Facebook hoặc TikTok (https). Máy chủ kiểm tra và chuẩn hóa liên kết; không nhận mã nhúng hay liên kết rút gọn.">
+    <Field label="Liên kết video" required hint="Liên kết đầy đủ từ YouTube, Facebook hoặc TikTok (https). Hệ thống kiểm tra liên kết; không nhận mã nhúng hay liên kết rút gọn.">
       {(p) => <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         <Input {...p} style={{ flex: "1 1 260px", minWidth: 0 }} inputMode="url" value={url} onChange={(event) => onChange(updateFields(block, { url: event.target.value }))} onBlur={() => { if (url.trim() && (!check || check.url !== url.trim())) onCheck(block.id, url); }} />
         <Button type="button" variant="secondary" disabled={!url.trim() || current?.state === "checking"} onClick={() => onCheck(block.id, url)}><ShieldCheck size={16} aria-hidden="true" />{current?.state === "checking" ? "Đang kiểm tra…" : "Kiểm tra liên kết"}</Button>
@@ -60,7 +60,7 @@ function BlockFields({ block, onChange, check, onCheck }: { block: EditorBlock; 
     </div>;
     case "image": return <div className="ops-form-grid">
       <Field label="Đường dẫn ảnh (https)" required className="ops-span-all">{(p) => <Input {...p} inputMode="url" value={text(block.fields.url)} onChange={(event) => set({ url: event.target.value })} />}</Field>
-      <Field label="Mô tả ảnh (alt)" required hint="Dành cho người đọc màn hình và khi ảnh không tải được." className="ops-span-all">{(p) => <Input {...p} maxLength={300} value={text(block.fields.alt)} onChange={(event) => set({ alt: event.target.value })} />}</Field>
+      <Field label="Mô tả ảnh" required hint="Dành cho người đọc màn hình và khi ảnh không tải được." className="ops-span-all">{(p) => <Input {...p} maxLength={300} value={text(block.fields.alt)} onChange={(event) => set({ alt: event.target.value })} />}</Field>
     </div>;
     case "video": return <VideoFields block={block} onChange={onChange} check={check} onCheck={onCheck} />;
     default: return <div style={{ display: "grid", gap: 8 }}>

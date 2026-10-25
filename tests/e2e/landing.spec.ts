@@ -109,7 +109,7 @@ test('reduced motion skips WebGL and keeps every reading beat and branch reachab
   await page.getByRole('button', { name: 'Tôi muốn tổ chức tập huấn', exact: true }).click();
   await page.getByRole('button', { name: 'Tiếp tục', exact: true }).click();
   await expect(page).toHaveURL(/\/organizations$/);
-  await expect(page.getByRole('heading', { name: 'Publish release và QR' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Phát hành và tạo mã QR' })).toBeVisible();
 });
 
 test('context loss gives a usable poster fallback, not a blank canvas', async ({ page }) => {

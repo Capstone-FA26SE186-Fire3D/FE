@@ -72,7 +72,7 @@ export function AdminTicketsTab({ accessToken, myId }: { accessToken: string; my
 
   return <>
     <DataTable<Ticket>
-      caption="Danh sách ticket hỗ trợ"
+      caption="Danh sách yêu cầu hỗ trợ"
       data-testid="admin-tickets-table"
       columns={columns}
       rows={items}
@@ -80,10 +80,10 @@ export function AdminTicketsTab({ accessToken, myId }: { accessToken: string; my
       loading={list.loading && !list.data}
       onRowClick={(ticket) => open(ticket.id)}
       rowTone={(ticket) => (ticket.status === "Closed" ? "muted" : ticket.priority === "Urgent" && ticket.status !== "Resolved" ? "warning" : undefined)}
-      error={list.error !== undefined ? <Alert tone="danger" title="Không tải được danh sách ticket" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{errorText(list.error, "Hãy kiểm tra kết nối rồi thử lại.")}</Alert> : undefined}
+      error={list.error !== undefined ? <Alert tone="danger" title="Không tải được danh sách yêu cầu" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{errorText(list.error, "Hãy kiểm tra kết nối rồi thử lại.")}</Alert> : undefined}
       toolbar={<>
-        <TableSearch value={searchText} onChange={setSearchText} label="Tìm ticket" placeholder="Tìm theo chủ đề hoặc mã" />
-        <FilterChips label="Bộ lọc ticket">
+        <TableSearch value={searchText} onChange={setSearchText} label="Tìm yêu cầu" placeholder="Tìm theo chủ đề hoặc mã" />
+        <FilterChips label="Bộ lọc yêu cầu">
           <FilterChip label="Trạng thái" value={status} onChange={(value) => setParams({ status: value })} options={ticketStatusOptions.map((value) => ({ value, label: ticketStatusLabel(value) }))} />
           <FilterChip label="Mức" value={priority} onChange={(value) => setParams({ priority: value })} options={priorityOptions.map((value) => ({ value, label: priorityLabel(value) }))} />
         </FilterChips>
@@ -91,20 +91,20 @@ export function AdminTicketsTab({ accessToken, myId }: { accessToken: string; my
         <Combobox aria-label="Tổ chức" value={organizationId} onChange={(value) => setParams({ organizationId: value })} options={organizationOptions} placeholder="Tổ chức: tất cả" searchPlaceholder="Tìm tổ chức" groupLabel="Tổ chức" loading={organizations.loading && !organizations.data} clearable className={styles.toolbarPick} />
         {filtering && <Button variant="quiet" onClick={() => { setSearchText(""); setParams({ status: null, priority: null, assignedTo: null, organizationId: null, q: null }); }}>Xóa bộ lọc</Button>}
       </>}
-      empty={<EmptyState icon={filtering ? Search : Inbox} title={filtering ? "Không có ticket phù hợp." : "Chưa có ticket nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Ticket do học viên và tổ chức gửi sẽ xuất hiện ở đây."} />}
+      empty={<EmptyState icon={filtering ? Search : Inbox} title={filtering ? "Không có yêu cầu phù hợp." : "Chưa có yêu cầu nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Yêu cầu do học viên và tổ chức gửi sẽ xuất hiện ở đây."} />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
-    <p className={styles.hint}>Bấm một hàng để mở ticket: đổi trạng thái, mức, người phụ trách và trả lời.</p>
+    <p className={styles.hint}>Bấm một hàng để mở yêu cầu: đổi trạng thái, mức ưu tiên, người phụ trách và trả lời.</p>
 
     <PendingBox
-      title="Chưa có từ backend"
+      title="Tính năng sắp có"
       items={[
-        "Tệp đính kèm: API hỗ trợ chỉ nhận văn bản thuần.",
-        "Thông báo email/push khi có phản hồi: API hỗ trợ chưa gửi thông báo.",
+        "Tệp đính kèm: hiện yêu cầu hỗ trợ chỉ nhận nội dung chữ.",
+        "Thông báo qua email hoặc điện thoại khi có trả lời: hệ thống chưa tự gửi.",
       ]}
     />
 
-    <Drawer open={Boolean(ticketId)} onOpenChange={(value) => { if (!value) close(); }} size="lg" data-testid="admin-ticket-drawer" title="Chi tiết ticket" description="Phân công, đổi trạng thái với If-Match và trao đổi với người gửi.">
+    <Drawer open={Boolean(ticketId)} onOpenChange={(value) => { if (!value) close(); }} size="lg" data-testid="admin-ticket-drawer" title="Chi tiết yêu cầu" description="Phân công, đổi trạng thái và trao đổi với người gửi.">
       {ticketId && <AdminTicketPanel key={ticketId} ticketId={ticketId} accessToken={accessToken} myId={myId} admins={adminOptions} onChanged={list.reload} />}
     </Drawer>
   </>;

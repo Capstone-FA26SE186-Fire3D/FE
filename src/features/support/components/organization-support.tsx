@@ -60,7 +60,7 @@ function TicketDrawer({ ticketId, accessToken, myId, onClose }: { ticketId: stri
       </dl>
       <section className={styles.section} aria-label="Trao đổi">
         <h3>Trao đổi ({state.messageTotal})</h3>
-        <MessageList messages={state.messages} empty="Chưa có phản hồi. Đội hỗ trợ sẽ trả lời tại đây; bạn cũng có thể bổ sung thông tin bên dưới." label={(item) => item.authorId === myId ? { name: "Bạn", mine: true } : { name: item.author?.displayName?.trim() ? `${item.author.displayName.trim()} · Đội hỗ trợ Fire3D` : "Đội hỗ trợ Fire3D", mine: false }} />
+        <MessageList messages={state.messages} empty="Chưa có phản hồi. Đội hỗ trợ sẽ trả lời tại đây; bạn cũng có thể bổ sung thông tin bên dưới." label={(item) => item.authorId === myId ? { name: "Bạn", mine: true } : { name: item.author?.displayName?.trim() ? `${item.author.displayName.trim()} · Đội hỗ trợ FET3D` : "Đội hỗ trợ FET3D", mine: false }} />
         <MessageComposer
           ticketId={ticket.id}
           disabledReason={ticket.status === "Closed" ? "Yêu cầu này đã đóng. Hãy tạo yêu cầu mới nếu bạn cần hỗ trợ thêm." : undefined}
@@ -114,11 +114,11 @@ function CreateTicketModal({ open, accessToken, audience, onCreated, onClose }: 
     }
   };
 
-  return <Modal open={open} onOpenChange={(next) => { if (!next && !saving) onClose(); }} title="Tạo yêu cầu hỗ trợ" description="Chỉ cần chủ đề và mô tả. Đội Fire3D sẽ trả lời ngay trong yêu cầu này."
+  return <Modal open={open} onOpenChange={(next) => { if (!next && !saving) onClose(); }} title="Tạo yêu cầu hỗ trợ" description="Chỉ cần chủ đề và mô tả. Đội FET3D sẽ trả lời ngay trong yêu cầu này."
     footer={<><Button type="button" variant="quiet" onClick={onClose} disabled={saving}>Hủy</Button><Button type="submit" form={formId} disabled={saving}>{saving ? "Đang gửi…" : "Gửi yêu cầu"}</Button></>}>
     <form id={formId} onSubmit={submit} noValidate className="ops-stack">
       <Field label="Chủ đề" required error={errors.subject}>{(p) => <Input {...p} maxLength={255} value={subject} onChange={(event) => setSubject(event.target.value)} autoComplete="off" />}</Field>
-      <Field label="Mô tả" required hint={audience === "trainee" ? "Mô tả vấn đề, các bước đã thử và bài học hoặc buổi tập liên quan (nếu có). Không gửi mật khẩu." : "Mô tả vấn đề, các bước đã thử, tên công trình hoặc mã revision liên quan (nếu có). Không gửi mật khẩu."} error={errors.description}>{(p) => <Textarea {...p} rows={6} maxLength={10000} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Mô tả vấn đề, mã revision nếu có…" />}</Field>
+      <Field label="Mô tả" required hint={audience === "trainee" ? "Mô tả vấn đề, các bước đã thử và bài học hoặc buổi tập liên quan (nếu có). Không gửi mật khẩu." : "Mô tả vấn đề, các bước đã thử, tên công trình hoặc bản IFC liên quan (nếu có). Không gửi mật khẩu."} error={errors.description}>{(p) => <Textarea {...p} rows={6} maxLength={10000} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Mô tả vấn đề, tên công trình nếu có…" />}</Field>
       {formError && <Alert tone="danger">{formError}</Alert>}
     </form>
   </Modal>;
@@ -166,7 +166,7 @@ function TicketsTab({ accessToken, myId, audience }: { accessToken: string; myId
         </FilterChips>
         {!master && <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo yêu cầu hỗ trợ</Button>}
       </>}
-      empty={<EmptyState icon={status || needle ? Search : Inbox} title={status || needle ? "Không có yêu cầu phù hợp." : "Bạn chưa gửi yêu cầu hỗ trợ nào"} description={status || needle ? "Thử đổi từ khóa hoặc bộ lọc trạng thái." : audience === "trainee" ? "Khi gặp sự cố với bài học, ứng dụng hoặc tài khoản, hãy tạo yêu cầu để đội Fire3D hỗ trợ." : "Khi gặp sự cố với công trình, mô hình IFC hoặc tài khoản, hãy tạo yêu cầu để đội Fire3D hỗ trợ."} action={!status && !needle ? <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo yêu cầu hỗ trợ</Button> : undefined} />}
+      empty={<EmptyState icon={status || needle ? Search : Inbox} title={status || needle ? "Không có yêu cầu phù hợp." : "Bạn chưa gửi yêu cầu hỗ trợ nào"} description={status || needle ? "Thử đổi từ khóa hoặc bộ lọc trạng thái." : audience === "trainee" ? "Khi gặp sự cố với bài học, ứng dụng hoặc tài khoản, hãy tạo yêu cầu để đội FET3D hỗ trợ." : "Khi gặp sự cố với công trình, mô hình IFC hoặc tài khoản, hãy tạo yêu cầu để đội FET3D hỗ trợ."} action={!status && !needle ? <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo yêu cầu hỗ trợ</Button> : undefined} />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
     <p className="ops-field-hint" style={{ margin: "10px 0 0" }}>Bấm một hàng để xem hội thoại trong ngăn bên phải. “Tạo yêu cầu” mở hộp thoại chỉ gồm chủ đề và mô tả.</p>
@@ -217,7 +217,7 @@ function CreateFeedbackModal({ open, accessToken, onCreated, onClose }: { open: 
     }
   };
 
-  return <Modal open={open} onOpenChange={(next) => { if (!next && !saving) onClose(); }} title="Gửi phản hồi" description="Phản hồi được đội Fire3D xem xét; không dùng để yêu cầu hỗ trợ khẩn."
+  return <Modal open={open} onOpenChange={(next) => { if (!next && !saving) onClose(); }} title="Gửi phản hồi" description="Phản hồi được đội FET3D xem xét; không dùng để yêu cầu hỗ trợ khẩn."
     footer={<><Button type="button" variant="quiet" onClick={onClose} disabled={saving}>Hủy</Button><Button type="submit" form={formId} disabled={saving}>{saving ? "Đang gửi…" : "Gửi phản hồi"}</Button></>}>
     <form id={formId} onSubmit={submit} noValidate className="ops-stack">
       <Field label="Chủ đề" required hint="Ví dụ: Giao diện, Hiệu năng, Quét IFC." error={errors.category}>{(p) => <Input {...p} maxLength={100} value={category} onChange={(event) => setCategory(event.target.value)} autoComplete="off" />}</Field>
@@ -259,7 +259,7 @@ function FeedbackTab({ accessToken, audience }: { accessToken: string; audience:
         <span className="ops-toolbar-grow" />
         <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Gửi phản hồi</Button>
       </>}
-      empty={<EmptyState icon={status ? Search : MessageSquareText} title={status ? "Không có phản hồi phù hợp." : "Bạn chưa gửi phản hồi nào"} description={status ? "Thử đổi bộ lọc trạng thái." : audience === "trainee" ? "Chia sẻ góp ý về bài học, ứng dụng hoặc trải nghiệm luyện tập để Fire3D cải thiện." : "Chia sẻ góp ý về công cụ, mô hình hoặc trải nghiệm sử dụng để Fire3D cải thiện."} action={!status ? <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Gửi phản hồi</Button> : undefined} />}
+      empty={<EmptyState icon={status ? Search : MessageSquareText} title={status ? "Không có phản hồi phù hợp." : "Bạn chưa gửi phản hồi nào"} description={status ? "Thử đổi bộ lọc trạng thái." : audience === "trainee" ? "Chia sẻ góp ý về bài học, ứng dụng hoặc trải nghiệm luyện tập để FET3D cải thiện." : "Chia sẻ góp ý về công cụ, mô hình hoặc trải nghiệm sử dụng để FET3D cải thiện."} action={!status ? <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Gửi phản hồi</Button> : undefined} />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
     <CreateFeedbackModal open={creating} accessToken={accessToken} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); list.reload(); }} />
@@ -285,7 +285,7 @@ export function OrganizationSupport() {
 
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (user?.role !== 1 || !accessToken) {
-    return <Alert tone="danger" title="Chỉ dành cho tài khoản tổ chức" action={user?.role === 0 ? <Link className="mt-3 inline-block underline" href={routes.adminSupport}>Mở hộp thư hỗ trợ của quản trị</Link> : user?.role === 2 ? <Link className="mt-3 inline-block underline" href={routes.learningHubSupport}>Mở hỗ trợ trong Góc học tập</Link> : undefined}>Yêu cầu và phản hồi thuộc về người tạo; PlatformAdmin xử lý chúng trong khu quản trị.</Alert>;
+    return <Alert tone="danger" title="Chỉ dành cho tài khoản tổ chức" action={user?.role === 0 ? <Link className="mt-3 inline-block underline" href={routes.adminSupport}>Mở hộp thư hỗ trợ của quản trị</Link> : user?.role === 2 ? <Link className="mt-3 inline-block underline" href={routes.learningHubSupport}>Mở hỗ trợ trong Góc học tập</Link> : undefined}>Yêu cầu và phản hồi thuộc về người tạo; quản trị FET3D xử lý chúng trong khu quản trị.</Alert>;
   }
 
   return <div className="org">

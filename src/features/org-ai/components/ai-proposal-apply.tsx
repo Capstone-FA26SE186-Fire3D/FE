@@ -10,10 +10,11 @@ import { SkeletonRows } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import type { Command } from "@/features/scenario-editor/store/commands";
 import type { Json, JsonObject } from "@/features/scenario-editor/store/json";
+import { KIND_META, type ObjectKind } from "@/features/scenario-editor/v1/contract";
 
 import { orgAiApi } from "../api";
 import { applyCount, buildApplyCommand, buildApplyPlan, previewIssues, readProposalNotes, readProposalState, type Chosen } from "../apply-plan";
-import { aiErrorText, isSuccessfulDraft } from "../labels";
+import { aiErrorText, isSuccessfulDraft, statusLabel } from "../labels";
 import styles from "../org-ai.module.css";
 
 function show(value: Json | undefined): string {
@@ -70,7 +71,7 @@ export function AiProposalApply<S>({ accessToken, requestId, draft, floorIds, on
     <div className={styles.stack} data-testid="ai-apply-dialog">
       {request.loading && !found && <SkeletonRows rows={3} label="Đang tải đề xuất AI…" />}
       {request.error !== undefined && <Alert tone="danger" title="Không tải được đề xuất" action={<Button type="button" size="sm" variant="secondary" className="mt-3" onClick={request.reload}>Thử lại</Button>}>{aiErrorText(request.error)}</Alert>}
-      {found && !proposal && <Alert tone="warning" title="Yêu cầu này không có đề xuất áp dụng được">Chỉ yêu cầu “Đề xuất kịch bản” đã hoàn tất theo fet3d.editor/1 mới áp dụng được (trạng thái hiện tại: {found.status}).</Alert>}
+      {found && !proposal && <Alert tone="warning" title="Yêu cầu này không có đề xuất áp dụng được">Chỉ yêu cầu “Đề xuất kịch bản” đã hoàn tất, đúng định dạng của trình soạn thảo mới áp dụng được (trạng thái hiện tại: {statusLabel(found.status, found.resultType).toLowerCase()}).</Alert>}
       {plan && <>
         <Alert tone="info" title="AI chỉ đề xuất">Đề xuất không thay thế quyết định của tổ chức. Phần ngưỡng đạt, chế độ và thời gian không được chọn sẵn.</Alert>
         {notes && <p className={styles.quote}>{notes}</p>}
@@ -94,24 +95,24 @@ export function AiProposalApply<S>({ accessToken, requestId, draft, floorIds, on
         <section className={styles.section} aria-label="Đối tượng không gian">
           <h3>Đối tượng không gian ({plan.objects.length})</h3>
           <p className={styles.dim} data-testid="ai-geometry-match">
-            {plan.geometry.matches ? "Đề xuất ghim cùng Geometry với bản nháp: tọa độ theo tầng có thể đối chiếu."
-              : plan.geometry.proposed ? "Đề xuất ghim Geometry khác với bản nháp nên không đưa đối tượng không gian vào."
-                : "Đề xuất không ghim Geometry nên không đưa đối tượng không gian vào."} Geometry của bản nháp luôn được giữ nguyên.
+            {plan.geometry.matches ? "Đề xuất dùng cùng bản mô hình với bản nháp: tọa độ theo tầng có thể đối chiếu."
+              : plan.geometry.proposed ? "Đề xuất dùng bản mô hình khác với bản nháp nên không đưa đối tượng không gian vào."
+                : "Đề xuất không gắn với bản mô hình nào nên không đưa đối tượng không gian vào."} Mô hình của bản nháp luôn được giữ nguyên.
           </p>
           {plan.objects.length === 0 && <p className={styles.dim}>Đề xuất không có đối tượng không gian.</p>}
           {plan.objects.some((item) => item.eligible) && <label className={styles.pick}>
             <input type="checkbox" checked={overrides.__objects ?? false} onChange={(event) => setOverrides((current) => ({ ...current, __objects: event.target.checked }))} data-testid="ai-apply-objects" />
-            <span><strong>Thêm {plan.objects.filter((item) => item.eligible).length} đối tượng vào bản nháp</strong><span className={styles.dim}> · thêm mới, không sửa đối tượng đang có; năng lực/tham số được kiểm tra ở bước Kiểm tra</span></span>
+            <span><strong>Thêm {plan.objects.filter((item) => item.eligible).length} đối tượng vào bản nháp</strong><span className={styles.dim}> · thêm mới, không sửa đối tượng đang có; khả năng/tham số được kiểm tra ở bước Kiểm tra</span></span>
           </label>}
           <ul className={styles.list}>
             {plan.objects.map((object) => <li key={object.index} className={styles.item} data-muted={!object.eligible} data-testid="ai-object">
-              <span className={styles.itemTitle}>{object.id || "?"} · {object.kind}{object.label ? ` · ${object.label}` : ""}</span>
-              <span className={styles.dim}>Tầng {object.floorId || "?"}{object.anchorId ? ` · Neo BIM ${object.anchorId}` : ""} · {object.eligible ? "có thể thêm" : `chỉ xem: ${object.reason}`}</span>
+              <span className={styles.itemTitle}>{object.id || "?"} · {KIND_META[object.kind as ObjectKind]?.label ?? "Đối tượng khác"}{object.label ? ` · ${object.label}` : ""}</span>
+              <span className={styles.dim}>Tầng {object.floorId || "?"}{object.anchorId ? ` · gắn phần tử IFC ${object.anchorId}` : ""} · {object.eligible ? "có thể thêm" : `chỉ xem: ${object.reason}`}</span>
             </li>)}
           </ul>
         </section>
-        {plan.ignoredKeys.length > 0 && <p className={styles.dim}>Trường không thuộc trình soạn thảo (bỏ qua, chỉ xem): {plan.ignoredKeys.join(", ")}.</p>}
-        {problems.length > 0 && <Alert tone="danger" title="Kết quả sẽ không hợp lệ nếu áp dụng">{problems.slice(0, 4).map((issue) => `${issue.path} ${issue.message}`).join("; ")}. Bỏ chọn mục gây lỗi.</Alert>}
+        {plan.ignoredKeys.length > 0 && <p className={styles.dim}>Đề xuất có {plan.ignoredKeys.length} trường trình soạn thảo không dùng; các trường này được bỏ qua.</p>}
+        {problems.length > 0 && <Alert tone="danger" title="Kết quả sẽ không hợp lệ nếu áp dụng">{problems.slice(0, 4).map((issue) => issue.message).join("; ")}. Bỏ chọn mục gây lỗi.</Alert>}
       </>}
     </div>
   </Modal>;

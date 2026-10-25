@@ -114,7 +114,7 @@ export function ItemDetail({ accessToken, itemId, versionParam, onVersion, onClo
       headerExtra: <Button size="sm" variant="quiet" onClick={() => onVersion(null)}><ArrowLeft size={16} aria-hidden="true" />Về mục</Button>,
       children: <div className="ops-stack" data-testid="item-detail">
         {versionParam === "new" && <VersionEditor key={`new:${seed.from ?? "blank"}`} accessToken={accessToken} item={item} version={null} seed={seed.form} onCreated={(created) => onVersion(created.id)} onChanged={reloadItem} onFork={startNew} onClose={() => onVersion(null)} />}
-        {versionParam !== "new" && !wantsVersion && <Alert tone="danger" title="Đường dẫn phiên bản không hợp lệ">Mã phiên bản phải là một UUID.</Alert>}
+        {versionParam !== "new" && !wantsVersion && <Alert tone="danger" title="Đường dẫn phiên bản không hợp lệ">Đường dẫn không trỏ tới phiên bản nào. Hãy mở phiên bản từ danh sách của mục.</Alert>}
         {wantsVersion && !loaded && versionQuery.error !== undefined && (() => {
           const view = describeLibraryError(versionQuery.error);
           return <Alert tone="danger" title={view.kind === "notFound" ? "Không tìm thấy phiên bản" : "Không tải được phiên bản"} action={view.kind === "notFound" ? undefined : <Button size="sm" variant="secondary" className="mt-3" onClick={versionQuery.reload}>Thử lại</Button>}>{view.message}</Alert>;
@@ -130,7 +130,7 @@ export function ItemDetail({ accessToken, itemId, versionParam, onVersion, onClo
 
   return shell({
     title: item.code,
-    description: `${kindLabel[item.kind]} · ETag mục ${etag}`,
+    description: `${kindLabel[item.kind]} · mục ${item.code}`,
     eyebrow: <>{activeBadge}<StatusBadge tone="info">{kindLabel[item.kind]}</StatusBadge></>,
     footer: <>
       <Button variant="quiet" onClick={onClose}>Đóng</Button>
@@ -149,7 +149,7 @@ export function ItemDetail({ accessToken, itemId, versionParam, onVersion, onClo
       <section aria-label="Phiên bản" className="ops-stack" style={{ gap: 10 }}>
         <div>
           <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>Phiên bản</h3>
-          <p className="ops-field-hint" style={{ margin: "2px 0 0" }}>Bản đã xuất bản là bất biến; mỗi lần đổi nội dung tạo một phiên bản mới. Chọn một phiên bản để mở trong ngăn này.</p>
+          <p className="ops-field-hint" style={{ margin: "2px 0 0" }}>Bản đã xuất bản không sửa được; mỗi lần đổi nội dung tạo một phiên bản mới. Chọn một phiên bản để mở trong ngăn này.</p>
         </div>
         {versions.length === 0
           ? <EmptyState icon={FilePlus2} title="Chưa có phiên bản nào" description="Tạo phiên bản đầu tiên, nhập nội dung rồi xuất bản để tổ chức dùng được." action={<Button size="sm" onClick={() => startNew(null, null)}>Tạo phiên bản</Button>} />

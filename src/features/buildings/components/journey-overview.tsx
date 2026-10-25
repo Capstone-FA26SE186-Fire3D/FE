@@ -96,7 +96,7 @@ export function JourneyOverview({ accessToken, building, etag, revision, pipelin
   const next: NextCard | null = (() => {
     if (waiting && focus) {
       const review = scenario?.reviewStatus?.toLowerCase();
-      const title = review === "submitted" ? `Đang chờ PlatformAdmin duyệt v${scenario?.versionNumber}` : review === "rejected" ? `Phiên bản v${scenario?.versionNumber} bị từ chối` : "Tiếp theo: gửi duyệt nội dung";
+      const title = review === "submitted" ? `Đang chờ quản trị FET3D duyệt v${scenario?.versionNumber}` : review === "rejected" ? `Phiên bản v${scenario?.versionNumber} bị từ chối` : "Tiếp theo: gửi duyệt nội dung";
       const text = review === "rejected" && scenario?.rejectReason ? `Lý do: ${scenario.rejectReason}` : "Bạn vẫn xem và sửa bản nháp; sửa sau khi gửi sẽ tạo phiên bản mới và duyệt lại.";
       return versionsHref ? { eyebrow: `Việc tiếp theo · bước ${focus.index}`, title, detail: text, label: "Xem phiên bản", icon: <Clock size={18} />, href: versionsHref, passive: review === "submitted" } : null;
     }
@@ -104,8 +104,8 @@ export function JourneyOverview({ accessToken, building, etag, revision, pipelin
     const eyebrow = `Việc tiếp theo · bước ${current.index}`;
     switch (current.key) {
       case "ifc":
-        if (!revision) return { eyebrow, title: "Tải lên mô hình IFC đầu tiên", detail: "Kéo thả tệp .ifc; worker dựng hình học và chạy QA, bạn theo dõi ở tab IFC.", label: "Tải IFC", icon: <Upload size={18} />, onClick: onUpload };
-        if (jobRunning) return { eyebrow, title: `Worker đang dựng hình học từ ${revision.versionLabel}`, detail: "Không cần thao tác. Khi QA đạt, bước Soạn kịch bản sẽ mở.", label: "Mở tab IFC", icon: <Upload size={18} />, onClick: () => onGoTo("ifc"), passive: true };
+        if (!revision) return { eyebrow, title: "Tải lên mô hình IFC đầu tiên", detail: "Kéo thả tệp .ifc; hệ thống dựng mô hình 3D và kiểm tra tự động, bạn theo dõi ở tab IFC.", label: "Tải IFC", icon: <Upload size={18} />, onClick: onUpload };
+        if (jobRunning) return { eyebrow, title: `Đang dựng mô hình 3D từ ${revision.versionLabel}`, detail: "Không cần thao tác. Khi mô hình qua kiểm tra tự động, bước Soạn kịch bản sẽ mở.", label: "Mở tab IFC", icon: <Upload size={18} />, onClick: () => onGoTo("ifc"), passive: true };
         return { eyebrow, title: `Hoàn tất mô hình IFC (${revision.versionLabel})`, detail: current.detail, label: "Mở tab IFC", icon: <Upload size={18} />, onClick: () => onGoTo("ifc") };
       case "scenario": return editorHref
         ? { eyebrow, title: `Tiếp tục soạn kịch bản “${scenario?.name}”`, detail: current.detail, label: "Mở trình soạn", icon: <PenLine size={18} />, href: editorHref }
@@ -184,7 +184,7 @@ function InfoCard({ accessToken, building, etag, address, isAdmin, onSaved }: { 
         if (!sameBuildingVersion(fresh.data, base)) { setStale({ current: fresh.data, etag: fresh.etag }); return; }
         ifMatch = fresh.etag;
       }
-      if (!ifMatch) { setFormError("Không đọc được phiên bản công trình (ETag). Hãy tải lại trang rồi thử lại."); return; }
+      if (!ifMatch) { setFormError("Chưa xác định được bản thông tin công trình đang sửa. Hãy tải lại trang rồi thử lại."); return; }
       // PlatformAdmin edits on behalf of the building's organization; an OrganizationUser never sends the parameter.
       await buildingsApi.update(accessToken, building.id, buildingFormToInput(form, base), ifMatch, isAdmin ? building.organizationId : undefined);
       setOpen(false);

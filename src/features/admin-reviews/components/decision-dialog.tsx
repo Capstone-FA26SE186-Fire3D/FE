@@ -75,19 +75,19 @@ export function DecisionDialog({ action, detail, accessToken, idempotency, reaso
     footer={<>
       <Button variant="ghost" onClick={onClose} disabled={busy}>Hủy</Button>
       <Button variant={rejecting ? "secondary" : "primary"} className={rejecting ? "rev-btn-danger" : undefined} onClick={() => void submit()} disabled={busy} data-testid="confirm-decision">
-        {busy ? "Đang ghi…" : retrying ? "Thử lại (cùng mã thao tác)" : rejecting ? "Từ chối phiên bản" : "Duyệt nội dung"}
+        {busy ? "Đang ghi…" : retrying ? "Thử lại" : rejecting ? "Từ chối phiên bản" : "Duyệt nội dung"}
       </Button>
     </>}
   >
     <div className="ops-stack">
       {rejecting
-        ? <p className="rev-note">Từ chối là <strong>quyết định cuối cùng của phiên bản này</strong> và không đổi được. Để tiếp tục, tổ chức phải sửa draft, tạo <strong>phiên bản mới</strong> và gửi duyệt lại.</p>
-        : <p className="rev-note">Bạn duyệt <strong>đúng nội dung và rubric đã đóng băng với hash dưới đây</strong>. Quyết định không đổi được; nếu nội dung thay đổi, tổ chức phải tạo phiên bản mới và gửi duyệt lại. Duyệt nội dung <strong>không phải</strong> là phát hành.</p>}
+        ? <p className="rev-note">Từ chối là <strong>quyết định cuối cùng của phiên bản này</strong> và không đổi được. Để tiếp tục, tổ chức phải sửa bản nháp, tạo <strong>phiên bản mới</strong> và gửi duyệt lại.</p>
+        : <p className="rev-note">Bạn duyệt <strong>đúng nội dung và tiêu chí chấm điểm (rubric) đã khóa, có mã nội dung dưới đây</strong>. Quyết định không đổi được; nếu nội dung thay đổi, tổ chức phải tạo phiên bản mới và gửi duyệt lại. Duyệt nội dung <strong>không phải</strong> là phát hành.</p>}
       <dl className="rev-dl">
-        <dt>Hash nội dung</dt><dd className="rev-hash" data-testid="dialog-content-hash" title={review.contentHash}>{shortHash(review.contentHash)}</dd>
-        <dt>Hash rubric</dt><dd className="rev-hash" data-testid="dialog-rubric-hash" title={review.rubricHash}>{shortHash(review.rubricHash)}</dd>
+        <dt>Mã nội dung kịch bản</dt><dd className="rev-hash" data-testid="dialog-content-hash" title={review.contentHash}>{shortHash(review.contentHash)}</dd>
+        <dt>Mã nội dung tiêu chí chấm</dt><dd className="rev-hash" data-testid="dialog-rubric-hash" title={review.rubricHash}>{shortHash(review.rubricHash)}</dd>
       </dl>
-      {!rejecting && !readiness.technicalReady && <Alert tone="warning" title="Readiness kỹ thuật chưa đạt">Bạn vẫn có thể duyệt nội dung, nhưng phiên bản chưa đủ điều kiện kỹ thuật để phát hành.</Alert>}
+      {!rejecting && !readiness.technicalReady && <Alert tone="warning" title="Chưa đủ điều kiện kỹ thuật">Bạn vẫn có thể duyệt nội dung, nhưng phiên bản chưa đủ điều kiện kỹ thuật để phát hành.</Alert>}
       {rejecting && <Field label="Lý do từ chối" required hint={`${trimmedLength}/${REASON_MAX} ký tự · 1–${REASON_MAX} ký tự. Tổ chức đọc được lý do này.`} error={reasonError}>
         {(props) => <Textarea {...props} rows={5} value={reason} onChange={(event) => { onReasonChange(event.target.value); if (reasonError) setReasonError(undefined); }} disabled={busy} />}
       </Field>}

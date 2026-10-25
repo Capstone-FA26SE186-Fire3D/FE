@@ -17,11 +17,15 @@ import { Table, TableMessage } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 
 import type { ReleaseView } from "../../use-version-server-state";
-import { approvalGate, describeError, missingText, releaseGate, shortHash, type DescribedError } from "../../version-readiness";
+import { approvalGate, describeError, missingText, releaseGate, type DescribedError } from "../../version-readiness";
 import type { ScenarioVersionDetail, VersionReadiness } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
 import { SupportCode } from "@/components/ui/support-code";
 import { formatDateTime } from "./version-content";
+
+const ENTITLEMENT_STATUS: Record<string, string> = { active: "Đang hiệu lực", pending: "Chưa đến kỳ", scheduled: "Chưa đến kỳ", expired: "Đã hết hạn", revoked: "Đã thu hồi", cancelled: "Đã hủy", canceled: "Đã hủy" };
+const TRAINING_STATUS: Record<string, string> = { active: "Đang dùng", inactive: "Tạm ngừng", archived: "Đã lưu trữ" };
+const RELEASE_STATUS: Record<string, string> = { built: "Đã tạo", published: "Đã phát hành", revoked: "Đã thu hồi" };
 
 /** A publish that did not happen is a gate decision, not a failure of the release: it stays Built. */
 function PublishBlocked({ error }: { error: DescribedError }) {
@@ -148,7 +152,7 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
         {release.entitlement !== undefined && <div className="ver-service">
           <span>Dịch vụ của công trình</span>
           <strong data-testid="release-entitlement">{release.entitlement
-            ? `${release.entitlement.status} · ${formatDateTime(release.entitlement.startsAt)} → ${formatDateTime(release.entitlement.endsAt)} · ${release.entitlement.paid ? "đã thanh toán" : "chưa thanh toán"}${release.entitlement.learnerLimit != null ? ` · tối đa ${release.entitlement.learnerLimit} học viên` : ""}`
+            ? `${ENTITLEMENT_STATUS[release.entitlement.status.toLowerCase()] ?? "Không rõ trạng thái"} · ${formatDateTime(release.entitlement.startsAt)} → ${formatDateTime(release.entitlement.endsAt)} · ${release.entitlement.paid ? "đã thanh toán" : "chưa thanh toán"}${release.entitlement.learnerLimit != null ? ` · tối đa ${release.entitlement.learnerLimit} học viên` : ""}`
             : "Không có kỳ dịch vụ nào đang hiệu lực"}</strong>
         </div>}
         <details className="ver-details">
@@ -162,12 +166,12 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
         </details>
 
         {status === "built" && <Alert tone="info" title="Đã tạo, chưa phát hành">
-          Gói đã được dựng và ghim, nhưng Trainee chưa dùng được cho tới khi phát hành. Khi bạn bấm Phát hành, máy chủ kiểm tra lại: nội dung được duyệt đúng hash, readiness kỹ thuật, tương thích runtime và Building còn dịch vụ trả phí hiệu lực.
+          Gói đã được dựng và chốt, nhưng học viên chưa dùng được cho tới khi phát hành. Khi bạn bấm Phát hành, hệ thống kiểm tra lại: nội dung đã duyệt đúng phiên bản này, mô hình đã được xác nhận dùng cho huấn luyện, gói tương thích với ứng dụng và công trình còn dịch vụ trả phí hiệu lực.
         </Alert>}
         {publishError && (publishError.status === 503 || publishError.status === 409 ? <PublishBlocked error={publishError} /> : <Alert tone="danger" title={publishError.message}><SupportCode code={publishError.code} /></Alert>)}
         <div className="ver-actions-row">
           {status === "built" && <Button onClick={() => void publish()} disabled={!canAct || publishing}><Rocket size={16} aria-hidden="true" />{publishing ? "Đang gửi…" : publishError ? "Thử lại phát hành" : "Phát hành"}</Button>}
-          {(status === "built" || status === "published") && <Button variant="quiet" onClick={() => { setRevokeError(null); setRevoking(true); }} disabled={!canAct}><Undo2 size={16} aria-hidden="true" />Thu hồi release</Button>}
+          {(status === "built" || status === "published") && <Button variant="quiet" onClick={() => { setRevokeError(null); setRevoking(true); }} disabled={!canAct}><Undo2 size={16} aria-hidden="true" />Thu hồi bản phát hành</Button>}
         </div>
       </>}
 
@@ -180,9 +184,9 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
             <div><dt>Duyệt nội dung</dt><dd>{approvalGate(version.reviewStatus, version.rejectReason).label}</dd></div>
             <div><dt>Phiên bản</dt><dd>v{version.versionNumber}</dd></div>
           </dl>
-          {readiness.error !== undefined && !state && <Alert tone="danger" title="Không đọc được readiness" action={<Button type="button" size="sm" variant="secondary" className="mt-3" onClick={readiness.reload}>Thử lại</Button>}>{describeError(readiness.error).message}</Alert>}
+          {readiness.error !== undefined && !state && <Alert tone="danger" title="Không đọc được điều kiện phát hành" action={<Button type="button" size="sm" variant="secondary" className="mt-3" onClick={readiness.reload}>Thử lại</Button>}>{describeError(readiness.error).message}</Alert>}
           {state && state.missing.length > 0 && <ul className="ver-list" data-testid="release-missing">{state.missing.map((code) => <li key={code} data-code={code}>{missingText(code)}</li>)}</ul>}
-          {!approved && version.reviewStatus && <p className="ver-note">Phiên bản chưa ở trạng thái Đã duyệt: máy chủ sẽ từ chối với CONTENT_APPROVAL_REQUIRED.</p>}
+          {!approved && version.reviewStatus && <p className="ver-note">Phiên bản chưa được duyệt nội dung nên chưa tạo được bản phát hành.</p>}
           {error && <Alert tone="danger" title={error.message} action={<Button size="sm" variant="secondary" type="submit" className="mt-3" disabled={!canBuild}>Thử lại</Button>}>
             Bấm thử lại an toàn: hệ thống không tạo bản trùng.<SupportCode code={error.code} />
           </Alert>}
@@ -194,16 +198,16 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
       </>}
     </Panel>
 
-    <Panel title="Training của công trình" description="Chỉ đọc, không phân trang. Chỉ gồm training đã gắn với nội dung được duyệt." bodyClassName="ops-stack">
-      {trainings.error !== undefined && <Alert tone="danger" title="Không tải được danh sách training" action={<Button size="sm" variant="secondary" className="mt-3" onClick={trainings.reload}>Thử lại</Button>}>{describeError(trainings.error).message}</Alert>}
-      <Table caption="Training của công trình">
+    <Panel title="Bài huấn luyện của công trình" description="Chỉ xem. Chỉ gồm bài huấn luyện đã gắn với nội dung được duyệt." bodyClassName="ops-stack">
+      {trainings.error !== undefined && <Alert tone="danger" title="Không tải được danh sách bài huấn luyện" action={<Button size="sm" variant="secondary" className="mt-3" onClick={trainings.reload}>Thử lại</Button>}>{describeError(trainings.error).message}</Alert>}
+      <Table caption="Bài huấn luyện của công trình">
         <thead><tr><th>Tên</th><th>Trạng thái</th><th>Bản phát hành</th><th>Phiên bản</th></tr></thead>
         <tbody>
-          {trainings.loading && !trainings.data && <TableMessage colSpan={4}><SkeletonRows rows={2} label="Đang tải training…" /></TableMessage>}
+          {trainings.loading && !trainings.data && <TableMessage colSpan={4}><SkeletonRows rows={2} label="Đang tải bài huấn luyện…" /></TableMessage>}
           {(trainings.data ?? []).map((training) => <tr key={training.id}>
             <td className="ops-cell-primary">{training.name}</td>
-            <td><StatusBadge tone={training.status.toLowerCase() === "active" ? "success" : "neutral"}>{training.status}</StatusBadge></td>
-            <td><span className="ver-hash">{shortHash(training.releaseId, 13)}</span>{training.releaseStatus && <> · {training.releaseStatus}</>}</td>
+            <td><StatusBadge tone={training.status.toLowerCase() === "active" ? "success" : "neutral"}>{TRAINING_STATUS[training.status.toLowerCase()] ?? "Khác"}</StatusBadge></td>
+            <td>{training.releaseStatus ? RELEASE_STATUS[training.releaseStatus.toLowerCase()] ?? "Khác" : "Đã tạo"}<SupportCode id={training.releaseId} /></td>
             <td>{training.scenarioVersionId === version.id ? "Phiên bản này" : "Phiên bản khác"}</td>
           </tr>)}
           {trainings.data && trainings.data.length === 0 && <TableMessage colSpan={4}><EmptyState icon={Package} title="Chưa có bài huấn luyện" description="Bài huấn luyện xuất hiện khi bản phát hành được tạo và gắn với nội dung đã duyệt." /></TableMessage>}

@@ -59,7 +59,7 @@ export function SavedPosts() {
   }
   const { items, total } = list.data;
   if (items.length === 0 && total === 0) {
-    return <StateCard icon={Bookmark} kicker="Bài đã lưu · chưa có bài" title="Bạn chưa lưu bài nào" actions={<Link className={buttonVariants({ variant: "primary" })} href="/learn">Khám phá Learn</Link>}>Mở Khám phá Learn, bấm Lưu trên bài bạn muốn đọc lại.</StateCard>;
+    return <StateCard icon={Bookmark} kicker="Bài đã lưu · chưa có bài" title="Bạn chưa lưu bài nào" actions={<Link className={buttonVariants({ variant: "primary" })} href="/learn">Khám phá bài học</Link>}>Mở Khám phá bài học, bấm Lưu trên bài bạn muốn đọc lại.</StateCard>;
   }
   if (items.length === 0) {
     return <div className="learn-state" role="status"><h2>Trang này không có bài</h2><Button variant="secondary" onClick={() => setPage(1)}>Về trang đầu</Button></div>;

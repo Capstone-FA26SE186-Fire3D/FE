@@ -72,7 +72,7 @@ function Intro() {
       <p>Không cần đọc trước mới được luyện tập. Bạn có thể bắt đầu ở bất kỳ bước nào.</p>
     </div>
     <ol className="ov-steps">
-      <li><span className="ov-step-no" aria-hidden="true">1</span><div><strong>Đọc trong Learn</strong><span>Bài viết, mẹo và video công khai.</span></div></li>
+      <li><span className="ov-step-no" aria-hidden="true">1</span><div><strong>Đọc bài học</strong><span>Bài viết, mẹo và video công khai.</span></div></li>
       <li><span className="ov-step-no" aria-hidden="true">2</span><div><strong>Luyện tập trên ứng dụng</strong><span>Quét mã công trình trên Android.</span></div></li>
       <li><span className="ov-step-no" aria-hidden="true">3</span><div><strong>Xem kết quả</strong><span>Kết quả đánh giá tách khỏi hoàn thành phiên.</span></div></li>
     </ol>
@@ -93,7 +93,7 @@ function SavedPreview({ accessToken, userId }: { accessToken: string; userId: st
   } else if (!saved.data) {
     body = <div className="ov-saved-grid" role="status" aria-label="Đang tải bài đã lưu">{Array.from({ length: 3 }, (_, index) => <div key={index} className="ov-skeleton" aria-hidden="true"><span /><span /><span /></div>)}</div>;
   } else if (items.length === 0) {
-    body = <StateCard icon={Bookmark} kicker="Bài đã lưu · chưa có bài" title="Bạn chưa lưu bài nào" actions={<Link className={buttonVariants({ variant: "primary" })} href={routes.learn}>Khám phá Learn</Link>}>Mở Khám phá Learn, bấm Lưu trên bài bạn muốn đọc lại.</StateCard>;
+    body = <StateCard icon={Bookmark} kicker="Bài đã lưu · chưa có bài" title="Bạn chưa lưu bài nào" actions={<Link className={buttonVariants({ variant: "primary" })} href={routes.learn}>Khám phá bài học</Link>}>Mở Khám phá bài học, bấm Lưu trên bài bạn muốn đọc lại.</StateCard>;
   } else {
     body = <div className="ov-saved-grid">{items.map((item) => item.available
       ? <article key={item.postId} className="ov-card" data-testid="overview-saved">

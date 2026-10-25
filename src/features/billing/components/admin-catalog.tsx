@@ -85,10 +85,10 @@ export function PackagesSection({ accessToken }: { accessToken: string }) {
     if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,49}$/.test(form.code.trim())) found.code = "Mã gói 1–50 ký tự: chữ, số, gạch dưới hoặc gạch ngang.";
     if (!form.name.trim() || form.name.trim().length > 255) found.name = "Nhập tên gói (tối đa 255 ký tự).";
     if (!/^\d+$/.test(form.unitPrice.trim())) found.unitPrice = "Đơn giá là số nguyên VND không âm.";
-    if (form.durationMonths !== "6" && form.durationMonths !== "12") found.durationMonths = "Gói v7 chỉ có thời hạn 6 hoặc 12 tháng.";
+    if (form.durationMonths !== "6" && form.durationMonths !== "12") found.durationMonths = "Gói chỉ có thời hạn 6 hoặc 12 tháng.";
     if (!/^\d+$/.test(form.learnerLimit.trim()) || Number(form.learnerLimit) < 1) found.learnerLimit = "Số học viên mỗi kỳ là số nguyên lớn hơn 0.";
-    if (!/^\d+$/.test(form.aiQuotaUnits.trim())) found.aiQuotaUnits = "Quota AI là số nguyên không âm (nhập 0 nếu gói không kèm quota).";
-    else if (Number(form.aiQuotaUnits) > 0 && !form.aiPolicyVersionId) found.aiPolicyVersionId = "Gói có quota phải chọn phiên bản chính sách quota.";
+    if (!/^\d+$/.test(form.aiQuotaUnits.trim())) found.aiQuotaUnits = "Hạn mức AI là số nguyên không âm (nhập 0 nếu gói không kèm hạn mức AI).";
+    else if (Number(form.aiQuotaUnits) > 0 && !form.aiPolicyVersionId) found.aiPolicyVersionId = "Gói có hạn mức AI phải chọn phiên bản chính sách hạn mức.";
     if (form.description.length > 10000) found.description = "Mô tả tối đa 10.000 ký tự.";
     return found;
   };
@@ -108,7 +108,7 @@ export function PackagesSection({ accessToken }: { accessToken: string }) {
     try {
       if (editing.item) await billingApi.updatePackage(accessToken, editing.item.id, input, editing.etag ?? "");
       else await billingApi.createPackage(accessToken, input);
-      toast.notify({ tone: "success", title: editing.item ? "Đã lưu gói" : "Đã tạo gói", description: `${input.code} · ${formatVnd(input.unitPrice)}/tháng/công trình. Báo giá đã phát hành giữ nguyên bản chụp cũ.` });
+      toast.notify({ tone: "success", title: editing.item ? "Đã lưu gói" : "Đã tạo gói", description: `${input.code} · ${formatVnd(input.unitPrice)}/tháng/công trình. Báo giá đã phát hành vẫn giữ giá cũ.` });
       setEditing(null);
       list.reload();
     } catch (cause) {
@@ -137,17 +137,17 @@ export function PackagesSection({ accessToken }: { accessToken: string }) {
   const noneSellable = list.data !== undefined && items.length > 0 && items.every((item) => item.isPurchasable === false);
 
   const columns: DataColumn<ServicePackage>[] = [
-    { key: "package", header: "Gói", primary: true, render: (item) => <CellTitle title={item.name} sub={`${item.code}${item.commercialVersion === 1 ? " · gói cũ (v1)" : ""}`} /> },
+    { key: "package", header: "Gói", primary: true, render: (item) => <CellTitle title={item.name} sub={`${item.code}${item.commercialVersion === 1 ? " · gói cũ" : ""}`} /> },
     { key: "price", header: "Đơn giá/tháng", width: 150, align: "right", render: (item) => formatVnd(item.unitPrice) },
     { key: "duration", header: "Thời hạn", width: 110, render: (item) => `${item.durationMonths} tháng` },
     { key: "learners", header: "Học viên/kỳ", width: 120, align: "right", hideBelow: 900, render: (item) => formatNumber(item.learnerLimit ?? null) },
-    { key: "quota", header: "Quota AI", width: 200, hideBelow: 1100, render: (item) => <CellTitle title={item.aiQuotaUnits != null ? formatNumber(item.aiQuotaUnits) : "—"} sub={item.aiPolicyVersionId ? `${policyById(item.aiPolicyVersionId)?.quotaUnit ?? "chính sách"} · ${item.aiPolicyVersionId.slice(0, 8)}` : undefined} /> },
+    { key: "quota", header: "Hạn mức AI", width: 200, hideBelow: 1100, render: (item) => <CellTitle title={item.aiQuotaUnits != null ? formatNumber(item.aiQuotaUnits) : "—"} sub={item.aiPolicyVersionId ? `${policyById(item.aiPolicyVersionId)?.quotaUnit ?? "chính sách"} · ${item.aiPolicyVersionId.slice(0, 8)}` : undefined} /> },
     { key: "sale", header: "Bán hàng", width: 260, render: (item) => <span className="bill-states"><StatusBadge tone={item.isActive ? "success" : "neutral"}>{item.isActive ? "Đang bán" : "Tạm ẩn"}</StatusBadge><StatusBadge tone={item.isPurchasable ? "success" : "warning"}>{item.isPurchasable ? "Đủ điều kiện bán" : "Không bán được"}</StatusBadge></span> },
   ];
 
   return <div className="ops-stack">
-    {noPolicies && <Alert tone="info" title="Chưa có chính sách quota">Gói có quota AI cần một phiên bản chính sách quota. Tạo ở tab “Chính sách quota” trước; gói không kèm quota (0) không cần chính sách.</Alert>}
-    {noneSellable && <Alert tone="warning" title="Chưa có gói nào đủ điều kiện bán">Tổ chức chỉ mua được gói v7 đã cấu hình đủ (6/12 tháng, số học viên, quota/chính sách). Gói cũ hiển thị “Không bán”. Sửa gói hoặc tạo gói mới.</Alert>}
+    {noPolicies && <Alert tone="info" title="Chưa có chính sách hạn mức">Gói có hạn mức AI cần một phiên bản chính sách hạn mức. Tạo ở tab “Chính sách hạn mức” trước; gói không kèm hạn mức AI (0) không cần chính sách.</Alert>}
+    {noneSellable && <Alert tone="warning" title="Chưa có gói nào đủ điều kiện bán">Tổ chức chỉ mua được gói mới đã cấu hình đủ (6/12 tháng, số học viên, hạn mức AI và chính sách). Gói cũ hiển thị “Không bán”. Sửa gói hoặc tạo gói mới.</Alert>}
     <DataTable<ServicePackage>
       caption="Danh sách gói dịch vụ"
       data-testid="admin-packages-table"
@@ -160,13 +160,13 @@ export function PackagesSection({ accessToken }: { accessToken: string }) {
       rowMenu={(item) => [{ label: "Sửa gói", icon: Pencil, onSelect: () => void openEdit(item), disabled: opening !== null }]}
       error={list.error !== undefined ? <Alert tone="danger" title="Không tải được gói" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert> : undefined}
       toolbar={<>
-        <p className="bill-muted ops-toolbar-grow" style={{ margin: 0 }}>Đơn giá tính theo tháng cho mỗi công trình; giá một dòng = đơn giá × thời hạn (6 hoặc 12 tháng). Báo giá chốt bản chụp khi phát hành. Không có giá, số học viên hay quota mặc định.</p>
+        <p className="bill-muted ops-toolbar-grow" style={{ margin: 0 }}>Đơn giá tính theo tháng cho mỗi công trình; giá một dòng = đơn giá × thời hạn (6 hoặc 12 tháng). Báo giá giữ nguyên giá lúc phát hành. Không có giá, số học viên hay hạn mức mặc định.</p>
         <Button variant="quiet" onClick={list.reload} disabled={list.loading} aria-label="Tải lại danh sách"><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
         <Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo gói</Button>
       </>}
-      empty={<EmptyState icon={Tags} title="Chưa có gói dịch vụ" description="Tạo gói 6 hoặc 12 tháng đầu tiên (đơn giá/tháng, số học viên, quota AI). Hệ thống không có giá hay quota mặc định." action={<Button onClick={openCreate}>Tạo gói</Button>} />}
+      empty={<EmptyState icon={Tags} title="Chưa có gói dịch vụ" description="Tạo gói 6 hoặc 12 tháng đầu tiên (đơn giá/tháng, số học viên, hạn mức AI). Hệ thống không có giá hay hạn mức mặc định." action={<Button onClick={openCreate}>Tạo gói</Button>} />}
     />
-    <p className="bill-hint">Bấm hàng để sửa gói; “Đang bán” là trạng thái bạn đặt, “Đủ điều kiện bán” là phán quyết của máy chủ.</p>
+    <p className="bill-hint">Bấm hàng để sửa gói; “Đang bán” là trạng thái bạn đặt, “Đủ điều kiện bán” do hệ thống kiểm tra.</p>
 
     <Modal open={editing !== null} onOpenChange={(open) => { if (!open && !saving) setEditing(null); }} size="lg" title={editing?.item ? "Sửa gói dịch vụ" : "Tạo gói dịch vụ"} description="Lưu sẽ thay toàn bộ các trường của gói; báo giá đã phát hành không đổi."
       footer={<><Button type="button" variant="quiet" onClick={() => setEditing(null)} disabled={saving}>Hủy</Button><Button type="submit" form={formId} disabled={saving}>{saving ? "Đang lưu…" : "Lưu gói"}</Button></>}>
@@ -176,10 +176,10 @@ export function PackagesSection({ accessToken }: { accessToken: string }) {
           <Field label="Tên gói" required error={errors.name}>{(p) => <Input {...p} maxLength={255} value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />}</Field>
           <Field label="Đơn giá/tháng (VND)" required error={errors.unitPrice}>{(p) => <Input {...p} inputMode="numeric" value={form.unitPrice} onChange={(event) => setForm({ ...form, unitPrice: event.target.value })} />}</Field>
           <Field label="Thời hạn (tháng)" required error={errors.durationMonths} hint="6 hoặc 12.">{(p) => <Combobox {...p} aria-label="Thời hạn (tháng)" value={form.durationMonths} onChange={(value) => setForm({ ...form, durationMonths: value })} options={DURATION_OPTIONS} placeholder="Chọn thời hạn" groupLabel="Thời hạn" />}</Field>
-          <Field label="Học viên mỗi kỳ" required error={errors.learnerLimit} hint="Trainee khác nhau được bắt đầu online ở mỗi công trình/kỳ.">{(p) => <Input {...p} inputMode="numeric" value={form.learnerLimit} onChange={(event) => setForm({ ...form, learnerLimit: event.target.value })} />}</Field>
-          <Field label="Quota AI kèm gói" required error={errors.aiQuotaUnits} hint="0 nếu không kèm quota. Đơn vị theo chính sách.">{(p) => <Input {...p} inputMode="numeric" value={form.aiQuotaUnits} onChange={(event) => setForm({ ...form, aiQuotaUnits: event.target.value })} />}</Field>
-          <Field label="Phiên bản chính sách quota" className="ops-span-all" required={Number(form.aiQuotaUnits) > 0} error={errors.aiPolicyVersionId} hint="Bắt buộc khi gói có quota; chính sách phải phủ cả kỳ dịch vụ khi phát hành.">
-            {(p) => <Combobox {...p} aria-label="Phiên bản chính sách quota" value={form.aiPolicyVersionId} onChange={(value) => setForm({ ...form, aiPolicyVersionId: value })} options={policyOptions} placeholder="Không dùng chính sách" searchPlaceholder="Tìm theo đơn vị hoặc mã" groupLabel="Phiên bản" clearable disabled={Number(form.aiQuotaUnits) <= 0 && !form.aiPolicyVersionId} loading={policies.loading && !policies.data} />}
+          <Field label="Học viên mỗi kỳ" required error={errors.learnerLimit} hint="Số học viên khác nhau được bắt đầu học trực tuyến ở mỗi công trình trong một kỳ.">{(p) => <Input {...p} inputMode="numeric" value={form.learnerLimit} onChange={(event) => setForm({ ...form, learnerLimit: event.target.value })} />}</Field>
+          <Field label="Hạn mức AI kèm gói" required error={errors.aiQuotaUnits} hint="0 nếu không kèm hạn mức AI. Đơn vị theo chính sách.">{(p) => <Input {...p} inputMode="numeric" value={form.aiQuotaUnits} onChange={(event) => setForm({ ...form, aiQuotaUnits: event.target.value })} />}</Field>
+          <Field label="Phiên bản chính sách hạn mức" className="ops-span-all" required={Number(form.aiQuotaUnits) > 0} error={errors.aiPolicyVersionId} hint="Bắt buộc khi gói có hạn mức AI; chính sách phải phủ cả kỳ dịch vụ khi phát hành.">
+            {(p) => <Combobox {...p} aria-label="Phiên bản chính sách hạn mức" value={form.aiPolicyVersionId} onChange={(value) => setForm({ ...form, aiPolicyVersionId: value })} options={policyOptions} placeholder="Không dùng chính sách" searchPlaceholder="Tìm theo đơn vị hoặc mã" groupLabel="Phiên bản" clearable disabled={Number(form.aiQuotaUnits) <= 0 && !form.aiPolicyVersionId} loading={policies.loading && !policies.data} />}
           </Field>
           <Field label="Mô tả" className="ops-span-all" error={errors.description}>{(p) => <Textarea {...p} rows={3} value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} />}</Field>
         </div>
@@ -250,7 +250,7 @@ export function DiscountsSection({ accessToken }: { accessToken: string }) {
     try {
       if (editing.item) await billingApi.updateDiscount(accessToken, editing.item.id, input, editing.etag ?? "");
       else await billingApi.createDiscount(accessToken, input);
-      toast.notify({ tone: "success", title: editing.item ? "Đã lưu quy tắc giảm giá" : "Đã tạo quy tắc giảm giá", description: "Báo giá đã phát hành giữ nguyên bản chụp." });
+      toast.notify({ tone: "success", title: editing.item ? "Đã lưu quy tắc giảm giá" : "Đã tạo quy tắc giảm giá", description: "Báo giá đã phát hành vẫn giữ mức giảm cũ." });
       setEditing(null);
       list.reload();
     } catch (cause) {
@@ -295,7 +295,7 @@ export function DiscountsSection({ accessToken }: { accessToken: string }) {
       rowMenu={(item) => [{ label: "Sửa quy tắc", icon: Pencil, onSelect: () => void openEdit(item) }]}
       error={list.error !== undefined ? <Alert tone="danger" title="Không tải được quy tắc giảm giá" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert> : undefined}
       toolbar={<>
-        <p className="bill-muted ops-toolbar-grow" style={{ margin: 0 }}>Mỗi báo giá áp dụng một quy tắc có mức giảm lớn nhất, không cộng dồn. Phần trăm làm tròn VND ở máy chủ.</p>
+        <p className="bill-muted ops-toolbar-grow" style={{ margin: 0 }}>Mỗi báo giá áp dụng một quy tắc có mức giảm lớn nhất, không cộng dồn. Mức giảm theo phần trăm được làm tròn đến đồng.</p>
         <Button variant="quiet" onClick={list.reload} disabled={list.loading} aria-label="Tải lại danh sách"><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
         <Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo quy tắc</Button>
       </>}
@@ -321,7 +321,7 @@ export function DiscountsSection({ accessToken }: { accessToken: string }) {
         </fieldset>
         <fieldset className="ops-fieldset"><legend>Hiệu lực</legend>
           <div className="ops-form-grid">
-            <Field label="Bắt đầu" required error={errors.validFrom} hint="Giờ địa phương, lưu dưới dạng UTC.">{(p) => <Input {...p} type="datetime-local" value={form.validFrom} onChange={(event) => setForm({ ...form, validFrom: event.target.value })} />}</Field>
+            <Field label="Bắt đầu" required error={errors.validFrom} hint="Theo giờ địa phương.">{(p) => <Input {...p} type="datetime-local" value={form.validFrom} onChange={(event) => setForm({ ...form, validFrom: event.target.value })} />}</Field>
             <Field label="Kết thúc" error={errors.validUntil} hint="Để trống nếu không giới hạn.">{(p) => <Input {...p} type="datetime-local" value={form.validUntil} onChange={(event) => setForm({ ...form, validUntil: event.target.value })} />}</Field>
           </div>
           <label className="bill-check"><input type="checkbox" className="ops-check" checked={form.isActive} onChange={(event) => setForm({ ...form, isActive: event.target.checked })} /><span>Đang bật</span></label>

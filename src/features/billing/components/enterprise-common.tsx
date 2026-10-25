@@ -21,7 +21,7 @@ export const enterpriseStatus: Record<string, { label: string; tone: Tone }> = {
 };
 
 export function EnterpriseStatusBadge({ status }: { status: string }) {
-  const item = enterpriseStatus[status] ?? { label: status, tone: "neutral" as Tone };
+  const item = enterpriseStatus[status] ?? { label: "Không rõ", tone: "neutral" as Tone };
   return <StatusBadge tone={item.tone}>{item.label}</StatusBadge>;
 }
 
@@ -35,7 +35,7 @@ export function EnterpriseResponses({ accessToken, scope, requestId, refreshKey 
     {list.loading && !list.data && <SkeletonRows rows={2} label="Đang tải phản hồi…" />}
     {list.data && items.length === 0 && <p className="bill-muted">{scope === "mine" ? "Chưa có phản hồi. Đội kinh doanh sẽ trả lời ở đây và qua email liên hệ." : "Chưa có phản hồi nào."}</p>}
     <ul className="bill-list">{items.map((item) => <li key={item.id} data-testid="enterprise-response">
-      <p className="bill-dim" style={{ margin: 0 }}>{item.authorName ?? "PlatformAdmin"} · {formatDateTime(item.createdAt)}</p>
+      <p className="bill-dim" style={{ margin: 0 }}>{item.authorName ?? "Quản trị FET3D"} · {formatDateTime(item.createdAt)}</p>
       <p className="bill-wrap" style={{ margin: "4px 0 0", whiteSpace: "pre-wrap" }}>{item.message}</p>
     </li>)}</ul>
   </div>;

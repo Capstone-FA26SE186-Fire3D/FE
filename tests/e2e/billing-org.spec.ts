@@ -25,7 +25,7 @@ test.describe("organization billing workspace (mock)", () => {
     await expect(row).toContainText("5.400.000");
     // Capacity, quota and the fixed period come from the line snapshot (not from the package list).
     await expect(row).toContainText("60 học viên/kỳ");
-    await expect(row).toContainText("Quota AI 1.000 tokens");
+    await expect(row).toContainText("Hạn mức AI 1.000 tokens");
     await expect(row).toContainText("Kỳ ");
     // Header must not depend on removed fields.
     expect(Object.keys(mock.quotations[ids.quote])).not.toContain("buildingId");
@@ -38,7 +38,7 @@ test.describe("organization billing workspace (mock)", () => {
     await page.goto(`/workspace/billing?quotation=${ids.quoteDraft}`);
     await expect(page.getByTestId("quotation-tax")).toHaveText("Chưa xác định");
     await expect(page.getByText("Tổng ước tính (chưa thuế)")).toBeVisible();
-    await expect(page.getByText("Đang chờ PlatformAdmin phát hành")).toBeVisible();
+    await expect(page.getByText("Đang chờ quản trị FET3D phát hành")).toBeVisible();
   });
 
   test("creating a quotation: double click sends one request and a retry reuses the same Idempotency-Key", async ({ page }) => {
@@ -64,7 +64,7 @@ test.describe("organization billing workspace (mock)", () => {
     expect(posts[1].headers["idempotency-key"]).toBe(posts[0].headers["idempotency-key"]);
     expect(posts[0].body).toEqual({ items: [{ buildingId: "b-1", servicePackageId: ids.pkg, purchaseAction: "New" }] });
     // Draft: tell the user it waits for PlatformAdmin and offers no payment.
-    await expect(page.getByText("Đang chờ PlatformAdmin phát hành")).toBeVisible();
+    await expect(page.getByText("Đang chờ quản trị FET3D phát hành")).toBeVisible();
     await expect(page.getByRole("button", { name: /Thanh toán qua PayOS|Chấp nhận báo giá/ })).toHaveCount(0);
     // The server replay returned ONE quotation, not two.
     expect(Object.keys(mock.quotations).filter((id) => !id.endsWith("001") && !id.endsWith("002"))).toHaveLength(1);
@@ -269,7 +269,7 @@ test.describe("organization billing workspace (mock)", () => {
     queue(mock, "POST /api/payments/payos/create", { status: 400, json: { code: "IDEMPOTENCY_KEY_REQUIRED", title: "Idempotency-Key is required.", errors: { idempotencyKey: ["Idempotency-Key is required."] } } });
     await page.goto(`/workspace/billing?quotation=${ids.quote}`);
     await page.getByRole("button", { name: "Thanh toán qua PayOS" }).click();
-    await expect(page.getByText(/thiếu khóa chống gửi trùng/)).toBeVisible();
+    await expect(page.getByText(/Yêu cầu chưa gửi được/)).toBeVisible();
     await expect(page.getByRole("button", { name: "Thử lại thanh toán" })).toBeEnabled();
   });
 
@@ -282,7 +282,7 @@ test.describe("organization billing workspace (mock)", () => {
     await page.goto(`/workspace/billing?quotation=${ids.quote}`);
     const pay = page.getByRole("button", { name: /Thanh toán qua PayOS|Thử lại thanh toán/ });
     await pay.click();
-    await expect(page.getByText(/đã được dùng cho nội dung khác/)).toBeVisible();
+    await expect(page.getByText(/trùng với một yêu cầu khác vừa gửi/)).toBeVisible();
     await pay.click();
     await expect(page.getByText(/Tổng tiền báo giá bằng 0/)).toBeVisible();
     await pay.click();

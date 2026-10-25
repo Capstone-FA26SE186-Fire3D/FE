@@ -27,7 +27,7 @@ export function SituationPicker({ accessToken, selected, onChange, disabled, ...
 
   return <div style={{ display: "grid", gap: 6 }}>
     <MultiCombobox {...field} values={selected.map((item) => item.id)} onChange={(values) => onChange(values.flatMap((id) => { const ref = byId.get(id); return ref ? [ref] : []; }))}
-      options={options} disabled={disabled} loading={catalog.loading && !catalog.data} placeholder="Chọn tình huống" searchPlaceholder="Tìm theo tên hoặc slug" groupLabel="Tình huống"
+      options={options} disabled={disabled} loading={catalog.loading && !catalog.data} placeholder="Chọn tình huống" searchPlaceholder="Tìm theo tên hoặc đường dẫn rút gọn" groupLabel="Tình huống"
       emptyText={catalog.data && items.length === 0 ? "Chưa có tình huống nào. Tạo ở thẻ “Tình huống”." : "Không có tình huống khớp từ khóa."} maxChips={4} />
     {catalog.error !== undefined && <span className="ops-field-error" role="alert">Không tải được danh mục tình huống: {describeLearnError(catalog.error).message} <button type="button" onClick={catalog.reload} style={{ background: "none", border: 0, padding: 0, color: "var(--ember)", textDecoration: "underline", cursor: "pointer", font: "inherit" }}>Thử lại</button></span>}
     {total > items.length && <span className="ops-field-hint">Hiển thị {items.length}/{total} tình huống đầu tiên.</span>}

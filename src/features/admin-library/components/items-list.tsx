@@ -26,7 +26,7 @@ export const STATES = ["active", "inactive", "unpublished"] as const;
 type ItemState = (typeof STATES)[number];
 const stateLabel: Record<ItemState, string> = { active: "Đang dùng", inactive: "Ngừng dùng", unpublished: "Chưa có bản xuất bản" };
 const isState = (value: string): value is ItemState => (STATES as readonly string[]).includes(value);
-const tabLabel: Record<LibraryKind, string> = { ScenarioTemplate: "Kịch bản mẫu", RubricSample: "Rubric mẫu", Equipment: "Thiết bị" };
+const tabLabel: Record<LibraryKind, string> = { ScenarioTemplate: "Kịch bản mẫu", RubricSample: "Tiêu chí chấm mẫu", Equipment: "Thiết bị" };
 const kindTone: Record<LibraryKind, Tone> = { ScenarioTemplate: "info", RubricSample: "ember", Equipment: "neutral" };
 
 const matches = (item: LibraryItem, state: ItemState | "") => state === "" || (state === "active" ? item.isActive : state === "inactive" ? !item.isActive : item.latestPublished === null);
@@ -143,17 +143,17 @@ export function ItemsList({ accessToken, reloadKey, onOpen, onNewVersion, onCrea
         </FilterChips>
       </>}
       empty={<EmptyState icon={filtered ? Search : Library} title={filtered ? "Không có mục khớp bộ lọc." : "Thư viện chưa có mục nào"}
-        description={filtered ? "Thử đổi hoặc xóa bộ lọc." : "Chưa có mẫu nào. Thư viện không có dữ liệu sẵn: thêm mục (template, rubric mẫu hoặc thiết bị), tạo phiên bản và xuất bản để tổ chức dùng được. Rubric mẫu cần danh mục rubric đã được cấu hình ở máy chủ."}
+        description={filtered ? "Thử đổi hoặc xóa bộ lọc." : "Chưa có mẫu nào. Thư viện không có dữ liệu sẵn: thêm mục (kịch bản mẫu, tiêu chí chấm mẫu hoặc thiết bị), tạo phiên bản và xuất bản để tổ chức dùng được. Tiêu chí chấm mẫu cần danh mục chỉ số chấm điểm đã được thiết lập trong hệ thống."}
         action={!filtered && <Button size="sm" onClick={onCreate}>Thêm mục</Button>} />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
     <p className="ops-field-hint" style={{ margin: "10px 0 0" }}>
       Bấm hàng để mở mục với danh sách phiên bản và trình sửa theo loại; menu “···” tạo phiên bản hoặc ngừng dùng mục.
-      {state && ` Máy chủ chưa có bộ lọc trạng thái: bộ lọc này chỉ áp dụng cho ${loaded.length} mục của trang đang mở.`}
+      {state && ` Bộ lọc trạng thái chỉ áp dụng cho ${loaded.length} mục của trang đang mở.`}
     </p>
     <div style={{ marginTop: 18 }}>
-      <Alert tone="info" title="Thêm metadata thiết bị không tự thêm khả năng gameplay">
-        Chỉ đối tượng mà runtime đang hỗ trợ mới dùng được trong kịch bản; thông tin thiết bị chỉ để mô tả và hiển thị.
+      <Alert tone="info" title="Thêm thông tin thiết bị không tự thêm chức năng trong game">
+        Chỉ đối tượng mà ứng dụng FET3D đang hỗ trợ mới dùng được trong kịch bản; thông tin thiết bị chỉ để mô tả và hiển thị.
       </Alert>
     </div>
 

@@ -49,7 +49,7 @@ export function AdminAi() {
   const requestTotal = requestsByStatus ? Object.values(requestsByStatus).reduce((sum, value) => sum + value, 0) : null;
 
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
-  if (user?.role !== 0 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ PlatformAdmin quản trị yêu cầu AI, chính sách và nguồn tri thức.</Alert>;
+  if (user?.role !== 0 || !accessToken) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ quản trị FET3D quản lý yêu cầu AI, chính sách và nguồn tri thức.</Alert>;
 
   const clearTabParams = () => Object.fromEntries(TAB_PARAMS.map((key) => [key, null]));
   const changeTab = (value: string) => {
@@ -61,15 +61,15 @@ export function AdminAi() {
     <PageHeader
       eyebrow="Quản lý nội dung"
       title="AI và nguồn tri thức"
-      description="Chính sách AI, nguồn tri thức đã duyệt và yêu cầu gần đây. RAG chỉ dùng nguồn đã duyệt."
+      description="Chính sách AI, nguồn tri thức đã duyệt và yêu cầu gần đây. AI chỉ trả lời dựa trên nguồn đã duyệt."
       breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "AI & nguồn tri thức" }]}
       actions={<Button onClick={() => setParams({ ...clearTabParams(), tab: "sources", create: "1" })}><Plus size={16} aria-hidden="true" />Đăng ký nguồn</Button>}
     />
     <KpiRow label="Tổng quan AI">
       <KpiTile label="Nguồn tri thức" value={formatCount(sources.data?.total)} loading={sources.loading && !sources.data} hint={drafts.data ? `${formatCount(drafts.data.total)} chưa duyệt` : "Từ máy chủ"} />
-      <KpiTile label="Chưa duyệt" value={formatCount(drafts.data?.total)} loading={drafts.loading && !drafts.data} hint="Draft chờ phê duyệt" />
+      <KpiTile label="Chưa duyệt" value={formatCount(drafts.data?.total)} loading={drafts.loading && !drafts.data} hint="Bản nháp chờ duyệt" />
       <KpiTile label="Yêu cầu AI 30 ngày" value={formatCount(requestTotal)} loading={usage.loading && !usage.data} hint="Hỏi đáp · Đề xuất · Học viên" />
-      <KpiTile label="Cần đối soát" value={formatCount(reconcile.data?.total)} loading={reconcile.loading && !reconcile.data} tone={(reconcile.data?.total ?? 0) > 0 ? "warning" : undefined} hint="Timeout chờ reconcile" />
+      <KpiTile label="Cần đối soát" value={formatCount(reconcile.data?.total)} loading={reconcile.loading && !reconcile.data} tone={(reconcile.data?.total ?? 0) > 0 ? "warning" : undefined} hint="Quá thời gian chờ, cần kiểm tra lại" />
     </KpiRow>
     <SubTabs label="Quản trị AI" value={tab} onValueChange={changeTab} items={[{ value: "requests", label: "Yêu cầu" }, { value: "policies", label: "Chính sách AI" }, { value: "sources", label: "Nguồn tri thức" }]}>
       <div className="ops-subtabs-content">
@@ -79,7 +79,7 @@ export function AdminAi() {
       </div>
     </SubTabs>
     <div style={{ marginTop: 18 }}>
-      <Alert tone="info" title="Model production không chọn qua API">Model do dịch vụ AI quyết định và ghi trên từng yêu cầu (modelVersion). Giao diện này chỉ quản trị chính sách, nguồn tri thức và đối soát yêu cầu.</Alert>
+      <Alert tone="info" title="Mô hình AI do dịch vụ AI chọn">Dịch vụ AI tự chọn mô hình và ghi lại trên từng yêu cầu. Trang này chỉ quản lý chính sách, nguồn tri thức và đối soát yêu cầu.</Alert>
     </div>
   </>;
 }

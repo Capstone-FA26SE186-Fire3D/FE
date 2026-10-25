@@ -110,10 +110,10 @@ export function checkForm(kind: LibraryKind, form: VersionForm, context: CheckCo
     if (isObject(rubric)) rubricCatalogNotes(rubric, "$.payload.state.rubric", context, advisory);
   } else if (kind === "RubricSample") {
     const rubric = form.doc.rubric;
-    if (!isObject(rubric)) blocking.push(issue("FIELD_REQUIRED", "$.payload.rubric", "Cần một rubric: thêm rubric rồi nhập tiêu chí."));
+    if (!isObject(rubric)) blocking.push(issue("FIELD_REQUIRED", "$.payload.rubric", "Cần phần tiêu chí chấm điểm: thêm phần này rồi nhập tiêu chí."));
     else {
       blocking.push(...reroot(shapeIssues({ schemaVersion: SCHEMA_VERSION, rubric }), "$.payload"));
-      if (rubric.schema_version === undefined) blocking.push(issue("FIELD_REQUIRED", "$.payload.rubric.schema_version", "Chọn schema_version của rubric."));
+      if (rubric.schema_version === undefined) blocking.push(issue("FIELD_REQUIRED", "$.payload.rubric.schema_version", "Chọn phiên bản tiêu chí chấm điểm."));
       if (Array.isArray(rubric.criteria) && rubric.criteria.length === 0) blocking.push(issue("FIELD_REQUIRED", "$.payload.rubric.criteria", "Cần ít nhất một tiêu chí."));
       rubricCatalogNotes(rubric, "$.payload.rubric", context, advisory);
     }
@@ -137,12 +137,12 @@ export function checkForm(kind: LibraryKind, form: VersionForm, context: CheckCo
 function rubricCatalogNotes(rubric: JsonObject, base: string, context: CheckContext, out: LibraryIssue[]) {
   const version = rubric.schema_version;
   if (context.schemaVersions && version !== undefined && !(typeof version === "string" && context.schemaVersions.includes(version))) {
-    out.push(issue("RUBRIC_SCHEMA_VERSION_UNSUPPORTED", `${base}.schema_version`, `Danh mục rubric chỉ hỗ trợ: ${context.schemaVersions.map((item) => `"${item}"`).join(", ") || "(chưa có)"}.`));
+    out.push(issue("RUBRIC_SCHEMA_VERSION_UNSUPPORTED", `${base}.schema_version`, `Hệ thống chỉ hỗ trợ phiên bản tiêu chí: ${context.schemaVersions.map((item) => `"${item}"`).join(", ") || "(chưa có)"}.`));
   }
   if (context.metrics && Array.isArray(rubric.criteria)) {
     rubric.criteria.forEach((criterion, index) => {
       if (isObject(criterion) && typeof criterion.metric === "string" && criterion.metric !== "" && !context.metrics!.has(criterion.metric)) {
-        out.push(issue("RUBRIC_METRIC_UNSUPPORTED", `${base}.criteria[${index}].metric`, "Chỉ số không có trong danh mục rubric của máy chủ."));
+        out.push(issue("RUBRIC_METRIC_UNSUPPORTED", `${base}.criteria[${index}].metric`, "Chỉ số này không có trong danh mục chỉ số của hệ thống."));
       }
     });
   }
@@ -157,7 +157,7 @@ export function describeDifferences(kind: LibraryKind, form: VersionForm, server
   if (mine.name !== theirs.name) out.push("tên phiên bản");
   if (mine.payload.description !== theirs.payload.description) out.push("mô tả");
   if (!deepEqual(mine.requiredCapabilities, theirs.requiredCapabilities)) out.push("năng lực yêu cầu");
-  if (!deepEqual(content(mine.payload), content(theirs.payload))) out.push(kind === "ScenarioTemplate" ? "nội dung template" : kind === "RubricSample" ? "rubric" : "thuộc tính thiết bị");
+  if (!deepEqual(content(mine.payload), content(theirs.payload))) out.push(kind === "ScenarioTemplate" ? "nội dung kịch bản mẫu" : kind === "RubricSample" ? "tiêu chí chấm điểm" : "thuộc tính thiết bị");
   return out;
 }
 
@@ -173,14 +173,16 @@ export const templateFieldLabel: Record<TemplateField, string> = {
   learnerInstructions: "Hướng dẫn cho người học",
   timeLimitSeconds: "Thời gian tối đa",
   modePolicy: "Chế độ huấn luyện",
-  rubric: "Rubric chấm điểm",
+  rubric: "Tiêu chí chấm điểm (rubric)",
 };
 
 /** Spatial or runtime parts a stored template state carries that this UI neither edits nor applies. */
 export function ignoredTemplateParts(state: JsonObject): string[] {
   const out: string[] = [];
-  if (state.geometry !== undefined) out.push("ghim Geometry");
+  if (state.geometry !== undefined) out.push("ghim mô hình");
   if (Array.isArray(state.objects) && state.objects.length > 0) out.push(`${state.objects.length} đối tượng đặt trong không gian`);
-  for (const key of ["runtimeVersion", "randomSeed", "replanIntervalSeconds"]) if (state[key] !== undefined) out.push(key);
+  if (state.runtimeVersion !== undefined) out.push("phiên bản ứng dụng");
+  if (state.randomSeed !== undefined) out.push("hạt giống ngẫu nhiên");
+  if (state.replanIntervalSeconds !== undefined) out.push("chu kỳ lập lại lộ trình");
   return out;
 }

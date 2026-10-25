@@ -22,7 +22,7 @@ export function TraineeSupport() {
 
   // The hub topbar already carries the page heading.
   return <div className="ops-stack">
-    <p className="ops-muted">Gửi yêu cầu hỗ trợ, theo dõi trao đổi với đội Fire3D và góp ý về bài học hoặc ứng dụng. Chỉ bạn xem được các mục do bạn tạo.</p>
+    <p className="ops-muted">Gửi yêu cầu hỗ trợ, theo dõi trao đổi với đội FET3D và góp ý về bài học hoặc ứng dụng. Chỉ bạn xem được các mục do bạn tạo.</p>
     <SupportTabs accessToken={accessToken} myId={user.id} audience="trainee" />
   </div>;
 }

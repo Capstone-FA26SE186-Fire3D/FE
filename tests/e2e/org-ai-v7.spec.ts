@@ -87,7 +87,7 @@ test.describe("Organization AI v7 details", () => {
     await page.getByTestId("ai-mode-draft").click();
     await input(page).fill("Sơ tán tầng 2");
     await page.getByTestId("ai-send").click();
-    await expect(page.getByText(/chưa có revision mô hình sẵn sàng cho kịch bản/)).toBeVisible();
+    await expect(page.getByText(/chưa có bản IFC sẵn sàng cho kịch bản/)).toBeVisible();
     expect(mock.requests).toHaveLength(0);
     await expect(page.getByTestId("ai-unknown")).toHaveCount(0);
   });
@@ -102,8 +102,8 @@ test.describe("Admin AI v7 details", () => {
     await expect(page.getByTestId("ai-requests-table").locator("tbody tr, li.ops-dt-card")).toHaveCount(2);
     await pick(page, "Đối tượng", { value: "trainee" });
     await expect(page.getByTestId("ai-requests-table").locator("tbody tr, li.ops-dt-card")).toHaveCount(1);
-    await expect(page.getByTestId("ai-requests-table").locator("tbody tr, li.ops-dt-card")).toContainText("Hỏi đáp của Trainee");
-    await expect(page.getByTestId("ai-requests-table").locator("tbody tr, li.ops-dt-card")).toContainText("không thuộc quota tổ chức");
+    await expect(page.getByTestId("ai-requests-table").locator("tbody tr, li.ops-dt-card")).toContainText("Hỏi đáp của học viên");
+    await expect(page.getByTestId("ai-requests-table").locator("tbody tr, li.ops-dt-card")).toContainText("không tính vào hạn mức tổ chức");
     await expect.poll(() => calls(mock, "GET", "/api/admin/ai/requests").at(-1)?.search).toContain("audience=trainee");
     await pick(page, "Thao tác", { value: "Answer" });
     await expect(page.getByTestId("ai-requests-table").locator("tbody tr, li.ops-dt-card")).toHaveCount(0);
@@ -125,8 +125,8 @@ test.describe("Admin AI v7 details", () => {
     await page.getByTestId("policy-new").click();
     const form = page.getByRole("form", { name: "Tạo chính sách AI" });
     await form.getByLabel("Thao tác").click();
-    await page.getByRole("option", { name: /\(TraineeAnswer\)/ }).click();
-    await form.getByLabel("Đơn vị quota").fill("tokens");
+    await page.getByRole("option", { name: "Hỏi đáp của học viên", exact: true }).click();
+    await form.getByLabel("Đơn vị hạn mức").fill("tokens");
     await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("50");
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("2000");
     await form.getByLabel("Số nguồn tối đa").fill("5");

@@ -206,8 +206,8 @@ function processFlags(cause: unknown) {
 
 function describeProcessFailure(cause: unknown) {
   const info = cause as FailureCause;
-  if (info?.status === 409) return "IFC đã được lưu nhưng revision này không nhận thêm yêu cầu xử lý lúc này (có thể đã có job đang chạy).";
-  if (info?.status === 400 && info.code === "IDEMPOTENCY_KEY_REQUIRED") return "Yêu cầu xử lý thiếu Idempotency-Key.";
+  if (info?.status === 409) return "IFC đã được lưu nhưng bản IFC này chưa nhận thêm yêu cầu xử lý lúc này (có thể đang được xử lý).";
+  if (info?.status === 400 && info.code === "IDEMPOTENCY_KEY_REQUIRED") return "Yêu cầu xử lý chưa hợp lệ. Hãy thử lại.";
   if (cause instanceof TypeError) return "IFC đã được lưu nhưng mất kết nối khi gửi yêu cầu xử lý. Hãy thử lại.";
   return "IFC đã được lưu nhưng chưa gửi được yêu cầu xử lý. Hãy thử lại.";
 }

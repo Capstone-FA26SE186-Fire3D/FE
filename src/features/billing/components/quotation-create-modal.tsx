@@ -28,11 +28,11 @@ const NONE: string[] = [];
 type AddressState = "checking" | "ok" | "missing" | "error";
 type UpgradeState = { state: "loading" | "ok" | "none" | "error"; entitlementId?: string; effectiveLimit?: number | null };
 
-const titles: Record<CreateMode, string> = { service: "Mua mới hoặc gia hạn", upgrade: "Nâng cấp số học viên", topup: "Mua thêm quota AI (top-up)" };
+const titles: Record<CreateMode, string> = { service: "Mua mới hoặc gia hạn", upgrade: "Nâng cấp số học viên", topup: "Nạp thêm hạn mức AI" };
 const descriptions: Record<CreateMode, string> = {
   service: "Chọn công trình và gói 6 hoặc 12 tháng. Giá, giảm giá và kỳ dịch vụ do hệ thống tính ở báo giá; gia hạn mở kỳ mới.",
-  upgrade: "Tăng số học viên của kỳ đang hiệu lực. Kỳ và các suất đã dùng được giữ; phí nâng cấp một lần do PlatformAdmin ấn định ở báo giá.",
-  topup: "Quota AI trả trước dùng chung cho tổ chức. Hết quota thì phải mua thêm trước khi dùng tiếp; không tính vượt mức, không nợ.",
+  upgrade: "Tăng số học viên của kỳ đang hiệu lực. Kỳ và các suất đã dùng được giữ; phí nâng cấp một lần do quản trị FET3D ấn định ở báo giá.",
+  topup: "Hạn mức AI trả trước dùng chung cho tổ chức. Hết hạn mức thì phải nạp thêm trước khi dùng tiếp; không tính vượt mức, không nợ.",
 };
 
 /**
@@ -150,7 +150,7 @@ export function QuotationCreateModal({ open, onOpenChange, accessToken, mode, on
       reset();
       onOpenChange(false);
       onCreated(result);
-      toast.notify({ tone: "success", title: "Đã tạo báo giá nháp", description: "Giá do hệ thống tính. PlatformAdmin cần phát hành báo giá trước khi bạn chấp nhận." });
+      toast.notify({ tone: "success", title: "Đã tạo báo giá nháp", description: "Giá do hệ thống tính. Quản trị FET3D cần phát hành báo giá trước khi bạn chấp nhận." });
     } catch (cause) {
       setError({ message: billingErrorText(cause), details: cause instanceof ApiError ? cause.fieldErrors.map((item) => item.message) : [] });
     } finally {
@@ -159,8 +159,8 @@ export function QuotationCreateModal({ open, onOpenChange, accessToken, mode, on
     }
   };
 
-  const modes: Array<{ id: CreateMode; label: string }> = [{ id: "service", label: "Mua mới / gia hạn" }, { id: "upgrade", label: "Nâng cấp" }, { id: "topup", label: "Quota AI" }];
-  const submitLabel = mode === "topup" ? "Tạo báo giá top-up" : `Tạo báo giá (${picked.length})`;
+  const modes: Array<{ id: CreateMode; label: string }> = [{ id: "service", label: "Mua mới / gia hạn" }, { id: "upgrade", label: "Nâng cấp" }, { id: "topup", label: "Hạn mức AI" }];
+  const submitLabel = mode === "topup" ? "Tạo báo giá nạp thêm" : `Tạo báo giá (${picked.length})`;
 
   return <Modal open={open} onOpenChange={(next) => { if (!next && submitting) return; onOpenChange(next); }} size="lg" title={lockedBuildingId ? titles[mode] : "Tạo báo giá"} description={descriptions[mode]} data-testid="quotation-create"
     footer={<><Button variant="quiet" onClick={() => onOpenChange(false)} disabled={submitting}>Hủy</Button><Button onClick={() => void submit()} disabled={!canSubmit}>{submitting ? "Đang tạo…" : submitLabel}</Button></>}>
@@ -169,9 +169,9 @@ export function QuotationCreateModal({ open, onOpenChange, accessToken, mode, on
         {modes.map((item) => <button key={item.id} type="button" role="radio" aria-checked={mode === item.id} data-active={mode === item.id} onClick={() => { setError(null); setPackageId(""); onModeChange(item.id); }}>{item.label}</button>)}
       </div>}
 
-      {mode === "topup" ? <fieldset className="ops-fieldset"><legend>Quota AI trả trước</legend>
-        <Field label="Số lượng muốn mua" hint="Có thể để trống. Đơn vị do chính sách quota quy định; PlatformAdmin chốt số lượng, giá, khoảng hiệu lực, thuế và điều khoản khi phát hành." error={topUpInvalid ? "Nhập số nguyên dương hoặc để trống." : undefined}>{(p) => <Input {...p} inputMode="numeric" value={topUpUnits} onChange={(event) => { setTopUpUnits(event.target.value); setError(null); }} />}</Field>
-        <p className="bill-muted">Top-up chỉ cấp quota cho tổ chức, không gia hạn hay nâng cấp công trình. Chưa phát sinh thanh toán cho tới khi bạn chấp nhận báo giá đã phát hành.</p>
+      {mode === "topup" ? <fieldset className="ops-fieldset"><legend>Hạn mức AI trả trước</legend>
+        <Field label="Số lượng muốn mua" hint="Có thể để trống. Đơn vị do chính sách hạn mức quy định; quản trị FET3D chốt số lượng, giá, khoảng hiệu lực, thuế và điều khoản khi phát hành." error={topUpInvalid ? "Nhập số nguyên dương hoặc để trống." : undefined}>{(p) => <Input {...p} inputMode="numeric" value={topUpUnits} onChange={(event) => { setTopUpUnits(event.target.value); setError(null); }} />}</Field>
+        <p className="bill-muted">Nạp thêm chỉ cấp hạn mức AI cho tổ chức, không gia hạn hay nâng cấp công trình. Chưa phát sinh thanh toán cho tới khi bạn chấp nhận báo giá đã phát hành.</p>
       </fieldset> : <>
         <fieldset className="ops-fieldset"><legend>1. Công trình</legend>
           {buildings.loading && !buildings.data && <SkeletonRows rows={3} label="Đang tải công trình…" />}
@@ -202,7 +202,7 @@ export function QuotationCreateModal({ open, onOpenChange, accessToken, mode, on
         <fieldset className="ops-fieldset"><legend>2. Gói</legend>
           {packages.error !== undefined && <Alert tone="danger" title="Không tải được gói" action={<Button size="sm" variant="secondary" className="mt-3" onClick={packages.reload}>Thử lại</Button>}>{billingErrorText(packages.error)}</Alert>}
           {packages.loading && !packages.data && <SkeletonRows rows={2} label="Đang tải gói…" />}
-          {packages.data && sellable.length === 0 && <EmptyState icon={FileText} title="Chưa có gói đang bán" description="PlatformAdmin cần tạo và bật gói 6/12 tháng (đủ số học viên và quota) trong khu Thương mại. Tổ chức không tự cấu hình giá hay quota." />}
+          {packages.data && sellable.length === 0 && <EmptyState icon={FileText} title="Chưa có gói đang bán" description="Quản trị FET3D cần tạo và bật gói 6/12 tháng (đủ số học viên và hạn mức AI) trong khu Thương mại. Tổ chức không tự cấu hình giá hay hạn mức." />}
           {sellable.length > 0 && <PackagePicker packages={sellable} value={packageId} onChange={(id) => { setPackageId(id); setError(null); }} legend={mode === "upgrade" ? "Gói đích" : "Gói dịch vụ"}
             isOptionDisabled={mode === "upgrade" ? (item) => (item.learnerLimit != null && highestCurrent > 0 && item.learnerLimit <= highestCurrent ? `Không cao hơn mức hiện tại (${formatNumber(highestCurrent)} học viên).` : null) : undefined} />}
           {mode === "service" && <p className="bill-muted">Công trình đã có lịch sử thanh toán sẽ được báo giá là gia hạn kỳ mới; chưa có thì là mua mới. Hệ thống kiểm lại khi tạo.</p>}

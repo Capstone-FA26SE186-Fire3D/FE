@@ -34,19 +34,19 @@ export const provisioningLabels: Record<string, Label> = {
   Succeeded: { label: "Đã kích hoạt", tone: "success" },
 };
 
-export const purposeLabels: Record<string, string> = { BuildingService: "Dịch vụ công trình", AIQuotaTopUp: "Top-up quota AI" };
-export const purposeLabel = (purpose: QuotationPurpose | string | undefined) => purposeLabels[purpose ?? "BuildingService"] ?? String(purpose);
+export const purposeLabels: Record<string, string> = { BuildingService: "Dịch vụ công trình", AIQuotaTopUp: "Nạp thêm hạn mức AI" };
+export const purposeLabel = (purpose: QuotationPurpose | string | undefined) => purposeLabels[purpose ?? "BuildingService"] ?? "Khác";
 
 function badge(map: Record<string, Label>, value: string | null | undefined, prefix: string, empty: string) {
   if (!value) return <StatusBadge tone="neutral">{prefix}: {empty}</StatusBadge>;
-  const item = map[value] ?? { label: value, tone: "neutral" as Tone };
+  const item = map[value] ?? { label: "Không rõ", tone: "neutral" as Tone };
   return <StatusBadge tone={item.tone}>{prefix}: {item.label}</StatusBadge>;
 }
 
 /** The three states stay separate on purpose: checkout (link) / payment (money) / provisioning (service granted). */
 export function PaymentStateBadges({ item, className }: { item: Pick<PayosLedgerItem, "checkoutStatus" | "paymentStatus" | "provisioningStatus">; className?: string }) {
   return <span className={className ?? "bill-states"} data-testid="payment-states">
-    {badge(checkoutLabels, item.checkoutStatus, "Checkout", "—")}
+    {badge(checkoutLabels, item.checkoutStatus, "Liên kết", "—")}
     {badge(paymentLabels, item.paymentStatus, "Thanh toán", "chưa có")}
     {badge(provisioningLabels, item.provisioningStatus, "Kích hoạt", "—")}
   </span>;

@@ -34,7 +34,7 @@ function CreateSituationModal({ accessToken, onClose, onCreated }: { accessToken
   const [submitted, setSubmitted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<LearnErrorView | null>(null);
-  const slugProblem = !slug ? "Nhập slug." : slug.length > 120 ? "Slug tối đa 120 ký tự." : !SLUG_PATTERN.test(slug) ? "Slug chỉ gồm chữ thường không dấu, số và dấu gạch ngang." : error?.code === "SLUG_EXISTS" ? "Đã có tình huống dùng slug này. Chọn một slug khác." : undefined;
+  const slugProblem = !slug ? "Nhập đường dẫn rút gọn." : slug.length > 120 ? "Đường dẫn rút gọn tối đa 120 ký tự." : !SLUG_PATTERN.test(slug) ? "Đường dẫn rút gọn chỉ gồm chữ thường không dấu, số và dấu gạch ngang." : error?.code === "SLUG_EXISTS" ? "Đã có tình huống dùng đường dẫn rút gọn này. Chọn đường dẫn khác." : undefined;
   const nameProblem = !name.trim() ? "Nhập tên tình huống." : name.trim().length > 255 ? "Tên tối đa 255 ký tự." : undefined;
 
   const submit = async () => {
@@ -57,11 +57,11 @@ function CreateSituationModal({ accessToken, onClose, onCreated }: { accessToken
     }
   };
 
-  return <Modal open onOpenChange={(open) => { if (!open && !busy) onClose(); }} title="Tạo tình huống" description="Một tình huống dùng để lọc bài công khai và gắn vào phiên bản bài. API chưa có sửa hay ngừng dùng tình huống."
+  return <Modal open onOpenChange={(open) => { if (!open && !busy) onClose(); }} title="Tạo tình huống" description="Tình huống dùng để lọc bài công khai và gắn vào phiên bản bài. Hiện chưa sửa hay ngừng dùng được tình huống sau khi tạo."
     footer={<><Button type="button" variant="quiet" disabled={busy} onClick={onClose}>Hủy</Button><SubmitButton type="submit" form={formId} state={busy ? "busy" : "idle"}><Plus size={16} aria-hidden="true" />{busy ? "Đang tạo…" : error?.kind === "retry" ? "Thử lại" : "Tạo tình huống"}</SubmitButton></>}>
     <form id={formId} className="ops-stack" onSubmit={(event) => { event.preventDefault(); void submit(); }} noValidate>
       <Field label="Tên tình huống" required error={submitted ? nameProblem : undefined}>{(p) => <Input {...p} maxLength={255} value={name} onChange={(event) => setName(event.target.value)} />}</Field>
-      <Field label="Slug" required hint="Dùng trong bộ lọc công khai (?situation=slug). Không đổi được sau khi tạo." error={submitted || error?.code === "SLUG_EXISTS" ? slugProblem : undefined}>{(p) => <Input {...p} maxLength={120} value={slug} onChange={(event) => { setSlug(event.target.value.toLowerCase()); if (error?.code === "SLUG_EXISTS") setError(null); }} />}</Field>
+      <Field label="Đường dẫn rút gọn" required hint="Dùng trong bộ lọc ở trang bài học công khai. Không đổi được sau khi tạo." error={submitted || error?.code === "SLUG_EXISTS" ? slugProblem : undefined}>{(p) => <Input {...p} maxLength={120} value={slug} onChange={(event) => { setSlug(event.target.value.toLowerCase()); if (error?.code === "SLUG_EXISTS") setError(null); }} />}</Field>
       <Field label="Mô tả (không bắt buộc)">{(p) => <Textarea {...p} rows={3} value={description} onChange={(event) => setDescription(event.target.value)} />}</Field>
       {error && error.code !== "SLUG_EXISTS" && <Alert tone="danger" title={error.title}>{error.message}</Alert>}
     </form>
@@ -82,7 +82,7 @@ export function SituationsTab({ accessToken }: { accessToken: string }) {
 
   const columns: DataColumn<AdminSituation>[] = [
     { key: "name", header: "Tình huống", primary: true, render: (item) => <CellTitle title={item.name} sub={item.description ?? undefined} /> },
-    { key: "slug", header: "Slug", width: 220, render: (item) => <code className="ops-mono">{item.slug}</code> },
+    { key: "slug", header: "Đường dẫn rút gọn", width: 220, render: (item) => <code className="ops-mono">{item.slug}</code> },
     { key: "active", header: "Trạng thái", width: 160, render: (item) => <StatusBadge tone={item.isActive ? "success" : "neutral"}>{item.isActive ? "Đang hoạt động" : "Ngừng dùng"}</StatusBadge> },
     { key: "updated", header: "Cập nhật", width: 170, hideBelow: 900, render: (item) => formatDateTime(item.updatedAt) },
   ];
@@ -90,7 +90,7 @@ export function SituationsTab({ accessToken }: { accessToken: string }) {
   return <>
     {list.error !== undefined && <Alert tone="danger" className="mb-4" title="Không tải được danh sách tình huống" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{describeLearnError(list.error).message}</Alert>}
     <DataTable
-      caption="Danh mục tình huống Learn"
+      caption="Danh mục tình huống bài học"
       data-testid="learn-situations-table"
       columns={columns}
       rows={items}
@@ -98,7 +98,7 @@ export function SituationsTab({ accessToken }: { accessToken: string }) {
       loading={list.loading && !list.data}
       rowTone={(item) => (item.isActive ? undefined : "muted")}
       toolbar={<>
-        <TableSearch value={search} onChange={setSearch} label="Tìm tình huống" placeholder="Tên hoặc slug" />
+        <TableSearch value={search} onChange={setSearch} label="Tìm tình huống" placeholder="Tên hoặc đường dẫn rút gọn" />
         <FilterChips label="Bộ lọc tình huống">
           <FilterChip label="Trạng thái" value={active} onChange={(value) => setParams({ active: value })} options={ACTIVE_OPTIONS} allLabel="mọi trạng thái" />
         </FilterChips>

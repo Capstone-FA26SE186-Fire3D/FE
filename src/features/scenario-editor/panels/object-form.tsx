@@ -54,7 +54,7 @@ export function ObjectForm({ draft, selection, issues, actions }: { draft: JsonO
             onCommit={(value) => { if (value !== undefined) actions.setCoordinate(kind, index, axis, value); }} />
         ))}
       </div>
-      <p className="ops-field-hint">Bản nháp cũ không khai báo đơn vị xoay; editor giả định {ROTATION_UNIT === "degrees" ? "độ" : "radian"} quanh trục đứng. Bản nháp theo fet3d.editor/1 dùng quaternion đơn vị.</p>
+      <p className="ops-field-hint">Bản nháp cũ không ghi đơn vị góc xoay; trình soạn hiểu là {ROTATION_UNIT === "degrees" ? "độ" : "radian"} quanh trục đứng. Bản nháp soạn trên mô hình 3D lưu góc xoay đầy đủ hơn.</p>
     </fieldset>
 
     {hazard && <fieldset className="ops-fieldset">
@@ -67,8 +67,8 @@ export function ObjectForm({ draft, selection, issues, actions }: { draft: JsonO
         </Select>}
       </Field>
       <div className="se-coord-grid">
-        <NumberField label="Cường độ" hint="Số không âm; thang đo do runtime quy định." data-testid="hazard-intensity" value={typeof (draft.hazards as Array<Record<string, unknown>>)[index]?.intensity === "number" ? hazard.intensity : undefined} error={issueMessage(issues, `$.hazards[${index}].intensity`)} onCommit={(value) => actions.setField(["hazards", index, "intensity"], value, "Đổi cường độ")} />
-        <NumberField label="Kích hoạt sau" unit="giây" hint="Thời điểm nguy cơ xuất hiện (activationTime)." data-testid="hazard-activation" value={typeof (draft.hazards as Array<Record<string, unknown>>)[index]?.activationTime === "number" ? hazard.activationTime : undefined} error={issueMessage(issues, `$.hazards[${index}].activationTime`)} onCommit={(value) => actions.setField(["hazards", index, "activationTime"], value, "Đổi thời điểm kích hoạt")} />
+        <NumberField label="Cường độ" hint="Số không âm; thang đo do ứng dụng quy định." data-testid="hazard-intensity" value={typeof (draft.hazards as Array<Record<string, unknown>>)[index]?.intensity === "number" ? hazard.intensity : undefined} error={issueMessage(issues, `$.hazards[${index}].intensity`)} onCommit={(value) => actions.setField(["hazards", index, "intensity"], value, "Đổi cường độ")} />
+        <NumberField label="Kích hoạt sau" unit="giây" hint="Thời điểm nguy cơ xuất hiện." data-testid="hazard-activation" value={typeof (draft.hazards as Array<Record<string, unknown>>)[index]?.activationTime === "number" ? hazard.activationTime : undefined} error={issueMessage(issues, `$.hazards[${index}].activationTime`)} onCommit={(value) => actions.setField(["hazards", index, "activationTime"], value, "Đổi thời điểm kích hoạt")} />
       </div>
     </fieldset>}
   </div>;

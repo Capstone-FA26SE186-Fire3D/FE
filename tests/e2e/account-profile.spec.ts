@@ -153,7 +153,7 @@ test("changing a password ends the current local session", async ({ page }) => {
   await page.getByRole("button", { name: "Đổi mật khẩu" }).click();
 
   await expect.poll(() => changePasswordPayload).toEqual({ currentPassword: "old-password", newPassword: "new-password" });
-  await expect(page.getByRole("heading", { name: "Đăng nhập Fire3D" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Đăng nhập FET3D" })).toBeVisible();
 });
 
 test("avatar upload creates an intent, sends the image to storage, then completes with the current profile ETag", async ({ page }) => {

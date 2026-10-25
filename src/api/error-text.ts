@@ -102,6 +102,21 @@ const FIELD_TEXT: Record<string, string> = {
   address: "Địa chỉ chưa hợp lệ.",
   label: "Nhãn chưa hợp lệ.",
   reason: "Lý do chưa hợp lệ.",
+  title: "Tiêu đề chưa hợp lệ.",
+  slug: "Đường dẫn rút gọn chưa hợp lệ.",
+  url: "Đường dẫn chưa hợp lệ.",
+  question: "Câu hỏi chưa hợp lệ. Chỉ dùng văn bản thuần.",
+  description: "Mô tả chưa hợp lệ.",
+  learnerlimit: "Số học viên chưa hợp lệ.",
+  durationmonths: "Thời hạn chỉ có thể là 6 hoặc 12 tháng.",
+  aipolicyversionid: "Hãy chọn phiên bản chính sách AI.",
+  quotaunit: "Đơn vị hạn mức chưa hợp lệ.",
+  dailyunits: "Hạn mức mỗi ngày chưa hợp lệ.",
+  reserveunits: "Mức giữ chỗ chưa hợp lệ.",
+  unitprice: "Đơn giá chưa hợp lệ.",
+  effectivefrom: "Thời điểm bắt đầu chưa hợp lệ.",
+  effectiveuntil: "Thời điểm kết thúc chưa hợp lệ.",
+  versionlabel: "Nhãn bản IFC chưa hợp lệ.",
 };
 
 export function statusText(status: number, retryAfterSeconds?: number): string | undefined {

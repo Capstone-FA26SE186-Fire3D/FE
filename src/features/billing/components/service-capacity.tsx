@@ -19,13 +19,13 @@ const statusLabel: Record<string, string> = { Active: "Đang hoạt động", Tr
 /** Seat usage as the BE reports it: distinct Trainees with a first online start in this period. */
 function Seats({ view }: { view: ServiceEntitlementView }) {
   const limit = view.effectiveLearnerLimit;
-  if (limit === null) return <p className="bill-muted">Kỳ này không đặt giới hạn học viên (dịch vụ cũ trước v7). Đã dùng {formatNumber(view.seatsUsed)} suất.</p>;
+  if (limit === null) return <p className="bill-muted">Kỳ này không đặt giới hạn học viên (dịch vụ theo gói cũ). Đã dùng {formatNumber(view.seatsUsed)} suất.</p>;
   const percent = limit > 0 ? Math.min(100, Math.round((view.seatsUsed / limit) * 100)) : 100;
   const full = view.seatsRemaining !== null && view.seatsRemaining <= 0;
   return <div className="ops-stack" style={{ gap: 8 }}>
     <div className="bill-row"><span className="ops-field-label"><Users size={14} aria-hidden="true" style={{ verticalAlign: "-2px", marginRight: 6 }} />Suất học viên của kỳ</span><span data-testid="seat-count" className="bill-dim">Đã dùng {formatNumber(view.seatsUsed)} / {formatNumber(limit)} · còn {formatNumber(view.seatsRemaining)}</span></div>
     <div className="bill-meter" role="img" aria-label={`Đã dùng ${view.seatsUsed} trên ${limit} suất`}><span style={{ width: `${percent}%` }} /></div>
-    {full && <Alert tone="warning" title="Đã hết suất học viên">Học viên mới không thể bắt đầu phiên online ở công trình này; học viên đã được tính vẫn tiếp tục nếu dịch vụ còn hiệu lực. Nâng cấp để tăng số học viên (kỳ và suất đã dùng được giữ).</Alert>}
+    {full && <Alert tone="warning" title="Đã hết suất học viên">Học viên mới không thể bắt đầu học trực tuyến ở công trình này; học viên đã được tính vẫn tiếp tục nếu dịch vụ còn hiệu lực. Nâng cấp để tăng số học viên (kỳ và suất đã dùng được giữ).</Alert>}
   </div>;
 }
 
@@ -36,7 +36,7 @@ function PeriodCard({ view, kind }: { view: ServiceEntitlementView; kind: "curre
       <div><p className="ops-field-label" style={{ margin: 0 }}>{kind === "current" ? "Kỳ hiện tại" : "Kỳ sắp tới"}</p><strong>{formatDate(view.startsAt)} – {formatDate(view.endsAt)}</strong></div>
       <div className="ops-actions">
         <StatusBadge tone={view.isEffective ? "success" : "neutral"}>{view.isEffective ? "Đang hiệu lực" : kind === "upcoming" ? "Chưa đến kỳ" : "Không hiệu lực"}</StatusBadge>
-        <StatusBadge tone="neutral">{statusLabel[view.status] ?? view.status}</StatusBadge>
+        <StatusBadge tone="neutral">{statusLabel[view.status] ?? "Không rõ"}</StatusBadge>
       </div>
     </div>
     {kind === "current" && view.isEffective && days !== null && <p className="bill-dim" style={{ margin: 0 }}>Còn {Math.max(days, 0)} ngày</p>}
@@ -46,7 +46,7 @@ function PeriodCard({ view, kind }: { view: ServiceEntitlementView; kind: "curre
     </div>
     {kind === "current" && <Seats view={view} />}
     {view.upgrades.length > 0 && <Table className="bill-table" caption="Lịch sử nâng cấp của kỳ">
-      <thead><tr><th>Hiệu lực từ</th><th className="bill-money">Từ</th><th className="bill-money">Lên</th><th className="bill-money">Quota AI kèm</th></tr></thead>
+      <thead><tr><th>Hiệu lực từ</th><th className="bill-money">Từ</th><th className="bill-money">Lên</th><th className="bill-money">Hạn mức AI kèm</th></tr></thead>
       <tbody>{view.upgrades.map((item) => <tr key={item.id}><td>{formatDateTime(item.effectiveFrom)}</td><td className="bill-money">{formatNumber(item.previousLearnerLimit)}</td><td className="bill-money">{formatNumber(item.learnerLimit)}</td><td className="bill-money">{formatNumber(item.additionalQuotaUnits)}</td></tr>)}</tbody>
     </Table>}
   </div>;
@@ -71,7 +71,7 @@ export function ServiceCapacity({ accessToken, buildingId, refreshKey = 0, onLoa
   });
   const data = query.data;
   return <div className="ops-stack" data-testid="service-capacity">
-    <div className="bill-row"><p className="bill-muted">Số liệu do máy chủ tính tại thời điểm {data ? formatDateTime(data.asOf) : "đọc"}; không suy từ ngày.</p><Button size="sm" variant="quiet" onClick={query.reload} disabled={query.loading}><RefreshCw size={14} aria-hidden="true" />Tải lại</Button></div>
+    <div className="bill-row"><p className="bill-muted">Số liệu do hệ thống tính {data ? `lúc ${formatDateTime(data.asOf)}` : "khi tải"}.</p><Button size="sm" variant="quiet" onClick={query.reload} disabled={query.loading}><RefreshCw size={14} aria-hidden="true" />Tải lại</Button></div>
     {query.error !== undefined && <Alert tone="danger" title="Không tải được dịch vụ của công trình" action={<Button size="sm" variant="secondary" className="mt-3" onClick={query.reload}>Thử lại</Button>}>{billingErrorText(query.error)}</Alert>}
     {query.loading && !data && <div role="status" aria-live="polite"><span style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0 0 0 0)" }}>Đang tải dịch vụ…</span><Skeleton style={{ height: 140 }} /></div>}
     {data && !data.current && data.upcoming.length === 0 && <EmptyState icon={CalendarClock} title="Công trình chưa có kỳ dịch vụ đã trả tiền" description="Tạo báo giá để mua gói đầu tiên. Dùng thử không có suất học viên." />}

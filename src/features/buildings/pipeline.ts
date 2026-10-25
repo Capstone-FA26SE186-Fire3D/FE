@@ -27,13 +27,13 @@ export function isTerminalJob(status: string | undefined | null) {
 
 export function jobLabel(status: string | undefined | null): { label: string; tone: Tone } {
   switch (status) {
-    case "Queued": return { label: "Đang chờ worker", tone: "pending" };
+    case "Queued": return { label: "Đang chờ máy xử lý", tone: "pending" };
     case "Running": return { label: "Đang xử lý", tone: "pending" };
     // Deliberately not "Hoàn thành/Đạt": the job finishing says nothing about QA.
-    case "Succeeded": return { label: "Worker chạy xong", tone: "info" };
+    case "Succeeded": return { label: "Đã xử lý xong", tone: "info" };
     case "Failed": return { label: "Xử lý thất bại", tone: "danger" };
     case "Cancelled": return { label: "Đã hủy", tone: "neutral" };
-    default: return { label: status ?? "Chưa xử lý", tone: "neutral" };
+    default: return { label: status ? "Không rõ trạng thái" : "Chưa xử lý", tone: "neutral" };
   }
 }
 
@@ -44,11 +44,11 @@ export function revisionLabel(status: string | undefined | null): { label: strin
     case "Processing": return { label: "Đang xử lý", tone: "pending" };
     case "NeedsFix": return { label: "Cần sửa mô hình", tone: "warning" };
     case "ReadyForScenario": return { label: "Sẵn sàng soạn kịch bản", tone: "success" };
-    case "ConfirmedForTraining": return { label: "Đã xác nhận kỹ thuật", tone: "success" };
+    case "ConfirmedForTraining": return { label: "Đã xác nhận dùng cho huấn luyện", tone: "success" };
     case "Rejected": return { label: "Bị từ chối", tone: "danger" };
     case "Failed": return { label: "Xử lý thất bại", tone: "danger" };
     case "Superseded": return { label: "Đã được thay thế", tone: "neutral" };
-    default: return { label: status ?? "Không rõ", tone: "neutral" };
+    default: return { label: "Không rõ trạng thái", tone: "neutral" };
   }
 }
 
@@ -60,7 +60,7 @@ export function severityLabel(severity: string): { label: string; tone: Tone } {
     case "Error": return { label: "Lỗi", tone: "danger" };
     case "Warning": return { label: "Cảnh báo", tone: "warning" };
     case "Info": return { label: "Thông tin", tone: "info" };
-    default: return { label: severity, tone: "neutral" };
+    default: return { label: "Khác", tone: "neutral" };
   }
 }
 
@@ -99,31 +99,31 @@ function runOutcome(run: ValidationRun): string | undefined {
  */
 export function deriveQaVerdict(pipeline: RevisionPipeline, currentIssues: Array<Pick<RevisionIssue, "severity">> | undefined): QaVerdict {
   const { job, qa } = pipeline;
-  if (!job) return { state: "none", label: "Chưa có QA", detail: "Revision này chưa được xử lý nên chưa có kết quả kiểm tra.", tone: "neutral" };
+  if (!job) return { state: "none", label: "Chưa kiểm tra", detail: "Bản IFC này chưa được xử lý nên chưa có kết quả kiểm tra tự động.", tone: "neutral" };
   if (job.status === "Queued" || job.status === "Running") {
-    return { state: "pending", label: "Đang chờ kết quả QA", detail: "Worker đang xử lý; kết quả QA chỉ có sau khi lần chạy này kết thúc.", tone: "pending" };
+    return { state: "pending", label: "Đang chờ kết quả kiểm tra", detail: "Mô hình đang được xử lý; kết quả kiểm tra tự động chỉ có sau khi lượt xử lý này xong.", tone: "pending" };
   }
   if (job.status === "Failed" || job.status === "Cancelled") {
-    return { state: "unavailable", label: "Không có kết quả QA", detail: "Lần xử lý này không hoàn tất nên không có kết quả QA hợp lệ.", tone: "danger" };
+    return { state: "unavailable", label: "Không có kết quả kiểm tra", detail: "Lượt xử lý này không hoàn tất nên không có kết quả kiểm tra.", tone: "danger" };
   }
   if (pipeline.qaError !== undefined) {
-    return { state: "unavailable", label: "Không tải được kết quả QA", detail: "Máy chủ không trả kết quả QA của lần chạy hiện hành. Chưa thể coi là đạt; hãy tải lại.", tone: "danger" };
+    return { state: "unavailable", label: "Không tải được kết quả kiểm tra", detail: "Chưa lấy được kết quả kiểm tra của lượt xử lý mới nhất nên chưa thể coi là đạt. Hãy tải lại trang.", tone: "danger" };
   }
 
   const runs = qa?.validationRuns.items ?? [];
   if (runs.length === 0) {
-    return { state: "unavailable", label: "Chưa có kết quả QA", detail: "Worker đã chạy xong nhưng API chưa trả validation run cho lần chạy hiện hành. Chưa thể coi là đạt.", tone: "warning" };
+    return { state: "unavailable", label: "Chưa có kết quả kiểm tra", detail: "Mô hình đã xử lý xong nhưng hệ thống chưa có kết quả kiểm tra tự động. Chưa thể coi là đạt.", tone: "warning" };
   }
 
   const blocking = (currentIssues ?? []).filter((issue) => issue.severity === "Error" || issue.severity === "Critical").length;
   const outcomes = runs.map(runOutcome);
   if (outcomes.some((outcome) => outcome === "Failed") || blocking > 0) {
-    return { state: "failed", label: "QA không đạt", detail: blocking > 0 ? `Có ${blocking} issue mức Error/Critical cần xử lý trước khi dùng mô hình.` : "Validator báo kết quả Failed.", tone: "danger" };
+    return { state: "failed", label: "Kiểm tra không đạt", detail: blocking > 0 ? `Có ${blocking} lỗi nghiêm trọng cần xử lý trước khi dùng mô hình.` : "Lần kiểm tra tự động báo mô hình không đạt.", tone: "danger" };
   }
   if (outcomes.every((outcome) => outcome === "Passed")) {
-    return { state: "passed", label: "QA đạt", detail: "Validation run hiện hành báo Passed và không còn issue Error/Critical.", tone: "success" };
+    return { state: "passed", label: "Kiểm tra đạt", detail: "Lần kiểm tra tự động mới nhất đạt và không còn lỗi nghiêm trọng.", tone: "success" };
   }
-  return { state: "unknown", label: `QA: ${runs[0].status}`, detail: "Validator chưa trả kết quả Passed/Failed rõ ràng.", tone: "warning" };
+  return { state: "unknown", label: "Chưa rõ kết quả kiểm tra", detail: "Lần kiểm tra tự động chưa cho biết rõ mô hình đạt hay không đạt.", tone: "warning" };
 }
 
 /** The run to cite when confirming readiness: newest Passed run of the current attempt. */
@@ -145,6 +145,21 @@ const STEP_LABELS: Record<string, string> = {
 
 export function processingStepLabel(step: string) {
   return STEP_LABELS[step] ?? step;
+}
+
+/** Kind of a processing job (`Geometry` for IFC, package builds otherwise). */
+export function jobKindLabel(kind: string | undefined | null) {
+  if (kind === "Geometry") return "Dựng mô hình 3D";
+  if (kind === "Package" || kind === "PackageBuild") return "Dựng gói";
+  return "Xử lý";
+}
+
+/** Result of one automatic check (validation run). */
+export function runStatusLabel(status: string | undefined | null): { label: string; tone: Tone } {
+  if (status === "Passed") return { label: "Đạt", tone: "success" };
+  if (status === "Failed") return { label: "Không đạt", tone: "danger" };
+  if (status === "Running" || status === "Pending" || status === "Queued") return { label: "Đang kiểm tra", tone: "pending" };
+  return { label: "Chưa rõ", tone: "warning" };
 }
 
 export type StepState = "todo" | "active" | "done" | "error" | "skipped";
@@ -181,7 +196,7 @@ export function derivePipelineProgress({ revision, pipeline, currentIssues, load
   const exitRequired = issues.some((issue) => issue.issueCode === EXIT_UNKNOWN);
   const verdict = deriveQaVerdict(pipeline, currentIssues);
   const ready = status === "ReadyForScenario" || status === "ConfirmedForTraining";
-  const attemptText = attempt ? `lần chạy #${attempt.attemptNumber}` : "";
+  const attemptText = attempt ? `lượt xử lý thứ ${attempt.attemptNumber}` : "";
   const log = job?.status === "Running" ? pipeline.latestLog : null;
 
   const upload: PipelineStep = source
@@ -191,32 +206,32 @@ export function derivePipelineProgress({ revision, pipeline, currentIssues, load
   let quarantineStep: PipelineStep = { id: "quarantine", label: "Kiểm tra tệp", state: "todo", detail: "" };
   if (quarantine === "Rejected") quarantineStep = { ...quarantineStep, state: "error", detail: "Tệp bị từ chối" };
   else if (quarantine === "Accepted") quarantineStep = { ...quarantineStep, state: "done", detail: "Tệp được chấp nhận" };
-  else if (source && job) quarantineStep = { ...quarantineStep, state: "skipped", detail: "Chưa có kết quả quét (Pending), không chặn xử lý" };
+  else if (source && job) quarantineStep = { ...quarantineStep, state: "skipped", detail: "Chưa có kết quả kiểm tra tệp, không ảnh hưởng việc xử lý" };
   else if (source) quarantineStep = { ...quarantineStep, state: "active", detail: "Đang chờ kiểm tra tệp" };
 
-  let geometry: PipelineStep = { id: "geometry", label: "Dựng hình học", state: "todo", detail: source && quarantine !== "Rejected" && !job ? "Chưa chạy xử lý" : "" };
-  if (job?.status === "Queued") geometry = { ...geometry, state: "active", detail: attempt ? `Đang chờ worker · ${attemptText}` : "Đang chờ worker nhận job" };
+  let geometry: PipelineStep = { id: "geometry", label: "Dựng mô hình 3D", state: "todo", detail: source && quarantine !== "Rejected" && !job ? "Chưa chạy xử lý" : "" };
+  if (job?.status === "Queued") geometry = { ...geometry, state: "active", detail: attempt ? `Đang chờ máy xử lý · ${attemptText}` : "Đang chờ máy xử lý nhận tệp" };
   else if (job?.status === "Running") geometry = { ...geometry, state: "active", detail: ["Đang xử lý", attemptText, log ? `bước ${processingStepLabel(log.step)}` : ""].filter(Boolean).join(" · ") };
   else if (job?.status === "Succeeded") geometry = { ...geometry, state: "done", detail: attemptText };
-  else if (job?.status === "Failed") geometry = { ...geometry, state: "error", detail: attemptText ? `Thất bại ở ${attemptText}` : "Job thất bại" };
+  else if (job?.status === "Failed") geometry = { ...geometry, state: "error", detail: attemptText ? `Lỗi ở ${attemptText}` : "Xử lý bị lỗi" };
   else if (job?.status === "Cancelled") geometry = { ...geometry, state: "error", detail: "Đã hủy" };
 
-  let qa: PipelineStep = { id: "qa", label: "Kiểm tra QA", state: "todo", detail: "" };
+  let qa: PipelineStep = { id: "qa", label: "Kiểm tra tự động", state: "todo", detail: "" };
   if (job?.status === "Succeeded") {
     const countText = `${errors} lỗi · ${warnings} cảnh báo`;
     if (verdict.state === "failed") qa = { ...qa, state: "error", detail: countText };
     else if (verdict.state === "passed" || ready) qa = { ...qa, state: "done", detail: countText };
     else if (pipeline.qaError !== undefined) qa = { ...qa, state: "error", detail: "Lỗi tải kết quả" };
-    else qa = { ...qa, state: "active", detail: "Chờ validation run" };
-  } else if (job?.status === "Failed" || job?.status === "Cancelled") qa = { ...qa, detail: "Không có kết quả QA" };
+    else qa = { ...qa, state: "active", detail: "Đang chờ kết quả kiểm tra" };
+  } else if (job?.status === "Failed" || job?.status === "Cancelled") qa = { ...qa, detail: "Không có kết quả kiểm tra" };
 
   const steps: PipelineStep[] = [upload, quarantineStep, geometry, qa];
   if (exitRequired) {
     const exitState: StepState = ready ? "done" : status === "NeedsFix" && verdict.state !== "failed" ? "error" : "todo";
     steps.push({ id: "exit", label: "Xác nhận cửa thoát", state: exitState, detail: ready ? "Đã chọn cửa thoát" : exitState === "error" ? "Cần chọn một cửa làm lối thoát" : "" });
   }
-  let readyStep: PipelineStep = { id: "ready", label: "Sẵn sàng soạn kịch bản", state: ready ? "done" : "todo", detail: status === "ConfirmedForTraining" ? "Đã xác nhận kỹ thuật" : ready ? "Có thể soạn kịch bản" : "" };
-  if (status === "Rejected") readyStep = { ...readyStep, state: "error", detail: "Revision bị từ chối" };
+  let readyStep: PipelineStep = { id: "ready", label: "Sẵn sàng soạn kịch bản", state: ready ? "done" : "todo", detail: status === "ConfirmedForTraining" ? "Đã xác nhận dùng cho huấn luyện" : ready ? "Có thể soạn kịch bản" : "" };
+  if (status === "Rejected") readyStep = { ...readyStep, state: "error", detail: "Bản IFC bị từ chối" };
   if (status === "Superseded") readyStep = { ...readyStep, state: "skipped", detail: "Đã được thay thế" };
   steps.push(readyStep);
 
@@ -224,42 +239,42 @@ export function derivePipelineProgress({ revision, pipeline, currentIssues, load
 
   function nextAction(): PipelineNext {
     if (status === "Superseded") {
-      return { tone: "warning", title: "Revision đã được thay thế", guidance: "Một revision mới hơn đã thay revision này. Xem tiến trình và soạn kịch bản trên revision mới nhất.", actions: hasNewerRevision ? ["latest"] : [] };
+      return { tone: "warning", title: "Bản IFC đã được thay thế", guidance: "Đã có bản IFC mới hơn thay cho bản này. Xem tiến trình và soạn kịch bản trên bản IFC mới nhất.", actions: hasNewerRevision ? ["latest"] : [] };
     }
     if (status === "Rejected") {
-      return { tone: "danger", title: "Revision bị từ chối", guidance: "Revision này không dùng được để soạn kịch bản. Sửa mô hình trong phần mềm thiết kế rồi tải lên tệp IFC mới (tạo revision mới).", actions: ["upload"] };
+      return { tone: "danger", title: "Bản IFC bị từ chối", guidance: "Bản IFC này không dùng được để soạn kịch bản. Sửa mô hình trong phần mềm thiết kế rồi tải lên tệp IFC mới.", actions: ["upload"] };
     }
     if (quarantine === "Rejected") {
-      return { tone: "danger", title: "Tệp IFC bị từ chối khi kiểm tra", guidance: "Máy chủ không chấp nhận tệp này nên không xử lý. Kiểm tra lại tệp xuất từ phần mềm thiết kế rồi tải lên tệp IFC mới.", actions: ["upload"] };
+      return { tone: "danger", title: "Tệp IFC bị từ chối khi kiểm tra", guidance: "Hệ thống không chấp nhận tệp này nên không xử lý. Kiểm tra lại tệp xuất từ phần mềm thiết kế rồi tải lên tệp IFC mới.", actions: ["upload"] };
     }
-    if (!source) return { tone: "info", title: "Chưa hoàn tất tải lên", guidance: "Revision chưa có tệp IFC đã xác nhận. Bấm “Tải IFC” để tải tệp lên.", actions: ["upload"] };
+    if (!source) return { tone: "info", title: "Chưa hoàn tất tải lên", guidance: "Bản IFC này chưa có tệp tải lên hoàn chỉnh. Bấm “Tải IFC” để tải tệp lên.", actions: ["upload"] };
     if (!loaded) return { tone: "info", title: "Đang tải trạng thái xử lý…", guidance: "", actions: [] };
     if (job?.status === "Failed") {
-      return { tone: "danger", title: "Xử lý IFC thất bại", guidance: `Worker không dựng được hình học${attemptText ? ` ở ${attemptText}` : ""}. Chạy lại job (cần nhập lý do); nếu lỗi lặp lại, kiểm tra tệp rồi tải lên IFC mới.`, actions: ["retry", "upload"] };
+      return { tone: "danger", title: "Xử lý IFC thất bại", guidance: `Máy xử lý không dựng được mô hình 3D${attemptText ? ` ở ${attemptText}` : ""}. Bấm chạy lại (cần nhập lý do); nếu vẫn lỗi, kiểm tra tệp rồi tải lên IFC mới.`, actions: ["retry", "upload"] };
     }
-    if (job?.status === "Cancelled") return { tone: "danger", title: "Job xử lý đã bị hủy", guidance: "Chỉ job thất bại mới chạy lại được. Tải lên IFC mới để xử lý lại.", actions: ["upload"] };
-    if (status === "Failed") return { tone: "danger", title: "Xử lý thất bại", guidance: "Revision ở trạng thái thất bại và không chạy lại được. Tải lên IFC mới.", actions: ["upload"] };
+    if (job?.status === "Cancelled") return { tone: "danger", title: "Lượt xử lý đã bị hủy", guidance: "Chỉ lượt xử lý bị lỗi mới chạy lại được. Tải lên IFC mới để xử lý lại.", actions: ["upload"] };
+    if (status === "Failed") return { tone: "danger", title: "Xử lý thất bại", guidance: "Bản IFC này bị lỗi khi xử lý và không chạy lại được. Tải lên IFC mới.", actions: ["upload"] };
     if (!job) {
       return isUnsettledRevision(status)
-        ? { tone: "info", title: "Chưa chạy xử lý IFC", guidance: "Tệp đã tải lên nhưng chưa có job xử lý. Chạy xử lý để dựng hình học và kiểm tra QA.", actions: ["process"] }
-        : { tone: "info", title: revisionLabel(status).label, guidance: "Revision này chưa có job xử lý.", actions: [] };
+        ? { tone: "info", title: "Chưa chạy xử lý IFC", guidance: "Tệp đã tải lên nhưng chưa được xử lý. Bấm chạy xử lý để dựng mô hình 3D và kiểm tra tự động.", actions: ["process"] }
+        : { tone: "info", title: revisionLabel(status).label, guidance: "Bản IFC này chưa được xử lý.", actions: [] };
     }
     if (job.status === "Queued" || job.status === "Running") {
-      return { tone: "info", title: "Đang dựng hình học", guidance: "Worker đang xử lý; trang tự cập nhật, bạn không cần thao tác. Kết quả QA có sau khi lần chạy kết thúc.", actions: [] };
+      return { tone: "info", title: "Đang dựng mô hình 3D", guidance: "Máy xử lý đang làm việc; trang tự cập nhật, bạn không cần thao tác. Kết quả kiểm tra có sau khi xử lý xong.", actions: [] };
     }
-    if (pipeline.qaError !== undefined) return { tone: "danger", title: "Không tải được kết quả QA", guidance: "Chưa thể biết mô hình có đạt QA hay không. Tải lại để thử lần nữa.", actions: ["refresh"] };
+    if (pipeline.qaError !== undefined) return { tone: "danger", title: "Không tải được kết quả kiểm tra", guidance: "Chưa biết mô hình có đạt kiểm tra hay không. Tải lại để thử lần nữa.", actions: ["refresh"] };
     if (ready) {
       return status === "ConfirmedForTraining"
-        ? { tone: "success", title: "Đã xác nhận kỹ thuật cho đào tạo", guidance: "Mô hình đã qua QA và được xác nhận. Tiếp tục soạn hoặc quản lý kịch bản ở tab Kịch bản.", actions: ["author"] }
-        : { tone: "success", title: "Sẵn sàng soạn kịch bản", guidance: `Mô hình đã qua QA${warnings > 0 ? ` (còn ${warnings} cảnh báo không chặn)` : ""}. Mở tab Kịch bản để tạo hoặc soạn kịch bản trên revision này.`, actions: ["author"] };
+        ? { tone: "success", title: "Đã xác nhận dùng cho huấn luyện", guidance: "Mô hình đã qua kiểm tra và được xác nhận dùng được cho huấn luyện. Tiếp tục soạn hoặc quản lý kịch bản ở tab Kịch bản.", actions: ["author"] }
+        : { tone: "success", title: "Sẵn sàng soạn kịch bản", guidance: `Mô hình đã qua kiểm tra${warnings > 0 ? ` (còn ${warnings} cảnh báo, không ảnh hưởng)` : ""}. Mở tab Kịch bản để tạo hoặc soạn kịch bản trên bản IFC này.`, actions: ["author"] };
     }
     if (status === "NeedsFix" && exitRequired && verdict.state !== "failed") {
-      return { tone: "warning", title: "Chọn cửa thoát ra ngoài", guidance: "QA không xác định được cửa thoát (IFC_EXIT_UNKNOWN). Chọn một cửa có sẵn làm lối thoát ở mục “Thiết bị phát hiện từ IFC” rồi lưu; không cần tải lại IFC.", actions: ["exit"] };
+      return { tone: "warning", title: "Chọn cửa thoát ra ngoài", guidance: "Kiểm tra tự động chưa tìm thấy cửa nào dẫn ra ngoài tòa nhà. Chọn một cửa có sẵn làm lối thoát ở mục “Thiết bị phát hiện từ IFC” rồi lưu; không cần tải lại IFC.", actions: ["exit"] };
     }
     if (status === "NeedsFix" || verdict.state === "failed") {
-      return { tone: "danger", title: "Mô hình cần sửa", guidance: `QA báo ${errors > 0 ? `${errors} lỗi mức Error/Critical` : "kết quả không đạt"}. Xem từng issue và cách xử lý; lỗi trong mô hình phải sửa trong phần mềm thiết kế rồi tải lên IFC mới, vì job đã chạy xong không chạy lại được.`, actions: ["issues", "upload"] };
+      return { tone: "danger", title: "Mô hình cần sửa", guidance: `Kiểm tra tự động ${errors > 0 ? `tìm thấy ${errors} lỗi nghiêm trọng` : "báo mô hình không đạt"}. Xem từng vấn đề và cách xử lý; lỗi trong mô hình phải sửa trong phần mềm thiết kế rồi tải lên IFC mới, vì lượt xử lý đã xong không chạy lại được.`, actions: ["issues", "upload"] };
     }
-    if (isUnsettledRevision(status)) return { tone: "info", title: "Đang cập nhật trạng thái revision", guidance: "Worker đã chạy xong; đang chờ máy chủ ghi kết quả QA vào revision. Trang tự cập nhật.", actions: [] };
+    if (isUnsettledRevision(status)) return { tone: "info", title: "Đang cập nhật trạng thái bản IFC", guidance: "Mô hình đã xử lý xong; hệ thống đang ghi kết quả kiểm tra. Trang tự cập nhật.", actions: [] };
     return { tone: "info", title: revisionLabel(status).label, guidance: verdict.detail, actions: [] };
   }
 }

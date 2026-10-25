@@ -542,8 +542,8 @@ test.describe("Building QR landing", () => {
     await expect(page.getByText("Bạn đã có quyền tham gia")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Thoát hiểm a" })).toBeVisible();
     await expect(page.getByText("Mô tả bài a")).toBeVisible();
-    await expect(page.getByRole("list", { name: "Chế độ cho phép" }).first()).toContainText("Guided Drill");
-    await expect(page.getByRole("list", { name: "Chế độ cho phép" }).first()).toContainText("Assessment");
+    await expect(page.getByRole("list", { name: "Chế độ cho phép" }).first()).toContainText("Luyện có hướng dẫn");
+    await expect(page.getByRole("list", { name: "Chế độ cho phép" }).first()).toContainText("Đánh giá");
     await expect(page.getByText(/Thời gian mở: .*–/)).toBeVisible();
     await expect(page.getByText("Chưa có mô tả.")).toBeVisible();
     await expect(page.getByText("Chưa có chế độ nào được cho phép.")).toBeVisible();

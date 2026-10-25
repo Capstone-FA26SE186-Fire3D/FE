@@ -84,7 +84,7 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
   useEffect(() => { if (operationsData) onOperations?.(operationsData); }, [operationsData, onOperations]);
 
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
-  if (user?.role !== ROLE[variant]) return <Alert tone="danger" title="Không có quyền truy cập">{variant === "organization" ? "Báo cáo này dành cho tài khoản tổ chức." : "Chỉ PlatformAdmin có thể xem báo cáo này."}</Alert>;
+  if (user?.role !== ROLE[variant]) return <Alert tone="danger" title="Không có quyền truy cập">{variant === "organization" ? "Báo cáo này dành cho tài khoản tổ chức." : "Chỉ quản trị FET3D xem được báo cáo này."}</Alert>;
 
   const active = tab === "training" ? training : tab === "operations" ? operations : revenue;
   const meta = active.data;

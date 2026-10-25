@@ -4,10 +4,10 @@ import { ApiError } from "@/api/types/common";
 const CODE_MESSAGES: Record<string, string> = {
   BILLING_VALIDATION_FAILED: "Dữ liệu chưa hợp lệ. Kiểm tra các trường được đánh dấu rồi gửi lại.",
   ZERO_AMOUNT_NOT_SUPPORTED: "Tổng tiền báo giá bằng 0 nên chưa hỗ trợ phát hành/thanh toán. Hãy chọn gói có đơn giá lớn hơn 0.",
-  IDEMPOTENCY_KEY_CONFLICT: "Khóa chống gửi trùng đã được dùng cho nội dung khác. Tải lại trang rồi thao tác lại để tạo khóa mới.",
-  IDEMPOTENCY_KEY_REQUIRED: "Yêu cầu thiếu khóa chống gửi trùng (Idempotency-Key). Tải lại trang rồi thử lại; nếu lặp lại hãy báo cho đội kỹ thuật.",
-  IF_MATCH_REQUIRED: "Yêu cầu thiếu phiên bản (If-Match). Tải lại dữ liệu rồi thử lại.",
-  INVALID_IF_MATCH: "Phiên bản (ETag) không đúng định dạng. Tải lại dữ liệu rồi thử lại.",
+  IDEMPOTENCY_KEY_CONFLICT: "Yêu cầu này trùng với một yêu cầu khác vừa gửi. Tải lại trang rồi thao tác lại.",
+  IDEMPOTENCY_KEY_REQUIRED: "Yêu cầu chưa gửi được. Tải lại trang rồi thử lại; nếu vẫn lỗi hãy liên hệ hỗ trợ.",
+  IF_MATCH_REQUIRED: "Thiếu thông tin phiên bản của dữ liệu. Tải lại dữ liệu rồi thử lại.",
+  INVALID_IF_MATCH: "Thông tin phiên bản của dữ liệu không hợp lệ. Tải lại dữ liệu rồi thử lại.",
   REVISION_MISMATCH: "Dữ liệu vừa được thay đổi ở nơi khác. Đã giữ nội dung bạn nhập; hãy tải bản mới để đối chiếu rồi lưu lại.",
   BILLING_STATE_CONFLICT: "Trạng thái hiện tại không cho phép thao tác này (ví dụ báo giá đã hết hạn hoặc không còn ở trạng thái chờ chấp nhận).",
   BILLING_RESOURCE_NOT_FOUND: "Không tìm thấy mục này trong phạm vi của bạn. Công trình cần có tên và địa chỉ, và gói phải đang hoạt động.",
@@ -18,8 +18,8 @@ const CODE_MESSAGES: Record<string, string> = {
   SESSION_REVOKED: "Phiên đăng nhập đã bị thu hồi. Hãy đăng nhập lại rồi tiếp tục.",
   PACKAGE_CODE_EXISTS: "Mã gói đã tồn tại. Chọn mã khác.",
   DISCOUNT_CODE_EXISTS: "Mã giảm giá đã tồn tại. Chọn mã khác.",
-  BILLING_PAGINATION_INVALID: "Tham số phân trang không hợp lệ.",
-  PAYOS_DISABLED: "Cổng thanh toán PayOS đang tắt ở môi trường này. Chưa thể tạo liên kết thanh toán.",
+  BILLING_PAGINATION_INVALID: "Trang danh sách không hợp lệ. Tải lại trang rồi thử lại.",
+  PAYOS_DISABLED: "Cổng thanh toán PayOS đang tạm tắt. Chưa thể tạo liên kết thanh toán.",
   PAYOS_NOT_CONFIGURED: "Cổng thanh toán PayOS chưa được cấu hình. Chưa thể tạo liên kết thanh toán.",
   PAYOS_QUOTATION_REQUIRED: "Thiếu mã báo giá để thanh toán.",
   QUOTATION_NOT_PAYABLE: "Chỉ báo giá đã được chấp nhận và còn hạn mới thanh toán được. Hãy chấp nhận lại hoặc yêu cầu báo giá mới.",
@@ -38,34 +38,34 @@ const CODE_MESSAGES: Record<string, string> = {
   PAYOS_SCOPE_UNAVAILABLE: "Tổ chức hoặc công trình không còn khả dụng để thanh toán.",
   PAYOS_RESPONSE_SIGNATURE_INVALID: "Không xác thực được phản hồi từ PayOS. Giao dịch bị chặn; hãy liên hệ hỗ trợ.",
   PAYOS_PROVISIONING_UNAVAILABLE: "Hệ thống kích hoạt dịch vụ tạm thời chưa sẵn sàng. Hệ thống sẽ tự thử lại.",
-  PAYOS_QUOTATION_CANCELLED: "Báo giá đã bị hủy trước khi tiền về. Tiền vẫn được ghi nhận nhưng dịch vụ chưa kích hoạt; PlatformAdmin cần đối soát thủ công.",
-  PAYOS_SERVICE_PERIOD_INVALID: "Kỳ dịch vụ trong báo giá không còn hợp lệ. Dịch vụ chưa kích hoạt; cần PlatformAdmin đối soát.",
+  PAYOS_QUOTATION_CANCELLED: "Báo giá đã bị hủy trước khi tiền về. Tiền vẫn được ghi nhận nhưng dịch vụ chưa kích hoạt; quản trị FET3D cần đối soát thủ công.",
+  PAYOS_SERVICE_PERIOD_INVALID: "Kỳ dịch vụ trong báo giá không còn hợp lệ. Dịch vụ chưa kích hoạt; cần quản trị FET3D đối soát.",
   PAYOS_SERVICE_PERIOD_RESERVED: "Kỳ dịch vụ này đang được giữ cho một thanh toán khác của công trình. Hoàn tất hoặc hủy thanh toán kia trước.",
-  PAYOS_NEW_ALREADY_ENTITLED: "Công trình đã có dịch vụ từ một đơn khác nên kỳ này không được cấp chồng. Cần PlatformAdmin xử lý thương mại.",
+  PAYOS_NEW_ALREADY_ENTITLED: "Công trình đã có dịch vụ từ một đơn khác nên kỳ này không được cấp chồng. Cần quản trị FET3D xử lý.",
   PAYOS_UPGRADE_RESERVED: "Một thanh toán nâng cấp khác đang giữ mức suất hiện tại của công trình. Hoàn tất hoặc hủy thanh toán kia trước.",
   PAYOS_UPGRADE_BASELINE_CHANGED: "Mức suất của công trình đã đổi sau khi báo giá nâng cấp được phát hành. Hãy tạo báo giá nâng cấp mới.",
-  PAYOS_UPGRADE_NEEDS_RECONCILE: "Đã nhận tiền nhưng nâng cấp chưa áp dụng vì mức suất đã đổi hoặc kỳ đã kết thúc. Không cần thanh toán lại; PlatformAdmin sẽ đối soát.",
+  PAYOS_UPGRADE_NEEDS_RECONCILE: "Đã nhận tiền nhưng nâng cấp chưa áp dụng vì mức suất đã đổi hoặc kỳ đã kết thúc. Không cần thanh toán lại; quản trị FET3D sẽ đối soát.",
   PAYOS_EVENT_CONFLICT: "Sự kiện thanh toán không khớp với dữ liệu đã ghi. Hãy liên hệ hỗ trợ kèm mã giao dịch.",
   QUOTATION_EXPIRED: "Báo giá đã quá hạn hiệu lực nên không hủy hoặc thanh toán được; trạng thái được giữ nguyên.",
   QUOTATION_CHECKOUT_UNRESOLVED: "Báo giá còn thanh toán chưa kết thúc. Hủy thanh toán (hoặc chờ PayOS xác nhận hết hạn) rồi hủy báo giá.",
-  QUOTATION_V7_REQUIRED: "Báo giá cũ (trước v7) không thể phát hành hoặc thanh toán. Hãy tạo báo giá mới.",
-  PACKAGE_NOT_PURCHASABLE: "Gói chưa cấu hình đủ (6/12 tháng, số học viên, quota/chính sách) nên chưa bán được. PlatformAdmin cần hoàn tất cấu hình gói.",
+  QUOTATION_V7_REQUIRED: "Báo giá theo mẫu cũ không thể phát hành hoặc thanh toán. Hãy tạo báo giá mới.",
+  PACKAGE_NOT_PURCHASABLE: "Gói chưa cấu hình đủ (6/12 tháng, số học viên, hạn mức AI và chính sách) nên chưa bán được. Quản trị FET3D cần hoàn tất cấu hình gói.",
   BUILDING_PROFILE_INCOMPLETE: "Công trình thiếu tên hoặc địa chỉ. Bổ sung trong thông tin công trình rồi tạo lại báo giá.",
   UPGRADE_LIMIT_NOT_HIGHER: "Gói đích phải có số học viên lớn hơn mức hiện tại của công trình.",
   UPGRADE_ENTITLEMENT_INVALID: "Công trình không có kỳ dịch vụ đã trả tiền phù hợp để nâng cấp. Tải lại thông tin dịch vụ rồi thử lại.",
-  BILLING_POLICY_INTERVAL_INVALID: "Chính sách quota không phủ hết khoảng thời gian đã chọn. Chọn phiên bản chính sách khác hoặc đổi khoảng thời gian.",
-  BILLING_POLICY_INVALID: "Phiên bản chính sách quota không hợp lệ cho dòng này.",
+  BILLING_POLICY_INTERVAL_INVALID: "Chính sách hạn mức không phủ hết khoảng thời gian đã chọn. Chọn phiên bản chính sách khác hoặc đổi khoảng thời gian.",
+  BILLING_POLICY_INVALID: "Phiên bản chính sách hạn mức không hợp lệ cho dòng này.",
   ENTERPRISE_REQUEST_CLOSED: "Yêu cầu đã đóng nên không thể thay đổi hay phản hồi thêm.",
   ENTERPRISE_REQUESTER_UNAVAILABLE: "Người gửi yêu cầu không còn hoạt động nên chưa thể tạo báo giá cho họ.",
   NOTIFICATION_NOT_FOUND: "Không tìm thấy thông báo này.",
-  AI_QUOTA_EXHAUSTED: "Quota AI trả trước đã hết. Mua thêm (top-up) và chờ thanh toán được kích hoạt trước khi dùng tiếp.",
+  AI_QUOTA_EXHAUSTED: "Hạn mức AI trả trước đã hết. Nạp thêm và chờ thanh toán được kích hoạt trước khi dùng tiếp.",
 };
 
 /** Message for a stable error code (also usable for `errorCode` fields in checkout/provisioning payloads). */
 export function billingCodeMessage(code: string | null | undefined): string | undefined {
   if (!code) return undefined;
   if (CODE_MESSAGES[code]) return CODE_MESSAGES[code];
-  if (code.startsWith("PAYOS_PROVIDER_HTTP_")) return `PayOS trả lỗi HTTP ${code.slice("PAYOS_PROVIDER_HTTP_".length)}. Hệ thống sẽ tự thử lại.`;
+  if (code.startsWith("PAYOS_PROVIDER_HTTP_")) return "PayOS đang gặp lỗi. Hệ thống sẽ tự thử lại.";
   if (code.startsWith("PAYOS_")) return "Cổng thanh toán đang xử lý sự cố. Hệ thống sẽ tự thử lại; nếu kéo dài hãy liên hệ hỗ trợ kèm mã giao dịch.";
   return undefined;
 }

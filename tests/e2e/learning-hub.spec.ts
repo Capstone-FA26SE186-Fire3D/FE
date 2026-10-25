@@ -147,7 +147,7 @@ test("an unknown article from Learn blocks sending until the learner picks 'Hỏ
   await restore(page, "trainee", () => undefined, ai);
   await page.goto("/learning-hub?view=questions&article=khong-co-bai-nay");
   const missing = page.getByTestId("trainee-ai-article-missing");
-  await expect(missing).toContainText("Không tìm thấy bài bạn mở từ Learn");
+  await expect(missing).toContainText("Không tìm thấy bài bạn mở từ thư viện bài học");
   await expect(missing).toContainText("Câu hỏi chưa được gửi");
   await expect(missing.getByRole("link", { name: "Chọn bài khác" })).toHaveAttribute("href", "/learn");
   await page.getByLabel("Câu hỏi", { exact: true }).fill("Thoát hiểm thế nào?");
@@ -453,8 +453,8 @@ test.describe("overview (Tổng quan)", () => {
   await page.keyboard.press("Enter");
   const tour = page.getByRole("dialog", { name: "Hướng dẫn nhanh" });
   await expect(tour).toBeVisible();
-  await expect(tour.getByTestId("tour-step")).toContainText("Đọc trong Learn");
-  await expect(tour.getByRole("link", { name: "Mở Learn" })).toHaveAttribute("href", "/learn");
+  await expect(tour.getByTestId("tour-step")).toContainText("Đọc bài học");
+  await expect(tour.getByRole("link", { name: "Mở thư viện bài học" })).toHaveAttribute("href", "/learn");
   await tour.getByRole("button", { name: "Tiếp" }).click();
   await expect(tour.getByRole("link", { name: "Tải ứng dụng" })).toHaveAttribute("href", "/download");
   await tour.getByRole("button", { name: "Tiếp" }).click();

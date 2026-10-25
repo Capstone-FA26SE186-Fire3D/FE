@@ -32,10 +32,10 @@ export type FormActions = ReturnType<typeof useFormActions>;
 export const issuesFrom = (list: ReadonlyArray<{ code: string; path: string; message: string }>): FormIssues => list.map((item) => ({ ...item, source: "client" as const }));
 
 function CapabilitiesField({ capabilities, onChange, error, disabled, kind }: { capabilities: string[]; onChange: (next: string[]) => void; error?: string; disabled?: boolean; kind: LibraryKind }) {
-  return <StringList label="Năng lực runtime yêu cầu" items={capabilities} maxLength={128} disabled={disabled} testId="capabilities" error={error} addLabel="Thêm năng lực" placeholder="Ví dụ: cover.nose"
+  return <StringList label="Năng lực yêu cầu" items={capabilities} maxLength={128} disabled={disabled} testId="capabilities" error={error} addLabel="Thêm năng lực" placeholder="Ví dụ: cover.nose"
     hint={kind === "Equipment"
-      ? "Chỉ là khai báo yêu cầu. Danh sách này chưa được kiểm với Unity và KHÔNG thêm năng lực vào runtime; năng lực chỉ có khi danh mục runtime công bố."
-      : "Khai báo tùy chọn, chưa được kiểm với Unity hay danh mục runtime."}
+      ? "Chỉ là khai báo yêu cầu, chưa được kiểm tra với ứng dụng FET3D và KHÔNG thêm năng lực vào ứng dụng. Năng lực chỉ có khi ứng dụng đã hỗ trợ."
+      : "Khai báo tùy chọn, chưa được kiểm tra với ứng dụng FET3D."}
     onChange={(index, value) => onChange(capabilities.map((item, at) => (at === index ? value : item)))}
     onAdd={() => onChange([...capabilities, ""])}
     onRemove={(index) => onChange(capabilities.filter((_, at) => at !== index))} />;
@@ -43,7 +43,7 @@ function CapabilitiesField({ capabilities, onChange, error, disabled, kind }: { 
 
 function PropertyRows({ rows, onChange, issues, disabled }: { rows: PropertyRow[]; onChange: (rows: PropertyRow[]) => void; issues: FormIssues; disabled?: boolean }) {
   const update = (index: number, patch: Partial<PropertyRow>) => onChange(rows.map((row, at) => (at === index ? { ...row, ...patch } : row)));
-  return <Group title="Thuộc tính thiết bị" description={`Tối đa ${LIBRARY_LIMITS.propertiesMax} thuộc tính; mỗi giá trị là chuỗi, số hoặc đúng/sai. Hiển thị cho tổ chức, không phải tham số của runtime.`} testId="group-properties">
+  return <Group title="Thuộc tính thiết bị" description={`Tối đa ${LIBRARY_LIMITS.propertiesMax} thuộc tính; mỗi giá trị là chuỗi, số hoặc đúng/sai. Hiển thị cho tổ chức, không phải thiết lập trong ứng dụng.`} testId="group-properties">
     {messageAt(issues, "$.payload.properties") && <span className="ops-field-error" role="alert">{messageAt(issues, "$.payload.properties")}</span>}
     <ul className="se-list" style={{ gap: 10 }}>
       {rows.map((row, index) => {
@@ -80,8 +80,8 @@ function TemplateFields({ form, actions, issues, rubricCatalog }: { form: Versio
     else actions.setField(["modePolicy", "allowedModes"], [...next]);
   };
   return <>
-    <Alert tone="info" title="Template chỉ mang nội dung phi không gian">Tên, mục tiêu, hướng dẫn, thời gian, chế độ và rubric. Template không tạo vị trí hay đối tượng trong công trình; tổ chức tự đặt đối tượng trên mô hình của mình.</Alert>
-    {ignored.length > 0 && <Alert tone="warning" title="Phiên bản này còn mang phần không chỉnh sửa được ở đây">Có {ignored.join(", ")} do API ghi. Form này giữ nguyên chúng khi lưu nhưng tổ chức không nhận chúng khi áp dụng.</Alert>}
+    <Alert tone="info" title="Kịch bản mẫu chỉ mang phần nội dung, không có vị trí">Tên, mục tiêu, hướng dẫn, thời gian, chế độ và tiêu chí chấm điểm (rubric). Mẫu không tạo vị trí hay đối tượng trong công trình; tổ chức tự đặt đối tượng trên mô hình của mình.</Alert>
+    {ignored.length > 0 && <Alert tone="warning" title="Phiên bản này còn mang phần không chỉnh sửa được ở đây">Có {ignored.join(", ")} từ trước. Biểu mẫu này giữ nguyên chúng khi lưu nhưng tổ chức không nhận chúng khi áp dụng.</Alert>}
     {at("$") && <span className="ops-field-error" role="alert">{at("$")}</span>}
     <Group title="Thông tin kịch bản" testId="group-info">
       <TextField label="Tên kịch bản" maxLength={LIMITS.nameMax} value={typeof state.name === "string" ? state.name : ""} error={at("$.name")} data-testid="tpl-name" hint="1–255 ký tự." onCommit={optional("name")} />
@@ -127,7 +127,7 @@ export function PayloadFields({ kind, form, setForm, issues, rubricCatalog, disa
       <CapabilitiesField kind={kind} capabilities={form.capabilities} error={messageAt(issues, "$.requiredCapabilities")} onChange={(next) => setForm((current) => ({ ...current, capabilities: next }))} />
     </Group>
     {kind === "Equipment" && <>
-      <Alert tone="info" title="Không thêm năng lực cho runtime"><span data-testid="no-capability-notice">{NO_CAPABILITY_NOTICE}</span></Alert>
+      <Alert tone="info" title="Không thêm năng lực cho ứng dụng"><span data-testid="no-capability-notice">{NO_CAPABILITY_NOTICE}</span></Alert>
       <PropertyRows rows={form.properties} issues={issues} onChange={(rows) => setForm((current) => ({ ...current, properties: rows }))} />
     </>}
     {kind === "ScenarioTemplate" && <TemplateFields form={form} actions={actions} issues={issues} rubricCatalog={rubricCatalog} />}

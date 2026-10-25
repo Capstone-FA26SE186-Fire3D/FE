@@ -83,8 +83,8 @@ export function TrainingHistory({ accessToken, userId }: { accessToken: string; 
     body = <div data-testid="history-empty"><EmptyState
       icon={History}
       title="Bạn chưa có lượt tập nào"
-      description="Lượt tập xuất hiện ở đây sau khi bạn bắt đầu một bài trên ứng dụng. Quét mã QR của Building hoặc mở ứng dụng Fire3D, chọn bài rồi bắt đầu. Kết quả được lưu theo tài khoản của bạn."
-      action={<div className="ops-actions"><Link className={buttonVariants({ variant: "primary" })} href={routes.download}>Xem trang ứng dụng</Link><Link className={buttonVariants({ variant: "secondary" })} href={routes.learn}>Đọc bài trong Learn</Link></div>}
+      description="Lượt tập xuất hiện ở đây sau khi bạn bắt đầu một bài trên ứng dụng. Quét mã QR của công trình hoặc mở ứng dụng FET3D, chọn bài rồi bắt đầu. Kết quả được lưu theo tài khoản của bạn."
+      action={<div className="ops-actions"><Link className={buttonVariants({ variant: "primary" })} href={routes.download}>Xem trang ứng dụng</Link><Link className={buttonVariants({ variant: "secondary" })} href={routes.learn}>Đọc bài học</Link></div>}
     /></div>;
   } else if (items.length === 0 && totalCount === 0) {
     body = <div data-testid="history-filtered-empty"><EmptyState
@@ -112,6 +112,6 @@ export function TrainingHistory({ accessToken, userId }: { accessToken: string; 
       <div className="th-main">{body}</div>
       {sessionParam && <ResultDrawer inline={wide} sessionId={sessionParam} known={known} accessToken={accessToken} onClose={closeSession} onRefresh={list.reload} />}
     </div>
-    <p className="th-foot th-note">Danh sách lượt tập của riêng bạn. Trạng thái phiên cho biết lượt tập đang ở đâu; kết quả là điểm hoặc đánh giá máy chủ đã lưu. Hoàn thành lượt tập không có nghĩa là đạt. Kết quả mô phỏng không phải chứng nhận.</p>
+    <p className="th-foot th-note">Danh sách lượt tập của riêng bạn. Trạng thái phiên cho biết lượt tập đang ở đâu; kết quả là điểm hoặc đánh giá đã được lưu. Hoàn thành lượt tập không có nghĩa là đạt. Kết quả mô phỏng không phải chứng nhận.</p>
   </div>;
 }

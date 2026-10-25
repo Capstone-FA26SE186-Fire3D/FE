@@ -178,7 +178,7 @@ export function EditorWorkspace({ accessToken, buildingId, scenarioId, editor }:
   const previewBanner = preview.phase === "reprocess"
     ? null
     : preview.phase === "not-ready"
-    ? <Alert tone="warning" title="Mô hình 3D chưa sẵn sàng" action={<div className="se-banner-actions"><span>Trạng thái revision: {revisionLabel(preview.preview?.revisionStatus).label}. Tự kiểm tra lại mỗi vài giây{preview.attempts >= 24 ? " (đã dừng, hãy thử lại)" : ""}. Bạn vẫn đặt được đối tượng bằng tọa độ.</span><Button type="button" size="sm" variant="secondary" onClick={preview.refresh}>Kiểm tra lại</Button></div>} />
+    ? <Alert tone="warning" title="Mô hình 3D chưa sẵn sàng" action={<div className="se-banner-actions"><span>Trạng thái bản IFC: {revisionLabel(preview.preview?.revisionStatus).label}. Tự kiểm tra lại mỗi vài giây{preview.attempts >= 24 ? " (đã dừng, hãy thử lại)" : ""}. Bạn vẫn đặt được đối tượng bằng tọa độ.</span><Button type="button" size="sm" variant="secondary" onClick={preview.refresh}>Kiểm tra lại</Button></div>} />
     : preview.phase === "error"
       ? <Alert tone="danger" title="Không lấy được thông tin mô hình" action={<div className="se-banner-actions"><span>{preview.error}</span><Button type="button" size="sm" variant="secondary" onClick={preview.refresh}>Thử lại</Button></div>} />
       : null;

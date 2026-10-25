@@ -31,8 +31,8 @@ const HUB = "/learning-hub?view=questions";
 
 /** Why a Trainee cannot ask now, from `GET /api/ai/trainee/quota`; null when a question can be sent. */
 export function traineeBlock(quota: TraineeAiQuota): { title: string; text: string } | null {
-  if (!quota.policyActive) return { title: "Hỏi đáp AI chưa được bật", text: "Hệ thống chưa có chính sách AI cho học viên nên câu hỏi chưa được gửi. Bạn vẫn đọc bài trong Learn bình thường." };
-  if (quota.blockedByAssessment) return { title: "AI tạm khóa trong bài đánh giá", text: "Bạn đang có một bài đánh giá (Assessment) chưa kết thúc. AI không hỗ trợ trong lúc làm bài; hãy hoàn tất bài rồi hỏi lại." };
+  if (!quota.policyActive) return { title: "Hỏi đáp AI chưa được bật", text: "Hỏi đáp AI chưa được mở cho học viên nên câu hỏi chưa được gửi. Bạn vẫn đọc bài học bình thường." };
+  if (quota.blockedByAssessment) return { title: "AI tạm khóa trong bài đánh giá", text: "Bạn đang có một bài đánh giá chưa kết thúc. AI không hỗ trợ trong lúc làm bài; hãy hoàn tất bài rồi hỏi lại." };
   if (!quota.canSubmit) return { title: "Đã hết lượt hỏi hôm nay", text: `Hạn mức hôm nay đã dùng hết. Lượt mới có lại lúc ${formatDateTime(quota.resetsAt)}.` };
   return null;
 }
@@ -156,7 +156,7 @@ function TraineeAsk({ accessToken, articleParam }: { accessToken: string; articl
     : null;
 
   return <div className={styles.stack} data-testid="trainee-ai">
-    <Panel title="Hỏi đáp AI" description="AI trả lời dựa trên bài Learn và tài liệu chuẩn đã duyệt, luôn kèm nguồn. Đây là thông tin tham khảo để học, không phải hướng dẫn khẩn cấp hay chứng nhận an toàn." actions={<MessageCircleQuestion size={18} aria-hidden="true" />}>
+    <Panel title="Hỏi đáp AI" description="AI trả lời dựa trên bài học và tài liệu chuẩn đã duyệt, luôn kèm nguồn. Đây là thông tin tham khảo để học, không phải hướng dẫn khẩn cấp hay chứng nhận an toàn." actions={<MessageCircleQuestion size={18} aria-hidden="true" />}>
       <form className={styles.stack} onSubmit={send} aria-label="Hỏi đáp AI cho học viên">
         <QuotaLine quota={quota.data} error={quota.error} onRetry={quota.reload} />
         {block && <div data-testid="trainee-ai-blocked"><StateCard
@@ -166,7 +166,7 @@ function TraineeAsk({ accessToken, articleParam }: { accessToken: string; articl
           kicker={quota.data?.blockedByAssessment ? "Hỏi đáp · đang ở chế độ Đánh giá" : !quota.data?.policyActive ? "Hỏi đáp · chưa bật" : "Hỏi đáp · hết lượt hôm nay"}
           title={block.title}
           actions={<>
-            <Link className={buttonVariants({ variant: "primary" })} href={routes.learn}>{quota.data?.blockedByAssessment ? "Mở Learn" : "Quay lại Learn"}</Link>
+            <Link className={buttonVariants({ variant: "primary" })} href={routes.learn}>{quota.data?.blockedByAssessment ? "Mở thư viện bài học" : "Quay lại thư viện bài học"}</Link>
             {quota.data?.blockedByAssessment && <Link className={buttonVariants({ variant: "secondary" })} href="/learning-hub?view=history">Xem lịch sử</Link>}
           </>}>{block.text}</StateCard></div>}
         {contextLine && <div className={styles.row} data-testid="trainee-ai-context">
@@ -175,7 +175,7 @@ function TraineeAsk({ accessToken, articleParam }: { accessToken: string; articl
         </div>}
         {articlePending && <p role="status" className={styles.dim}>Đang mở thông tin bài…</p>}
         {articleUnresolved && <div data-testid="trainee-ai-article-missing">
-          <Alert tone="warning" title={articleGone ? "Không tìm thấy bài bạn mở từ Learn" : "Chưa tải được bài bạn mở từ Learn"}
+          <Alert tone="warning" title={articleGone ? "Không tìm thấy bài bạn mở từ thư viện bài học" : "Chưa tải được bài bạn mở từ thư viện bài học"}
             action={<div className="ops-actions mt-3">
               <Button type="button" size="sm" variant="secondary" onClick={() => go({ article: null })} disabled={working}>Hỏi chung</Button>
               <Link className="underline" href={routes.learn}>Chọn bài khác</Link>
@@ -184,7 +184,7 @@ function TraineeAsk({ accessToken, articleParam }: { accessToken: string; articl
             {articleGone ? "Bài có thể đã bị ẩn hoặc gỡ." : aiErrorText(article.error)} Câu hỏi chưa được gửi: hãy chọn &quot;Hỏi chung&quot; (không kèm bài) hoặc chọn bài khác.
           </Alert>
         </div>}
-        <Field label="Câu hỏi" required error={questionError} hint="Văn bản thuần. Không nhập thông tin cá nhân của người khác.">
+        <Field label="Câu hỏi" required error={questionError} hint="Chỉ nhập chữ. Không nhập thông tin cá nhân của người khác.">
           {(props) => <Textarea {...props} rows={4} value={question} onChange={(event) => setQuestion(event.target.value)} disabled={working} placeholder="Ví dụ: Vì sao không nên dùng thang máy khi có cháy?" />}
         </Field>
         <CharCount value={text} max={maxChars} />
@@ -196,7 +196,7 @@ function TraineeAsk({ accessToken, articleParam }: { accessToken: string; articl
       </form>
     </Panel>
 
-    {requestId && (phase.kind === "idle" || phase.kind === "tracking") && <Panel title="Câu trả lời" description="Lấy từ máy chủ theo mã yêu cầu; tải lại trang vẫn mở lại được.">
+    {requestId && (phase.kind === "idle" || phase.kind === "tracking") && <Panel title="Câu trả lời" description="Câu trả lời được lưu lại; tải lại trang vẫn xem được.">
       <RequestPanel accessToken={accessToken} requestId={requestId} trainee onSettled={settled} />
     </Panel>}
 
@@ -205,12 +205,12 @@ function TraineeAsk({ accessToken, articleParam }: { accessToken: string; articl
       {recent.data && recent.data.items.length === 0 && <p className={styles.dim}>Bạn chưa hỏi câu nào.</p>}
       {recent.data && recent.data.items.length > 0 && <ul className={styles.list} data-testid="trainee-ai-recent">
         {recent.data.items.map((item) => <li key={item.requestId} className={styles.item}>
-          <button type="button" className={styles.rowButton} onClick={() => go({ request: item.requestId })} aria-current={item.requestId === requestId ? "true" : undefined}>{item.input?.text?.slice(0, 120) || `Yêu cầu ${item.requestId.slice(0, 8)}…`}</button>
+          <button type="button" className={styles.rowButton} onClick={() => go({ request: item.requestId })} aria-current={item.requestId === requestId ? "true" : undefined}>{item.input?.text?.slice(0, 120) || "Câu hỏi không có nội dung xem trước"}</button>
           <span className={styles.dim}><StatusBadge tone={statusTone(item.status, item.resultType)}>{statusLabel(item.status, item.resultType)}</StatusBadge> · {formatDateTime(item.createdAt)}</span>
         </li>)}
       </ul>}
     </Panel>
-    <p className={styles.dim}><Link href={HUB.replace("questions", "saved")}>Bài đã lưu</Link> · <Link href={routes.learn}>Đọc thêm trong Learn</Link></p>
+    <p className={styles.dim}><Link href={HUB.replace("questions", "saved")}>Bài đã lưu</Link> · <Link href={routes.learn}>Đọc thêm bài học</Link></p>
   </div>;
 }
 
@@ -221,6 +221,6 @@ function QuotaLine({ quota, error, onRetry }: { quota: TraineeAiQuota | undefine
   const unit = quota.quotaUnit ?? undefined;
   return <p className={styles.dim} data-testid="trainee-ai-quota">
     Hôm nay còn {formatQuota(quota.remainingUnits, unit)}{quota.dailyUnits != null ? ` / ${formatQuota(quota.dailyUnits, unit)}` : ""}
-    {quota.estimatedReserve != null ? `; mỗi câu hỏi giữ chỗ khoảng ${formatQuota(quota.estimatedReserve, unit)}` : ""}. Làm mới lúc {formatDateTime(quota.resetsAt)}.
+    {quota.estimatedReserve != null ? `; mỗi câu hỏi dùng khoảng ${formatQuota(quota.estimatedReserve, unit)}` : ""}. Làm mới lúc {formatDateTime(quota.resetsAt)}.
   </p>;
 }

@@ -157,7 +157,7 @@ export function classifyUploadError(stage: IfcUploadStage, cause: unknown): IfcU
       return new IfcUploadError(stage, cause.message, { ...base, restart: true });
     }
     if (cause.status === 422 || cause.code === "IFC_SOURCE_MISMATCH") {
-      return new IfcUploadError(stage, "Tệp trên kho lưu trữ không khớp với tệp đã chọn (kích thước hoặc SHA-256). Hãy tải lên lại từ đầu.", { ...base, restart: true });
+      return new IfcUploadError(stage, "Tệp trên kho lưu trữ không khớp với tệp đã chọn (khác kích thước hoặc nội dung). Hãy tải lên lại từ đầu.", { ...base, restart: true });
     }
     if (cause.status === 400 && cause.fieldErrors.length > 0) {
       return new IfcUploadError(stage, fieldDetail(cause), base);

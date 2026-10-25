@@ -50,7 +50,7 @@ const tabTour: Partial<Record<BuildingTab, string>> = { journey: "tab-journey", 
 const tabAliases: Record<string, { tab: BuildingTab; sub?: string }> = { overview: { tab: "journey" }, qr: { tab: "access", sub: "qr" } };
 const ifcSubTabs = ["progress", "preview", "equipment", "technical", "annotations"] as const;
 type IfcSub = (typeof ifcSubTabs)[number];
-const ifcSubLabels: Record<IfcSub, string> = { progress: "Tiến trình", preview: "Preview 3D", equipment: "Thiết bị", technical: "Kỹ thuật", annotations: "Annotation" };
+const ifcSubLabels: Record<IfcSub, string> = { progress: "Tiến trình", preview: "Xem trước 3D", equipment: "Thiết bị", technical: "Kỹ thuật", annotations: "Ghi chú" };
 const SCENARIO_PAGE_SIZE = 20;
 // After a Succeeded job the revision is re-read until QA moved it out of Uploaded/Processing; ~1 minute at most.
 const MAX_SETTLE_POLLS = 20;
@@ -312,14 +312,14 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
         <div className="ops-stack">
           <div className="bd-revision-bar">
             <div className="ops-field bd-revision-field">
-              <label htmlFor="revision-select">Revision đang xem</label>
-              <Combobox id="revision-select" value={revisionId} options={revisionOptions} placeholder={revisions.loading && !revisionItems ? "Đang tải…" : "Chưa có revision"} searchPlaceholder="Tìm revision…" groupLabel="Revision" disabled={!revisionItems?.length} onChange={selectRevision} aria-label="Revision đang xem" />
+              <label htmlFor="revision-select">Bản IFC đang xem</label>
+              <Combobox id="revision-select" value={revisionId} options={revisionOptions} placeholder={revisions.loading && !revisionItems ? "Đang tải…" : "Chưa có bản IFC"} searchPlaceholder="Tìm bản IFC…" groupLabel="Bản IFC" disabled={!revisionItems?.length} onChange={selectRevision} aria-label="Bản IFC đang xem" />
             </div>
             {rev && <StatusBadge tone={rev.tone}>{rev.label}</StatusBadge>}
             <Button onClick={() => setUploadOpen(true)} data-tour="upload-ifc" data-testid="ifc-upload-open"><Upload size={16} aria-hidden="true" />Tải IFC</Button>
           </div>
-          {revisions.error !== undefined && <Alert tone="danger" title="Không tải được danh sách revision" action={<Button size="sm" variant="secondary" className="mt-3" onClick={revisions.reload}>Thử lại</Button>}>{describeApiError(revisions.error, "Hãy thử lại sau.")}</Alert>}
-          {revisions.data && !revision && <Alert tone="info" title="Chưa có revision nào">Tải lên tệp IFC đầu tiên bằng nút “Tải IFC”. Sau khi tải xong, tiến trình xử lý, QA và preview hiển thị ở đây.</Alert>}
+          {revisions.error !== undefined && <Alert tone="danger" title="Không tải được danh sách bản IFC" action={<Button size="sm" variant="secondary" className="mt-3" onClick={revisions.reload}>Thử lại</Button>}>{describeApiError(revisions.error, "Hãy thử lại sau.")}</Alert>}
+          {revisions.data && !revision && <Alert tone="info" title="Chưa có bản IFC nào">Tải lên tệp IFC đầu tiên bằng nút “Tải IFC”. Sau khi tải xong, tiến trình xử lý, kết quả kiểm tra và bản xem trước 3D hiển thị ở đây.</Alert>}
 
           {revision && accessToken && <SubTabs label="Mục IFC" value={ifcSub} onValueChange={selectIfcSub} items={ifcSubTabs.map((value) => ({ value, label: ifcSubLabels[value], "data-testid": `ifc-sub-${value}` }))}>
             <SubTabsContent value="progress">

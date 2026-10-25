@@ -58,14 +58,14 @@ export type DecisionFailure = { kind: "retry" | "reload" | "fix"; message: strin
 
 export function describeDecisionError(error: unknown): DecisionFailure {
   if (!(error instanceof ApiError)) {
-    return { kind: "retry", message: "Không kết nối được tới máy chủ hoặc chưa nhận được phản hồi. Quyết định có thể đã được ghi: bấm Thử lại sẽ gửi cùng mã thao tác nên không bị ghi hai lần." };
+    return { kind: "retry", message: "Không kết nối được tới máy chủ hoặc chưa nhận được phản hồi. Quyết định có thể đã được ghi: bấm Thử lại an toàn, không bị ghi hai lần." };
   }
   const code = error.code;
   switch (code) {
     case "CONTENT_REVIEW_NOT_PENDING": return { kind: "reload", code, message: "Bản này không còn ở trạng thái chờ duyệt: đã có quyết định (quyết định không đổi được). Đang tải lại trạng thái hiện tại." };
     case "CONTENT_HASH_MISMATCH": return { kind: "reload", code, message: "Nội dung phiên bản không khớp với bản đang xem. Đang tải lại chi tiết; hãy xem lại rồi quyết định lại." };
     case "IDEMPOTENCY_KEY_CONFLICT": return { kind: "reload", code, message: "Mã thao tác đã được dùng cho một quyết định khác. Đang tải lại trạng thái hiện tại." };
-    case "SCENARIO_SNAPSHOT_REQUIRED": return { kind: "reload", code, message: "Phiên bản chưa có nội dung kịch bản và rubric hợp lệ nên chưa quyết định được." };
+    case "SCENARIO_SNAPSHOT_REQUIRED": return { kind: "reload", code, message: "Phiên bản chưa có nội dung kịch bản và tiêu chí chấm điểm hợp lệ nên chưa quyết định được." };
     default: break;
   }
   if (error.status === 409) return { kind: "reload", code, message: "Quyết định không ghi được ở trạng thái hiện tại. Đang tải lại để hiển thị trạng thái đúng." };
@@ -75,12 +75,12 @@ export function describeDecisionError(error: unknown): DecisionFailure {
   if (error.status === 400) {
     const reason = error.fieldMessage("reason");
     const hash = error.fieldMessage("contentHash") ?? error.fieldMessage("rubricHash");
-    if (hash) return { kind: "reload", code, message: "Hash do máy chủ trả về bị từ chối. Đang tải lại chi tiết." };
+    if (hash) return { kind: "reload", code, message: "Mã nội dung không còn khớp. Đang tải lại chi tiết." };
     return { kind: "fix", code, reason, message: reason ?? "Dữ liệu chưa hợp lệ. Kiểm tra lại lý do rồi gửi lại." };
   }
   if (error.isRateLimited) {
     const wait = error.retryAfterSeconds ? ` Thử lại sau ${error.retryAfterSeconds} giây.` : " Thử lại sau ít phút.";
-    return { kind: "retry", code, message: `Máy chủ đang bận.${wait} Thử lại dùng cùng mã thao tác.` };
+    return { kind: "retry", code, message: `Máy chủ đang bận.${wait} Thử lại sẽ không ghi quyết định hai lần.` };
   }
   return { kind: "retry", code, message: "Không ghi được quyết định. Nội dung bạn nhập vẫn được giữ lại; bấm thử lại an toàn, không bị ghi hai lần." };
 }

@@ -70,11 +70,11 @@ export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, se
     <section aria-labelledby="se-floors-title">
       <h3 id="se-floors-title"><Layers size={14} aria-hidden="true" /> Tầng</h3>
       {floors.length === 0
-        ? <p className="se-note" data-testid="floors-empty">{geometryNote ?? "Chưa có dữ liệu tầng (cần Geometry hợp lệ)."}</p>
+        ? <p className="se-note" data-testid="floors-empty">{geometryNote ?? "Chưa có dữ liệu tầng (cần mô hình 3D hợp lệ)."}</p>
         : <ul className="se-chips" role="radiogroup" aria-label="Chọn tầng">
           <li role="none"><button type="button" role="radio" aria-checked={activeFloor === null} className="se-chip" onClick={() => onFloor(null)}>Tất cả</button></li>
           {[...floors].sort((a, b) => a.elevationMeters - b.elevationMeters).map((floor) => <li role="none" key={floor.id}>
-            <button type="button" role="radio" aria-checked={activeFloor === floor.id} className="se-chip" onClick={() => onFloor(floor.id)} title={`Cao độ ${fmt(floor.elevationMeters)} m · mã ${floor.id}`}>
+            <button type="button" role="radio" aria-checked={activeFloor === floor.id} className="se-chip" onClick={() => onFloor(floor.id)} title={`Cao độ ${fmt(floor.elevationMeters)} m`}>
               {floor.name}<small>{fmt(floor.elevationMeters)} m</small>
             </button>
           </li>)}

@@ -181,13 +181,13 @@ test.describe("queue", () => {
     await expect(rows(page)).toHaveCount(2);
     expect(server.listQueries[0].get("status")).toBe("Submitted");
     expect(server.listQueries[0].get("pageSize")).toBe("20");
-    await expect(page.getByRole("group", { name: "Tổng theo trạng thái" })).toContainText("Tổng từ máy chủ");
+    await expect(page.getByRole("group", { name: "Tổng theo trạng thái" })).toContainText("Tổng mọi thời điểm");
     const first = rows(page).first();
     await expect(first).toContainText("Công ty Sao Mai"); // newest submittedAt first
     await expect(first).toContainText("Kho hàng");
     await expect(first).toContainText("Chờ duyệt");
     await expect(rows(page).nth(1)).toContainText("v2");
-    await expect(page.getByRole("navigation", { name: "Quản trị hệ thống" }).getByRole("link", { name: /Duyệt kịch bản/ })).not.toContainText("Chờ BE");
+    await expect(page.getByRole("navigation", { name: "Quản trị hệ thống" }).getByRole("link", { name: /Duyệt kịch bản/ })).not.toContainText("Sắp có");
   });
 
   test("status and organization filters live in the URL and drive the query", async ({ page }) => {
@@ -261,7 +261,7 @@ test.describe("queue", () => {
 
     server.faults.listStatus = 403;
     await page.getByRole("button", { name: "Tải lại" }).click();
-    await expect(page.getByText("Chỉ PlatformAdmin xem và quyết định được bản duyệt kịch bản.")).toBeVisible();
+    await expect(page.getByText("Chỉ quản trị FET3D xem và quyết định được bản duyệt kịch bản.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Thử lại" })).toHaveCount(0);
   });
 
@@ -295,7 +295,7 @@ test.describe("detail", () => {
     await expect(dialog.locator(".ops-dialog-eyebrow")).toContainText("v2");
     await expect(dialog.getByText("Trường THPT Lê Quý Đôn · Nhà A")).toBeVisible();
     await expect(dialog.getByText(`${target.submittedBy.slice(0, 8)}…`).first()).toBeVisible(); // ids only: the API has no display names
-    await expect(dialog.locator(".rev-hash", { hasText: target.scenarioVersionId })).toBeVisible();
+    await expect(dialog.locator(".rev-hash", { hasText: target.scenarioVersionId.slice(0, 8) })).toBeVisible();
 
     const contentHash = dialog.getByTestId("hash-content");
     await expect(contentHash).not.toHaveText(target.contentHash);
@@ -306,7 +306,7 @@ test.describe("detail", () => {
 
     await expect(dialog.getByText("Nhận biết tín hiệu báo cháy và sơ tán ngay.")).toBeVisible();
     await expect(dialog.getByTestId("review-instructions")).toHaveText("Bạn đang ở khu làm việc khi chuông báo cháy vang lên.");
-    const rubric = dialog.getByRole("table", { name: "Tiêu chí rubric đã đóng băng" });
+    const rubric = dialog.getByRole("table", { name: "Tiêu chí chấm điểm đã khóa" });
     await expect(rubric.getByRole("row")).toHaveCount(3);
     await expect(rubric).toContainText("evac_time");
     await expect(rubric).toContainText("≤ 180");
@@ -314,11 +314,11 @@ test.describe("detail", () => {
 
     const readiness = dialog.getByTestId("readiness-block");
     await expect(readiness.getByTestId("technical-ready")).toHaveText("Sẵn sàng kỹ thuật");
-    await expect(readiness.getByTestId("readiness-outcome")).toContainText("Passed");
+    await expect(readiness.getByTestId("readiness-outcome")).toContainText("Kiểm tra tự động đạt");
     await expect(readiness.getByTestId("readiness-blockers")).toHaveText("0");
-    await expect(readiness.getByTestId("readiness-confirmation")).toContainText("eeeeeeee-0000");
-    await expect(readiness.getByTestId("readiness-artifact")).toContainText("ffffffff-0000");
-    await expect(readiness.getByText("Readiness kỹ thuật ≠ duyệt nội dung ≠ publish gate")).toBeVisible();
+    await expect(readiness.getByTestId("readiness-confirmation")).toContainText("Đã xác nhận");
+    await expect(readiness.getByTestId("readiness-artifact")).toContainText("Đã có tệp");
+    await expect(readiness.getByText("Điều kiện kỹ thuật, duyệt nội dung và điều kiện phát hành là ba việc tách biệt")).toBeVisible();
     await expect(dialog.getByTestId("gate-separation")).toContainText("Không đánh giá ở màn này");
     await expect(dialog.getByTestId("review-status")).toHaveText("Chờ duyệt");
   });
@@ -342,11 +342,11 @@ test.describe("detail", () => {
     await page.goto(`/admin/reviews?review=${server.reviews[1].summary.reviewId}`);
     const dialog = drawer(page);
     await expect(dialog.getByTestId("technical-ready")).toHaveText("Chưa sẵn sàng kỹ thuật");
-    await expect(dialog.getByTestId("readiness-outcome")).toHaveText("Chưa có kết quả QA");
+    await expect(dialog.getByTestId("readiness-outcome")).toHaveText("Chưa có kết quả kiểm tra tự động");
     await expect(dialog.getByTestId("readiness-confirmation")).toContainText("Chưa xác nhận");
-    await expect(dialog.getByTestId("readiness-artifact")).toContainText("Chưa có artifact runtime");
+    await expect(dialog.getByTestId("readiness-artifact")).toContainText("Chưa có tệp cho ứng dụng");
     await dialog.getByRole("button", { name: "Duyệt nội dung" }).click();
-    await expect(confirmDialog(page, "approve").getByText("Readiness kỹ thuật chưa đạt")).toBeVisible();
+    await expect(confirmDialog(page, "approve").getByText("Chưa đủ điều kiện kỹ thuật", { exact: true })).toBeVisible();
   });
 
   test("legacy snapshots with null content are shown as missing, not invented", async ({ page }) => {
@@ -354,10 +354,10 @@ test.describe("detail", () => {
     await install(page, server);
     await page.goto(`/admin/reviews?review=${server.reviews[0].summary.reviewId}`);
     const dialog = drawer(page);
-    await expect(dialog.getByText("Snapshot này không có mục tiêu học tập")).toBeVisible();
-    await expect(dialog.getByText("Snapshot này không có hướng dẫn")).toBeVisible();
-    await expect(dialog.getByText("Snapshot không có rubric")).toBeVisible();
-    await expect(dialog.getByText("Snapshot không có nội dung kịch bản")).toBeVisible();
+    await expect(dialog.getByText("Phiên bản này không có mục tiêu học tập")).toBeVisible();
+    await expect(dialog.getByText("Phiên bản này không có hướng dẫn")).toBeVisible();
+    await expect(dialog.getByText("Phiên bản này không có tiêu chí chấm điểm")).toBeVisible();
+    await expect(dialog.getByText("Phiên bản này không có nội dung kịch bản")).toBeVisible();
   });
 
   test("a decided review shows its immutable result and the rejection reason, with no decision buttons", async ({ page }) => {
@@ -389,7 +389,7 @@ test.describe("detail", () => {
 
     server.faults.detailStatus = 403;
     await page.goto(`/admin/reviews?review=${server.reviews[0].summary.reviewId}`);
-    await expect(drawer(page).getByText("Chỉ PlatformAdmin xem và quyết định được bản duyệt kịch bản.")).toBeVisible();
+    await expect(drawer(page).getByText("Chỉ quản trị FET3D xem và quyết định được bản duyệt kịch bản.")).toBeVisible();
   });
 
   test("a late detail response for a previous review never overwrites the one now open", async ({ page }) => {
@@ -415,7 +415,7 @@ test.describe("decisions", () => {
     await page.goto(`/admin/reviews?review=${target.reviewId}`);
     await drawer(page).getByRole("button", { name: "Duyệt nội dung" }).click();
     const confirm = confirmDialog(page, "approve");
-    await expect(confirm).toContainText("đúng nội dung và rubric đã đóng băng");
+    await expect(confirm).toContainText("đúng nội dung và tiêu chí chấm điểm (rubric) đã khóa");
     await expect(confirm).toContainText("không đổi được");
     await expect(confirm).toContainText("không phải");
     expect(server.decisionRequests).toHaveLength(0); // opening the dialog is not a decision
@@ -450,7 +450,7 @@ test.describe("decisions", () => {
     await confirm.getByRole("button", { name: "Duyệt nội dung" }).click();
     await expect(confirm.getByText("Chưa xác nhận được quyết định")).toBeVisible();
     await expect(confirm.getByText("không bị ghi hai lần")).toBeVisible();
-    await confirm.getByRole("button", { name: "Thử lại (cùng mã thao tác)" }).click();
+    await confirm.getByRole("button", { name: "Thử lại", exact: true }).click();
     await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Approved");
     expect(server.decisionRequests).toHaveLength(2);
     expect(server.decisionRequests[1].key).toBe(server.decisionRequests[0].key);
@@ -577,7 +577,7 @@ test.describe("decisions", () => {
     target.summary.contentHash = hex("f0");
     await drawer(page).getByRole("button", { name: "Duyệt nội dung" }).click();
     await confirmDialog(page, "approve").getByRole("button", { name: "Duyệt nội dung" }).click();
-    await expect(drawer(page).getByText("Hash không khớp nội dung đã đóng băng")).toBeVisible();
+    await expect(drawer(page).getByText("Nội dung phiên bản không khớp với bản đang xem")).toBeVisible();
     await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Submitted");
     await drawer(page).getByTestId("hash-content").locator("xpath=following-sibling::button").click();
     await expect(drawer(page).getByTestId("hash-content")).toHaveText(hex("f0"));
@@ -589,7 +589,7 @@ test.describe("decisions", () => {
     expect(server.decisionRequests[1].key).not.toBe(server.decisionRequests[0].key);
   });
 
-  for (const [status, code, text] of [[404, "NOT_FOUND", "Không tìm thấy phiên bản này"], [403, "FORBIDDEN", "Chỉ PlatformAdmin được duyệt hoặc từ chối"], [401, "UNAUTHORIZED", "Phiên đăng nhập đã hết hạn hoặc bị thu hồi"]] as const) {
+  for (const [status, code, text] of [[404, "NOT_FOUND", "Không tìm thấy phiên bản này"], [403, "FORBIDDEN", "Chỉ quản trị FET3D được duyệt hoặc từ chối"], [401, "UNAUTHORIZED", "Phiên đăng nhập đã hết hạn hoặc bị thu hồi"]] as const) {
     test(`${status} on a decision is explained and nothing is guessed`, async ({ page }) => {
       const server = new ReviewServer(baseSeeds());
       await install(page, server);

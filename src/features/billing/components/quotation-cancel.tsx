@@ -71,7 +71,7 @@ export function QuotationCancel({ accessToken, scope, quotation, etag, onChanged
     <Modal open={open} onOpenChange={(next) => { if (!saving) setOpen(next); }} title="Hủy báo giá?" description="Không thể hoàn tác. Nếu đã có thanh toán đang mở, hủy thanh toán đó trước; tiền đã nhận không tự hoàn lại."
       footer={<><Button variant="quiet" onClick={() => setOpen(false)} disabled={saving}>Giữ báo giá</Button><Button variant="danger" onClick={() => void submit()} disabled={saving}>{saving ? "Đang hủy…" : "Hủy báo giá"}</Button></>}>
       <div className="ops-stack">
-        <Field label="Lý do hủy" required error={fieldError} hint="Được ghi vào nhật ký kiểm toán.">{(p) => <Textarea {...p} maxLength={1000} value={reason} onChange={(event) => { setReason(event.target.value); setFieldError(""); }} />}</Field>
+        <Field label="Lý do hủy" required error={fieldError} hint="Được ghi vào nhật ký thao tác.">{(p) => <Textarea {...p} maxLength={1000} value={reason} onChange={(event) => { setReason(event.target.value); setFieldError(""); }} />}</Field>
         {error && <Alert tone="danger" title="Chưa hủy được báo giá">{error}</Alert>}
       </div>
     </Modal>

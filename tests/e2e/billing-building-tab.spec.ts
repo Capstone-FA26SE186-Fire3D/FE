@@ -21,7 +21,7 @@ test.describe("building services tab (mock)", () => {
     // Catalog snapshot: 6/12 month groups with price, learner capacity and quota straight from the package list.
     await expect(page.getByRole("group", { name: "Gói 6 tháng" })).toContainText("30 học viên mỗi kỳ");
     await expect(page.getByRole("group", { name: "Gói 12 tháng" })).toContainText("60 học viên mỗi kỳ");
-    await expect(page.getByRole("group", { name: "Gói 12 tháng" })).toContainText("Quota AI trả trước: 1.000 đơn vị");
+    await expect(page.getByRole("group", { name: "Gói 12 tháng" })).toContainText("Hạn mức AI trả trước: 1.000 đơn vị");
     const submit = page.getByRole("button", { name: /^Tạo báo giá \(1\)$/ });
     await expect(submit).toBeDisabled();
     await pick(page, ids.pkg).check({ force: true });
@@ -36,7 +36,7 @@ test.describe("building services tab (mock)", () => {
     await page.goto("/workspace/buildings/b-1?tab=services");
     await page.getByTestId("building-services").getByRole("button", { name: "Mua dịch vụ" }).click();
     await expect(page.getByText("Chưa có gói đang bán")).toBeVisible();
-    await expect(page.getByText(/Tổ chức không tự cấu hình giá hay quota/)).toBeVisible();
+    await expect(page.getByText(/Tổ chức không tự cấu hình giá hay hạn mức/)).toBeVisible();
     await expect(page.getByTestId("package-option")).toHaveCount(0);
   });
 
@@ -111,7 +111,7 @@ test.describe("building services tab (mock)", () => {
     await expect(line).toContainText("60 → 200 học viên/kỳ");
     await expect(line).toContainText("Giữ kỳ hiện tại và các suất đã dùng");
     await expect(line).toContainText("Một lần");
-    await expect(page.getByText(/Phí nâng cấp là một lần và do PlatformAdmin ấn định/)).toBeVisible();
+    await expect(page.getByText(/Phí nâng cấp là một lần và do quản trị FET3D ấn định/)).toBeVisible();
     // The UI computed nothing: the draft total is the BE's estimate (0) until Admin fixes the fee.
     await expect(page.getByTestId("quotation-total")).toHaveText(/0\s*₫/);
   });
@@ -161,19 +161,19 @@ test.describe("building services tab (mock)", () => {
     await signIn(page, owner);
     await mockBilling(page, mock);
     await page.goto("/workspace/buildings/b-1?tab=services");
-    await page.getByTestId("building-services").getByRole("button", { name: "Mua thêm quota AI" }).click();
+    await page.getByTestId("building-services").getByRole("button", { name: "Nạp thêm hạn mức AI" }).click();
     await page.getByLabel("Số lượng muốn mua").fill("abc");
     await expect(page.getByText("Nhập số nguyên dương hoặc để trống.")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Tạo báo giá top-up" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Tạo báo giá nạp thêm" })).toBeDisabled();
     await page.getByLabel("Số lượng muốn mua").fill("500");
-    await page.getByRole("button", { name: "Tạo báo giá top-up" }).click();
+    await page.getByRole("button", { name: "Tạo báo giá nạp thêm" }).click();
     const post = callsTo(mock, "POST", "/api/billing/quotations")[0];
     expect(post.body).toEqual({ purpose: "AIQuotaTopUp", topUp: { requestedQuotaUnits: 500 } });
     expect(post.headers["idempotency-key"]).toBeTruthy();
     const snapshot = page.getByTestId("topup-snapshot");
     await expect(snapshot).toContainText("500");
-    await expect(snapshot).toContainText("Chờ PlatformAdmin chốt khi phát hành");
-    await expect(page.getByText(/PlatformAdmin sẽ chốt số lượng quota, giá, khoảng hiệu lực/)).toBeVisible();
+    await expect(snapshot).toContainText("Chờ quản trị FET3D chốt khi phát hành");
+    await expect(page.getByText(/Quản trị FET3D sẽ chốt số lượng hạn mức, giá, khoảng hiệu lực/)).toBeVisible();
   });
 
   test("no 'Chờ BE (#56)' block and no sample data in the services tab", async ({ page }) => {

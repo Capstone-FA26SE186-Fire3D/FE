@@ -38,7 +38,7 @@ type TabId = (typeof TABS)[number];
 const TAB_ITEMS: Array<{ value: TabId; label: string }> = [
   { value: "services", label: "Dịch vụ theo công trình" },
   { value: "quotes", label: "Báo giá và thanh toán" },
-  { value: "ai", label: "Quota AI" },
+  { value: "ai", label: "Hạn mức AI" },
   { value: "reminders", label: "Nhắc gia hạn" },
   { value: "enterprise", label: "Số lượng lớn" },
 ];
@@ -49,12 +49,12 @@ function QuotaSummary({ accessToken, refreshKey, onTopUp, onOpen }: { accessToke
   const units = balance.data?.units ?? [];
   return <section className="org-card bill-quota-card" aria-labelledby="bill-quota-title">
     <div className="bill-row">
-      <div style={{ minWidth: 0 }}><h2 id="bill-quota-title" className="org-card-title" style={{ margin: 0 }}>Quota AI trả trước</h2><p className="bill-dim" style={{ margin: "4px 0 0" }}>Gộp từ các gói công trình và top-up đã thanh toán. Hết quota thì chặn yêu cầu tính phí mới; không có nợ trả sau.</p></div>
-      <div className="ops-actions">{onTopUp && <Button size="sm" variant="secondary" onClick={onTopUp}>Nạp quota AI</Button>}<Button size="sm" variant="quiet" onClick={onOpen}>Chi tiết</Button></div>
+      <div style={{ minWidth: 0 }}><h2 id="bill-quota-title" className="org-card-title" style={{ margin: 0 }}>Hạn mức AI trả trước</h2><p className="bill-dim" style={{ margin: "4px 0 0" }}>Gộp từ các gói công trình và các lần nạp thêm đã thanh toán. Hết hạn mức thì chưa gửi được yêu cầu tính phí mới; không có nợ trả sau.</p></div>
+      <div className="ops-actions">{onTopUp && <Button size="sm" variant="secondary" onClick={onTopUp}>Nạp hạn mức AI</Button>}<Button size="sm" variant="quiet" onClick={onOpen}>Chi tiết</Button></div>
     </div>
     {balance.error !== undefined && <p className="bill-dim" role="alert" style={{ margin: 0 }}>{billingErrorText(balance.error)}</p>}
-    {balance.loading && !balance.data && <SkeletonRows rows={2} label="Đang tải số dư quota…" />}
-    {balance.data && units.length === 0 && <p className="bill-dim" style={{ margin: 0 }}>Tổ chức chưa có quota AI còn hiệu lực.</p>}
+    {balance.loading && !balance.data && <SkeletonRows rows={2} label="Đang tải số dư hạn mức…" />}
+    {balance.data && units.length === 0 && <p className="bill-dim" style={{ margin: 0 }}>Tổ chức chưa có hạn mức AI còn hiệu lực.</p>}
     {units.map((unit) => {
       const used = unit.reserved + unit.consumed;
       const percent = unit.granted > 0 ? Math.min(100, Math.round((used / unit.granted) * 100)) : 100;
@@ -68,12 +68,12 @@ function QuotaSummary({ accessToken, refreshKey, onTopUp, onOpen }: { accessToke
 }
 
 function summarizeQuotation(quotation: Quotation) {
-  if (quotation.purpose === "AIQuotaTopUp") return "Top-up quota AI";
+  if (quotation.purpose === "AIQuotaTopUp") return "Nạp thêm hạn mức AI";
   const names = quotation.items.map((line) => line.buildingName || "Công trình");
   return names.length <= 2 ? names.join(", ") : `${names.slice(0, 2).join(", ")} +${names.length - 2}`;
 }
 
-const quotationKind = (quotation: Quotation) => quotation.purpose === "AIQuotaTopUp" ? "Quota AI trả trước" : quotation.items.some((line) => line.purchaseAction === "Upgrade") ? `Nâng cấp · ${quotation.items.length} công trình` : `${quotation.items.length} công trình`;
+const quotationKind = (quotation: Quotation) => quotation.purpose === "AIQuotaTopUp" ? "Hạn mức AI trả trước" : quotation.items.some((line) => line.purchaseAction === "Upgrade") ? `Nâng cấp · ${quotation.items.length} công trình` : `${quotation.items.length} công trình`;
 
 const stateLabel: Record<ServiceState, { label: string; tone: "success" | "warning" | "danger" | "info" | "neutral" }> = {
   effective: { label: "Đang hiệu lực", tone: "success" },
@@ -186,9 +186,9 @@ export function BillingWorkspace() {
   return <div className="org">
     <PageHeader
       title="Dịch vụ và thanh toán"
-      description="Gói công trình, quota AI trả trước và lịch sử thanh toán qua PayOS. Mua, gia hạn hoặc nâng cấp theo công trình."
+      description="Gói công trình, hạn mức AI trả trước và lịch sử thanh toán qua PayOS. Mua, gia hạn hoặc nâng cấp theo công trình."
       eyebrow="Quản lý" breadcrumbs={[{ label: "Dịch vụ & thanh toán" }]}
-      actions={<><Button variant="quiet" size="icon" onClick={reloadAll} disabled={quotations.loading} aria-label="Tải lại" title="Tải lại"><RefreshCw size={16} aria-hidden="true" /></Button>{canPurchase && <><Button variant="secondary" onClick={() => openCreate("topup")}>Nạp quota AI</Button><Button onClick={() => openCreate("service")}><Plus size={16} aria-hidden="true" />Mua gói công trình</Button></>}</>}
+      actions={<><Button variant="quiet" size="icon" onClick={reloadAll} disabled={quotations.loading} aria-label="Tải lại" title="Tải lại"><RefreshCw size={16} aria-hidden="true" /></Button>{canPurchase && <><Button variant="secondary" onClick={() => openCreate("topup")}>Nạp hạn mức AI</Button><Button onClick={() => openCreate("service")}><Plus size={16} aria-hidden="true" />Mua gói công trình</Button></>}</>}
     />
 
     {canPurchase && <ReminderBanner accessToken={token} refreshKey={settled} onOpen={() => setParams({ tab: "reminders", quotation: null, payment: null })} />}
@@ -225,7 +225,7 @@ export function BillingWorkspace() {
               rowKey={(item) => item.id}
               loading={quotations.loading && !quotations.data}
               onRowClick={(item) => openQuotation(item.id)}
-              empty={<EmptyState icon={FileText} title="Chưa có báo giá" description="Mua gói công trình hoặc nạp quota AI để tạo báo giá đầu tiên. Giá, quota và chính sách nâng cấp theo cấu hình từ máy chủ." action={canPurchase ? <Button onClick={() => openCreate("service")}><Plus size={16} aria-hidden="true" />Mua gói công trình</Button> : undefined} />}
+              empty={<EmptyState icon={FileText} title="Chưa có báo giá" description="Mua gói công trình hoặc nạp hạn mức AI để tạo báo giá đầu tiên. Giá, hạn mức và chính sách nâng cấp theo cấu hình của hệ thống." action={canPurchase ? <Button onClick={() => openCreate("service")}><Plus size={16} aria-hidden="true" />Mua gói công trình</Button> : undefined} />}
             />
           </section>
         </div>}
@@ -253,7 +253,7 @@ export function BillingWorkspace() {
       </div>
     </SubTabs>
 
-    <Drawer open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) { setOverride(null); setParams({ quotation: null, payment: null }); } }} size="xl" title="Chi tiết báo giá" description="Số tiền, kỳ và điều khoản là bản chụp do hệ thống phát hành." eyebrow={current ? <><span className="bill-mono">{current.data.quotationNumber}</span><QuotationStatusBadge status={current.data.status} /></> : undefined} data-testid="quotation-drawer">
+    <Drawer open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) { setOverride(null); setParams({ quotation: null, payment: null }); } }} size="xl" title="Chi tiết báo giá" description="Số tiền, kỳ và điều khoản giữ đúng như lúc phát hành." eyebrow={current ? <><span className="bill-mono">{current.data.quotationNumber}</span><QuotationStatusBadge status={current.data.status} /></> : undefined} data-testid="quotation-drawer">
       {selectedId && selected.loading && !current && <SkeletonDetail rows={6} label="Đang tải báo giá…" />}
       {selectedId && selected.error !== undefined && !current && <Alert tone="danger" title={noAccess(selected.error) ? "Không có quyền xem báo giá này" : "Không tải được báo giá"} action={<Button size="sm" variant="secondary" className="mt-3" onClick={selected.reload}>Thử lại</Button>}>{billingErrorText(selected.error)}</Alert>}
       {current && <div className="ops-stack">

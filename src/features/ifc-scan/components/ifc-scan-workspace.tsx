@@ -44,7 +44,7 @@ export const categoryLabels: Record<IfcCategory, string> = {
 const categoryOrder: IfcCategory[] = ["wall", "slab", "roof", "door", "window", "stair", "railing", "structure", "space", "furniture", "equipment", "site", "other"];
 const defaultHidden: IfcCategory[] = ["space"];
 const anchorLabels: Record<ScenarioAnchorKind, string> = { room: "không gian nguồn cháy", stair: "cầu thang", exit: "cửa / lối thoát" };
-const phaseLabels = { parse: "Đang đọc cấu trúc IFC", geometry: "Đang dựng hình học", edges: "Đang dựng nét viền" } as const;
+const phaseLabels = { parse: "Đang đọc cấu trúc IFC", geometry: "Đang dựng mô hình 3D", edges: "Đang dựng nét viền" } as const;
 
 function safeErrorMessage(error: unknown) {
   // The IFC parser reports in English for developers: the console keeps it, the page explains in Vietnamese.
@@ -87,9 +87,9 @@ type IfcScanWorkspaceProps = {
  */
 export function IfcScanWorkspace({
   embedded = false,
-  eyebrow = "IFC / local prototype",
+  eyebrow = "IFC · xem ngay trên máy",
   title = "Quét mô hình IFC",
-  description = "Xem nhanh một tệp IFC ngay trên máy bạn. Tệp không được tải lên máy chủ và không tạo revision.",
+  description = "Xem nhanh một tệp IFC ngay trên máy bạn. Tệp không được tải lên máy chủ và không lưu vào công trình nào.",
 }: IfcScanWorkspaceProps) {
   const [model, setModel] = useState<LoadedIfcModel | null>(null);
   const [scan, setScan] = useState<IfcSceneScan | null>(null);
@@ -278,7 +278,7 @@ export function IfcScanWorkspace({
         <p className="kicker"><span className="kicker-line" /> {eyebrow}</p>
         <h1>{title}</h1>
         <p>{description}</p>
-        <div className={styles.heroActions}>{fileButton}<p className={styles.localNote}><CheckCircle2 size={15} aria-hidden="true" /> File chỉ được xử lý trong trình duyệt này.</p></div>
+        <div className={styles.heroActions}>{fileButton}<p className={styles.localNote}><CheckCircle2 size={15} aria-hidden="true" /> Tệp chỉ được xử lý trong trình duyệt này.</p></div>
       </header>}
 
     <div className={styles.layout}>
@@ -299,7 +299,7 @@ export function IfcScanWorkspace({
             <FloatingButtonGroup label="Công cụ xem mô hình" items={toolbarItems} onAction={onToolbarAction} placement="bottom" className={styles.toolbar} />
           </TooltipProvider>
 
-          {model && <p className={styles.hint}><MousePointerClick size={14} aria-hidden="true" /> Bấm để chọn · kéo để xoay · chuột phải để di chuyển · cuộn để phóng to · F focus · Esc bỏ chọn</p>}
+          {model && <p className={styles.hint}><MousePointerClick size={14} aria-hidden="true" /> Bấm để chọn · kéo để xoay · chuột phải để di chuyển · cuộn để phóng to · F phóng tới cấu kiện · Esc bỏ chọn</p>}
 
           {!model && !progress && <div className={styles.dropZone}>
             <Upload size={28} aria-hidden="true" />
@@ -360,10 +360,10 @@ export function IfcScanWorkspace({
               <div><dt>Tầng</dt><dd>{details.storeyName ?? "—"}</dd></div>
               <div><dt>Kích thước</dt><dd>{details.size ? details.size.map((value) => value.toLocaleString("vi-VN", { maximumFractionDigits: 2 })).join(" × ") + " m" : "Không có hình học"}</dd></div>
               <div><dt>GlobalId</dt><dd className={styles.globalId}><code>{details.globalId ?? "—"}</code>{details.globalId && <button type="button" onClick={() => void copyGlobalId()} aria-label="Sao chép GlobalId"><Copy size={13} aria-hidden="true" />{copied ? "Đã chép" : ""}</button>}</dd></div>
-              <div><dt>Express ID</dt><dd>#{details.expressID}</dd></div>
+              <div><dt>Số thứ tự trong tệp</dt><dd>#{details.expressID}</dd></div>
             </dl>
             <div className={styles.propActions}>
-              <button type="button" onClick={() => viewerRef.current?.focusSelection()}><Focus size={14} aria-hidden="true" /> Focus</button>
+              <button type="button" onClick={() => viewerRef.current?.focusSelection()}><Focus size={14} aria-hidden="true" /> Phóng tới</button>
               <button type="button" onClick={() => toggleCategory(details.category)}><EyeOff size={14} aria-hidden="true" /> Ẩn loại này</button>
               <button type="button" onClick={() => select(null)}><X size={14} aria-hidden="true" /> Bỏ chọn</button>
             </div>
@@ -372,7 +372,7 @@ export function IfcScanWorkspace({
 
         {embedded && <section className={`${styles.panel} ${styles.nextStep}`} aria-labelledby="ifc-next-title">
           <p className={styles.nextKicker} id="ifc-next-title"><Sparkles size={13} aria-hidden="true" /> Bước tiếp theo</p>
-          <p className={styles.nextText}>Muốn dùng mô hình này cho huấn luyện? Tạo công trình rồi tải IFC để worker xử lý và kiểm tra QA, sau đó soạn kịch bản và phát hành.</p>
+          <p className={styles.nextText}>Muốn dùng mô hình này cho huấn luyện? Tạo công trình rồi tải IFC lên để hệ thống dựng mô hình 3D và kiểm tra tự động, sau đó soạn kịch bản và phát hành.</p>
           <Button asChild><Link href={routes.workspaceBuildings}>Tới danh sách công trình <ArrowRight size={15} aria-hidden="true" /></Link></Button>
         </section>}
       </aside>

@@ -12,7 +12,7 @@ export function MobileGuide() {
     <ol className="qrl-steps">
       <li><span><strong>Cài ứng dụng FET3D trên Android</strong> (chỉ cần cài một lần). Xem <Link href={routes.download}>trạng thái tải ứng dụng</Link>.</span></li>
       <li><span><strong>Mở ứng dụng và đăng nhập</strong>, rồi quét lại mã QR của công trình bằng chức năng quét trong ứng dụng.</span></li>
-      <li><span><strong>Chọn bài</strong> trong danh sách. Ứng dụng tải và kiểm tra gói bài; máy chủ chỉ cho bắt đầu khi có kết nối.</span></li>
+      <li><span><strong>Chọn bài</strong> trong danh sách. Ứng dụng tải bài về máy; điện thoại cần có mạng khi bắt đầu bài.</span></li>
     </ol>
     <p className="ops-muted"><Smartphone size={14} aria-hidden="true" style={{ display: "inline", verticalAlign: "-2px", marginRight: 6 }} />Trang này không tự mở ứng dụng và không biết ứng dụng đã được cài hay chưa. Nếu chưa cài, hãy cài rồi quét lại mã QR.</p>
   </Panel>;

@@ -7,17 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import type { PipelineAction, PipelineProgressModel, StepState } from "../pipeline";
 
-const STATE_TEXT: Record<StepState, string> = { todo: "Chờ", active: "Đang chạy", done: "Xong", error: "Lỗi", skipped: "Không chặn" };
+const STATE_TEXT: Record<StepState, string> = { todo: "Chờ", active: "Đang chạy", done: "Xong", error: "Lỗi", skipped: "Bỏ qua" };
 
 const ACTIONS: Record<PipelineAction, { label: string; icon: ReactNode }> = {
   upload: { label: "Tải lên IFC mới", icon: <Upload size={16} aria-hidden="true" /> },
   process: { label: "Chạy xử lý IFC", icon: <Play size={16} aria-hidden="true" /> },
-  retry: { label: "Chạy lại job thất bại", icon: <RotateCcw size={16} aria-hidden="true" /> },
+  retry: { label: "Chạy lại lượt xử lý bị lỗi", icon: <RotateCcw size={16} aria-hidden="true" /> },
   refresh: { label: "Tải lại trạng thái", icon: <RefreshCw size={16} aria-hidden="true" /> },
-  issues: { label: "Xem issue QA", icon: <ListChecks size={16} aria-hidden="true" /> },
+  issues: { label: "Xem các vấn đề", icon: <ListChecks size={16} aria-hidden="true" /> },
   exit: { label: "Chọn cửa thoát", icon: <DoorOpen size={16} aria-hidden="true" /> },
   author: { label: "Soạn kịch bản", icon: <PenLine size={16} aria-hidden="true" /> },
-  latest: { label: "Xem revision mới nhất", icon: <ArrowRight size={16} aria-hidden="true" /> },
+  latest: { label: "Xem bản IFC mới nhất", icon: <ArrowRight size={16} aria-hidden="true" /> },
 };
 
 /** Upload → processing → QA → ready, with the one call to action that unblocks the selected revision. */

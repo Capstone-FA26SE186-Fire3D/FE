@@ -27,6 +27,6 @@ export function RelatedPosts({ currentId, situation }: { currentId: string; situ
         </Link>
       </li>;
     })}</ul>
-    <Link className="reader-related-all" href="/learn">Xem thư viện Learn <span aria-hidden="true">↗</span></Link>
+    <Link className="reader-related-all" href="/learn">Xem thư viện bài học <span aria-hidden="true">↗</span></Link>
   </aside>;
 }

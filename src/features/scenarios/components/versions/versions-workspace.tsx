@@ -138,7 +138,7 @@ function Workbench({ accessToken, buildingId, scenario, versionCount, editorHref
       { id: "approval", title: "Duyệt nội dung", state: approvalGate(version.reviewStatus, version.rejectReason) },
       { id: "release", title: "Phát hành", state: releaseGate(server.releaseView.release) },
     ]} />} />
-    {server.readiness.error !== undefined && !readiness && <Alert tone="danger" title="Không đọc được readiness từ máy chủ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={server.readiness.reload}>Thử lại</Button>}>{describeError(server.readiness.error).message} Các cổng ở trên chỉ phản ánh phần đã tải được.</Alert>}
+    {server.readiness.error !== undefined && !readiness && <Alert tone="danger" title="Không đọc được điều kiện phát hành" action={<Button size="sm" variant="secondary" className="mt-3" onClick={server.readiness.reload}>Thử lại</Button>}>{describeError(server.readiness.error).message} Các cổng ở trên chỉ phản ánh phần đã tải được.</Alert>}
     <div id="ver-workbench" className="ver-workbench" tabIndex={-1}>
       <Tabs value={tab} onValueChange={(value) => onTab(value as TabId)}>
         <TabsList aria-label="Các bước của phiên bản">

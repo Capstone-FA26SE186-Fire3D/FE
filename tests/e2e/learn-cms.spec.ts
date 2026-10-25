@@ -38,7 +38,7 @@ async function openNew(page: Page): Promise<Locator> {
 }
 
 async function fillBasics(dialog: Locator, slug: string, title: string, summary: string, intro = "Đoạn mở đầu của bài.") {
-  await dialog.getByLabel(/^Slug/).fill(slug);
+  await dialog.getByLabel(/^Đường dẫn rút gọn/).fill(slug);
   await dialog.getByLabel("Tiêu đề", { exact: true }).fill(title);
   await dialog.getByLabel(/^Tóm tắt/).fill(summary);
   await dialog.getByLabel(/^Đoạn mở đầu/).fill(intro);
@@ -75,7 +75,7 @@ test.describe("production Learn CMS", () => {
   test("is no longer a pending module and calls only the real admin routes", async ({ page }) => {
     const backend = await setup(page);
     await page.goto("/admin/learn");
-    await expect(page.getByRole("heading", { level: 1, name: "Learn CMS" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Quản lý bài học" })).toBeVisible();
     await expect(page.getByTestId("pending-module")).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Chưa có bài nào" })).toBeVisible();
     await expect(page.getByTestId("prototype-banner")).toHaveCount(0);
@@ -108,10 +108,10 @@ test.describe("situations", () => {
     await page.getByRole("button", { name: "Tạo tình huống" }).first().click();
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Tên tình huống").fill("Cháy trong nhà");
-    await dialog.getByLabel("Slug", { exact: true }).fill("chay-trong-nha");
+    await dialog.getByLabel("Đường dẫn rút gọn", { exact: true }).fill("chay-trong-nha");
     await dialog.getByRole("button", { name: "Tạo tình huống" }).click();
     await expect(page.getByText("Đã tạo tình huống")).toBeVisible();
-    const table = page.getByRole("table", { name: "Danh mục tình huống Learn" });
+    const table = page.getByRole("table", { name: "Danh mục tình huống bài học" });
     await expect(table.getByText("Cháy trong nhà")).toBeVisible();
     const create = backend.callsTo("POST", /\/api\/admin\/learn\/situations$/);
     expect(create).toHaveLength(1);
@@ -123,9 +123,9 @@ test.describe("situations", () => {
 
     await page.getByRole("button", { name: "Tạo tình huống" }).first().click();
     await page.getByRole("dialog").getByLabel("Tên tình huống").fill("Trùng");
-    await page.getByRole("dialog").getByLabel("Slug", { exact: true }).fill("chay-trong-nha");
+    await page.getByRole("dialog").getByLabel("Đường dẫn rút gọn", { exact: true }).fill("chay-trong-nha");
     await page.getByRole("dialog").getByRole("button", { name: "Tạo tình huống" }).click();
-    await expect(page.getByRole("dialog").getByText("Đã có tình huống dùng slug này")).toBeVisible();
+    await expect(page.getByRole("dialog").getByText("Đã có tình huống dùng đường dẫn rút gọn này")).toBeVisible();
     await expect(page.getByRole("dialog").getByLabel("Tên tình huống")).toHaveValue("Trùng");
     expect(backend.situations).toHaveLength(1);
   });
@@ -133,7 +133,7 @@ test.describe("situations", () => {
   test("filters by status (chip) and search live in the URL", async ({ page }) => {
     await setup(page, (backend) => { backend.seedSituation("a", "Thoát nạn"); backend.seedSituation("b", "Cũ", { isActive: false }); });
     await page.goto("/admin/learn?section=situations&active=false");
-    const table = page.getByRole("table", { name: "Danh mục tình huống Learn" });
+    const table = page.getByRole("table", { name: "Danh mục tình huống bài học" });
     await expect(table.getByText("Cũ", { exact: true })).toBeVisible();
     await expect(table.getByText("Thoát nạn")).toHaveCount(0);
     await pickChip(page, "Trạng thái", "mọi trạng thái");
@@ -193,10 +193,10 @@ test.describe("post lifecycle", () => {
     };
     await lifecycle("Ẩn bài", "Ẩn bài", "Hidden", "hide");
     await expect(page.getByText("Đã ẩn", { exact: true }).first()).toBeVisible();
-    await expect(page.getByTestId("status-visibility")).toContainText("vẫn có thể là nguồn RAG hợp lệ theo quyền backend");
+    await expect(page.getByTestId("status-visibility")).toContainText("AI vẫn có thể dùng khi người hỏi có quyền");
     await lifecycle("Hiện lại", "Hiện bài", "Published", "show");
     await lifecycle("Xóa bài", "Xóa bài", "Deleted", "delete");
-    await expect(page.getByTestId("status-visibility")).toContainText("loại khỏi RAG");
+    await expect(page.getByTestId("status-visibility")).toContainText("AI không còn dùng");
     await expect(page.getByRole("button", { name: "Xuất bản bản nháp" })).toHaveCount(0);
     await lifecycle("Khôi phục", "Khôi phục", "Hidden", "restore"); // was public once: never straight back to public
     await expect(page.getByText("Đã ẩn", { exact: true }).first()).toBeVisible();
@@ -233,7 +233,7 @@ test.describe("post lifecycle", () => {
     const dialog = await openNew(page);
     await fillBasics(dialog, "da-co", "Tiêu đề của tôi", "Tóm tắt của tôi.", "Nội dung của tôi.");
     await dialog.getByTestId("create-post").click();
-    await expect(dialog.getByText("Đã có bài khác dùng slug này").first()).toBeVisible();
+    await expect(dialog.getByText("Đã có bài khác dùng đường dẫn rút gọn này").first()).toBeVisible();
     await expect(page).toHaveURL(/post=new/);
     await expect(dialog.getByLabel("Tiêu đề", { exact: true })).toHaveValue("Tiêu đề của tôi");
   });
@@ -434,7 +434,7 @@ test.describe("media", () => {
     await expect(block.getByText("Dùng liên kết đầy đủ từ YouTube, Facebook hoặc TikTok")).toBeVisible();
     // A refused link blocks saving.
     await page.getByRole("button", { name: "Lưu bản nháp" }).click();
-    await expect(page.getByText("Có liên kết video bị máy chủ từ chối")).toBeVisible();
+    await expect(page.getByText("Có liên kết video không hợp lệ")).toBeVisible();
     expect(backend.callsTo("PUT", /\/versions\//)).toHaveLength(0);
 
     await block.getByLabel(/^Liên kết video/).fill("https://youtu.be/dQw4w9WgXcQ");
@@ -458,7 +458,7 @@ test.describe("media", () => {
     await pickOption(page, dialog.getByRole("combobox", { name: "Loại bài" }), /^Video$/);
     await dialog.getByLabel(/^Liên kết video/).fill("https://vimeo.com/123456");
     await dialog.getByTestId("create-post").click();
-    await expect(dialog.getByText(/LEARN_MEDIA_INVALID/).first()).toBeVisible();
+    await expect(dialog.getByText(/Dùng liên kết đầy đủ từ YouTube/).first()).toBeVisible();
     expect(backend.bySlug("video-ngay")).toBeUndefined();
     await dialog.getByLabel(/^Liên kết video/).fill("https://youtu.be/dQw4w9WgXcQ");
     await dialog.getByTestId("create-post").click();
@@ -540,8 +540,8 @@ test.describe("unknown block fields", () => {
     await page.getByRole("button", { name: "Lưu bản nháp" }).click();
     const put = backend.callsTo("PUT", /\/versions\//)[0];
     expect(put.body).toMatchObject({ blocks: [{ type: "paragraph", text: "Đoạn một", futureField: "giữ lại" }, { type: "carousel", slides: [1, 2] }] });
-    await expect(page.getByText(/FIELD_UNKNOWN/).first()).toBeVisible();
-    await expect(page.getByTestId("content-block").first().getByRole("alert")).toContainText("FIELD_UNKNOWN");
+    await expect(page.getByText(/thông tin không thuộc loại khối/).first()).toBeVisible();
+    await expect(page.getByTestId("content-block").first().getByRole("alert")).toContainText("thông tin không thuộc loại khối");
     expect(backend.versionsOf(post.id)[0].title).not.toBe("Có trường lạ"); // nothing was silently dropped or half-saved
   });
 });
@@ -574,7 +574,7 @@ test.describe("sources", () => {
 
     await tab(page, "Phiên bản & Xuất bản").click();
     await expect(page.getByRole("button", { name: "Xuất bản bản nháp" })).toBeDisabled();
-    await expect(page.getByText(/Nguồn “Quy chuẩn chờ duyệt”: Nguồn chưa được duyệt \(Draft\)/).first()).toBeVisible();
+    await expect(page.getByText(/Nguồn “Quy chuẩn chờ duyệt”: Nguồn chưa được duyệt/).first()).toBeVisible();
     expect(publishedCalls(backend)).toHaveLength(0);
 
     // The verdict survives a reload: it is fetched by id for the stored source.
@@ -704,7 +704,7 @@ test.describe("statuses in the list", () => {
   test("every state is labelled, the status filter lives in the URL, and drafts without a published version say so", async ({ page }) => {
     await setup(page, seed);
     await page.goto("/admin/learn");
-    const table = page.getByRole("table", { name: "Danh sách bài Learn" });
+    const table = page.getByRole("table", { name: "Danh sách bài học" });
     await expect(table.getByRole("row")).toHaveCount(5);
     await expect(table.getByText("Chưa có bản xuất bản")).toBeVisible();
     for (const label of ["Chưa xuất bản", "Đang công khai", "Đã ẩn", "Đã xóa"]) await expect(table.getByText(label, { exact: true }).first()).toBeVisible();
@@ -727,15 +727,15 @@ test.describe("statuses in the list", () => {
     const backend = await setup(page, seed);
     await page.goto(`/admin/learn?post=${backend.bySlug("c-an")!.id}&tab=publish`);
     await expect(page.getByTestId("status-visibility")).toContainText("Không công khai");
-    await expect(page.getByTestId("status-visibility")).toContainText("vẫn có thể là nguồn RAG hợp lệ theo quyền backend");
+    await expect(page.getByTestId("status-visibility")).toContainText("AI vẫn có thể dùng khi người hỏi có quyền");
     await expect(page.getByRole("button", { name: "Hiện lại", exact: true })).toBeVisible();
     await page.goto(`/admin/learn?post=${backend.bySlug("d-xoa")!.id}&tab=publish`);
-    await expect(page.getByTestId("status-visibility")).toContainText("bị loại khỏi RAG");
+    await expect(page.getByTestId("status-visibility")).toContainText("AI không còn dùng");
     await expect(page.getByRole("button", { name: "Khôi phục", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Ẩn bài", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Xóa bài", exact: true })).toHaveCount(0);
     await page.goto(`/admin/learn?post=${backend.bySlug("a-chua")!.id}&tab=publish`);
-    await expect(page.getByTestId("status-visibility")).toContainText("Người đọc nhận 404");
+    await expect(page.getByTestId("status-visibility")).toContainText("Người đọc không mở được bài");
   });
 
   test("pagination keeps the page in the URL", async ({ page }) => {
@@ -755,7 +755,7 @@ test.describe("statuses in the list", () => {
     await page.goto("/admin/learn");
     await expect(page.getByText("Không tải được danh sách bài")).toBeVisible();
     await page.getByRole("button", { name: "Thử lại" }).click();
-    await expect(page.getByRole("table", { name: "Danh sách bài Learn" }).getByText("ok", { exact: true })).toBeVisible();
+    await expect(page.getByRole("table", { name: "Danh sách bài học" }).getByText("ok", { exact: true })).toBeVisible();
     await page.goto("/admin/learn?post=11111111-2222-4333-8444-555555555555");
     await expect(page.getByText("Không tìm thấy bài")).toBeVisible();
     await page.goto("/admin/learn?post=khong-phai-uuid");
@@ -805,7 +805,7 @@ for (const width of [1440, 375]) {
       for (const path of paths) {
         await page.goto(path);
         // v2: quick edit and the new-post form are modal, which hides the page heading from the accessibility tree.
-        await expect(page.getByRole("dialog").or(page.getByRole("heading", { level: 1, name: "Learn CMS" })).first()).toBeVisible();
+        await expect(page.getByRole("dialog").or(page.getByRole("heading", { level: 1, name: "Quản lý bài học" })).first()).toBeVisible();
         await page.waitForTimeout(500);
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
         expect(overflow, `${path} overflows horizontally`).toBeLessThanOrEqual(0);

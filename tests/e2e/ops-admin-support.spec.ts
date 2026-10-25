@@ -71,7 +71,7 @@ test.describe("admin overview", () => {
     await expect(page.getByTestId("tile-payments")).toHaveAttribute("href", "/admin/commerce?tab=payments");
     const system = page.getByRole("group", { name: "Tổng quan hệ thống" });
     await expect(system.getByTestId("kpi-accounts").locator(".ops-kpi-value")).toHaveText("52");
-    await expect(system.getByTestId("kpi-accounts")).toContainText("Học viên 43 · Tổ chức 7 · Admin 2");
+    await expect(system.getByTestId("kpi-accounts")).toContainText("Học viên 43 · Tổ chức 7 · Quản trị FET3D 2");
     await expect(page.getByText("Hoạt động gần đây")).toHaveCount(0);
     await expect(page.getByText("Cập nhật lúc")).toBeVisible();
     await expect(page.getByText("mặc định 30 ngày gần nhất")).toBeVisible();
@@ -80,7 +80,7 @@ test.describe("admin overview", () => {
     const report = page.getByRole("group", { name: "Chỉ số vận hành" });
     await expect(report.getByTestId("kpi-accounts").locator(".ops-kpi-value")).toHaveText("52");
     await expect(report.getByTestId("kpi-buildings").locator(".ops-kpi-value")).toHaveText("13");
-    await expect(page.getByTestId("chart-jobs").getByRole("img", { name: /Tiến trình Geometry theo trạng thái/ })).toHaveAccessibleName(/Thất bại/);
+    await expect(page.getByTestId("chart-jobs").getByRole("img", { name: /Tiến trình Dựng mô hình 3D theo trạng thái/ })).toHaveAccessibleName(/Thất bại/);
     await expect(page.getByTestId("chart-jobs")).toContainText("Thất bại");
     // Only the operations endpoint is called until another tab opens; the old "Chờ BE" cards are gone.
     await expect(page.locator("#ops-main").getByText("Chờ BE")).toHaveCount(0);
@@ -202,7 +202,7 @@ test.describe("admin support inbox", () => {
     await page.getByRole("option", { name: "Platform Admin (tôi)" }).click();
     await drawer.getByRole("button", { name: "Lưu thay đổi" }).click();
 
-    await expect(drawer.getByText("Ticket vừa được thay đổi ở nơi khác")).toBeVisible();
+    await expect(drawer.getByText("Yêu cầu vừa được thay đổi ở nơi khác")).toBeVisible();
     expect(patches[0]).toEqual({ ifMatch: '"support-2"', body: { status: "InProgress", priority: "High", assignedTo: "admin-1" } });
     // Choices are kept, nothing was overwritten.
     await expect(drawer.getByLabel("Ưu tiên")).toContainText("Cao");
@@ -214,7 +214,7 @@ test.describe("admin support inbox", () => {
     await drawer.getByRole("button", { name: "Lưu thay đổi" }).click();
     await expect.poll(() => patches.length).toBe(2);
     expect(patches[1].ifMatch).toBe('"support-3"');
-    await expect(page.getByText("Đã cập nhật ticket")).toBeVisible();
+    await expect(page.getByText("Đã cập nhật yêu cầu")).toBeVisible();
   });
 
   test("double clicking send posts once; a failed send retries with the same Idempotency-Key and keeps the text", async ({ page }) => {
@@ -258,11 +258,11 @@ test.describe("admin support inbox", () => {
     await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ETag: '"support-2"' }, json: { ...ticket({ status: "Closed" }), messages: messagesPage([]) } }));
     await page.goto("/admin/support?ticket=ticket-1");
     const drawer = page.getByTestId("admin-ticket-drawer");
-    await expect(drawer.getByText(/Ticket đã đóng/)).toBeVisible();
+    await expect(drawer.getByText(/Yêu cầu đã đóng/)).toBeVisible();
     await expect(drawer.getByRole("button", { name: "Gửi tin nhắn" })).toBeDisabled();
   });
 
-  test("empty, error and loading states plus the Chờ BE block", async ({ page }) => {
+  test("empty, error and loading states plus the Sắp có block", async ({ page }) => {
     let fail = true;
     await signIn(page, admin);
     await mockAdminLookups(page);
@@ -274,11 +274,11 @@ test.describe("admin support inbox", () => {
     await page.goto("/admin/support");
     // The DataTable shows its skeleton while the first page loads (`data-loading`), then the error, then the empty state.
     await expect(page.getByTestId("admin-tickets-table")).toHaveAttribute("data-loading", "true");
-    await expect(page.getByText("Không tải được danh sách ticket")).toBeVisible();
+    await expect(page.getByText("Không tải được danh sách yêu cầu")).toBeVisible();
     fail = false;
     await page.getByRole("button", { name: "Thử lại" }).click();
-    await expect(page.getByText("Chưa có ticket nào")).toBeVisible();
-    await expect(page.getByRole("region", { name: "Chưa có từ backend" })).toContainText("Tệp đính kèm");
+    await expect(page.getByText("Chưa có yêu cầu nào")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Tính năng sắp có" })).toContainText("Tệp đính kèm");
   });
 
   test("feedback tab updates status with If-Match and handles 412 without losing the choice", async ({ page }) => {
@@ -315,7 +315,7 @@ test.describe("admin support inbox", () => {
     await page.route("**/api/admin/support/tickets?*", (route) => route.fulfill({ json: page1([]) }));
     await page.route("**/api/admin/audit-logs?*", (route) => route.fulfill({ json: { items: [], total: 0, page: 1, pageSize: 20, from: "2026-09-10T00:00:00Z", to: "2026-10-10T00:00:00Z" } }));
     await page.goto("/admin/support?status=Open");
-    await page.getByRole("tab", { name: "Nhật ký audit" }).click();
+    await page.getByRole("tab", { name: "Nhật ký thao tác" }).click();
     await expect(page).toHaveURL(/tab=audit/);
     await expect(page).not.toHaveURL(/status=/);
   });
@@ -339,13 +339,13 @@ test.describe("audit log", () => {
     await page.route("**/api/admin/audit-logs?*", (route) => { queries.push(new URL(route.request().url()).searchParams); return route.fulfill({ json: { items: [log], total: 1, page: 1, pageSize: 20, from: "2026-09-10T00:00:00Z", to: "2026-10-10T00:00:00Z" } }); });
     await page.goto("/admin/support?tab=audit");
     await expect(page.getByText("mặc định 30 ngày gần nhất")).toBeVisible();
-    await expect(page.getByText("Chỉ metadata").first()).toBeVisible();
+    await expect(page.getByText("Chỉ thông tin chung").first()).toBeVisible();
     expect(queries[0].has("from")).toBe(false);
     expect(queries[0].has("to")).toBe(false);
     await page.route("**/api/admin/audit-logs/a-1", (route) => route.fulfill({ json: { ...log, changes: [] } }));
-    await page.getByRole("row").filter({ hasText: "Update" }).first().click();
-    const drawer = page.getByRole("dialog", { name: "Chi tiết bản ghi audit" });
-    await expect(drawer.getByText("Chỉ hiển thị metadata")).toBeVisible();
+    await page.getByRole("row").filter({ hasText: "Cập nhật" }).first().click();
+    const drawer = page.getByRole("dialog", { name: "Chi tiết thao tác" });
+    await expect(drawer.getByText("Chỉ hiển thị thông tin chung")).toBeVisible();
     await drawer.getByRole("button", { name: "Lọc theo người thực hiện" }).click();
     await expect(page).toHaveURL(/actorId=11111111-1111-4111-8111-111111111111/);
   });
@@ -373,7 +373,7 @@ test.describe("audit log", () => {
     await stage("Người thực hiện", "Mã người thực hiện", g(1));
     await stage("Tổ chức", "Mã tổ chức", g(2));
     await stage("Đối tượng", "Mã đối tượng", g(3));
-    await stage("Correlation", "Mã correlation", g(4));
+    await stage("Truy vết", "Mã truy vết", g(4));
     await page.getByRole("button", { name: "Áp dụng bộ lọc" }).click();
     await expect.poll(() => queries.length).toBe(2);
     const q = queries[1];
@@ -387,7 +387,7 @@ test.describe("audit log", () => {
     await stage("Thời gian", "Từ ngày", "2026-09-01");
     await stage("Tổ chức", "Mã tổ chức", "not-a-guid");
     await page.getByRole("button", { name: "Áp dụng bộ lọc" }).click();
-    await expect(page.getByText(/Nhập mã dạng GUID/).first()).toBeVisible();
+    await expect(page.getByText(/Mã định danh chưa đúng/).first()).toBeVisible();
     expect(queries).toHaveLength(before);
   });
 
@@ -401,10 +401,10 @@ test.describe("audit log", () => {
     expect(calls).toBe(0);
 
     await page.goto("/admin/support?tab=audit");
-    await expect(page.getByText("Không tải được nhật ký audit")).toBeVisible();
+    await expect(page.getByText("Không tải được nhật ký thao tác")).toBeVisible();
     fail = false;
     await page.getByRole("button", { name: "Thử lại" }).click();
-    await expect(page.getByText("Chưa có bản ghi audit trong khoảng thời gian này")).toBeVisible();
+    await expect(page.getByText("Chưa có thao tác nào trong khoảng thời gian này")).toBeVisible();
   });
 });
 
@@ -442,7 +442,7 @@ test.describe("organization support", () => {
     const drawer = page.getByTestId("ticket-drawer");
     await expect(drawer.getByRole("heading", { name: "Không tải được mô hình IFC" })).toBeVisible();
     await expect(drawer.getByText("Chúng tôi đã nhận yêu cầu")).toBeVisible();
-    await expect(drawer.getByText("Đội hỗ trợ Fire3D")).toBeVisible();
+    await expect(drawer.getByText("Đội hỗ trợ FET3D")).toBeVisible();
     await expect(drawer.getByText("Bạn", { exact: true })).toBeVisible();
   });
 
