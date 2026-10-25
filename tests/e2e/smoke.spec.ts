@@ -57,6 +57,6 @@ test("an article offers saving, and the hub Q&A opens after sign-in", async ({ p
   await page.getByRole("link", { name: "Đăng nhập" }).click();
   await login(page);
   await expect(page).toHaveURL(/\/learning-hub\?view=questions/);
-  await expect(page.getByRole("link", { name: /^Hỏi đáp/ })).not.toContainText(/chưa khả dụng/i);
+  await expect(page.getByRole("link", { name: /^Trợ lý AI/ }).first()).toBeVisible();
   expect(await page.evaluate(() => sessionStorage.getItem("fire3d-prototype-content"))).toBeNull();
 });

@@ -40,6 +40,7 @@
 .ai-panel-context { display: flex; align-items: center; gap: 8px; margin: 0; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--bg-soft); color: var(--muted); font-size: 12px; line-height: 1.4; }
 .ai-panel-context svg { flex: none; color: var(--dim); }
 .ai-panel-context span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-panel-context .ai-action { flex: none; margin-left: auto; white-space: nowrap; }
 .ai-panel-modes { margin-bottom: 12px; }
 .ai-panel-messages { flex: 1; min-height: 0; }
 
@@ -85,6 +86,8 @@
 .ai-composer-box.is-locked { opacity: .5; padding-right: 8px; }
 .ai-composer-input { flex: 1; min-width: 0; max-height: 120px; padding: 11px 0; border: 0; background: transparent; color: var(--text); font: inherit; font-size: 13px; line-height: 20px; resize: none; outline: 0; field-sizing: content; }
 .ai-composer-input::placeholder { color: var(--dim); }
+/* The box shows focus (:focus-within); the global :focus-visible ring would draw a second frame inside it. */
+.ai-composer-input:focus-visible { outline: 0; }
 .ai-composer-locked { flex: 1; color: var(--dim); font-size: 13px; }
 .ai-send-target { display: inline-grid; flex: none; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; cursor: pointer; }
 .ai-send-target:disabled { cursor: not-allowed; }

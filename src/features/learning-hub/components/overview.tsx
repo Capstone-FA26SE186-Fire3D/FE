@@ -1,5 +1,6 @@
 "use client";
 
+import { useOptionalAiBubble } from "@/features/org-ai/floating/ai-bubble-context";
 import { Bookmark, ChevronRight, History, RefreshCw, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -120,21 +121,23 @@ function SavedPreview({ accessToken, userId }: { accessToken: string; userId: st
   </section>;
 }
 
-/** Shortcut to the Q&A view. The text is only carried over as a draft (`q`); nothing is sent to the AI from here. */
+/** Shortcut to the floating assistant. The text is only carried over as a draft; nothing is sent to the AI from here. */
 function AskShortcut() {
   const router = useRouter();
+  const bubble = useOptionalAiBubble();
   const [text, setText] = useState("");
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const draft = text.trim().slice(0, ASK_PREFILL_MAX);
-    router.push(`/learning-hub?view=questions${draft ? `&q=${encodeURIComponent(draft)}` : ""}`);
+    if (bubble?.enabled) bubble.openWith(null, draft || undefined);
+    else router.push(`/learning-hub?view=questions${draft ? `&q=${encodeURIComponent(draft)}` : ""}`);
   };
   return <section className="ov-card ov-ask" aria-labelledby="ov-ask-title">
     <h3 id="ov-ask-title"><Sparkles size={20} aria-hidden="true" />Hỏi AI</h3>
     <p>Câu trả lời kèm nguồn trích dẫn. Trong chế độ Đánh giá, AI bị tắt.</p>
     <form onSubmit={submit}>
       <input type="text" aria-label="Câu hỏi cho AI" placeholder="Hỏi về nội dung bài viết…" value={text} maxLength={ASK_PREFILL_MAX} onChange={(event) => setText(event.target.value)} />
-      <Button type="submit">Mở Hỏi đáp AI</Button>
+      <Button type="submit">Hỏi Trợ lý AI</Button>
     </form>
   </section>;
 }

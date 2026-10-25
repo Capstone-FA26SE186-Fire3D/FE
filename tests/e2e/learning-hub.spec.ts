@@ -45,6 +45,7 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 980, height: 650 
     await expect(page.getByTestId("trainee-ai-quota")).toContainText("160 tokens");
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
     await page.screenshot({ path: testInfo.outputPath(`hub-${viewport.width}.png`), fullPage: true });
+    await page.getByTestId("ai-chat-close").click();
     if (viewport.width < 1024) await page.getByRole("button", { name: "Mở menu học tập" }).click();
     await page.getByRole("navigation", { name: "Quản lý học tập" }).getByRole("link", { name: /^Lịch sử/ }).click();
     await expect(page.getByTestId("history-empty")).toContainText("Bạn chưa có lượt tập nào");
@@ -52,25 +53,40 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 980, height: 650 
   });
 }
 
-test("Q&A shows today's allowance, asks with the article as context and polls the answer with a Learn citation", async ({ page }) => {
+/** The assistant lives in the floating bubble; the "Trợ lý AI" view only manages history and the allowance. */
+async function openAssistant(page: Page) {
+  const panel = page.getByTestId("ai-chat-panel");
+  if (!(await panel.isVisible())) await page.getByTestId("ai-bubble-button").click();
+  await expect(panel).toBeVisible();
+  return panel;
+}
+
+test("the bubble shows today's allowance, asks with the article as context and polls the answer with a Learn citation", async ({ page }) => {
   const ai = new TraineeAiBackend();
   let ids = { post: "", version: "" };
   await restore(page, "trainee", (backend) => { const seeded = backend.seedPost("hoi-dap", { title: "Thang máy khi có cháy", summary: "x", status: "Published" }); ids = { post: seeded.post.id, version: seeded.version.id }; }, ai);
   await page.goto("/learning-hub?view=questions&article=hoi-dap");
-  await expect(page.getByRole("navigation", { name: "Quản lý học tập" }).getByRole("link", { name: /^Hỏi đáp/ })).not.toContainText(/chưa khả dụng/i);
+  await expect(page.getByRole("navigation", { name: "Quản lý học tập" }).getByRole("link", { name: /^Trợ lý AI/ })).toBeVisible();
+  const panel = page.getByTestId("ai-chat-panel");
+  await expect(panel).toBeVisible();
+  await expect(page).not.toHaveURL(/article=/); // handed over to the bubble; a reload does not reopen it
   await expect(page.getByTestId("trainee-ai-quota")).toContainText("Hôm nay còn 160 tokens / 200 tokens");
   await expect(page.getByTestId("trainee-ai-context")).toContainText("Thang máy khi có cháy");
-  await page.getByLabel("Câu hỏi", { exact: true }).fill("  Vì sao không nên dùng thang máy?  ");
-  await page.getByTestId("ai-send").click();
-  await expect(page.getByTestId("ai-answer")).toContainText("Không dùng thang máy", { timeout: 15_000 });
-  await expect(page.getByTestId("ai-citation-link").first()).toHaveAttribute("href", "/learn/doc-khong-gian");
+  await panel.getByLabel("Câu hỏi", { exact: true }).fill("  Vì sao không nên dùng thang máy?  ");
+  await panel.getByTestId("ai-send").click();
+  await expect(panel.getByTestId("ai-chat-answer-text")).toContainText("Không dùng thang máy", { timeout: 15_000 });
+  await expect(panel.getByTestId("ai-chat-citation").first().getByRole("link")).toHaveAttribute("href", "/learn/doc-khong-gian");
   expect(ai.posts()).toHaveLength(1);
   expect(ai.posts()[0].body).toEqual({ question: "Vì sao không nên dùng thang máy?", context: { kind: "Learn", postId: ids.post, versionId: ids.version } });
   expect(ai.posts()[0].headers["idempotency-key"]).toBeTruthy();
+
+  // The management view lists the question; a row opens the stored answer.
+  await expect(page.getByTestId("trainee-ai-history")).toContainText("Vì sao không nên dùng thang máy?");
+  await panel.getByTestId("ai-chat-detail").click();
   await expect(page).toHaveURL(/request=eeeeeeee/);
+  await expect(page.getByTestId("trainee-ai-request").getByTestId("ai-answer")).toBeVisible();
   await page.reload();
-  await expect(page.getByTestId("ai-answer")).toBeVisible();
-  await expect(page.getByTestId("trainee-ai-recent")).toContainText("Vì sao không nên dùng thang máy?");
+  await expect(page.getByTestId("trainee-ai-request").getByTestId("ai-answer")).toBeVisible();
 });
 
 test("a result or a Training from the URL becomes the context; 'Hỏi chung' drops it", async ({ page }) => {
@@ -78,18 +94,19 @@ test("a result or a Training from the URL becomes the context; 'Hỏi chung' dro
   await restore(page, "trainee", () => undefined, ai);
   const session = "aaaaaaaa-0000-4000-8000-000000000001";
   await page.goto(`/learning-hub?view=questions&session=${session}`);
+  const panel = page.getByTestId("ai-chat-panel");
   await expect(page.getByTestId("trainee-ai-context")).toContainText("một kết quả tập huấn của bạn");
-  await page.getByLabel("Câu hỏi", { exact: true }).fill("Vì sao tôi chưa đạt?");
-  await page.getByTestId("ai-send").click();
+  await panel.getByLabel("Câu hỏi", { exact: true }).fill("Vì sao tôi chưa đạt?");
+  await panel.getByTestId("ai-send").click();
   await expect.poll(() => ai.posts().length).toBe(1);
   expect(ai.posts()[0].body).toEqual({ question: "Vì sao tôi chưa đạt?", context: { kind: "Result", sessionId: session } });
 
   await page.goto("/learning-hub?view=questions&training=bbbbbbbb-0000-4000-8000-000000000001");
   await expect(page.getByTestId("trainee-ai-context")).toContainText("bài tập huấn bạn đã chọn");
-  await page.getByRole("button", { name: "Hỏi chung" }).click();
+  await page.getByTestId("trainee-ai-context").getByRole("button", { name: "Hỏi chung" }).click();
   await expect(page.getByTestId("trainee-ai-context")).toHaveCount(0);
-  await page.getByLabel("Câu hỏi", { exact: true }).fill("Bình chữa cháy CO2 dùng thế nào?");
-  await page.getByTestId("ai-send").click();
+  await panel.getByLabel("Câu hỏi", { exact: true }).fill("Bình chữa cháy CO2 dùng thế nào?");
+  await panel.getByTestId("ai-send").click();
   await expect.poll(() => ai.posts().length).toBe(2);
   expect(ai.posts()[1].body).toEqual({ question: "Bình chữa cháy CO2 dùng thế nào?" });
 });
@@ -99,17 +116,18 @@ test("no allowance left, an Assessment in progress or no policy blocks before an
   ai.quota = { ...ai.quota, remainingUnits: 0, canSubmit: false };
   await restore(page, "trainee", () => undefined, ai);
   await page.goto("/learning-hub?view=questions");
-  await expect(page.getByTestId("trainee-ai-blocked")).toContainText("Đã hết lượt hỏi hôm nay");
-  await page.getByLabel("Câu hỏi", { exact: true }).fill("Còn lượt không?");
-  await expect(page.getByTestId("ai-send")).toBeDisabled();
+  const panel = await openAssistant(page);
+  await expect(panel.getByTestId("trainee-ai-blocked")).toContainText("Đã hết lượt hỏi hôm nay");
+  await expect(panel.getByLabel("Câu hỏi", { exact: true })).toHaveCount(0);
+  await expect(page.getByTestId("trainee-ai")).toContainText("Đã hết lượt hỏi hôm nay");
 
   ai.quota = { ...ai.quota, canSubmit: false, blockedByAssessment: true };
   await page.reload();
-  await expect(page.getByTestId("trainee-ai-blocked")).toContainText("AI tạm khóa trong bài đánh giá");
+  await expect((await openAssistant(page)).getByTestId("trainee-ai-blocked")).toContainText("AI tạm khóa trong bài đánh giá");
 
   ai.quota = { ...ai.quota, policyActive: false, blockedByAssessment: false };
   await page.reload();
-  await expect(page.getByTestId("trainee-ai-blocked")).toContainText("Hỏi đáp AI chưa được bật");
+  await expect((await openAssistant(page)).getByTestId("trainee-ai-blocked")).toContainText("Trợ lý AI chưa được bật");
   expect(ai.posts()).toHaveLength(0);
 });
 
@@ -118,13 +136,14 @@ test("a lost response is recovered with the same key or found again by its text,
   ai.submitFaults.push("lost-response");
   await restore(page, "trainee", () => undefined, ai);
   await page.goto("/learning-hub?view=questions");
-  await page.getByLabel("Câu hỏi", { exact: true }).fill("Câu hỏi bị mất phản hồi");
-  await page.getByTestId("ai-send").click();
-  await expect(page.getByTestId("ai-unknown")).toBeVisible();
-  await page.getByRole("button", { name: "Tra yêu cầu gần nhất của tôi" }).click();
-  await expect(page.getByTestId("ai-candidate")).toHaveCount(1);
-  await page.getByRole("button", { name: "Theo dõi yêu cầu này" }).click();
-  await expect(page.getByTestId("ai-answer")).toBeVisible({ timeout: 15_000 });
+  const panel = await openAssistant(page);
+  await panel.getByLabel("Câu hỏi", { exact: true }).fill("Câu hỏi bị mất phản hồi");
+  await panel.getByTestId("ai-send").click();
+  await expect(panel.getByTestId("ai-unknown")).toBeVisible();
+  await panel.getByRole("button", { name: "Tra yêu cầu gần nhất của tôi" }).click();
+  await expect(panel.getByTestId("ai-candidate")).toHaveCount(1);
+  await panel.getByRole("button", { name: "Theo dõi yêu cầu này" }).click();
+  await expect(panel.getByTestId("ai-chat-answer-text")).toBeVisible({ timeout: 15_000 });
   expect(ai.posts()).toHaveLength(1);
   expect(ai.requests.filter((item) => (item.input as { text: string }).text === "Câu hỏi bị mất phản hồi")).toHaveLength(1);
 });
@@ -139,28 +158,29 @@ test("a withheld answer (access lost) is explained without content; other roles 
 
   await restore(page, "org");
   await page.goto("/learning-hub?view=questions");
-  await expect(page.getByText("Hỏi đáp AI ở đây dành cho tài khoản học viên")).toBeVisible();
+  await expect(page.getByText("Trợ lý AI ở đây dành cho tài khoản học viên")).toBeVisible();
+  await expect(page.getByTestId("ai-bubble")).toHaveCount(0);
 });
 
 test("an unknown article from Learn blocks sending until the learner picks 'Hỏi chung' or another article", async ({ page }) => {
   const ai = new TraineeAiBackend();
   await restore(page, "trainee", () => undefined, ai);
   await page.goto("/learning-hub?view=questions&article=khong-co-bai-nay");
+  const panel = page.getByTestId("ai-chat-panel");
   const missing = page.getByTestId("trainee-ai-article-missing");
   await expect(missing).toContainText("Không tìm thấy bài bạn mở từ thư viện bài học");
   await expect(missing).toContainText("Câu hỏi chưa được gửi");
   await expect(missing.getByRole("link", { name: "Chọn bài khác" })).toHaveAttribute("href", "/learn");
-  await page.getByLabel("Câu hỏi", { exact: true }).fill("Thoát hiểm thế nào?");
-  await expect(page.getByTestId("ai-send")).toBeDisabled();
-  await page.getByLabel("Câu hỏi", { exact: true }).press("Enter");
-  await page.getByLabel("Câu hỏi", { exact: true }).evaluate((element) => (element as HTMLTextAreaElement).form?.requestSubmit());
+  await panel.getByLabel("Câu hỏi", { exact: true }).fill("Thoát hiểm thế nào?");
+  await expect(panel.getByTestId("ai-send")).toBeDisabled();
+  await panel.getByLabel("Câu hỏi", { exact: true }).press("Enter");
+  await panel.getByLabel("Câu hỏi", { exact: true }).evaluate((element) => (element as HTMLTextAreaElement).form?.requestSubmit());
   expect(ai.posts()).toHaveLength(0);
 
   await missing.getByRole("button", { name: "Hỏi chung" }).click();
-  await expect(page).not.toHaveURL(/article=/);
   await expect(page.getByTestId("trainee-ai-article-missing")).toHaveCount(0);
-  await page.getByLabel("Câu hỏi", { exact: true }).fill("Thoát hiểm thế nào?");
-  await page.getByTestId("ai-send").click();
+  await panel.getByLabel("Câu hỏi", { exact: true }).fill("Thoát hiểm thế nào?");
+  await panel.getByTestId("ai-send").click();
   await expect.poll(() => ai.posts().length).toBe(1);
   expect(ai.posts()[0].body).toEqual({ question: "Thoát hiểm thế nào?" });
 });
@@ -184,33 +204,34 @@ test("an answer already shown is dropped when a reload answers 403 or 404; only 
   }
 });
 
-test("the quota is re-read on focus, at the reset time and when a request settles, unlocking the send button", async ({ page }) => {
+test("the quota is re-read on focus, at the reset time and when a request settles, unlocking the composer", async ({ page }) => {
   const ai = new TraineeAiBackend();
   ai.quota = { ...ai.quota, canSubmit: false, blockedByAssessment: true };
   await restore(page, "trainee", () => undefined, ai);
   await page.goto("/learning-hub?view=questions");
-  await expect(page.getByTestId("trainee-ai-blocked")).toContainText("AI tạm khóa trong bài đánh giá");
-  await page.getByLabel("Câu hỏi", { exact: true }).fill("Bình CO2 dùng thế nào?");
-  await expect(page.getByTestId("ai-send")).toBeDisabled();
+  const panel = await openAssistant(page);
+  await expect(panel.getByTestId("trainee-ai-blocked")).toContainText("AI tạm khóa trong bài đánh giá");
+  await expect(panel.getByLabel("Câu hỏi", { exact: true })).toHaveCount(0);
 
   // The Assessment ended in Unity; coming back to the window re-reads the quota.
   ai.quota = { ...ai.quota, canSubmit: true, blockedByAssessment: false };
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await expect(page.getByTestId("trainee-ai-blocked")).toHaveCount(0);
-  await expect(page.getByTestId("ai-send")).toBeEnabled();
+  await expect(panel.getByTestId("trainee-ai-blocked")).toHaveCount(0);
+  await panel.getByLabel("Câu hỏi", { exact: true }).fill("Bình CO2 dùng thế nào?");
+  await expect(panel.getByTestId("ai-send")).toBeEnabled();
 
-  // Daily allowance used up: the page re-reads it right after the reset time without any user action.
+  // Daily allowance used up: the bubble re-reads it right after the reset time without any user action.
   ai.quota = { ...ai.quota, remainingUnits: 0, canSubmit: false, resetsAt: new Date(Date.now() + 2_000).toISOString() };
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-  await expect(page.getByTestId("trainee-ai-blocked")).toContainText("Đã hết lượt hỏi hôm nay");
-  await expect(page.getByTestId("ai-send")).toBeDisabled();
+  await expect(panel.getByTestId("trainee-ai-blocked")).toContainText("Đã hết lượt hỏi hôm nay");
   ai.quota = { ...ai.quota, remainingUnits: 200, usedUnits: 0, canSubmit: true, resetsAt: "2026-10-19T17:00:00Z" };
-  await expect(page.getByTestId("ai-send")).toBeEnabled({ timeout: 10_000 });
+  await expect(panel.getByTestId("trainee-ai-blocked")).toHaveCount(0, { timeout: 10_000 });
   await expect(page.getByTestId("trainee-ai-quota")).toContainText("Hôm nay còn 200 tokens");
 
   // Sending reserves 50; when the answer settles (30 consumed) the quota is read again and shows the released reserve.
-  await page.getByTestId("ai-send").click();
-  await expect(page.getByTestId("ai-answer")).toContainText("Không dùng thang máy", { timeout: 15_000 });
+  await panel.getByLabel("Câu hỏi", { exact: true }).fill("Bình CO2 dùng thế nào?");
+  await panel.getByTestId("ai-send").click();
+  await expect(panel.getByTestId("ai-chat-answer-text")).toContainText("Không dùng thang máy", { timeout: 15_000 });
   await expect(page.getByTestId("trainee-ai-quota")).toContainText("Hôm nay còn 170 tokens");
 });
 
@@ -407,15 +428,19 @@ test("mobile menu Escape returns focus and profile scrolls without overflow", as
 });
 
 for (const width of [375, 1440]) {
-  test(`Trainee Q&A fits ${width}px without page overflow`, async ({ page }, testInfo) => {
+  test(`Trainee AI view and bubble fit ${width}px without page overflow`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     const ai = new TraineeAiBackend();
     ai.seed();
     await restore(page, "trainee", () => undefined, ai);
-    await page.goto(`/learning-hub?view=questions&article=${slug}&request=${ai.requests[0].requestId}`);
+    await page.goto(`/learning-hub?view=questions&request=${ai.requests[0].requestId}`);
     await expect(page.getByTestId("ai-answer")).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await page.screenshot({ path: testInfo.outputPath(`trainee-ai-${width}.png`), fullPage: true });
+    await page.goto(`/learning-hub?view=questions&article=${slug}`);
+    await expect(page.getByTestId("trainee-ai-context")).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+    await page.screenshot({ path: testInfo.outputPath(`trainee-ai-bubble-${width}.png`), fullPage: true });
   });
 }
 
@@ -477,9 +502,8 @@ test("an empty account sees explained empty states, and the Ask AI shortcut only
     await expect(page.getByText("Bạn chưa lưu bài nào", { exact: true })).toBeVisible();
     await expect(page.getByText("Chưa có phiên luyện tập", { exact: true })).toBeVisible();
     await page.getByLabel("Câu hỏi cho AI").fill("Thang máy khi có cháy?");
-    await page.getByRole("button", { name: "Mở Hỏi đáp AI" }).click();
-    await expect(page).toHaveURL(/view=questions/);
-    await expect(page.getByLabel("Câu hỏi", { exact: true })).toHaveValue("Thang máy khi có cháy?");
+    await page.getByRole("region", { name: "Hỏi AI" }).getByRole("button", { name: "Hỏi Trợ lý AI" }).click();
+    await expect(page.getByTestId("ai-chat-panel").getByLabel("Câu hỏi", { exact: true })).toHaveValue("Thang máy khi có cháy?");
     expect(ai.posts()).toHaveLength(0);
   });
 
