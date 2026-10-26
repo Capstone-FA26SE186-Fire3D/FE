@@ -75,7 +75,7 @@ export function PaymentStatusView({ payment, buildingNames }: { payment: PayosPa
         <p>{!paid ? "Bắt đầu sau khi PayOS xác nhận thanh toán." : payment.provisioningStatus === "Succeeded" ? "Hoàn tất cho mọi mục trong báo giá." : "Chưa hoàn tất: chưa xem là đã có dịch vụ."}</p>
         {payment.items.length > 0 && <ul aria-label="Trạng thái kích hoạt theo mục">
           {payment.items.map((line) => <li key={line.quotationItemId} data-testid="provisioning-line" data-line-status={line.status}>
-            <span>{line.buildingId === null ? "Hạn mức AI nạp thêm" : buildingNames[line.buildingId] ?? `Công trình ${line.buildingId.slice(0, 8)}`}{line.errorCode && <small className="bill-dim" style={{ display: "block" }}>{billingCodeMessage(line.errorCode) ?? "Mục này chưa kích hoạt được. Hệ thống sẽ tự thử lại; nếu kéo dài hãy liên hệ hỗ trợ."}</small>}{line.errorCode && <SupportCode code={line.errorCode} />}</span>
+            <span>{line.buildingId === null ? "Hạn mức AI nạp thêm" : buildingNames[line.buildingId] ?? "Công trình không còn trong danh sách"}{line.errorCode && <small className="bill-dim" style={{ display: "block" }}>{billingCodeMessage(line.errorCode) ?? "Mục này chưa kích hoạt được. Hệ thống sẽ tự thử lại; nếu kéo dài hãy liên hệ hỗ trợ."}</small>}{line.errorCode && <SupportCode code={line.errorCode} />}</span>
             {lineBadge(line)}
           </li>)}
         </ul>}

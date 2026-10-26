@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field, Input, Select } from "@/components/ui/field";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { capabilityName } from "@/configs/capability-labels";
 
 import type { Issue } from "../../store/validation";
 import { capabilitiesForKind, findCapability, findRuntime, rangeMessage, type CapabilityOption, type ParameterField, type RuntimeOption } from "../../v1/catalog";
@@ -158,11 +159,11 @@ function CapabilityField({ object, kind, catalog, runtimeVersion, issues, action
           actions.setCapability(object.index, next ? { id: next.id, version: next.version } : undefined);
         }}>
         <option value="">{required ? "Chọn khả năng…" : "Không dùng khả năng"}</option>
-        {object.capability && !options.some((option) => option.id === object.capability?.id) && <option value={object.capability.id}>{object.capability.id}@{object.capability.version} (phiên bản ứng dụng này không có)</option>}
-        {options.map((option) => <option key={option.id} value={option.id}>{option.id} · v{option.version}</option>)}
+        {object.capability && !options.some((option) => option.id === object.capability?.id) && <option value={object.capability.id}>{capabilityName(object.capability.id)} (phiên bản ứng dụng đang chọn không có)</option>}
+        {options.map((option) => <option key={option.id} value={option.id}>{capabilityName(option.id)}</option>)}
       </Select>}
     </Field>}
-    {object.capability && !runtime && <p className="ops-field-hint">Đang dùng {object.capability.id}@{object.capability.version}; chọn phiên bản ứng dụng để kiểm tra.</p>}
+    {object.capability && !runtime && <p className="ops-field-hint">Đang dùng {capabilityName(object.capability.id)}; chọn phiên bản ứng dụng để kiểm tra.</p>}
     {selected && object.capability && selected.version !== object.capability.version && <div className="ops-stack">
       <Alert tone="warning" title="Phiên bản khả năng khác với ứng dụng">Đối tượng dùng v{object.capability.version}, ứng dụng đang có v{selected.version}.</Alert>
       <div><Button type="button" size="sm" variant="secondary" data-testid="update-capability-version" onClick={() => actions.setCapability(object.index, { id: selected.id, version: selected.version })}>Cập nhật lên v{selected.version}</Button></div>

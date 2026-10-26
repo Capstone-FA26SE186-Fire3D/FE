@@ -40,8 +40,8 @@ export { describeApiError };
 /** Building create/update/archive failures; 412 is handled by the caller (it shows the newer version). */
 export function describeBuildingWriteError(error: unknown, fallback: string) {
   if (error instanceof ApiError) {
-    if (error.code === "IDEMPOTENCY_KEY_CONFLICT") return "Khóa chống tạo trùng đã được dùng cho nội dung khác. Bấm lưu lần nữa để gửi như một thao tác mới.";
-    if (error.code === "IDEMPOTENCY_KEY_REQUIRED") return "Yêu cầu thiếu khóa chống tạo trùng. Hãy thử lại.";
+    if (error.code === "IDEMPOTENCY_KEY_CONFLICT") return "Thao tác này đã được gửi với nội dung khác. Bấm lưu lần nữa để gửi lại.";
+    if (error.code === "IDEMPOTENCY_KEY_REQUIRED") return "Chưa gửi được. Hãy thử lại.";
     if (error.status === 428) return "Chưa xác định được bản thông tin công trình đang sửa. Hãy tải lại công trình rồi thử lại.";
     if (error.status === 404) return "Không tìm thấy công trình, hoặc công trình đã được lưu trữ nên không sửa được nữa.";
   }

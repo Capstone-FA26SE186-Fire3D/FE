@@ -13,7 +13,7 @@ import type { RuntimeCatalogEntry } from "../api";
 import type { EditorActions } from "./actions";
 import { NumberField, StringList, TextField } from "./fields";
 
-const OPERATORS = [{ value: "gte", label: "≥ (gte)" }, { value: "lte", label: "≤ (lte)" }, { value: "eq", label: "= (eq)" }];
+const OPERATORS = [{ value: "gte", label: "≥ (từ ngưỡng trở lên)" }, { value: "lte", label: "≤ (từ ngưỡng trở xuống)" }, { value: "eq", label: "= (đúng bằng ngưỡng)" }];
 
 function Group({ title, description, children, testId }: { title: string; description?: string; children: React.ReactNode; testId?: string }) {
   return <fieldset className="ops-fieldset se-group" data-testid={testId}>
