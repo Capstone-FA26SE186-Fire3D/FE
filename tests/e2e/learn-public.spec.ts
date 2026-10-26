@@ -146,13 +146,19 @@ test.describe("reader", () => {
     await expect(page.getByRole("note")).toContainText("Cảnh báo quan trọng");
     await expect(page.getByAltText("Sơ đồ minh họa")).toHaveAttribute("src", "https://example.com/a.png");
     await expect(page.getByAltText("Ảnh độc hại")).toHaveCount(0);
-    // Video: one card (the off-allowlist host and the unknown block are dropped), no iframe.
+    // Video: one card (the off-allowlist host and the unknown block are dropped). No player loads until play is pressed;
+    // then a youtube-nocookie iframe built from the video id plays in the article. Summary and link-out stay as the fallback.
     const video = page.getByTestId("video-fallback");
     await expect(video).toHaveCount(1);
     await expect(video).toContainText("Tóm tắt thay cho video khi không nhúng được.");
     await expect(video.getByRole("link", { name: /Xem video trên YouTube/ })).toHaveAttribute("href", "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
     await expect(video.getByRole("link")).toHaveAttribute("rel", /noopener/);
     await expect(page.locator("iframe")).toHaveCount(0);
+    await video.getByRole("button", { name: "Phát video trên YouTube ngay trong bài" }).click();
+    const player = video.getByTestId("video-player");
+    await expect(player).toHaveAttribute("src", "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?autoplay=1&rel=0");
+    await expect(player).toHaveAttribute("sandbox", /allow-scripts/);
+    await expect(page.locator("iframe")).toHaveCount(1);
     await expect(page.getByText("3 phần nội dung không hiển thị được")).toBeVisible();
     // Situation and source.
     await expect(page.getByRole("link", { name: "Cháy trong nhà" })).toHaveAttribute("href", "/learn?situation=chay-nha");

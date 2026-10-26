@@ -1,11 +1,10 @@
-import { ExternalLink, Film } from "lucide-react";
 import { headingId, parseBlocks, type RenderBlock } from "../blocks";
-import { KIND_ART, KIND_ART_SIZE } from "../kind-art";
+import { VideoEmbed } from "./video-embed";
 
 /*
  * Renders `fet3d.learn/1` blocks from an allowlist of block types. All text is a React text node (escaped); there is no
- * dangerouslySetInnerHTML, no iframe and no third-party script. The API gives a video as {provider, videoId, canonical url}
- * and no embed descriptor, so a video is always a link-out card with the post summary as the fallback text.
+ * dangerouslySetInnerHTML and no third-party script in the page itself. The API gives a video as {provider, videoId, canonical url}
+ * and no embed descriptor: `VideoEmbed` builds the player URL from the provider allowlist and loads it only when the reader presses play.
  */
 
 function Heading({ level, text, id }: { level: 2 | 3 | 4; text: string; id: string }) {
@@ -14,7 +13,6 @@ function Heading({ level, text, id }: { level: 2 | 3 | 4; text: string; id: stri
   return <h2 id={id}>{text}</h2>;
 }
 
-const providerName: Record<string, string> = { YouTube: "YouTube", TikTok: "TikTok", Facebook: "Facebook" };
 
 const calloutLabel = { info: "Lưu ý", warning: "Cần chú ý", danger: "Cảnh báo" } as const;
 
@@ -33,17 +31,7 @@ function Block({ block, index, fallbackSummary }: { block: RenderBlock; index: n
       <img src={block.url} alt={block.alt} loading="lazy" referrerPolicy="no-referrer" />
       {block.alt && <figcaption>{block.alt}</figcaption>}
     </figure>;
-    case "video": return <div className="learn-video lv2-video" data-provider={block.provider} data-testid="video-fallback">
-      <a className="lv2-video-frame" href={block.url} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={KIND_ART.Video} alt="" width={KIND_ART_SIZE.width} height={KIND_ART_SIZE.height} loading="lazy" decoding="async" />
-        <span className="lv2-video-play"><Film size={22} /></span>
-      </a>
-      <div className="lv2-video-foot">
-        <div><strong>Video trên {providerName[block.provider] ?? block.provider}</strong>{fallbackSummary && <p className="learn-text">{fallbackSummary}</p>}</div>
-        <a className="learn-video-link" href={block.url} target="_blank" rel="noopener noreferrer"><ExternalLink size={16} aria-hidden="true" />Xem video trên {block.provider}<span className="sr-only"> (mở trong tab mới)</span></a>
-      </div>
-    </div>;
+    case "video": return <VideoEmbed provider={block.provider} videoId={block.videoId} url={block.url} fallbackSummary={fallbackSummary} />;
   }
 }
 

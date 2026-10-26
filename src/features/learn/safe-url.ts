@@ -31,3 +31,21 @@ export function videoLink(provider: unknown, value: unknown): string | null {
   if (!href) return null;
   return new URL(href).hostname === CANONICAL_HOSTS[provider] ? href : null;
 }
+
+const YOUTUBE_ID = /^[A-Za-z0-9_-]{11}$/;
+const NUMERIC_ID = /^\d{1,25}$/;
+
+/**
+ * Player URL for an allowlisted video (BE docs/learn-library.md): built from `provider` + `videoId` (+ the canonical link for
+ * Facebook), never from anything the content could inject. Hosts: youtube-nocookie.com, tiktok.com/embed/v2, facebook.com/plugins.
+ */
+export function embedUrl(provider: VideoProvider, videoId: string, link: string): string | null {
+  if (provider === "YouTube") return YOUTUBE_ID.test(videoId) ? `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0` : null;
+  if (provider === "TikTok") return NUMERIC_ID.test(videoId) ? `https://www.tiktok.com/embed/v2/${videoId}` : null;
+  return NUMERIC_ID.test(videoId) && videoLink(provider, link) ? `https://www.facebook.com/plugins/video.php?href=${encodeURIComponent(link)}&show_text=false&autoplay=true` : null;
+}
+
+/** Still frame for a YouTube video (no request to the player until the reader presses play); other providers have none. */
+export function videoPoster(provider: VideoProvider, videoId: string): string | null {
+  return provider === "YouTube" && YOUTUBE_ID.test(videoId) ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : null;
+}
