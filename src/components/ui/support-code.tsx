@@ -2,11 +2,12 @@
  * Error codes and ids are for whoever investigates a problem, not for the person using the page: they stay out of the
  * message and sit in a folded line the user can copy into a support request.
  */
-export function SupportCode({ code, id }: { code?: string; id?: string }) {
-  if (!code && !id) return null;
+export function SupportCode({ code, id, detail }: { code?: string; id?: string; /** Raw text from the server (an English worker message, a list of ids). */ detail?: string }) {
+  if (!code && !id && !detail) return null;
   return <details className="support-code">
     <summary>Thông tin cho bộ phận hỗ trợ</summary>
     {code && <span>Mã: <code data-testid="support-code">{code}</code></span>}
     {id && <span>Định danh: <code>{id}</code></span>}
+    {detail && <span>Chi tiết: <code>{detail}</code></span>}
   </details>;
 }

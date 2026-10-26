@@ -43,11 +43,11 @@ export const feedbackStatusTone = (status: string): Tone => feedbackStatuses[sta
 export const auditActions = ["Upload", "ConfirmForTraining", "Reject", "Publish", "Revoke", "Sync", "Login", "Logout", "Download", "Delete", "Create", "Update", "Rollback", "Grant", "Resume", "Payment", "Support"] as const;
 
 const auditActionLabels: Record<string, string> = {
-  Upload: "Tải lên", ConfirmForTraining: "Xác nhận cho tập huấn", Reject: "Từ chối", Publish: "Phát hành", Revoke: "Thu hồi",
+  Upload: "Tải lên", ConfirmForTraining: "Chốt gói phát hành", Reject: "Từ chối", Publish: "Phát hành", Revoke: "Thu hồi",
   Sync: "Đồng bộ", Login: "Đăng nhập", Logout: "Đăng xuất", Download: "Tải xuống", Delete: "Xóa", Create: "Tạo mới",
   Update: "Cập nhật", Rollback: "Quay về bản trước", Grant: "Cấp quyền sử dụng", Resume: "Tiếp tục", Payment: "Thanh toán", Support: "Hỗ trợ",
 };
-export const auditActionLabel = (action: string) => auditActionLabels[action] ?? action;
+export const auditActionLabel = (action: string) => auditActionLabels[action] ?? "Thao tác khác";
 
 /** Audit `TargetEntity` values are table or class names ("organizations", "SupportTicket"); show them as plain words. */
 const auditTargetLabels: Record<string, string> = {
@@ -60,7 +60,7 @@ const auditTargetLabels: Record<string, string> = {
 export function auditTargetLabel(entity: string | null | undefined): string {
   if (!entity) return "—";
   const key = entity.toLowerCase().replace(/_/g, "").replace(/s$/, "");
-  return auditTargetLabels[key] ?? entity;
+  return auditTargetLabels[key] ?? "Đối tượng khác";
 }
 
 export const isGuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim());
@@ -93,13 +93,13 @@ const auditFieldLabels: Record<string, string> = {
   revisionId: "Bản IFC", validationRunId: "Lần kiểm tra", candidateArtifactId: "Tệp kết quả chờ duyệt", annotationSetId: "Bộ ghi chú",
   packageRevision: "Phiên bản gói", aiPolicyVersionId: "Phiên bản chính sách AI",
 };
-export const auditFieldLabel = (field: string) => auditFieldLabels[field] ?? field;
+export const auditFieldLabel = (field: string) => auditFieldLabels[field] ?? "Thông tin khác";
 
 const statusWords: Record<string, string> = {
   Open: "Mới", InProgress: "Đang xử lý", Resolved: "Đã giải quyết", Closed: "Đã đóng", Submitted: "Mới gửi", Reviewed: "Đã xem",
   Draft: "Bản nháp", Issued: "Đã phát hành báo giá", Accepted: "Đã chấp nhận", Expired: "Hết hạn", Cancelled: "Đã hủy", Active: "Đang dùng",
   Suspended: "Tạm ngưng", Approved: "Đã duyệt", Rejected: "Bị từ chối", Built: "Đã tạo", Published: "Đã phát hành", Revoked: "Đã thu hồi",
-  ConfirmForTraining: "Đã xác nhận cho tập huấn", Low: "Thấp", Normal: "Bình thường", High: "Cao", Urgent: "Khẩn cấp",
+  ConfirmForTraining: "Đã chốt gói phát hành", Low: "Thấp", Normal: "Bình thường", High: "Cao", Urgent: "Khẩn cấp",
 };
 
 /** Renders one allowlisted audit value. Anything that is not a plain scalar shows as unavailable instead of raw JSON. */

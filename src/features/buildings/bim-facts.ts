@@ -7,9 +7,9 @@ import type { BimFact } from "./types";
  */
 
 const SPACE_PROPERTIES: Record<string, { label: string; order: number }> = {
-  Name: { label: "Tên phòng (Name)", order: 0 },
-  LongName: { label: "Tên đầy đủ (LongName)", order: 1 },
-  Category: { label: "Loại phòng (Category)", order: 2 },
+  Name: { label: "Tên phòng", order: 0 },
+  LongName: { label: "Tên đầy đủ", order: 1 },
+  Category: { label: "Loại phòng", order: 2 },
 };
 
 const FLAG_LABEL: Record<string, string> = {
@@ -18,11 +18,11 @@ const FLAG_LABEL: Record<string, string> = {
 };
 
 export function entityLabel(entityType: string): string {
-  return entityType === "IfcSpace" ? "Phòng (IfcSpace)" : entityType;
+  return entityType === "IfcSpace" ? "Phòng" : "Cấu kiện khác";
 }
 
 export function propertyLabel(fact: Pick<BimFact, "entityType" | "propertyPath">): string {
-  return fact.entityType === "IfcSpace" ? SPACE_PROPERTIES[fact.propertyPath]?.label ?? fact.propertyPath : fact.propertyPath;
+  return (fact.entityType === "IfcSpace" && SPACE_PROPERTIES[fact.propertyPath]?.label) || "Thuộc tính khác";
 }
 
 export function qualityFlagCodes(flags: unknown): string[] {
@@ -34,9 +34,9 @@ export function qualityFlagCodes(flags: unknown): string[] {
   });
 }
 
-/** Vietnamese label with the stable code kept for support ("Phòng chưa có tên (SPACE_UNNAMED)"); unknown codes stay as sent. */
+/** Vietnamese label of a quality flag; the code itself is support information, not part of the label. */
 export function qualityFlagLabel(code: string): string {
-  return FLAG_LABEL[code] ? `${FLAG_LABEL[code]} (${code})` : code;
+  return FLAG_LABEL[code] ?? "Cảnh báo khác";
 }
 
 /** Rows of one element side by side (Name, LongName, Category for a space); the server pages by row, not by element. */

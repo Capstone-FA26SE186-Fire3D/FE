@@ -1,4 +1,4 @@
-import { DetailList, HashValue, formatDateTime } from "@/components/ops/detail-parts";
+import { DetailList, formatDateTime } from "@/components/ops/detail-parts";
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table } from "@/components/ui/table";
@@ -6,6 +6,9 @@ import { isObject } from "@/features/scenario-editor/store/json";
 import { summarizeField } from "../apply";
 import { TEMPLATE_FIELDS, ignoredTemplateParts, templateFieldLabel } from "../payload";
 import { kindLabel, type LibraryVersion } from "../types";
+import { capabilityName } from "@/configs/capability-labels";
+import { SupportCode } from "@/components/ui/support-code";
+import { metricName, operatorSymbol } from "@/features/training-history/labels";
 
 export const NO_CAPABILITY_NOTICE = "Thông tin thiết bị không thêm khả năng cho ứng dụng. Năng lực của đối tượng vẫn lấy từ danh mục của ứng dụng FET3D.";
 
@@ -14,14 +17,14 @@ function RubricTable({ rubric }: { rubric: unknown }) {
   if (!isObject(rubric)) return null;
   return <div className="ops-stack" data-testid="rubric-view">
     <DetailList columns={3} items={[
-      { label: "Phiên bản tiêu chí", value: typeof rubric.schema_version === "string" ? <code>{`"${rubric.schema_version}"`}</code> : "—" },
+      { label: "Phiên bản tiêu chí", value: typeof rubric.schema_version === "string" ? rubric.schema_version : "—" },
       { label: "Ngưỡng đạt", value: typeof rubric.pass_threshold === "number" ? rubric.pass_threshold : "—" },
       { label: "Số tiêu chí", value: criteria.length },
     ]} />
     {criteria.length > 0 && <Table caption="Tiêu chí chấm điểm">
-      <thead><tr><th>Mã</th><th>Chỉ số</th><th>Toán tử</th><th>Ngưỡng</th><th>Trọng số</th><th>Bắt buộc</th></tr></thead>
+      <thead><tr><th>Tiêu chí</th><th>Điều kiện</th><th>Trọng số</th><th>Bắt buộc</th></tr></thead>
       <tbody>{criteria.map((item, index) => <tr key={`${String(item.id)}-${index}`}>
-        <td className="ops-cell-primary">{String(item.id ?? "")}</td><td>{String(item.metric ?? "")}</td><td>{String(item.operator ?? "")}</td><td>{String(item.threshold ?? "")}</td><td>{String(item.weight ?? "")}</td><td>{item.mandatory === true ? "Có" : "Không"}</td>
+        <td className="ops-cell-primary">{metricName(String(item.metric ?? ""))}<SupportCode code={String(item.id ?? "") || undefined} /></td><td>{operatorSymbol(String(item.operator ?? ""))} {String(item.threshold ?? "")}</td><td>{String(item.weight ?? "")}</td><td>{item.mandatory === true ? "Có" : "Không"}</td>
       </tr>)}</tbody>
     </Table>}
   </div>;
@@ -42,7 +45,7 @@ export function VersionPreview({ version, compact = false }: { version: LibraryV
       { label: "Phiên bản", value: <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>v{version.versionNumber}<StatusBadge tone={version.status === "Published" ? "success" : "warning"}>{version.status === "Published" ? "Đã xuất bản" : "Bản nháp"}</StatusBadge></span> },
       { label: "Xuất bản", value: formatDateTime(version.publishedAt) },
     ]} />
-    {!compact && <details><summary className="ops-field-hint" style={{ margin: "0 0 4px", cursor: "pointer" }}>Mã nội dung (không đổi sau khi xuất bản)</summary><HashValue value={version.payloadHash || "—"} label="Mã nội dung" /></details>}
+    {!compact && version.payloadHash && <SupportCode id={version.payloadHash} />}
     {typeof payload.description === "string" && <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, overflowWrap: "anywhere" }}>{payload.description}</p>}
 
     {version.kind === "ScenarioTemplate" && <>
@@ -64,7 +67,7 @@ export function VersionPreview({ version, compact = false }: { version: LibraryV
       <p className="ops-field-label" style={{ margin: "0 0 4px" }}>Năng lực mẫu này yêu cầu</p>
       {version.requiredCapabilities.length === 0
         ? <p className="ops-field-hint" style={{ margin: 0 }}>Không khai báo năng lực nào.</p>
-        : <ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc", fontSize: 14 }}>{version.requiredCapabilities.map((id) => <li key={id}><code>{id}</code></li>)}</ul>}
+        : <ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc", fontSize: 14 }}>{version.requiredCapabilities.map((id) => <li key={id}>{capabilityName(id)}</li>)}</ul>}
     </div>
   </div>;
 }

@@ -294,7 +294,8 @@ test.describe("detail", () => {
     await expect(dialog.locator(".ops-dialog-eyebrow")).toContainText("Chờ duyệt"); // status and version are the drawer's eyebrow chips
     await expect(dialog.locator(".ops-dialog-eyebrow")).toContainText("v2");
     await expect(dialog.getByText("Trường THPT Lê Quý Đôn · Nhà A")).toBeVisible();
-    await expect(dialog.getByText(`${target.submittedBy.slice(0, 8)}…`).first()).toBeVisible(); // ids only: the API has no display names
+    await expect(dialog.getByText("Tài khoản tổ chức").first()).toBeVisible(); // the API has no display names; ids sit in the support line
+    await dialog.getByTestId("review-support").locator("summary").click();
     await expect(dialog.locator(".rev-hash", { hasText: target.scenarioVersionId.slice(0, 8) })).toBeVisible();
 
     const contentHash = dialog.getByTestId("hash-content");
@@ -328,7 +329,7 @@ test.describe("detail", () => {
     await install(page, server);
     await page.goto(`/admin/reviews?review=${server.reviews[0].summary.reviewId}`);
     const dialog = drawer(page);
-    await expect(dialog.getByText("Danh sách · 2 phần tử")).toBeVisible();
+    await expect(dialog.getByText("2 mục", { exact: true })).toBeVisible();
     await dialog.getByText("hazards", { exact: true }).click();
     await expect(dialog.locator('pre[aria-label*="hazards"]')).toContainText('"smoke-1"');
     await expect(dialog.getByText("<img src=x", { exact: false }).first()).toBeVisible();
@@ -367,7 +368,7 @@ test.describe("detail", () => {
     const dialog = drawer(page);
     await expect(dialog.getByTestId("decision-result")).toContainText("đã bị từ chối");
     await expect(dialog.getByTestId("reject-reason")).toContainText("Thiếu tiêu chí thời gian phản ứng.");
-    await expect(dialog.getByText(`${ADMIN_ID.slice(0, 8)}…`)).toBeVisible();
+    await expect(dialog.getByText("Quản trị FET3D", { exact: true })).toBeVisible(); // the decider's id sits in the support line
     await expect(dialog.getByRole("button", { name: "Duyệt nội dung" })).toHaveCount(0);
     await expect(dialog.getByRole("button", { name: "Từ chối", exact: true })).toHaveCount(0);
   });
@@ -415,7 +416,7 @@ test.describe("decisions", () => {
     await page.goto(`/admin/reviews?review=${target.reviewId}`);
     await drawer(page).getByRole("button", { name: "Duyệt nội dung" }).click();
     const confirm = confirmDialog(page, "approve");
-    await expect(confirm).toContainText("đúng nội dung và tiêu chí chấm điểm (rubric) đã khóa");
+    await expect(confirm).toContainText("đúng nội dung và tiêu chí chấm điểm (rubric) đang xem");
     await expect(confirm).toContainText("không đổi được");
     await expect(confirm).toContainText("không phải");
     expect(server.decisionRequests).toHaveLength(0); // opening the dialog is not a decision
@@ -579,6 +580,7 @@ test.describe("decisions", () => {
     await confirmDialog(page, "approve").getByRole("button", { name: "Duyệt nội dung" }).click();
     await expect(drawer(page).getByText("Nội dung phiên bản không khớp với bản đang xem")).toBeVisible();
     await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Submitted");
+    await drawer(page).getByTestId("review-support").locator("summary").click();
     await drawer(page).getByTestId("hash-content").locator("xpath=following-sibling::button").click();
     await expect(drawer(page).getByTestId("hash-content")).toHaveText(hex("f0"));
     await drawer(page).getByRole("button", { name: "Duyệt nội dung" }).click();

@@ -34,10 +34,10 @@ export function RevenueReportView({ data }: { data: RevenueReport }) {
         {currencies.map((currency) => {
           const days = data.byDay.filter((day) => day.currency === currency).sort((a, b) => a.date.localeCompare(b.date)).map((day) => ({ date: day.date, amount: day.amount, transactions: day.transactions }));
           const series: Series[] = [{ key: "amount", label: `Đã nhận (${currency})`, color: seriesColor.revenue }];
-          return <ChartCard key={currency} title={`Theo ngày (${currency})`} description="Ngày theo UTC · chỉ những ngày có phát sinh" legend={legendOf(series, colorAt)} height={190} empty={days.length === 0} emptyText={`Không có khoản thu theo ngày bằng ${currency}`} data-testid={`chart-revenue-${currency}`}
+          return <ChartCard key={currency} title={`Theo ngày (${currency})`} description="Ngày theo giờ quốc tế · chỉ những ngày có phát sinh" legend={legendOf(series, colorAt)} height={190} empty={days.length === 0} emptyText={`Không có khoản thu theo ngày bằng ${currency}`} data-testid={`chart-revenue-${currency}`}
             footer={days.length > 0 && <>{fmt(days.length)} ngày có phát sinh · cao nhất trong ngày <strong>{formatMoney(Math.max(...days.map((day) => day.amount)), currency)}</strong></>}
             table={<ReportTable caption={`Doanh thu theo ngày (${currency})`}>
-              <thead><tr><th>Ngày (UTC)</th><Num header>Đã nhận</Num><Num header>Giao dịch</Num></tr></thead>
+              <thead><tr><th>Ngày</th><Num header>Đã nhận</Num><Num header>Giao dịch</Num></tr></thead>
               <tbody>{days.map((day) => <tr key={day.date}><td>{day.date}</td><Num>{formatMoney(day.amount, currency)}</Num><Num>{fmt(day.transactions)}</Num></tr>)}</tbody>
             </ReportTable>}>
             <AreaChart data={days} xKey="date" series={series} height={190} formatX={shortDate} formatY={(value) => compactMoney(value, currency)} />

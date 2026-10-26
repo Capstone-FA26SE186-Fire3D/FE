@@ -83,7 +83,7 @@ export function IfcUploadModal({ open, onOpenChange, accessToken, buildingId, on
       {status === "done"
         ? <Button type="button" variant="secondary" onClick={flow.reset}><FileUp size={16} aria-hidden="true" />Tải IFC khác</Button>
         : <Button type="submit" form="ifc-upload-form" disabled={!canStart || running || blockedRetry}>
-          {running ? <Spinner size={16} /> : status === "error" ? <RotateCcw size={16} aria-hidden="true" /> : <Upload size={16} aria-hidden="true" />}{running ? "Đang xử lý…" : startLabel}{waitSeconds > 0 && ` (${waitSeconds}s)`}
+          {running ? <Spinner size={16} /> : status === "error" ? <RotateCcw size={16} aria-hidden="true" /> : <Upload size={16} aria-hidden="true" />}{running ? "Đang xử lý…" : startLabel}{waitSeconds > 0 && ` (còn ${waitSeconds} giây)`}
         </Button>}
     </>}>
     <form id="ifc-upload-form" onSubmit={submit} className="ops-stack" noValidate>
@@ -101,7 +101,7 @@ export function IfcUploadModal({ open, onOpenChange, accessToken, buildingId, on
       </div>
 
       <Field label="Tên bản IFC" required error={labelTooLong ? "Tên bản IFC tối đa 100 ký tự." : undefined}>
-        {(p) => <Input {...p} maxLength={120} value={versionLabel} disabled={locked} placeholder="VD: IFC rev. 02 — tối đa 100 ký tự" onChange={(event) => flow.setVersionLabel(event.target.value)} />}
+        {(p) => <Input {...p} maxLength={120} value={versionLabel} disabled={locked} placeholder="VD: Bản IFC tháng 10 — tối đa 100 ký tự" onChange={(event) => flow.setVersionLabel(event.target.value)} />}
       </Field>
 
       <Stepper completed={completed} running={running} failedStep={status === "error" && error ? error.step : null} />

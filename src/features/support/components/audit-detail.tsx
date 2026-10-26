@@ -59,7 +59,7 @@ export function AuditDetail({ id, accessToken, onFilter }: { id: string; accessT
     ["Mã người thực hiện", log.userId ?? "—", null, true],
     ["Tổ chức", log.organizationName?.trim() || (log.organizationId ? "Chưa có tên hiển thị" : "Không thuộc tổ chức"), log.organizationId ? { organizationId: log.organizationId } : null, false],
     ["Mã tổ chức", log.organizationId ?? "—", null, true],
-    ["Mã truy vết", log.correlationId ?? "—", log.correlationId ? { correlationId: log.correlationId } : null, true],
+    ["Mã nhóm thao tác", log.correlationId ?? "—", log.correlationId ? { correlationId: log.correlationId } : null, true],
     ["Mã bản ghi", log.id, null, true],
   ];
 

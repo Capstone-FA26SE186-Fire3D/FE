@@ -10,7 +10,7 @@ import styles from "./analytics.module.css";
 
 export function reportErrorText(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.status === 400) return "Khoảng thời gian không hợp lệ: dùng ngày theo UTC và tối đa 90 ngày.";
+    if (error.status === 400) return "Khoảng thời gian không hợp lệ: tối đa 90 ngày.";
     if (error.status === 401) return "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.";
     if (error.status === 403) return "Phiên hiện tại không có quyền xem báo cáo này.";
     if (error.status === 404) return "Không tìm thấy tổ chức hoặc tổ chức đã bị xóa.";

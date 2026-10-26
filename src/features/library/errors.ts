@@ -38,19 +38,42 @@ export function issuesOf(error: unknown): LibraryIssue[] {
 }
 
 const issueMessages: Record<string, string> = {
-  RUBRIC_SCHEMA_VERSION_UNSUPPORTED: 'Phiên bản tiêu chí chấm điểm này không được hỗ trợ. Chọn một phiên bản trong danh sách (giá trị chuỗi, ví dụ "1"; số 1, "v1" hay "1.0" không được chấp nhận).',
+  RUBRIC_SCHEMA_VERSION_UNSUPPORTED: 'Phiên bản tiêu chí chấm điểm này không được hỗ trợ. Chọn một phiên bản trong danh sách.',
   RUBRIC_METRIC_UNSUPPORTED: "Hệ thống không tính được chỉ số này. Chọn chỉ số trong danh mục.",
   EDITOR_SCHEMA_VERSION_UNSUPPORTED: "Kịch bản mẫu phải theo đúng định dạng của trình soạn kịch bản FET3D.",
   FIELD_UNKNOWN: "Trường này không thuộc loại mẫu đang dùng nên máy chủ từ chối.",
   FIELD_REQUIRED: "Trường này là bắt buộc.",
   STRING_INVALID: "Văn bản trống, quá dài hoặc chứa ký tự điều khiển.",
-  CAPABILITIES_INVALID: "Tối đa 50 mã năng lực, không trùng nhau, mỗi mã gồm chữ, số và _ . : - (tối đa 128 ký tự).",
+  CAPABILITIES_INVALID: "Tối đa 50 năng lực, không trùng nhau, mỗi năng lực viết liền không dấu (tối đa 128 ký tự).",
   PROPERTIES_INVALID: "Tối đa 50 thuộc tính; mỗi giá trị là chuỗi, số hoặc đúng/sai.",
   CONTENT_TOO_LARGE: "Nội dung tối đa 256 KB.",
   ID_DUPLICATE: "Mã bị trùng.",
 };
 
 /** A backend validation issue as the form shows it: the Vietnamese explanation only (the code stays out of the sentence). */
+/** Plain field names for a server/client issue path (`$.payload.state.rubric.criteria[1].weight` → "Tiêu chí 2 · Trọng số"). */
+const FIELD_NAMES: Record<string, string> = {
+  name: "Tên", code: "Mã mục", description: "Mô tả", learningObjectives: "Mục tiêu học tập", learnerInstructions: "Hướng dẫn cho người học",
+  timeLimitSeconds: "Thời gian tối đa", modePolicy: "Chế độ huấn luyện", rubric: "Tiêu chí chấm điểm", schema_version: "Phiên bản tiêu chí",
+  pass_threshold: "Ngưỡng đạt", id: "Mã tiêu chí", metric: "Chỉ số", operator: "Phép so sánh", threshold: "Ngưỡng", weight: "Trọng số",
+  mandatory: "Bắt buộc", requiredCapabilities: "Năng lực yêu cầu", properties: "Thuộc tính", state: "Kịch bản mẫu", payload: "Nội dung",
+};
+
+/** Plain name of one content field; a field this list does not know keeps its own name. */
+export const fieldName = (key: string) => FIELD_NAMES[key] ?? key;
+
+export function issueFieldLabel(path: string): string {
+  const parts: string[] = [];
+  for (const match of path.matchAll(/([A-Za-z_]+)(?:\[(\d+)\])?/g)) {
+    const [, name, index] = match;
+    if (name === "criteria") parts.push(index !== undefined ? `Tiêu chí ${Number(index) + 1}` : "Danh sách tiêu chí");
+    else if (FIELD_NAMES[name]) parts.push(index !== undefined ? `${FIELD_NAMES[name]} ${Number(index) + 1}` : FIELD_NAMES[name]);
+  }
+  // Keep the most specific two names: "Tiêu chí 2 · Trọng số" rather than the whole path.
+  const shown = parts.filter((part) => part !== "Nội dung" && part !== "Kịch bản mẫu").slice(-2);
+  return shown.length ? shown.join(" · ") : "Nội dung";
+}
+
 export function translateIssue(issue: LibraryIssue): string {
   return issueMessages[issue.code] ?? issue.message;
 }

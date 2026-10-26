@@ -73,7 +73,7 @@ function PaymentDetail({ accessToken, checkoutId, paymentRequestId, onChanged }:
         <div className="ops-stat"><span>Liên kết thanh toán</span><strong>{checkoutLabels[checkout.data.checkoutStatus]?.label ?? "Không rõ"}</strong>{checkout.data.errorCode && <><small>{billingCodeMessage(checkout.data.errorCode) ?? "Liên kết thanh toán gặp sự cố. Hệ thống sẽ tự thử lại; nếu kéo dài hãy liên hệ hỗ trợ."}</small><SupportCode code={checkout.data.errorCode} /></>}</div>
         <div className="ops-stat"><span>Hết hạn liên kết</span><strong>{formatDateTime(checkout.data.expiresAt)}</strong></div>
       </div>
-      <p className="bill-dim bill-wrap" style={{ margin: 0 }}>Báo giá {quote.data?.data.quotationNumber ?? checkout.data.quotationId.slice(0, 8)}</p>
+      <p className="bill-dim bill-wrap" style={{ margin: 0 }}>Báo giá {quote.data?.data.quotationNumber ?? "(chưa đọc được số báo giá)"}</p>
       <SupportCode id={checkout.data.checkoutId} />
       {!paymentId && <Alert tone="warning" title="Chưa có bản ghi thanh toán">Liên kết PayOS chưa được ghi nhận nên chưa có trạng thái thanh toán hay kích hoạt.</Alert>}
     </>}
@@ -131,7 +131,7 @@ export function PaymentsSection({ accessToken }: { accessToken: string }) {
 
   const applyQuote = (close: () => void) => {
     const value = quoteDraft.trim();
-    if (value && !GUID.test(value)) { setQuoteError("Mã báo giá chưa đúng. Dán đủ mã gồm 36 ký tự."); return; }
+    if (value && !GUID.test(value)) { setQuoteError("Mã báo giá chưa đúng. Dán đủ mã lấy ở chi tiết báo giá."); return; }
     setQuoteError("");
     setParams({ q: value || null });
     close();
@@ -150,7 +150,7 @@ export function PaymentsSection({ accessToken }: { accessToken: string }) {
   const columns: DataColumn<PayosLedgerItem>[] = [
     { key: "quotation", header: "Báo giá", primary: true, render: (item) => <CellTitle title={item.quotationNumber} sub={purposeLabel(item.purpose)} /> },
     { key: "created", header: "Tạo lúc", width: 190, render: (item) => <CellTitle title={formatDateTime(item.createdAt)} sub={item.paidAt ? `Nhận tiền ${formatDateTime(item.paidAt)}` : undefined} /> },
-    { key: "organization", header: "Tổ chức", width: 180, hideBelow: 1000, render: (item) => orgName[item.organizationId] ?? item.organizationId.slice(0, 8) },
+    { key: "organization", header: "Tổ chức", width: 180, hideBelow: 1000, render: (item) => orgName[item.organizationId] ?? "Tổ chức không còn tồn tại" },
     { key: "amount", header: "Số tiền", width: 170, align: "right", render: (item) => <CellTitle title={formatVnd(item.amount)} sub={item.provisioningLines > 0 ? `kích hoạt ${item.provisioningSucceeded}/${item.provisioningLines}` : "chưa có mục kích hoạt"} /> },
     { key: "state", header: "Trạng thái", render: (item) => <><PaymentStateBadges item={item} />{item.checkoutError && <span className="ops-cell-sub">{billingCodeMessage(item.checkoutError) ?? "Liên kết thanh toán gặp sự cố."}</span>}</> },
   ];
@@ -184,9 +184,9 @@ export function PaymentsSection({ accessToken }: { accessToken: string }) {
       toolbar={<>
         <FilterChips label="Bộ lọc thanh toán">
           <FilterChip label="Trạng thái" value={status} onChange={(value) => setParams({ status: value })} options={statusOptions} />
-          <ChipPopover label="Mã báo giá" value={quotationId ? `${quotationId.slice(0, 8)}…` : "tất cả"} active={Boolean(quotationId)} dataValue={quotationId} panelLabel="Lọc theo mã báo giá">
+          <ChipPopover label="Mã báo giá" value={quotationId ? "đang lọc" : "tất cả"} active={Boolean(quotationId)} dataValue={quotationId} panelLabel="Lọc theo mã báo giá">
             {(close) => <div className="bill-chip-form">
-              <Field label="Mã báo giá" hint="Mã đầy đủ gồm 36 ký tự." error={quoteError || undefined}>{(p) => <Input {...p} placeholder="Dán mã báo giá" value={quoteDraft} onChange={(event) => setQuoteDraft(event.target.value)} autoComplete="off" spellCheck={false} className="font-mono" />}</Field>
+              <Field label="Mã báo giá" hint="Dán mã lấy ở chi tiết báo giá." error={quoteError || undefined}>{(p) => <Input {...p} placeholder="Dán mã báo giá" value={quoteDraft} onChange={(event) => setQuoteDraft(event.target.value)} autoComplete="off" spellCheck={false} className="font-mono" />}</Field>
               <div className="bill-chip-actions">{quotationId && <Button type="button" size="sm" variant="quiet" onClick={() => { setQuoteDraft(""); setQuoteError(""); setParams({ q: null }); close(); }}>Bỏ</Button>}<Button type="button" size="sm" variant="secondary" onClick={() => applyQuote(close)}>Áp dụng</Button></div>
             </div>}
           </ChipPopover>

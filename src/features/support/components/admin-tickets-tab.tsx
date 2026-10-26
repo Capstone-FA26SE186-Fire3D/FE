@@ -48,7 +48,7 @@ export function AdminTicketsTab({ accessToken, myId }: { accessToken: string; my
   const organizations = useAsyncData("admin-tickets:orgs", () => accountsApi.organizations(accessToken), true);
 
   const adminOptions = useMemo(() => (admins.data?.items ?? []).map((admin) => ({ id: admin.id, name: admin.fullName || admin.email })), [admins.data]);
-  const nameOf = (id: string | null) => (id ? adminOptions.find((admin) => admin.id === id)?.name ?? `${id.slice(0, 8)}…` : "Chưa phân công");
+  const nameOf = (id: string | null) => (id ? adminOptions.find((admin) => admin.id === id)?.name ?? "Quản trị viên khác" : "Chưa phân công");
   const loaded = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
   const needle = urlSearch.trim().toLowerCase();

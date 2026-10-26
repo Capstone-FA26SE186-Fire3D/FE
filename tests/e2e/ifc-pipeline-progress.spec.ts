@@ -80,7 +80,7 @@ test.describe("IFC progress view", () => {
     await expect(step(page, "quarantine")).toContainText("Chưa có kết quả kiểm tra tệp");
     await expect(step(page, "geometry")).toHaveAttribute("data-state", "active");
     await expect(step(page, "geometry")).toContainText("lượt xử lý thứ 2");
-    await expect(step(page, "geometry")).toContainText("bước Tạo lưới di chuyển");
+    await expect(step(page, "geometry")).toContainText("bước Tạo đường đi");
     await expect(step(page, "qa")).toHaveAttribute("data-state", "todo");
     await expect(step(page, "exit")).toHaveCount(0);
     await expect(next(page)).toContainText("Đang dựng mô hình 3D");

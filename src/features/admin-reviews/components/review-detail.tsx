@@ -18,10 +18,10 @@ import { DecisionDialog } from "./decision-dialog";
 import { ReviewContent } from "./review-content";
 import { GateSeparation, HashValue, ReadinessBlock, ReadinessStrip } from "./review-parts";
 
-/** The review API returns account ids only (no display names), so submitter and decider are shown as short ids. */
-function AccountRef({ id }: { id: string | null }) {
+/** The review API returns account ids only (no display names): people see the role, the id stays in the support line. */
+function AccountRef({ id, role }: { id: string | null; role: string }) {
   if (!id) return <>—</>;
-  return <span title={id} className="adm-mono">{shortId(id)}</span>;
+  return <span title={id}>{role}</span>;
 }
 
 type Notice = { tone: "success" | "warning"; title: string; text: string };
@@ -112,13 +112,21 @@ export function ReviewDrawer({ open, reviewId, accessToken, summary, onChanged, 
 
           <section aria-label="Thông tin bản duyệt">
             <dl className="rev-dl">
-              <dt>Người gửi</dt><dd><AccountRef id={data.review.submittedBy} /></dd>
+              <dt>Người gửi</dt><dd><AccountRef id={data.review.submittedBy} role="Tài khoản tổ chức" /></dd>
               <dt>Gửi lúc</dt><dd>{formatDateTime(data.review.submittedAt)}</dd>
-              <dt>Mã nội dung kịch bản</dt><dd><HashValue value={data.review.contentHash} label="Mã nội dung kịch bản" /></dd>
-              <dt>Mã nội dung tiêu chí chấm</dt><dd><HashValue value={data.review.rubricHash} label="Mã nội dung tiêu chí chấm (rubric)" /></dd>
-              <dt>Mã phiên bản</dt><dd className="rev-hash" title={data.review.scenarioVersionId}>{shortId(data.review.scenarioVersionId)}</dd>
-              <dt>Mã bản duyệt</dt><dd className="rev-hash" title={data.review.reviewId}>{shortId(data.review.reviewId)}</dd>
             </dl>
+            {/* The exact hashes the decision pins, and the ids, are for support: folded so the reviewer reads content, not codes. */}
+            <details className="support-code" data-testid="review-support">
+              <summary>Thông tin cho bộ phận hỗ trợ</summary>
+              <dl className="rev-dl">
+                <dt>Mã nội dung kịch bản</dt><dd><HashValue value={data.review.contentHash} label="Mã nội dung kịch bản" /></dd>
+                <dt>Mã nội dung tiêu chí chấm</dt><dd><HashValue value={data.review.rubricHash} label="Mã nội dung tiêu chí chấm (rubric)" /></dd>
+                <dt>Mã phiên bản</dt><dd className="rev-hash" title={data.review.scenarioVersionId}>{shortId(data.review.scenarioVersionId)}</dd>
+                <dt>Mã bản duyệt</dt><dd className="rev-hash" title={data.review.reviewId}>{shortId(data.review.reviewId)}</dd>
+                <dt>Tài khoản gửi</dt><dd className="rev-hash">{data.review.submittedBy ?? "—"}</dd>
+                {data.review.decidedBy && <><dt>Tài khoản quyết định</dt><dd className="rev-hash">{data.review.decidedBy}</dd></>}
+              </dl>
+            </details>
           </section>
 
           <ReadinessStrip readiness={data.readiness} />
@@ -132,7 +140,7 @@ export function ReviewDrawer({ open, reviewId, accessToken, summary, onChanged, 
             <h3>Quyết định</h3>
             <p className="rev-note" data-testid="decision-result">{data.review.status === "Approved" ? "Nội dung và tiêu chí chấm điểm của phiên bản này đã được duyệt." : data.review.status === "Rejected" ? "Phiên bản này đã bị từ chối. Tổ chức cần sửa và gửi phiên bản mới." : "Đang cập nhật trạng thái từ máy chủ…"} Quyết định không đổi được nữa.</p>
             {data.review.decidedAt && <dl className="rev-dl" style={{ marginTop: 10 }}>
-              <dt>Người quyết định</dt><dd><AccountRef id={data.review.decidedBy} /></dd>
+              <dt>Người quyết định</dt><dd><AccountRef id={data.review.decidedBy} role="Quản trị FET3D" /></dd>
               <dt>Thời điểm quyết định</dt><dd>{formatDateTime(data.review.decidedAt)}</dd>
             </dl>}
             {data.review.status === "Rejected" && <div className="rev-reason" style={{ marginTop: 10 }} data-testid="reject-reason"><strong>Lý do từ chối</strong><p>{data.review.reason || "Không có lý do được lưu."}</p></div>}

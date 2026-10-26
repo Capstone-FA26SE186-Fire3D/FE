@@ -135,16 +135,16 @@ export function pickPassedRun(qa: JobQa | null): ValidationRun | null {
 const STEP_LABELS: Record<string, string> = {
   Quarantine: "Kiểm tra tệp",
   Parse: "Đọc IFC",
-  CleanGeometry: "Làm sạch hình học",
-  Decimate: "Giảm lưới",
-  GenNavMesh: "Tạo lưới di chuyển",
-  GenHazardGrid: "Tạo lưới nguy hiểm",
+  CleanGeometry: "Làm sạch mô hình",
+  Decimate: "Giảm độ chi tiết",
+  GenNavMesh: "Tạo đường đi",
+  GenHazardGrid: "Tạo vùng nguy hiểm",
   ExportGLB: "Xuất GLB",
   PackageBundle: "Đóng gói",
 };
 
 export function processingStepLabel(step: string) {
-  return STEP_LABELS[step] ?? step;
+  return STEP_LABELS[step] ?? "Bước khác";
 }
 
 /** Kind of a processing job (`Geometry` for IFC, package builds otherwise). */

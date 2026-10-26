@@ -143,7 +143,7 @@ test.describe("Admin AI: policies", () => {
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("20001");
     await form.getByLabel("Số nguồn tối đa").fill("101");
     await page.getByTestId("policy-create").click();
-    await expect(form.getByText(/Chữ thường không dấu, bắt đầu bằng chữ cái/)).toBeVisible();
+    await expect(form.getByText(/Viết liền không dấu, bắt đầu bằng chữ/)).toBeVisible();
     await expect(form.getByText("Số nguyên từ 1 đến 20.000.")).toBeVisible();
     await expect(form.getByText("Số nguyên từ 1 đến 100.", { exact: true })).toBeVisible();
     expect(calls(mock, "POST", "/api/admin/ai/policies")).toHaveLength(0);
@@ -213,18 +213,18 @@ test.describe("Admin AI: knowledge sources", () => {
     await page.getByRole("option", { name: "Dùng chung (mọi tổ chức)" }).click();
     await form.getByLabel("Tiêu đề").fill("Nghị định 136/2020/NĐ-CP");
     await form.getByLabel("Nhãn phiên bản").fill("2020");
-    await form.getByLabel("Mã nội dung (SHA-256) của tài liệu").fill("abc");
+    await form.getByLabel("Mã kiểm tra tài liệu").fill("abc");
     await form.getByLabel("Liên kết tham chiếu (https)").fill("http://example.gov.vn/nd136");
     await page.getByTestId("source-create").click();
     await expect(form.getByText("Chỉ nhận liên kết https.")).toBeVisible();
-    await expect(form.getByText("Mã nội dung phải gồm đúng 64 ký tự 0–9 hoặc a–f.")).toBeVisible();
+    await expect(form.getByText("Mã kiểm tra chưa đúng. Chọn tệp bên dưới để hệ thống tự tính.")).toBeVisible();
     await form.getByLabel("Liên kết tham chiếu (https)").fill("https://user:secret@example.gov.vn/nd136");
     await page.getByTestId("source-create").click();
     await expect(form.getByText("Liên kết không được chứa tài khoản hoặc mật khẩu.")).toBeVisible();
     expect(calls(mock, "POST", "/api/admin/knowledge-sources")).toHaveLength(0);
 
     await form.getByLabel("Liên kết tham chiếu (https)").fill("https://example.gov.vn/nd136");
-    await form.getByLabel("Mã nội dung (SHA-256) của tài liệu").fill("C".repeat(64));
+    await form.getByLabel("Mã kiểm tra tài liệu").fill("C".repeat(64));
     await page.getByTestId("source-create").click();
     await expect(page.getByTestId("source-detail")).toContainText("Nghị định 136/2020/NĐ-CP");
     await expect(page.getByTestId("source-status")).toHaveText("Bản nháp");
@@ -241,7 +241,7 @@ test.describe("Admin AI: knowledge sources", () => {
     const form = page.getByRole("form", { name: "Đăng ký nguồn tri thức" });
     await form.getByLabel("Tính mã nội dung từ tệp").setInputFiles({ name: "doc.txt", mimeType: "text/plain", buffer: Buffer.from("abc") });
     // SHA-256("abc")
-    await expect(form.getByLabel("Mã nội dung (SHA-256) của tài liệu")).toHaveValue("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+    await expect(form.getByLabel("Mã kiểm tra tài liệu")).toHaveValue("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     expect(mock.calls.filter((call) => call.method === "POST")).toHaveLength(0);
   });
 
