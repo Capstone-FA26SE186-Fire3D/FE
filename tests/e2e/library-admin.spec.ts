@@ -359,7 +359,7 @@ test.describe("equipment and template payloads", () => {
     await openItem(page, "MAT-NA-LOC-KHOI");
     // The row menu also starts a version (`?version=new`).
     await page.getByTestId("new-version").click();
-    await expect(page.getByTestId("no-capability-notice")).toContainText("không thêm khả năng cho ứng dụng");
+    await expect(page.getByTestId("no-capability-notice")).toContainText("không thêm tính năng cho ứng dụng");
     await page.getByTestId("version-name").fill("Mặt nạ lọc khói");
     await page.getByTestId("save-version").click();
     await expect(page.getByTestId("group-version").getByText("Nhập mô tả để tổ chức biết thiết bị này là gì.")).toBeVisible();
@@ -369,15 +369,15 @@ test.describe("equipment and template payloads", () => {
     await page.getByTestId("property-0-key").fill("Khối lượng (g)");
     await page.getByTestId("property-0").getByLabel("Kiểu giá trị").selectOption("number");
     await page.getByTestId("property-0-value").fill("120");
-    await page.getByTestId("capabilities").getByRole("button", { name: "Thêm năng lực" }).click();
-    await page.getByRole("textbox", { name: "Năng lực yêu cầu 1", exact: true }).fill("cover.nose");
+    await page.getByTestId("capabilities").getByRole("button", { name: "Thêm yêu cầu" }).click();
+    await page.getByRole("textbox", { name: "Yêu cầu 1", exact: true }).fill("cover.nose");
     await page.getByTestId("save-version").click();
     await expect(page).toHaveURL(/version=[0-9a-f-]{36}/);
     expect(backend.callsTo("POST", /\/versions$/)[0].body).toEqual({ name: "Mặt nạ lọc khói", payload: { description: "Mặt nạ lọc khói dùng một lần.", properties: { "Khối lượng (g)": 120 } }, requiredCapabilities: ["cover.nose"] });
     expect(backend.calls.some((call) => /scenario-interactions|runtime/.test(call.path))).toBe(false);
     await page.getByTestId("publish-version").click();
     await page.getByTestId("confirm-publish").click();
-    await expect(page.getByTestId("version-preview")).toContainText("Không thêm năng lực cho ứng dụng");
+    await expect(page.getByTestId("version-preview")).toContainText("Không thêm tính năng cho ứng dụng");
     await expect(page.getByTestId("version-preview")).toContainText("cover.nose");
     await backToItem(page);
     await expect(page.getByTestId("version-row-1")).toContainText("Đã xuất bản");

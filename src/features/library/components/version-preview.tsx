@@ -10,7 +10,7 @@ import { capabilityName } from "@/configs/capability-labels";
 import { SupportCode } from "@/components/ui/support-code";
 import { metricName, operatorSymbol } from "@/features/training-history/labels";
 
-export const NO_CAPABILITY_NOTICE = "Thông tin thiết bị không thêm khả năng cho ứng dụng. Năng lực của đối tượng vẫn lấy từ danh mục của ứng dụng FET3D.";
+export const NO_CAPABILITY_NOTICE = "Thông tin thiết bị không thêm tính năng cho ứng dụng. Tính năng của đối tượng vẫn lấy từ danh mục của ứng dụng FET3D.";
 
 function RubricTable({ rubric }: { rubric: unknown }) {
   const criteria = isObject(rubric) && Array.isArray(rubric.criteria) ? rubric.criteria.filter(isObject) : [];
@@ -60,13 +60,13 @@ export function VersionPreview({ version, compact = false }: { version: LibraryV
 
     {version.kind === "Equipment" && <>
       {properties.length > 0 && <Table caption="Thuộc tính thiết bị"><thead><tr><th>Thuộc tính</th><th>Giá trị</th></tr></thead><tbody>{properties.map(([key, value]) => <tr key={key}><td className="ops-cell-primary">{key}</td><td>{String(value)}</td></tr>)}</tbody></Table>}
-      <Alert tone="info" title="Không thêm năng lực cho ứng dụng">{NO_CAPABILITY_NOTICE}</Alert>
+      <Alert tone="info" title="Không thêm tính năng cho ứng dụng">{NO_CAPABILITY_NOTICE}</Alert>
     </>}
 
     <div>
-      <p className="ops-field-label" style={{ margin: "0 0 4px" }}>Năng lực mẫu này yêu cầu</p>
+      <p className="ops-field-label" style={{ margin: "0 0 4px" }}>Yêu cầu của mẫu này</p>
       {version.requiredCapabilities.length === 0
-        ? <p className="ops-field-hint" style={{ margin: 0 }}>Không khai báo năng lực nào.</p>
+        ? <p className="ops-field-hint" style={{ margin: 0 }}>Chưa ghi yêu cầu nào.</p>
         : <ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc", fontSize: 14 }}>{version.requiredCapabilities.map((id) => <li key={id}>{capabilityName(id)}</li>)}</ul>}
     </div>
   </div>;

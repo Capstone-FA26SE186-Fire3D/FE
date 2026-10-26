@@ -97,7 +97,7 @@ export function checkForm(kind: LibraryKind, form: VersionForm, context: CheckCo
 
   const caps = form.capabilities.map((item) => item.trim());
   if (caps.length > LIBRARY_LIMITS.capabilitiesMax || new Set(caps).size !== caps.length || caps.some((item) => !LIBRARY_LIMITS.capabilityPattern.test(item))) {
-    blocking.push(issue("CAPABILITIES_INVALID", "$.requiredCapabilities", "Tối đa 50 mã năng lực, khác nhau, mỗi mã gồm chữ, số và _ . : - (tối đa 128 ký tự)."));
+    blocking.push(issue("CAPABILITIES_INVALID", "$.requiredCapabilities", "Tối đa 50 yêu cầu, không trùng nhau, mỗi yêu cầu viết liền không dấu (tối đa 128 ký tự)."));
   }
 
   const description = form.description.trim();
@@ -156,7 +156,7 @@ export function describeDifferences(kind: LibraryKind, form: VersionForm, server
   const out: string[] = [];
   if (mine.name !== theirs.name) out.push("tên phiên bản");
   if (mine.payload.description !== theirs.payload.description) out.push("mô tả");
-  if (!deepEqual(mine.requiredCapabilities, theirs.requiredCapabilities)) out.push("năng lực yêu cầu");
+  if (!deepEqual(mine.requiredCapabilities, theirs.requiredCapabilities)) out.push("yêu cầu");
   if (!deepEqual(content(mine.payload), content(theirs.payload))) out.push(kind === "ScenarioTemplate" ? "nội dung kịch bản mẫu" : kind === "RubricSample" ? "tiêu chí chấm điểm" : "thuộc tính thiết bị");
   return out;
 }
