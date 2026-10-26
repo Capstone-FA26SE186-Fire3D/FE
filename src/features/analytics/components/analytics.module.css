@@ -27,7 +27,10 @@
 .kpis[data-count="3"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .kpis[data-count="2"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .lead { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 20px; align-items: start; }
-.trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+/* Cards of one row share its height; the "Xem bảng số liệu" link sits on the bottom edge of each. */
+.trio > :global(.ops-chart-card) { display: flex; flex-direction: column; }
+.trio > :global(.ops-chart-card) > :global(.ops-chart-table) { margin-top: auto; }
 .trio > :only-child { grid-column: 1 / -1; }
 @media (max-width: 1100px) {
   .kpis, .kpis[data-count="3"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }

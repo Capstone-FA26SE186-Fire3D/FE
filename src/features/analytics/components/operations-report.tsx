@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { ChartCard } from "@/components/charts/chart-card";
 import { colorAt, seriesColor } from "@/components/charts/chart-config";
-import { Donut, GroupedBars } from "@/components/charts/lazy";
+import { AreaChart, Donut, GroupedBars } from "@/components/charts/lazy";
+import { RankedBars } from "@/components/charts/ranked-bars";
 import { Stacked100 } from "@/components/charts/stacked-100";
 import { Button } from "@/components/ui/button";
 import type { Tone } from "@/components/ui/status-badge";
@@ -13,7 +14,8 @@ import { ChipTabs } from "@/components/ui/sub-tabs";
 import { routes } from "@/configs/routes";
 import { ticketStatusLabel, ticketStatusTone } from "@/features/support/labels";
 import { fmt } from "../format";
-import type { OperationsReport } from "../types";
+import { fillPeriods, periodTick, periodTitle } from "../periods";
+import type { OperationsReport, TrainingReport } from "../types";
 import { KpiTile, Num, ReportTable, sumCounts, toneColor } from "./charts";
 import styles from "./analytics.module.css";
 
@@ -22,6 +24,16 @@ const roleNames: Record<string, string> = { PlatformAdmin: "Quản trị FET3D",
 const kindLabels: Record<string, string> = { IfcProcessing: "Dựng mô hình 3D", Geometry: "Dựng mô hình 3D", PlaytestPackage: "Gói chạy thử", ReleasePackage: "Gói phát hành", PackageBuild: "Dựng gói" };
 const jobStatusLabel: Record<string, string> = { Queued: "Đang chờ", Running: "Đang chạy", Processing: "Đang xử lý", Succeeded: "Hoàn tất", Failed: "Thất bại", Cancelled: "Đã hủy", Canceled: "Đã hủy" };
 const ticketOrder = ["Open", "InProgress", "Resolved", "Closed"];
+/** "Tạo mới trong kỳ" rows, in this order; a key the server adds later keeps its own name. */
+const createdLabels: Record<string, string> = { accounts: "Tài khoản", organizations: "Tổ chức", buildings: "Công trình", processingJobs: "Tiến trình xử lý", tickets: "Yêu cầu hỗ trợ" };
+const activitySeries = [
+  { key: "plays", label: "Lượt chơi", color: seriesColor.plays },
+  { key: "trainees", label: "Học viên tham gia", color: seriesColor.passed },
+  { key: "completed", label: "Hoàn thành", color: seriesColor.completed },
+];
+
+/** Daily cohorts of the operations period, read by the workspace next to the operations report (no training filters). */
+export type OperationsActivity = { report?: TrainingReport; loading: boolean; failed: boolean };
 
 function jobTone(status: string): Tone {
   if (/fail|error|dead/i.test(status)) return "danger";
@@ -38,7 +50,7 @@ const jobPattern = (tone: Tone): "stripes" | "dots" | undefined => (tone === "da
  * organizations are a snapshot at the update time; jobs and tickets are those created in the period. A finished job is
  * not the same as a model that passed QA.
  */
-export function OperationsReportView({ data, scope, organizationId }: { data: OperationsReport; scope: "platform" | "organization" | "admin-organization"; organizationId?: string }) {
+export function OperationsReportView({ data, scope, organizationId, activity }: { data: OperationsReport; scope: "platform" | "organization" | "admin-organization"; organizationId?: string; activity?: OperationsActivity }) {
   const platform = scope === "platform";
   const accounts = data.accounts ?? [];
   const accountsActive = sumCounts(accounts.filter((item) => item.isActive));
@@ -68,6 +80,12 @@ export function OperationsReportView({ data, scope, organizationId }: { data: Op
   const accountRows = roles.map((role) => ({ role: roleNames[role] ?? role, active: sumCounts(accounts.filter((item) => item.role === role && item.isActive)), inactive: sumCounts(accounts.filter((item) => item.role === role && !item.isActive)) }));
   const accountData = accountRows.map((row) => ({ role: row.role, count: row.active + row.inactive }));
 
+  const report = activity?.report;
+  const days = report?.cohorts ? fillPeriods(report.cohorts, "day", report.from, report.to) : [];
+  const activityData = days.map((day) => ({ day: day.key, plays: day.plays, trainees: day.uniqueTrainees, completed: day.completed }));
+  const createdRows = [...Object.keys(createdLabels).filter((key) => key in data.created), ...Object.keys(data.created).filter((key) => !(key in createdLabels))]
+    .map((key) => ({ key, label: createdLabels[key] ?? key, value: data.created[key] }));
+
   return <div className={styles.report}>
     <div className={styles.kpis} data-count={platform ? 4 : 3} role="group" aria-label="Chỉ số vận hành">
       {platform && <KpiTile label="Tài khoản (hiện tại)" value={accountsTotal} hint={`${fmt(accountsActive)} hoạt động · ${fmt(accountsTotal - accountsActive)} vô hiệu`} data-testid="kpi-accounts" />}
@@ -75,6 +93,16 @@ export function OperationsReportView({ data, scope, organizationId }: { data: Op
       <KpiTile label="Tiến trình xử lý (trong kỳ)" value={jobsTotal} hint={`${fmt(jobsFailed)} thất bại`} data-testid="kpi-jobs" />
       <KpiTile label="Yêu cầu hỗ trợ (trong kỳ)" value={ticketsTotal} hint={`${fmt(ticketsOpen)} chưa xử lý xong`} data-testid="kpi-tickets" />
     </div>
+
+    {activity && <ChartCard title="Hoạt động huấn luyện theo ngày" description="Lượt chơi, số học viên tham gia và lượt hoàn thành mỗi ngày trong khoảng thời gian đã chọn" height={220} data-testid="chart-activity"
+      loading={activity.loading} empty={activity.failed || !report?.plays} emptyText={activity.failed ? "Chưa lấy được số liệu huấn luyện. Bấm Tải lại để thử lại." : "Chưa có lượt chơi nào trong khoảng này"}
+      legend={report ? [{ label: "Lượt chơi", color: seriesColor.plays, value: fmt(report.plays) }, { label: "Học viên tham gia", color: seriesColor.passed, value: fmt(report.uniqueTrainees) }, { label: "Hoàn thành", color: seriesColor.completed, value: fmt(report.completed) }] : undefined}
+      table={<ReportTable caption="Hoạt động huấn luyện theo ngày">
+        <thead><tr><th>Ngày</th><Num header>Lượt chơi</Num><Num header>Học viên</Num><Num header>Hoàn thành</Num></tr></thead>
+        <tbody>{days.filter((day) => day.plays > 0).map((day) => <tr key={day.key}><td>{periodTitle(day.key, "day")}</td><Num>{fmt(day.plays)}</Num><Num>{fmt(day.uniqueTrainees)}</Num><Num>{fmt(day.completed)}</Num></tr>)}</tbody>
+      </ReportTable>}>
+      <AreaChart data={activityData} xKey="day" series={activitySeries} height={220} formatX={periodTick} />
+    </ChartCard>}
 
     <div className={styles.trio}>
       <ChartCard title="Công trình" description="Ảnh chụp hiện tại; công trình đã xóa không được tính" height={140} empty={buildingsTotal === 0} emptyText="Chưa có công trình" data-testid="chart-buildings"
@@ -86,7 +114,7 @@ export function OperationsReportView({ data, scope, organizationId }: { data: Op
         <Donut size={140} slices={[{ key: "active", label: "Đang hoạt động", value: buildingsActive, color: seriesColor.passed }, { key: "archived", label: "Đã lưu trữ", value: buildingsTotal - buildingsActive, color: seriesColor.neutral }]} center={{ value: fmt(buildingsTotal), caption: "công trình" }} />
       </ChartCard>
 
-      <ChartCard title="Tiến trình xử lý" description="Tạo trong khoảng thời gian đã chọn, gồm xử lý IFC và dựng gói. Xử lý xong chưa có nghĩa là mô hình đã đạt kiểm tra tự động." height={140} empty={kinds.length === 0} emptyText="Không có tiến trình nào trong khoảng thời gian này" data-testid="chart-jobs"
+      <ChartCard title="Tiến trình xử lý" description="Tạo trong kỳ đã chọn: xử lý IFC và dựng gói. Hoàn tất chưa có nghĩa là mô hình đã đạt kiểm tra." height={140} empty={kinds.length === 0} emptyText="Không có tiến trình nào trong khoảng thời gian này" data-testid="chart-jobs"
         table={<ReportTable caption="Tiến trình theo loại và trạng thái">
           <thead><tr><th>Loại</th><th>Trạng thái</th><Num header>Số tiến trình</Num></tr></thead>
           <tbody>{data.processingJobs.map((item) => <tr key={`${item.kind}-${item.status}`}><td>{kindLabels[item.kind] ?? item.kind}</td><td>{jobStatusLabel[item.status] ?? item.status}</td><Num>{fmt(item.count)}</Num></tr>)}</tbody>
@@ -125,6 +153,10 @@ export function OperationsReportView({ data, scope, organizationId }: { data: Op
         </ReportTable>}>
         <Donut size={140} slices={[{ key: "active", label: "Hoạt động", value: organizationsActive, color: seriesColor.passed }, { key: "inactive", label: "Vô hiệu", value: sumCounts(organizations) - organizationsActive, color: seriesColor.neutral }]} center={{ value: fmt(sumCounts(organizations)) }} />
       </ChartCard>}
+
+      <ChartCard title="Tạo mới trong kỳ" description="Số mục được tạo trong khoảng thời gian đã chọn" height={140} empty={createdRows.length === 0} emptyText="Chưa có số liệu tạo mới" data-testid="chart-created">
+        <RankedBars rows={createdRows} label="Số mục tạo mới trong kỳ" />
+      </ChartCard>
     </div>}
   </div>;
 }
