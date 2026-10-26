@@ -25,6 +25,20 @@ const rows = (count: number) => Array.from({ length: count }, (_, index) => {
 });
 
 test.describe("admin payments ledger (mock)", () => {
+  test("the status chart shows one tile per state with its count and share beside it", async ({ page }, testInfo) => {
+    const mock = newMock();
+    mock.ledger = rows(45);
+    await signIn(page, admin);
+    await mockBilling(page, mock);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/admin/commerce?tab=payments");
+    const chart = page.getByTestId("payments-status-chart");
+    await expect(chart.locator(".ops-status-tiles li")).toHaveCount(5);
+    await expect(chart.locator(".ops-status-total strong")).not.toHaveText("");
+    await expect(chart.locator(".ops-status-tiles li").first().locator("small")).toHaveText(/%$/);
+    await chart.screenshot({ path: testInfo.outputPath("payments-status-chart.png") });
+  });
+
   test("paginates and filters on the server; the URL keeps kind, status, organization, range and page", async ({ page }) => {
     const mock = newMock();
     mock.ledger = rows(45);

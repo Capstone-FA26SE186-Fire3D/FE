@@ -97,6 +97,15 @@ test.describe("public list", () => {
     await expect(cards(page)).toHaveCount(12);
   });
 
+  test("the first page fills whole grid rows: 1 featured + 5 recent + 6 cards, then 12 per page", async ({ page }) => {
+    await setup(page, "guest", (b) => { for (let i = 1; i <= 26; i += 1) b.seedPost(`hang-${i}`, { title: `Bài hàng ${i}`, status: "Published" }); });
+    await page.goto("/learn");
+    await expect(page.getByRole("complementary", { name: "Mới đăng" }).locator("li")).toHaveCount(5);
+    await expect(page.locator(".learn-grid [data-learn-post]")).toHaveCount(6);
+    await page.getByRole("button", { name: "Trang sau" }).click();
+    await expect(page.locator(".learn-grid [data-learn-post]")).toHaveCount(12);
+  });
+
   test("loading skeleton, then error with retry", async ({ page }) => {
     const backend = await setup(page, "guest", (b) => { b.seedPost("p", { title: "Bài sau lỗi", status: "Published" }); });
     backend.failNext("GET", /^\/api\/learn\/posts$/, { status: 200, delayMs: 800, json: { items: [], total: 0, page: 1, pageSize: 12 } });

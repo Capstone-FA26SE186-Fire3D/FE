@@ -18,8 +18,11 @@ import { SavePostButton } from "./save-post-button";
 import "../learn.css";
 
 const PAGE_SIZE = 12;
-/** Posts in the "Mới đăng" list beside the featured one (first page, no filter). */
-const RECENT = 4;
+/**
+ * Posts in the "Mới đăng" list beside the featured one (first page, no filter). 1 + 5 leaves 6 for the grid, so its rows are full
+ * at 3 and at 2 columns, like the 12 of every other page: no half-empty row before "Sau".
+ */
+const RECENT = 5;
 
 function CardSkeletons() {
   return <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 learn-grid" role="status" aria-live="polite" aria-label="Đang tải bài viết">
