@@ -73,7 +73,7 @@ export function HistoryTab({ accessToken, variant, onApply }: { accessToken: str
     { key: "operation", header: "Loại", width: 170, cardHidden: saved, render: (row) => <StatusBadge tone={row.operation === "ScenarioDraft" ? "ember" : "info"}>{operationLabel(row.operation)}</StatusBadge> },
     { key: "status", header: "Trạng thái", width: 190, render: (row) => <StatusBadge tone={statusTone(row.status, row.resultType)} data-testid="ai-row-status">{statusLabel(row.status, row.resultType)}</StatusBadge> },
     { key: "building", header: "Công trình", width: 200, hideBelow: 900, render: (row) => row.input?.buildingName ?? "—" },
-    { key: "usage", header: "Sử dụng", width: 140, hideBelow: 1100, render: (row) => (row.consumedUnits !== undefined ? formatQuota(row.consumedUnits, row.quotaUnit) : row.reservedUnits !== undefined ? `Giữ chỗ ${formatQuota(row.reservedUnits, row.quotaUnit)}` : "—") },
+    { key: "usage", header: "Sử dụng", width: 140, hideBelow: 1100, render: (row) => (row.consumedUnits !== undefined ? formatQuota(row.consumedUnits, row.quotaUnit) : row.reservedUnits !== undefined ? `Tạm trừ ${formatQuota(row.reservedUnits, row.quotaUnit)}` : "—") },
     { key: "createdAt", header: "Thời gian", width: 160, render: (row) => formatDateTime(row.createdAt) },
   ];
 

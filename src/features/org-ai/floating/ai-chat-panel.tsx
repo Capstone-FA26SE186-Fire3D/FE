@@ -45,7 +45,7 @@ function QuotaOut({ limit, operation }: { limit: AiOperationLimit | null; operat
         <strong>{noPolicy ? "Chưa có chính sách AI cho thao tác này" : limit.availableUnits <= 0 ? "Hạn mức AI đã hết" : "Hạn mức AI không đủ cho một yêu cầu"}</strong>
         <p>{noPolicy
           ? `Quản trị FET3D chưa bật chính sách AI cho ${operationLabel(operation).toLowerCase()} nên yêu cầu chưa được gửi và không có hạn mức nào bị giữ.`
-          : `Mỗi yêu cầu cần giữ chỗ ${limit.estimatedReserve != null ? formatQuota(limit.estimatedReserve, unit) : "một phần hạn mức"}, tổ chức còn ${formatQuota(limit.availableUnits, unit)}. Hết hạn mức thì yêu cầu tính phí mới bị chặn; không có nợ trả sau. Nạp thêm hạn mức để tiếp tục.`}</p>
+          : `Mỗi yêu cầu tạm trừ ${limit.estimatedReserve != null ? formatQuota(limit.estimatedReserve, unit) : "một phần hạn mức"}, tổ chức còn ${formatQuota(limit.availableUnits, unit)}. Hết hạn mức thì yêu cầu tính phí mới bị chặn; không có nợ trả sau. Nạp thêm hạn mức để tiếp tục.`}</p>
       </div>
     </div>
     {!noPolicy && <Button asChild><Link href={BILLING_AI_HREF} data-testid="ai-topup-link">Nạp thêm hạn mức</Link></Button>}

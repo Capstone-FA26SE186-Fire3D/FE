@@ -127,12 +127,12 @@ test.describe("Admin AI v7 details", () => {
     await form.getByLabel("Thao tác").click();
     await page.getByRole("option", { name: "Hỏi đáp của học viên", exact: true }).click();
     await form.getByLabel("Đơn vị hạn mức").selectOption("tokens");
-    await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("50");
+    await form.getByLabel("Tạm trừ mỗi câu hỏi").fill("50");
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("2000");
     await form.getByLabel("Số nguồn tối đa").fill("5");
     await form.getByTestId("policy-daily-units").fill("20");
     await page.getByTestId("policy-create").click();
-    await expect(form.getByText("Phải lớn hơn hoặc bằng mức giữ chỗ mỗi yêu cầu.")).toBeVisible();
+    await expect(form.getByText("Phải lớn hơn hoặc bằng mức tạm trừ mỗi câu hỏi.")).toBeVisible();
     expect(calls(mock, "POST", "/api/admin/ai/policies")).toHaveLength(0);
     await form.getByTestId("policy-daily-units").fill("500");
     await page.getByTestId("policy-create").click();

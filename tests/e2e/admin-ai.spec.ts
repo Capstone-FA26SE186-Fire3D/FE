@@ -126,7 +126,7 @@ test.describe("Admin AI: policies", () => {
     await expect(policyRows(page)).toContainText("tokens");
     await page.getByTestId("policy-new").click();
     const form = page.getByRole("form", { name: "Tạo chính sách AI" });
-    for (const label of ["Đơn vị hạn mức", "Giữ chỗ mỗi yêu cầu", "Số ký tự đầu vào tối đa", "Số nguồn tối đa", "Hiệu lực từ", "Hiệu lực đến"]) await expect(form.getByLabel(label)).toHaveValue("");
+    for (const label of ["Đơn vị hạn mức", "Tạm trừ mỗi câu hỏi", "Số ký tự đầu vào tối đa", "Số nguồn tối đa", "Hiệu lực từ", "Hiệu lực đến"]) await expect(form.getByLabel(label)).toHaveValue("");
     // The operation combobox has no preset either: it still shows its placeholder.
     await expect(form.getByLabel("Thao tác")).toHaveAttribute("data-placeholder", "true");
     await expect(form).toContainText("Không sửa được sau khi tạo");
@@ -138,7 +138,7 @@ test.describe("Admin AI: policies", () => {
 
     await form.getByLabel("Thao tác").click();
     await page.getByRole("option", { name: "Đề xuất kịch bản", exact: true }).click();
-    await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("0");
+    await form.getByLabel("Tạm trừ mỗi câu hỏi").fill("0");
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("20001");
     await form.getByLabel("Số nguồn tối đa").fill("101");
     await page.getByTestId("policy-create").click();
@@ -148,7 +148,7 @@ test.describe("Admin AI: policies", () => {
     expect(calls(mock, "POST", "/api/admin/ai/policies")).toHaveLength(0);
 
     await form.getByLabel("Đơn vị hạn mức").selectOption("tokens");
-    await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("120");
+    await form.getByLabel("Tạm trừ mỗi câu hỏi").fill("120");
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("6000");
     await form.getByLabel("Số nguồn tối đa").fill("12");
     await page.getByTestId("policy-create").click();
@@ -169,12 +169,12 @@ test.describe("Admin AI: policies", () => {
     await form.getByLabel("Thao tác").click();
     await page.getByRole("option", { name: "Hỏi đáp", exact: true }).click();
     await form.getByLabel("Đơn vị hạn mức").selectOption("tokens");
-    await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("10");
+    await form.getByLabel("Tạm trừ mỗi câu hỏi").fill("10");
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("100");
     await form.getByLabel("Số nguồn tối đa").fill("5");
     await page.getByTestId("policy-create").click();
     await expect(form.getByText("Khoảng hiệu lực chồng lên một chính sách khác")).toBeVisible();
-    await expect(form.getByLabel("Giữ chỗ mỗi yêu cầu")).toHaveValue("10");
+    await expect(form.getByLabel("Tạm trừ mỗi câu hỏi")).toHaveValue("10");
     // Endless existing period for Answer: an until in the past is rejected client-side before any call.
     await form.getByLabel("Hiệu lực đến").fill("2020-01-01T00:00");
     await page.getByTestId("policy-create").click();
@@ -214,7 +214,7 @@ test.describe("Admin AI: ending a policy", () => {
     await form.getByLabel("Thao tác").click();
     await page.getByRole("option", { name: "Hỏi đáp", exact: true }).click();
     await form.getByLabel("Đơn vị hạn mức").selectOption("requests");
-    await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("1");
+    await form.getByLabel("Tạm trừ mỗi câu hỏi").fill("1");
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("2000");
     await form.getByLabel("Số nguồn tối đa").fill("100");
     await page.getByTestId("policy-create").click();

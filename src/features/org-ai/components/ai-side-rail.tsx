@@ -37,7 +37,7 @@ export function AiQuotaCard({ accessToken }: { accessToken: string }) {
           <p style={{ margin: 0 }}>{quotaUnitLabel(unit.quotaUnit)}</p>
           <dl className={styles.meta} style={{ marginTop: 10 }}>
             <dt>Đã cấp</dt><dd>{formatNumber(unit.granted)}</dd>
-            <dt>Đang giữ chỗ</dt><dd>{formatNumber(unit.reserved)}</dd>
+            <dt>Đang tạm trừ</dt><dd>{formatNumber(unit.reserved)}</dd>
             <dt>Đã dùng</dt><dd>{formatNumber(unit.consumed)}</dd>
             {unit.expired > 0 && <><dt>Đã hết hạn</dt><dd>{formatNumber(unit.expired)}</dd></>}
             {unit.scheduled > 0 && <><dt>Sắp hiệu lực</dt><dd>{formatNumber(unit.scheduled)}</dd></>}
@@ -49,7 +49,7 @@ export function AiQuotaCard({ accessToken }: { accessToken: string }) {
 
     <section className="org-card" aria-labelledby="org-ai-limits-title">
       <h2 id="org-ai-limits-title" className="org-card-title">Giới hạn theo chính sách</h2>
-      <p className="org-card-sub">Mức giữ chỗ cho một yêu cầu và giới hạn đầu vào do quản trị FET3D quy định; máy chủ chốt theo mức dùng thực tế.</p>
+      <p className="org-card-sub">Mức tạm trừ cho một yêu cầu và giới hạn đầu vào do quản trị FET3D quy định; máy chủ chốt theo mức dùng thực tế.</p>
       {limits.loading && !limits.data && <SkeletonRows rows={2} label="Đang tải giới hạn…" />}
       {limits.error !== undefined && !limits.data && <Alert tone="danger" title="Chưa đọc được giới hạn" action={<Button size="sm" variant="secondary" className="mt-3" onClick={limits.reload}>Thử lại</Button>}>{aiErrorText(limits.error)}</Alert>}
       {limits.data && items.length === 0 && <p className="org-card-sub">Chưa có chính sách AI đang hiệu lực.</p>}
@@ -59,10 +59,10 @@ export function AiQuotaCard({ accessToken }: { accessToken: string }) {
           {!item.policyActive
             ? <p>Chưa có chính sách đang hiệu lực; yêu cầu loại này sẽ không được gửi.</p>
             : <dl className={styles.meta} style={{ marginTop: 8 }}>
-              <dt>Giữ chỗ mỗi yêu cầu</dt><dd>{item.estimatedReserve != null ? formatQuota(item.estimatedReserve, item.quotaUnit ?? undefined) : "—"}</dd>
+              <dt>Tạm trừ mỗi câu hỏi</dt><dd>{item.estimatedReserve != null ? formatQuota(item.estimatedReserve, item.quotaUnit ?? undefined) : "—"}</dd>
               <dt>Đầu vào tối đa</dt><dd>{item.maxInputChars ? `${formatNumber(item.maxInputChars)} ký tự` : "—"}</dd>
               <dt>Nguồn tối đa</dt><dd>{item.maxSources ? formatNumber(item.maxSources) : "—"}</dd>
-              <dt>Có thể gửi</dt><dd>{item.canSubmit ? "Có" : "Không, số dư dưới mức giữ chỗ"}</dd>
+              <dt>Có thể gửi</dt><dd>{item.canSubmit ? "Có" : "Không, số dư thấp hơn mức tạm trừ"}</dd>
             </dl>}
         </div>)}
       </div>

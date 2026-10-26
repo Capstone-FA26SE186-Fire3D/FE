@@ -56,7 +56,7 @@ const FAILURE: Record<string, string> = {
   AI_RESULT_INVALID: "Kết quả của dịch vụ AI không đúng cấu trúc nên bị giữ lại, không hiển thị.",
   AI_CITATION_INVALID: "Kết quả trích dẫn nguồn không hợp lệ nên bị giữ lại, không hiển thị.",
   AI_USAGE_INVALID: "Số liệu sử dụng do dịch vụ AI báo không hợp lệ.",
-  AI_USAGE_EXCEEDS_RESERVATION: "Mức sử dụng vượt phần hạn mức đã giữ chỗ nên không được chấp nhận.",
+  AI_USAGE_EXCEEDS_RESERVATION: "Mức sử dụng vượt phần hạn mức đã tạm trừ nên không được chấp nhận.",
   AI_REQUEST_NOT_RECEIVED: "Dịch vụ AI xác nhận chưa nhận được yêu cầu này.",
   AI_SOURCE_HASH_MISMATCH: "Tài liệu nguồn đã thay đổi so với bản được ghim nên dịch vụ AI không dùng được.",
   AI_SOURCE_UNAVAILABLE: "Dịch vụ AI không đọc được tài liệu nguồn đã ghim.",

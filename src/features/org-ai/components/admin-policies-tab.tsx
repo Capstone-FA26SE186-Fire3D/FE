@@ -54,7 +54,7 @@ export function validatePolicy(form: Form): { errors: Errors; input?: CreateAiPo
   const trainee = form.operation === "TraineeAnswer";
   const daily = wholeNumber(form.dailyUnits);
   if (trainee && !(daily >= 1 && daily <= 100_000_000)) errors.dailyUnits = "Số nguyên từ 1 đến 100.000.000.";
-  else if (trainee && reserve >= 1 && daily < reserve) errors.dailyUnits = "Phải lớn hơn hoặc bằng mức giữ chỗ mỗi yêu cầu.";
+  else if (trainee && reserve >= 1 && daily < reserve) errors.dailyUnits = "Phải lớn hơn hoặc bằng mức tạm trừ mỗi câu hỏi.";
   const from = form.effectiveFrom ? new Date(form.effectiveFrom).getTime() : null;
   const until = form.effectiveUntil ? new Date(form.effectiveUntil).getTime() : null;
   if (from !== null && Number.isNaN(from)) errors.effectiveFrom = "Thời điểm không hợp lệ.";
@@ -131,10 +131,10 @@ function PolicyModal({ open, accessToken, onCreated, onClose }: { open: boolean;
         </Select>}
       </Field>
       <div className={styles.grid2}>
-        <Field label="Giữ chỗ mỗi yêu cầu" required hint="Số đơn vị tạm khóa khi gửi một câu hỏi, để hạn mức không bị dùng quá. AI trả lời xong chỉ trừ phần thực dùng, phần dư trả lại; lỗi thì trả lại hết." error={server("$.reserveUnits", "reserveUnits")}>{(props) => <Input {...props} inputMode="numeric" value={form.reserveUnits} onChange={set("reserveUnits")} />}</Field>
+        <Field label="Tạm trừ mỗi câu hỏi" required hint="Khi một câu hỏi được gửi, hệ thống trừ tạm số này khỏi hạn mức để không ai dùng quá. AI trả lời xong chỉ tính phần thực dùng, phần dư được hoàn lại; AI lỗi thì hoàn lại hết. Đơn vị lượt hỏi: để 1." error={server("$.reserveUnits", "reserveUnits")}>{(props) => <Input {...props} inputMode="numeric" value={form.reserveUnits} onChange={set("reserveUnits")} />}</Field>
         <Field label="Số ký tự đầu vào tối đa" required error={server("$.maxInputChars", "maxInputChars")}>{(props) => <Input {...props} inputMode="numeric" value={form.maxInputChars} onChange={set("maxInputChars")} />}</Field>
         <Field label="Số nguồn tối đa" required error={server("$.maxSources", "maxSources")}>{(props) => <Input {...props} inputMode="numeric" value={form.maxSources} onChange={set("maxSources")} />}</Field>
-        {form.operation === "TraineeAnswer" && <Field label="Hạn mức mỗi học viên mỗi ngày" required hint="Tính theo ngày giờ Việt Nam; gồm phần đã tính và phần đang giữ chỗ. Không lấy từ hạn mức của tổ chức." error={server("$.dailyUnits", "dailyUnits")}>{(props) => <Input {...props} inputMode="numeric" value={form.dailyUnits} onChange={set("dailyUnits")} data-testid="policy-daily-units" />}</Field>}
+        {form.operation === "TraineeAnswer" && <Field label="Hạn mức mỗi học viên mỗi ngày" required hint="Tính theo ngày giờ Việt Nam; gồm phần đã tính và phần đang tạm trừ. Không lấy từ hạn mức của tổ chức." error={server("$.dailyUnits", "dailyUnits")}>{(props) => <Input {...props} inputMode="numeric" value={form.dailyUnits} onChange={set("dailyUnits")} data-testid="policy-daily-units" />}</Field>}
       </div>
       <div className={styles.grid2}>
         <Field label="Hiệu lực từ" hint="Để trống: có hiệu lực ngay khi tạo." error={server("$.effectiveFrom", "effectiveFrom")}>{(props) => <Input {...props} type="datetime-local" value={form.effectiveFrom} onChange={set("effectiveFrom")} />}</Field>
@@ -198,7 +198,7 @@ export function AdminPoliciesTab({ accessToken }: { accessToken: string }) {
   const columns: DataColumn<AiPolicy>[] = [
     { key: "operation", header: "Thao tác", primary: true, render: (policy) => <CellTitle title={operationLabel(policy.operation)} /> },
     { key: "unit", header: "Đơn vị", width: 130, render: (policy) => <CellTitle title={quotaUnitLabel(policy.quotaUnit)} sub={quotaUnitLabel(policy.quotaUnit) !== policy.quotaUnit ? `mã nhập: ${policy.quotaUnit}` : undefined} /> },
-    { key: "reserve", header: "Giữ chỗ", width: 110, align: "right", render: (policy) => formatNumber(policy.reserveUnits) },
+    { key: "reserve", header: "Tạm trừ", width: 110, align: "right", render: (policy) => formatNumber(policy.reserveUnits) },
     { key: "chars", header: "Ký tự tối đa", width: 120, align: "right", hideBelow: 1100, render: (policy) => formatNumber(policy.maxInputChars) },
     { key: "sources", header: "Nguồn tối đa", width: 120, align: "right", hideBelow: 1100, render: (policy) => formatNumber(policy.maxSources) },
     { key: "daily", header: "Hạn mức/ngày", width: 130, align: "right", hideBelow: 1200, render: (policy) => (policy.dailyUnits != null ? formatNumber(policy.dailyUnits) : "—") },
@@ -208,7 +208,7 @@ export function AdminPoliciesTab({ accessToken }: { accessToken: string }) {
 
   return <div className={styles.stack}>
     <DataTable<AiPolicy>
-      caption="Chính sách giữ chỗ hạn mức AI"
+      caption="Chính sách hạn mức AI"
       data-testid="ai-policies-table"
       columns={columns}
       rows={items}
