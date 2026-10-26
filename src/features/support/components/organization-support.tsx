@@ -166,7 +166,7 @@ function TicketsTab({ accessToken, myId, audience }: { accessToken: string; myId
         </FilterChips>
         {!master && <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo yêu cầu hỗ trợ</Button>}
       </>}
-      empty={<EmptyState icon={status || needle ? Search : Inbox} title={status || needle ? "Không có yêu cầu phù hợp." : "Bạn chưa gửi yêu cầu hỗ trợ nào"} description={status || needle ? "Thử đổi từ khóa hoặc bộ lọc trạng thái." : audience === "trainee" ? "Khi gặp sự cố với bài học, ứng dụng hoặc tài khoản, hãy tạo yêu cầu để đội FET3D hỗ trợ." : "Khi gặp sự cố với công trình, mô hình IFC hoặc tài khoản, hãy tạo yêu cầu để đội FET3D hỗ trợ."} action={!status && !needle ? <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo yêu cầu hỗ trợ</Button> : undefined} />}
+      empty={<EmptyState icon={status || needle ? Search : Inbox} title={status || needle ? "Không có yêu cầu phù hợp." : "Bạn chưa gửi yêu cầu hỗ trợ nào"} description={status || needle ? "Thử đổi từ khóa hoặc bộ lọc trạng thái." : audience === "trainee" ? "Khi gặp sự cố với bài học, ứng dụng hoặc tài khoản, hãy tạo yêu cầu để đội FET3D hỗ trợ." : "Khi gặp sự cố với công trình, mô hình IFC hoặc tài khoản, hãy tạo yêu cầu để đội FET3D hỗ trợ."} />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
     <p className="ops-field-hint" style={{ margin: "10px 0 0" }}>Bấm một hàng để xem hội thoại trong ngăn bên phải. “Tạo yêu cầu” mở hộp thoại chỉ gồm chủ đề và mô tả.</p>
@@ -259,7 +259,7 @@ function FeedbackTab({ accessToken, audience }: { accessToken: string; audience:
         <span className="ops-toolbar-grow" />
         <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Gửi phản hồi</Button>
       </>}
-      empty={<EmptyState icon={status ? Search : MessageSquareText} title={status ? "Không có phản hồi phù hợp." : "Bạn chưa gửi phản hồi nào"} description={status ? "Thử đổi bộ lọc trạng thái." : audience === "trainee" ? "Chia sẻ góp ý về bài học, ứng dụng hoặc trải nghiệm luyện tập để FET3D cải thiện." : "Chia sẻ góp ý về công cụ, mô hình hoặc trải nghiệm sử dụng để FET3D cải thiện."} action={!status ? <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Gửi phản hồi</Button> : undefined} />}
+      empty={<EmptyState icon={status ? Search : MessageSquareText} title={status ? "Không có phản hồi phù hợp." : "Bạn chưa gửi phản hồi nào"} description={status ? "Thử đổi bộ lọc trạng thái." : audience === "trainee" ? "Chia sẻ góp ý về bài học, ứng dụng hoặc trải nghiệm luyện tập để FET3D cải thiện." : "Chia sẻ góp ý về công cụ, mô hình hoặc trải nghiệm sử dụng để FET3D cải thiện."} />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
     <CreateFeedbackModal open={creating} accessToken={accessToken} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); list.reload(); }} />

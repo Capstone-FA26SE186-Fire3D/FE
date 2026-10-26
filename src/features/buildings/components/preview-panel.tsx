@@ -95,7 +95,6 @@ export function PreviewPanel({ accessToken, buildingId, revisionId, reloadKey, h
       {ready && <FloatingButtonGroup label="Thao tác xem trước 3D" placement="bottom" onAction={(id) => { if (id === "reload") { autoRenewals.current = 0; reload(); } else if (id === "clear") onClearHighlight?.(); else if (id === "upload") onUploadNew?.(); }} items={[
         { id: "reload", label: "Tải lại mô hình", icon: RefreshCw },
         { id: "clear", label: "Bỏ đánh dấu cấu kiện", icon: Eraser, disabled: !highlight?.length },
-        { id: "upload", label: "Tải IFC mới", icon: Upload, separator: true },
       ]} />}
     </div>
     <p className="ops-muted">Bản xem trước dùng mô hình 3D hệ thống dựng từ bản IFC đang chọn, không dùng tệp IFC trên máy bạn. Tự kiểm tra lại mỗi 5 giây khi chưa sẵn sàng; xem được mô hình chưa có nghĩa là đã được phép huấn luyện hay phát hành.{!ready && !loading && <> <Button size="sm" variant="quiet" onClick={() => { autoRenewals.current = 0; reload(); }}><RefreshCw size={14} aria-hidden="true" />Tải lại</Button></>}</p>

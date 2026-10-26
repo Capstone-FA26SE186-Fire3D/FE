@@ -54,7 +54,7 @@ export function LearnCms() {
     {header}
     <SubTabs label="Quản lý bài học" value={section} className="mb-4" onValueChange={(value) => { if (isSection(value) && value !== section) setParams({ ...Object.fromEntries(SECTION_PARAMS.map((key) => [key, null])), section: value === "posts" ? null : value }); }}
       items={[{ value: "posts", label: "Bài viết" }, { value: "situations", label: "Tình huống" }]} />
-    {section === "posts" ? <PostsTab accessToken={accessToken} onOpen={(id) => setParams({ post: id, quick: null })} onCreate={openNew} /> : <SituationsTab accessToken={accessToken} />}
+    {section === "posts" ? <PostsTab accessToken={accessToken} onOpen={(id) => setParams({ post: id, quick: null })} /> : <SituationsTab accessToken={accessToken} />}
     {post === "new" && <NewPostModal accessToken={accessToken} onClose={() => setParams({ post: null })} onCreated={(id) => setParams({ post: id, version: null, tab: null })} />}
   </>;
 }

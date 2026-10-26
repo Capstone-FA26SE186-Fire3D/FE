@@ -202,7 +202,7 @@ export function OrganizationsAdmin() {
           <FilterChip label="Trạng thái" value={active} onChange={(value) => setParams({ status: value })} options={[{ value: "true", label: "Hoạt động" }, { value: "false", label: "Vô hiệu" }]} />
         </FilterChips>
       </>}
-      empty={<EmptyState icon={filtering ? Search : Landmark} title={filtering ? "Không có tổ chức phù hợp." : "Chưa có tổ chức"} description={filtering ? "Thử đổi từ khóa hoặc bộ lọc." : "Tạo tổ chức đầu tiên, sau đó tạo tài khoản chủ tổ chức."} action={!filtering ? <Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo tổ chức</Button> : undefined} />}
+      empty={<EmptyState icon={filtering ? Search : Landmark} title={filtering ? "Không có tổ chức phù hợp." : "Chưa có tổ chức"} description={filtering ? "Thử đổi từ khóa hoặc bộ lọc." : "Tạo tổ chức đầu tiên, sau đó tạo tài khoản chủ tổ chức."} />}
       pagination={totalCount > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount, onPageChange: setPage } : undefined}
     />
     {list.data && totalCount > 0 && <p className="ops-field-hint" style={{ margin: "10px 0 0" }} role="status">Hiển thị {items.length} trên {formatCount(totalCount)} · bộ lọc áp dụng toàn bộ danh sách.</p>}

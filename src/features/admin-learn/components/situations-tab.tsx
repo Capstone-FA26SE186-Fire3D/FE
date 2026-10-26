@@ -104,7 +104,7 @@ export function SituationsTab({ accessToken }: { accessToken: string }) {
         </FilterChips>
         <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo tình huống</Button>
       </>}
-      empty={<EmptyState icon={filtering ? Search : Compass} title={filtering ? "Không có tình huống phù hợp." : "Chưa có tình huống nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Tạo tình huống để người đọc lọc bài và để gắn vào bài viết. Hệ thống không tạo sẵn dữ liệu."} action={!filtering && <Button size="sm" onClick={() => setCreating(true)}>Tạo tình huống</Button>} />}
+      empty={<EmptyState icon={filtering ? Search : Compass} title={filtering ? "Không có tình huống phù hợp." : "Chưa có tình huống nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Tạo tình huống để người đọc lọc bài và để gắn vào bài viết. Hệ thống không tạo sẵn dữ liệu."} />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
     {creating && <CreateSituationModal accessToken={accessToken} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); list.reload(); }} />}

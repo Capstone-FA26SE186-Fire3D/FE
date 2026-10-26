@@ -422,7 +422,7 @@ test.describe("organization support", () => {
 
     await page.goto("/workspace/support");
     await expect(page.getByText("Bạn chưa gửi yêu cầu hỗ trợ nào")).toBeVisible();
-    await page.getByRole("button", { name: "Tạo yêu cầu hỗ trợ" }).first().click();
+    await page.getByRole("button", { name: "Tạo yêu cầu", exact: true }).click(); // the page header is the one entry point
     const form = page.getByRole("dialog", { name: "Tạo yêu cầu hỗ trợ" });
     await form.getByRole("button", { name: "Gửi yêu cầu" }).click();
     await expect(form.getByText("Chủ đề dài từ 1 đến 255 ký tự.")).toBeVisible();

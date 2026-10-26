@@ -123,7 +123,7 @@ export function ScenariosPanel({ accessToken, buildingId, revisionLabel, scenari
         <Button onClick={() => { setError(""); setFieldError(""); setOpen(true); }} data-testid="scenario-create"><Plus size={16} aria-hidden="true" />Tạo kịch bản</Button>
       </>}
       loading={loading && !data}
-      empty={<EmptyState icon={ClipboardList} title="Chưa có kịch bản" description="Tạo kịch bản đầu tiên cho công trình này rồi mở trình soạn để đặt điểm xuất phát, nguồn cháy và đường thoát." action={<Button onClick={() => setOpen(true)}><Plus size={16} aria-hidden="true" />Tạo kịch bản</Button>} />}
+      empty={<EmptyState icon={ClipboardList} title="Chưa có kịch bản" description="Tạo kịch bản đầu tiên cho công trình này rồi mở trình soạn để đặt điểm xuất phát, nguồn cháy và đường thoát." />}
       pagination={(data?.totalCount ?? 0) > PAGE_SIZE ? { page: scenarios.page, pageSize: PAGE_SIZE, totalCount: data?.totalCount ?? 0, onPageChange: scenarios.setPage } : undefined}
     />
 

@@ -1,0 +1,16 @@
+/* File drop zone (file-drop.tsx): drag a file in or press to choose, in place of the browser's file input. */
+.file-drop { display: flex; align-items: center; gap: 14px; padding: 16px 18px; border: 1.5px dashed var(--line-strong); border-radius: 12px; background: var(--bg-soft, transparent); color: var(--muted); font-size: 13px; transition: border-color 150ms ease, background-color 150ms ease; }
+.file-drop.is-dragging { border-color: var(--ember); background: var(--ember-soft, rgba(238, 134, 84, .12)); }
+.file-drop.has-file { border-style: solid; border-color: var(--success, #5fd08a); }
+.file-drop[data-disabled] { opacity: .7; }
+.file-drop-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+.file-drop-icon { display: inline-grid; flex: none; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--ember-soft, rgba(238, 134, 84, .12)); color: var(--ember); }
+.file-drop.has-file .file-drop-icon { background: var(--success-soft, rgba(95, 208, 138, .13)); color: var(--success, #5fd08a); }
+.file-drop-text { display: grid; gap: 3px; min-width: 0; }
+.file-drop-text strong { color: var(--text); font-size: 14px; overflow-wrap: anywhere; }
+.file-drop-hint { color: var(--dim, var(--muted)); font-size: 12px; }
+.file-drop-busy { color: var(--ember); font-size: 12px; }
+.file-drop-link { padding: 0; border: 0; background: transparent; color: var(--ember); font: inherit; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.file-drop-link:disabled { cursor: not-allowed; opacity: .6; }
+.file-drop:focus-within { outline: 2px solid var(--ember); outline-offset: 2px; }
+.file-drop-compact { padding: 12px 14px; }

@@ -152,7 +152,7 @@ export function ItemDetail({ accessToken, itemId, versionParam, onVersion, onClo
           <p className="ops-field-hint" style={{ margin: "2px 0 0" }}>Bản đã xuất bản không sửa được; mỗi lần đổi nội dung tạo một phiên bản mới. Chọn một phiên bản để mở ngay trong cửa sổ này.</p>
         </div>
         {versions.length === 0
-          ? <EmptyState icon={FilePlus2} title="Chưa có phiên bản nào" description="Tạo phiên bản đầu tiên, nhập nội dung rồi xuất bản để tổ chức dùng được." action={<Button size="sm" onClick={() => startNew(null, null)}>Tạo phiên bản</Button>} />
+          ? <EmptyState icon={FilePlus2} title="Chưa có phiên bản nào" description="Tạo phiên bản đầu tiên, nhập nội dung rồi xuất bản để tổ chức dùng được." />
           : <Table caption="Các phiên bản của mục">
             <thead><tr><th>Phiên bản</th><th>Trạng thái</th><th>Xuất bản</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
             <tbody>{versions.map((entry) => <tr key={entry.id} data-testid={`version-row-${entry.versionNumber}`}>

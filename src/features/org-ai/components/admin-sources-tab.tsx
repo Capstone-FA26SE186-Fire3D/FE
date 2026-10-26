@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, BookMarked, CheckCircle2, Eye, Plus, RefreshCw, Search } from "lucide-react";
+import { Ban, BookMarked, CheckCircle2, Eye, RefreshCw, Search } from "lucide-react";
 import { useId, useRef, useState, type FormEvent } from "react";
 
 import { ApiError } from "@/api/types/common";
@@ -14,6 +14,7 @@ import { Combobox } from "@/components/ui/combobox";
 import { CellTitle, DataTable, TableSearch, type DataColumn } from "@/components/ui/data-table";
 import { ConfirmDialog, Drawer, Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
+import { FileDrop } from "@/components/ui/file-drop";
 import { Field, Input } from "@/components/ui/field";
 import { FilterChip, FilterChips } from "@/components/ui/filter-chip";
 import { SkeletonDetail } from "@/components/ui/skeleton";
@@ -101,6 +102,7 @@ function SourceModal({ open, accessToken, organizations, onCreated, onClose }: {
   const [error, setError] = useState<unknown>();
   const [busy, setBusy] = useState(false);
   const [hashing, setHashing] = useState<string | null>(null);
+  const [hashedFile, setHashedFile] = useState<File | null>(null);
   const lock = useRef(false);
   const set = (key: keyof Form) => (event: { target: { value: string } }) => setForm((current) => ({ ...current, [key]: event.target.value }));
   const pick = (key: keyof Form) => (value: string) => setForm((current) => ({ ...current, [key]: value }));
@@ -160,9 +162,10 @@ function SourceModal({ open, accessToken, organizations, onCreated, onClose }: {
       <Field label="Mã kiểm tra tài liệu" required hint="Chọn tệp bên dưới để tự tính ngay trong trình duyệt (tệp không bị tải lên)." error={show("$.sourceHash", "sourceHash")}>
         {(props) => <Input {...props} value={form.sourceHash} onChange={set("sourceHash")} autoComplete="off" spellCheck={false} className="font-mono" />}
       </Field>
-      <Field label="Tính mã nội dung từ tệp" hint={hashing ?? "Chỉ tính cục bộ; tệp không rời trình duyệt."}>
-        {(props) => <Input {...props} type="file" onChange={(event) => void hashFile(event.target.files?.[0])} />}
-      </Field>
+      <div className="ops-field">
+        <span className="ops-field-label">Tính mã nội dung từ tệp</span>
+        <FileDrop label="Chọn tệp để tính mã nội dung" file={hashedFile} busy={hashing} hint="Chỉ tính trong trình duyệt; tệp không bị tải lên." onFile={(file) => { if (file) { setHashedFile(file); void hashFile(file); } }} compact data-testid="source-hash-file" />
+      </div>
       <Field label="Liên kết tham chiếu (https)" hint="Không chứa tài khoản/mật khẩu. Tùy chọn." error={show("$.sourceUri", "sourceUri")}>{(props) => <Input {...props} type="url" value={form.sourceUri} onChange={set("sourceUri")} placeholder="https://" autoComplete="off" />}</Field>
       <div className={styles.grid2}>
         <Field label="Hiệu lực từ" error={show("$.effectiveFrom", "effectiveFrom")}>{(props) => <Input {...props} type="datetime-local" value={form.effectiveFrom} onChange={set("effectiveFrom")} />}</Field>
@@ -321,9 +324,8 @@ export function AdminSourcesTab({ accessToken }: { accessToken: string }) {
         </FilterChips>
         {filtering && <Button variant="quiet" onClick={() => { setText(""); setParams({ visibility: null, status: null, q: null }); }}>Xóa bộ lọc</Button>}
         <Button variant="quiet" onClick={list.reload} disabled={list.loading} aria-label="Tải lại danh sách"><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
-        <Button onClick={() => setCreating(true)} data-testid="source-new"><Plus size={16} aria-hidden="true" />Đăng ký nguồn</Button>
       </>}
-      empty={<EmptyState icon={filtering ? Search : BookMarked} title={filtering ? "Không có nguồn phù hợp." : "Chưa có nguồn tri thức nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Chưa có nguồn đã duyệt thì AI không có gì để trích dẫn. Đăng ký nguồn (bản nháp) rồi duyệt."} action={!filtering ? <Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Đăng ký nguồn</Button> : undefined} />}
+      empty={<EmptyState icon={filtering ? Search : BookMarked} title={filtering ? "Không có nguồn phù hợp." : "Chưa có nguồn tri thức nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc." : "Chưa có nguồn đã duyệt thì AI không có gì để trích dẫn. Đăng ký nguồn (bản nháp) rồi duyệt."} />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
     <p className={styles.hint}>Bấm hàng để xem chi tiết; menu “···” để duyệt hoặc ngừng dùng nguồn.</p>

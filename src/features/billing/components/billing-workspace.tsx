@@ -197,7 +197,7 @@ export function BillingWorkspace() {
       <div className="ops-subtabs-content">
         {tab === "services" && <div className="org-stack">
           {entitlements.error !== undefined && <Alert tone="danger" title="Không tải được dịch vụ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={entitlements.reload}>Thử lại</Button>}>{billingErrorText(entitlements.error)}</Alert>}
-          <QuotaSummary accessToken={token} refreshKey={settled} onTopUp={canPurchase ? () => openCreate("topup") : undefined} onOpen={() => setParams({ tab: "ai" })} />
+          <QuotaSummary accessToken={token} refreshKey={settled} onOpen={() => setParams({ tab: "ai" })} />
           <DataTable
             caption="Dịch vụ theo công trình"
             data-testid="services-table"
@@ -225,7 +225,7 @@ export function BillingWorkspace() {
               rowKey={(item) => item.id}
               loading={quotations.loading && !quotations.data}
               onRowClick={(item) => openQuotation(item.id)}
-              empty={<EmptyState icon={FileText} title="Chưa có báo giá" description="Mua gói công trình hoặc nạp hạn mức AI để tạo báo giá đầu tiên. Giá, hạn mức và chính sách nâng cấp theo cấu hình của hệ thống." action={canPurchase ? <Button onClick={() => openCreate("service")}><Plus size={16} aria-hidden="true" />Mua gói công trình</Button> : undefined} />}
+              empty={<EmptyState icon={FileText} title="Chưa có báo giá" description="Mua gói công trình hoặc nạp hạn mức AI để tạo báo giá đầu tiên. Giá, hạn mức và chính sách nâng cấp theo cấu hình của hệ thống." />}
             />
           </section>
         </div>}
@@ -241,13 +241,13 @@ export function BillingWorkspace() {
             loading={quotations.loading && !quotations.data}
             onRowClick={(item) => openQuotation(item.id)}
             toolbar={<TableSearch value={searchText} onChange={setSearchText} label="Tìm mã đơn" placeholder="Tìm mã đơn hoặc công trình" />}
-            empty={<EmptyState icon={FileText} title={needle ? "Không có báo giá khớp" : "Chưa có báo giá"} description={needle ? "Thử từ khóa khác." : "Chọn một hoặc nhiều công trình và gói 6/12 tháng để tạo báo giá đầu tiên."} action={canPurchase && !needle ? <Button onClick={() => openCreate("service")}><Plus size={16} aria-hidden="true" />Mua gói công trình</Button> : undefined} />}
+            empty={<EmptyState icon={FileText} title={needle ? "Không có báo giá khớp" : "Chưa có báo giá"} description={needle ? "Thử từ khóa khác." : "Chọn một hoặc nhiều công trình và gói 6/12 tháng để tạo báo giá đầu tiên."} />}
             pagination={totalCount > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount, onPageChange: setPage } : undefined}
           />
           <p className="bill-dim" style={{ margin: "-6px 0 0" }}>Bấm một hàng để xem báo giá, chấp nhận, thanh toán và theo dõi kích hoạt trong ngăn bên phải.</p>
         </div>}
 
-        {tab === "ai" && <AiQuotaView accessToken={token} refreshKey={settled} onTopUp={canPurchase ? () => openCreate("topup") : undefined} onOpenQuotation={openQuotation} />}
+        {tab === "ai" && <AiQuotaView accessToken={token} refreshKey={settled} headerTopUp onTopUp={canPurchase ? () => openCreate("topup") : undefined} onOpenQuotation={openQuotation} />}
         {tab === "reminders" && <NotificationsPanel accessToken={token} onChanged={() => setSettled((value) => value + 1)} onRenew={canPurchase ? (buildingId) => openCreate("service", [buildingId]) : undefined} />}
         {tab === "enterprise" && <EnterpriseSection accessToken={token} defaultEmail={user?.email} defaultName={user?.fullName ?? undefined} onOpenQuotation={openQuotation} />}
       </div>

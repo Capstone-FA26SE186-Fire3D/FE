@@ -70,11 +70,13 @@ const usageColumns: DataColumn<AiUsageEntry>[] = [
  * `organizationId`. When a unit is exhausted (or there is no quota) paid AI requests are blocked: the view says so and
  * offers a prepaid top-up. No overage.
  */
-export function AiQuotaView({ accessToken, organizationId, onTopUp, onOpenQuotation, refreshKey = 0 }: {
+export function AiQuotaView({ accessToken, organizationId, onTopUp, onOpenQuotation, refreshKey = 0, headerTopUp = false }: {
   accessToken: string;
   organizationId?: string;
   /** Organization only: start a top-up quotation. */
   onTopUp?: () => void;
+  /** The page header already offers "Nạp hạn mức AI": no second button here (the "hết hạn mức" alert still offers it). */
+  headerTopUp?: boolean;
   onOpenQuotation?: (id: string) => void;
   refreshKey?: number;
 }) {
@@ -90,7 +92,7 @@ export function AiQuotaView({ accessToken, organizationId, onTopUp, onOpenQuotat
   const units = balance.data?.units ?? [];
   const exhausted = units.filter((unit) => unit.available <= 0);
   const blocked = balance.data !== undefined && (units.length === 0 || exhausted.length > 0);
-  const topUpButton = onTopUp ? <Button onClick={onTopUp}><Plus size={16} aria-hidden="true" />Nạp thêm hạn mức AI</Button> : undefined;
+  const topUpButton = onTopUp && !headerTopUp ? <Button onClick={onTopUp}><Plus size={16} aria-hidden="true" />Nạp thêm hạn mức AI</Button> : undefined;
 
   const topUpColumns: DataColumn<Quotation>[] = [
     { key: "number", header: "Mã đơn", primary: true, render: (item) => <CellTitle title={<span className="bill-mono">{item.quotationNumber}</span>} sub={`Yêu cầu ${item.topUp?.requestedQuotaUnits != null ? formatNumber(item.topUp.requestedQuotaUnits) : "không nêu"}`} /> },
