@@ -1,36 +1,40 @@
 import { headingId, parseBlocks, type RenderBlock } from "../blocks";
+import type { Run } from "../rich-text";
+import { RichText } from "./rich-text";
 import { VideoEmbed } from "./video-embed";
 
 /*
- * Renders `fet3d.learn/1` blocks from an allowlist of block types. All text is a React text node (escaped); there is no
+ * Renders `fet3d.learn/1` blocks from an allowlist of block types. All text is a React text node (escaped) and formatted runs
+ * become a fixed set of elements (`RichText`); there is no
  * dangerouslySetInnerHTML and no third-party script in the page itself. The API gives a video as {provider, videoId, canonical url}
  * and no embed descriptor: `VideoEmbed` builds the player URL from the provider allowlist and loads it only when the reader presses play.
  */
 
-function Heading({ level, text, id }: { level: 2 | 3 | 4; text: string; id: string }) {
-  if (level === 3) return <h3 id={id}>{text}</h3>;
-  if (level === 4) return <h4 id={id}>{text}</h4>;
-  return <h2 id={id}>{text}</h2>;
+function Heading({ level, text, runs, id }: { level: 2 | 3 | 4; text: string; runs: Run[] | null; id: string }) {
+  const content = <RichText text={text} runs={runs} />;
+  if (level === 3) return <h3 id={id}>{content}</h3>;
+  if (level === 4) return <h4 id={id}>{content}</h4>;
+  return <h2 id={id}>{content}</h2>;
 }
-
 
 const calloutLabel = { info: "Lưu ý", warning: "Cần chú ý", danger: "Cảnh báo" } as const;
 
 function Block({ block, index, fallbackSummary }: { block: RenderBlock; index: number; fallbackSummary: string }) {
   switch (block.type) {
-    case "heading": return <Heading level={block.level} text={block.text} id={headingId(index)} />;
-    case "paragraph": return <p className="learn-text">{block.text}</p>;
+    case "heading": return <Heading level={block.level} text={block.text} runs={block.runs} id={headingId(index)} />;
+    case "paragraph": return <p className="learn-text"><RichText text={block.text} runs={block.runs} /></p>;
     case "list": {
       const Tag = block.ordered ? "ol" : "ul";
-      return <Tag className="learn-list">{block.items.map((item, index) => <li key={index}>{item}</li>)}</Tag>;
+      return <Tag className="learn-list">{block.items.map((item, index) => <li key={index}><RichText text={item} runs={block.itemRuns[index]} /></li>)}</Tag>;
     }
-    case "callout": return <aside className="learn-callout" data-tone={block.tone} role="note"><strong>{calloutLabel[block.tone]}</strong><p className="learn-text">{block.text}</p></aside>;
+    case "callout": return <aside className="learn-callout" data-tone={block.tone} role="note"><strong>{calloutLabel[block.tone]}</strong><p className="learn-text"><RichText text={block.text} runs={block.runs} /></p></aside>;
     case "image": return <figure className="learn-figure">
       {/* Remote https image from the API: plain <img> (no optimizer allowlist), no referrer sent. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={block.url} alt={block.alt} loading="lazy" referrerPolicy="no-referrer" />
       {block.alt && <figcaption>{block.alt}</figcaption>}
     </figure>;
+    case "divider": return <hr className="learn-divider" />;
     case "video": return <VideoEmbed provider={block.provider} videoId={block.videoId} url={block.url} fallbackSummary={fallbackSummary} />;
   }
 }

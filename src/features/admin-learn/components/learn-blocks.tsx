@@ -1,22 +1,33 @@
 "use client";
 
-import { ArrowDown, ArrowUp, Film, GripVertical, Heading2, ImageIcon, List, ListOrdered, MessageSquareWarning, Pilcrow, Plus, ShieldCheck, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
+import { ArrowDown, ArrowUp, Film, GripVertical, Heading2, ImageIcon, List, ListOrdered, MessageSquareWarning, Minus, Pilcrow, Plus, ShieldCheck, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { SupportCode } from "@/components/ui/support-code";
-import { Field, Input, Select, Textarea } from "@/components/ui/field";
+import { Field, Input, Select } from "@/components/ui/field";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { blockLabel, extraFieldNames, isKnownType, KNOWN_TYPES, newBlock, updateFields, type EditorBlock, type KnownType } from "../blocks";
+import { replaceText, splitRuns, type Run } from "@/features/learn/rich-text";
+import { httpsUrl } from "@/features/learn/safe-url";
+import { blockLabel, extraFieldNames, isKnownType, itemsOf, KNOWN_TYPES, newBlock, richOf, updateFields, withItems, withRich, type EditorBlock, type KnownType } from "../blocks";
 import type { ContentIssue } from "../content";
-import { slashMatches, type SlashItem } from "../doc-actions";
+import { slashMatches, type RichSelection, type SlashItem } from "../doc-actions";
+import { ImageUpload } from "./image-upload";
 import { ListItems } from "./list-items";
+import { RichTextInput, type RichKeyInfo, type RichRange } from "./rich-text-input";
 import type { MediaCheck } from "../use-media-checks";
 
-const icons: Record<KnownType, LucideIcon> = { heading: Heading2, paragraph: Pilcrow, list: ListOrdered, callout: MessageSquareWarning, image: ImageIcon, video: Film };
+const icons: Record<KnownType, LucideIcon> = { heading: Heading2, paragraph: Pilcrow, list: ListOrdered, callout: MessageSquareWarning, image: ImageIcon, video: Film, divider: Minus };
 const toneLabel = { info: "Thông tin", warning: "Cần chú ý", danger: "Cảnh báo" } as const;
 const text = (value: unknown) => (typeof value === "string" ? value : "");
 
 type Common = { disabled: boolean };
+/** What every text field of a block needs: selection reports for the toolbar, page undo/redo and the image uploader. */
+type RichProps = {
+  onSelect: (item: number | null, range: RichRange) => void;
+  onUndo?: () => void; onRedo?: () => void;
+  uploadImage?: (file: File, idempotencyKey: string) => Promise<string>;
+  disabled: boolean;
+};
 
 function VideoFields({ block, onChange, check, onCheck }: { block: EditorBlock; onChange: (block: EditorBlock) => void; check: MediaCheck | undefined; onCheck: (blockId: string, url: string) => void }) {
   const url = text(block.fields.url);
@@ -42,40 +53,52 @@ function VideoFields({ block, onChange, check, onCheck }: { block: EditorBlock; 
   </>;
 }
 
+function ImageFields({ block, onChange, rich }: { block: EditorBlock; onChange: (block: EditorBlock) => void; rich: RichProps }) {
+  const set = (patch: Record<string, unknown>) => onChange(updateFields(block, patch));
+  const url = text(block.fields.url);
+  const preview = httpsUrl(url.trim());
+  return <div className="ops-form-grid image-fields">
+    {/* Remote https image (an uploaded one redirects to a short-lived signed URL): plain <img>, no referrer. */}
+    {/* eslint-disable-next-line @next/next/no-img-element */}
+    {preview && <img className="image-preview ops-span-all" src={preview} alt={text(block.fields.alt)} referrerPolicy="no-referrer" data-testid="image-preview" />}
+    {rich.uploadImage && <div className="ops-span-all"><ImageUpload label={preview ? "Đổi ảnh: tải ảnh khác từ máy" : "Tải ảnh lên từ máy"} upload={rich.uploadImage} onUrl={(next) => set({ url: next })} disabled={rich.disabled} compact /></div>}
+    <Field label="Đường dẫn ảnh (https)" required hint={rich.uploadImage ? "Điền tự động khi tải ảnh lên; cũng có thể dán đường dẫn ảnh https có sẵn." : undefined} className="ops-span-all">{(p) => <Input {...p} inputMode="url" value={url} onChange={(event) => set({ url: event.target.value })} />}</Field>
+    <Field label="Mô tả ảnh" required hint="Dành cho người đọc màn hình và khi ảnh không tải được." className="ops-span-all">{(p) => <Input {...p} maxLength={300} value={text(block.fields.alt)} onChange={(event) => set({ alt: event.target.value })} />}</Field>
+  </div>;
+}
+
 type TextKeys = {
-  onTextKey?: (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onTextKey?: (event: KeyboardEvent<HTMLDivElement>, info: RichKeyInfo) => void;
   /** Docs mode: a list is edited one item per line; leaving it (Enter on an empty last item) opens a paragraph. */
-  doc?: boolean; onExitList?: (items: string[]) => void;
+  doc?: boolean; onExitList?: (items: Run[][]) => void;
 };
 
-function BlockFields({ block, onChange, check, onCheck, onTextKey, doc, onExitList }: { block: EditorBlock; onChange: (block: EditorBlock) => void; check: MediaCheck | undefined; onCheck: (blockId: string, url: string) => void } & TextKeys) {
+function BlockFields({ block, onChange, check, onCheck, onTextKey, doc, onExitList, rich }: { block: EditorBlock; onChange: (block: EditorBlock) => void; check: MediaCheck | undefined; onCheck: (blockId: string, url: string) => void; rich: RichProps } & TextKeys) {
   const set = (patch: Record<string, unknown>) => onChange(updateFields(block, patch));
+  const richField = (item: null) => ({ richKey: block.id, runs: richOf(block), disabled: rich.disabled, onChange: (runs: Run[]) => onChange(withRich(block, runs)), onSelect: (range: RichRange) => rich.onSelect(item, range), onUndo: rich.onUndo, onRedo: rich.onRedo });
   switch (block.type) {
     case "heading": return <div className="ops-form-grid">
-      <Field label="Nội dung tiêu đề" required className="ops-span-all">{(p) => <Input {...p} maxLength={200} placeholder="Tiêu đề" value={text(block.fields.text)} onKeyDown={onTextKey} onChange={(event) => set({ text: event.target.value })} />}</Field>
+      <Field label="Nội dung tiêu đề" required className="ops-span-all">{(p) => <RichTextInput {...p} {...richField(null)} aria-label="Nội dung tiêu đề" singleLine placeholder="Tiêu đề" onKeyDown={onTextKey} />}</Field>
       <Field label="Cấp tiêu đề">{(p) => <Select {...p} value={String(block.fields.level ?? 2)} onChange={(event) => set({ level: Number(event.target.value) })}><option value="2">Cấp 2 (mục chính)</option><option value="3">Cấp 3</option><option value="4">Cấp 4</option></Select>}</Field>
     </div>;
-    case "paragraph": return <Field label="Nội dung" required hint="Chữ thường. Enter: đoạn mới · Shift+Enter: xuống dòng · gõ “/” để chèn khối.">{(p) => <Textarea {...p} rows={2} placeholder="Gõ nội dung, hoặc gõ “/” để chèn tiêu đề, danh sách, ảnh, video…" value={text(block.fields.text)} onKeyDown={onTextKey} onChange={(event) => set({ text: event.target.value })} />}</Field>;
+    case "paragraph": return <Field label="Nội dung" required hint="Enter: đoạn mới · Shift+Enter: xuống dòng · Ctrl+B / I / U: đậm, nghiêng, gạch chân · gõ “/” để chèn khối.">{(p) => <RichTextInput {...p} {...richField(null)} aria-label="Nội dung" placeholder="Gõ nội dung, hoặc gõ “/” để chèn tiêu đề, danh sách, ảnh, video…" onKeyDown={onTextKey} />}</Field>;
     case "list": {
-      const items = Array.isArray(block.fields.items) ? block.fields.items.map(text) : [""];
-      if (doc) return <div className="doc-list-wrap">
-        <ListItems items={items} ordered={block.fields.ordered === true} onChange={(next) => set({ items: next })} onExit={(next) => onExitList?.(next)} />
-        <Select aria-label="Kiểu danh sách" className="doc-list-kind" value={block.fields.ordered === true ? "ordered" : "bullets"} onChange={(event) => set({ ordered: event.target.value === "ordered" })}><option value="bullets">Gạch đầu dòng</option><option value="ordered">Đánh số</option></Select>
-      </div>;
+      const items = <ListItems blockId={block.id} items={itemsOf(block)} ordered={block.fields.ordered === true} disabled={rich.disabled} onChange={(next) => onChange(withItems(block, next))} onExit={(next) => onExitList?.(next)}
+        onSelect={(item, range) => rich.onSelect(item, range)} onUndo={rich.onUndo} onRedo={rich.onRedo} />;
+      const kind = (props: { id?: string; className?: string; "aria-label"?: string }) => <Select {...props} value={block.fields.ordered === true ? "ordered" : "bullets"} onChange={(event) => set({ ordered: event.target.value === "ordered" })}><option value="bullets">Gạch đầu dòng</option><option value="ordered">Đánh số</option></Select>;
+      if (doc) return <div className="doc-list-wrap">{items}{kind({ "aria-label": "Kiểu danh sách", className: "doc-list-kind" })}</div>;
       return <div className="ops-form-grid">
-        <Field label="Các mục (mỗi dòng một mục)" required hint="Mỗi dòng một mục · tối đa 50 mục, mỗi mục tối đa 1000 ký tự." className="ops-span-all">{(p) => <Textarea {...p} rows={3} placeholder="Mỗi dòng một mục" value={items.join("\n")} onChange={(event) => set({ items: event.target.value.split("\n") })} />}</Field>
-        <Field label="Kiểu danh sách">{(p) => <Select {...p} value={block.fields.ordered === true ? "ordered" : "bullets"} onChange={(event) => set({ ordered: event.target.value === "ordered" })}><option value="bullets">Gạch đầu dòng</option><option value="ordered">Đánh số</option></Select>}</Field>
+        <div className="ops-field ops-span-all"><span className="kind-label">Các mục</span>{items}<span className="ops-field-hint">Enter: thêm mục · tối đa 50 mục, mỗi mục tối đa 1000 ký tự.</span></div>
+        <Field label="Kiểu danh sách">{(p) => kind(p)}</Field>
       </div>;
     }
     case "callout": return <div className="ops-form-grid">
       <Field label="Mức nhấn mạnh">{(p) => <Select {...p} value={text(block.fields.tone) || "info"} onChange={(event) => set({ tone: event.target.value })}>{(Object.keys(toneLabel) as Array<keyof typeof toneLabel>).map((tone) => <option key={tone} value={tone}>{toneLabel[tone]}</option>)}</Select>}</Field>
-      <Field label="Nội dung" required className="ops-span-all">{(p) => <Textarea {...p} rows={2} placeholder="Nội dung cần nhấn mạnh" value={text(block.fields.text)} onChange={(event) => set({ text: event.target.value })} />}</Field>
+      <Field label="Nội dung" required className="ops-span-all">{(p) => <RichTextInput {...p} {...richField(null)} aria-label="Nội dung" newlineOnEnter placeholder="Nội dung cần nhấn mạnh" />}</Field>
     </div>;
-    case "image": return <div className="ops-form-grid">
-      <Field label="Đường dẫn ảnh (https)" required className="ops-span-all">{(p) => <Input {...p} inputMode="url" value={text(block.fields.url)} onChange={(event) => set({ url: event.target.value })} />}</Field>
-      <Field label="Mô tả ảnh" required hint="Dành cho người đọc màn hình và khi ảnh không tải được." className="ops-span-all">{(p) => <Input {...p} maxLength={300} value={text(block.fields.alt)} onChange={(event) => set({ alt: event.target.value })} />}</Field>
-    </div>;
+    case "image": return <ImageFields block={block} onChange={onChange} rich={rich} />;
     case "video": return <VideoFields block={block} onChange={onChange} check={check} onCheck={onCheck} />;
+    case "divider": return <hr className="doc-divider" aria-label="Đường kẻ ngăn cách hai phần" />;
     default: return <div style={{ display: "grid", gap: 8 }}>
       <p className="ops-field-hint" style={{ margin: 0 }}>Khối này không còn được hỗ trợ trong trình soạn. Nội dung được giữ nguyên khi lưu; nếu máy chủ từ chối, hãy xóa khối này.</p>
       <SupportCode code={block.type} detail={JSON.stringify(block.fields)} />
@@ -97,12 +120,12 @@ function SlashMenu({ items, selected, onPick, id }: { items: SlashItem[]; select
   </div>;
 }
 
-function BlockCard({ block, index, total, onChange, onMove, onRemove, onEnter, onEmptyBackspace, issues, check, onCheck, doc, active, onActive }: {
+function BlockCard({ block, index, total, onChange, onMove, onRemove, onEnter, onEmptyBackspace, issues, check, onCheck, doc, active, onActive, rich }: {
   block: EditorBlock; index: number; total: number; onChange: (block: EditorBlock) => void; onMove: (delta: -1 | 1) => void; onRemove: () => void;
-  /** Docs mode: Enter in a heading or paragraph opens a new paragraph below; Backspace in an empty paragraph removes it. */
-  onEnter: (replaced?: EditorBlock) => void; onEmptyBackspace: () => void;
+  /** Docs mode: Enter in a heading or paragraph splits it at the caret, the rest opening a paragraph below; Backspace in an empty paragraph removes it. */
+  onEnter: (replaced?: EditorBlock, rest?: Run[]) => void; onEmptyBackspace: () => void;
   issues: ContentIssue[]; check: MediaCheck | undefined; onCheck: (blockId: string, url: string) => void;
-  doc: boolean; active: boolean; onActive: () => void;
+  doc: boolean; active: boolean; onActive: () => void; rich: RichProps;
 }) {
   const known = isKnownType(block.type);
   const Icon = block.type === "list" ? (block.fields.ordered === true ? ListOrdered : List) : known ? icons[block.type as KnownType] : TriangleAlert;
@@ -116,15 +139,20 @@ function BlockCard({ block, index, total, onChange, onMove, onRemove, onEnter, o
   const showMenu = slashOpen && dismissed !== slashText;
   const current = Math.min(selected, Math.max(matches.length - 1, 0));
   const pick = (item: SlashItem) => { const next = item.make(); onChange({ ...next, id: block.id }); setSelected(0); };
-  const onTextKey = (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const onTextKey = (event: KeyboardEvent<HTMLDivElement>, info: RichKeyInfo) => {
     if (!doc) return;
     if (showMenu) {
       if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); const size = Math.max(matches.length, 1); setSelected((value) => (Math.min(value, size - 1) + (event.key === "ArrowDown" ? 1 : -1) + size) % size); return; }
       if (event.key === "Enter" && matches[current]) { event.preventDefault(); pick(matches[current]); return; }
       if (event.key === "Escape") { event.preventDefault(); setDismissed(slashText); return; }
     }
-    if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); onEnter(); return; }
-    if (event.key === "Backspace" && block.type === "paragraph" && slashText === "" && total > 1) { event.preventDefault(); onEmptyBackspace(); }
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      const [before, after] = splitRuns(replaceText(info.runs, info.start, info.end, ""), info.start);
+      onEnter(withRich(block, before), after);
+      return;
+    }
+    if (event.key === "Backspace" && block.type === "paragraph" && !info.length && total > 1) { event.preventDefault(); onEmptyBackspace(); }
   };
   return <li className={doc ? "doc-block" : undefined} style={doc ? undefined : { listStyle: "none", display: "grid", gap: 12, padding: 14, border: "1px solid var(--line)", borderRadius: 12, background: "var(--surface)" }}
     data-testid="content-block" data-block-type={block.type} data-block-id={block.id} data-active={doc && active ? "true" : undefined}
@@ -140,7 +168,7 @@ function BlockCard({ block, index, total, onChange, onMove, onRemove, onEnter, o
       </span>
     </div>
     <div className={doc ? "doc-block-body" : undefined}>
-      <BlockFields block={block} onChange={onChange} check={check} onCheck={onCheck} onTextKey={onTextKey} doc={doc} onExitList={(items) => onEnter(updateFields(block, { items }))} />
+      <BlockFields block={block} onChange={onChange} check={check} onCheck={onCheck} onTextKey={onTextKey} doc={doc} rich={rich} onExitList={(items) => onEnter(withItems(block, items))} />
       {showMenu && <SlashMenu items={matches} selected={current} onPick={pick} id={`slash-${block.id}`} />}
     </div>
     {known && extras.length > 0 && <p className="ops-field-hint" style={{ margin: 0 }} data-testid="block-extras">Khối có thông tin thừa (được giữ nguyên); máy chủ có thể từ chối khi lưu. Nếu vậy, hãy tạo lại khối này.<SupportCode detail={extras.join(", ")} /></p>}
@@ -149,15 +177,20 @@ function BlockCard({ block, index, total, onChange, onMove, onRemove, onEnter, o
 }
 
 /**
- * Content blocks of `fet3d.learn/1`: heading, paragraph, list, callout, image and external video links. No HTML, iframe or script.
- * `doc` renders them as one page (Figma "Learn · Trình soạn v3"): seamless text, a grip bar per block, the "/" menu, Enter and
- * Backspace between paragraphs. The editor's toolbar reads the focused block through `onActive`.
+ * Content blocks of `fet3d.learn/1`: heading, paragraph, list, callout, image, external video links and dividers. No HTML,
+ * iframe or script; text may carry formatted runs (BE#172). `doc` renders them as one page (Figma "Learn · Trình soạn v3"):
+ * seamless text, a grip bar per block, the "/" menu, Enter and Backspace between paragraphs. The editor's toolbar reads the
+ * focused block through `onActive` and the selection inside it through `onRichSelect`.
  */
-export function BlockEditor({ blocks, onChange, disabled, issues, checks, onCheck, doc = false, active = -1, onActive, focusId }: Common & {
+export function BlockEditor({ blocks, onChange, disabled, issues, checks, onCheck, doc = false, active = -1, onActive, focusId, onRichSelect, onUndo, onRedo, uploadImage }: Common & {
   blocks: EditorBlock[]; onChange: (blocks: EditorBlock[]) => void; issues: ContentIssue[]; checks: Record<string, MediaCheck>; onCheck: (blockId: string, url: string) => void;
   doc?: boolean; active?: number; onActive?: (index: number) => void;
   /** A block the parent just inserted (toolbar): its first field gets the focus. */
   focusId?: string | null;
+  onRichSelect?: (selection: RichSelection) => void;
+  onUndo?: () => void; onRedo?: () => void;
+  /** Uploads an image file and resolves to its url; without it image blocks only take a pasted link. */
+  uploadImage?: (file: File, idempotencyKey: string) => Promise<string>;
 }) {
   const [adding, setAdding] = useState<KnownType>("paragraph");
   const focusNext = useRef<string | null>(null);
@@ -167,7 +200,7 @@ export function BlockEditor({ blocks, onChange, disabled, issues, checks, onChec
     const id = focusNext.current;
     if (!id) return;
     focusNext.current = null;
-    list.current?.querySelector<HTMLElement>(`[data-block-id="${id}"] textarea, [data-block-id="${id}"] input`)?.focus();
+    list.current?.querySelector<HTMLElement>(`[data-block-id="${id}"] [contenteditable="true"], [data-block-id="${id}"] textarea, [data-block-id="${id}"] input`)?.focus();
   });
   const move = (index: number, delta: -1 | 1) => {
     const next = blocks.slice();
@@ -177,15 +210,16 @@ export function BlockEditor({ blocks, onChange, disabled, issues, checks, onChec
   const add = (index: number, block: EditorBlock) => { focusNext.current = block.id; onChange([...blocks.slice(0, index + 1), block, ...blocks.slice(index + 1)]); };
   const generalIssues = issues.filter((issue) => !/^\$\.blocks\[\d+\]/.test(issue.path) && issue.path.startsWith("$.blocks"));
   const issuesFor = (index: number) => issues.filter((issue) => issue.path === `$.blocks[${index}]` || issue.path.startsWith(`$.blocks[${index}].`));
+  const richFor = (block: EditorBlock): RichProps => ({ onSelect: (item, range) => onRichSelect?.({ blockId: block.id, item, ...range }), onUndo, onRedo, uploadImage, disabled });
   return <div className={doc ? "doc-blocks" : "ops-stack"}>
     {generalIssues.length > 0 && <ul role="alert" className="ops-field-error" style={{ margin: 0, paddingLeft: 18, listStyle: "disc" }}>{generalIssues.map((issue, index) => <li key={index}>{issue.message}</li>)}</ul>}
     {blocks.length === 0 && <p style={{ margin: 0, padding: 16, border: "1px dashed var(--line-strong)", borderRadius: 10, color: "var(--muted)", fontSize: 14 }}>Chưa có khối nội dung. Thêm đoạn văn, danh sách, ảnh hoặc video bên dưới.</p>}
     <ol ref={list} style={{ margin: 0, padding: 0, display: "grid", gap: doc ? 2 : 12 }} aria-label="Các khối nội dung">
       {blocks.map((block, index) => <BlockCard key={block.id} block={block} index={index} total={blocks.length} issues={issuesFor(index)} check={checks[block.id]} onCheck={onCheck}
-        doc={doc} active={index === active} onActive={() => onActive?.(index)}
-        onEnter={(replaced) => {
-          // One change for "leave the list": the trimmed list and the new paragraph together.
-          const paragraph = newBlock("paragraph");
+        doc={doc} active={index === active} onActive={() => onActive?.(index)} rich={richFor(block)}
+        onEnter={(replaced, rest) => {
+          // One change for "split the block" or "leave the list": the shortened block and the new paragraph together.
+          const paragraph = withRich(newBlock("paragraph"), rest ?? []);
           const base = replaced ? blocks.map((item) => (item.id === replaced.id ? replaced : item)) : blocks;
           focusNext.current = paragraph.id;
           onChange([...base.slice(0, index + 1), paragraph, ...base.slice(index + 1)]);

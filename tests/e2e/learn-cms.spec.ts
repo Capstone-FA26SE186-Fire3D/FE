@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { installLearnBackend, LearnBackend, signIn } from "./learn-mock";
+import { installLearnBackend, LearnBackend, PNG_1X1, signIn } from "./learn-mock";
 
 /*
  * Learn CMS (Admin v2) against a STATEFUL MOCK of the real contract (learn-mock.ts). Mock evidence only: it shows the UI sends
@@ -767,7 +767,7 @@ test.describe("statuses in the list", () => {
     await createDraft(page, "khoi-phuc", "Khôi phục sau reload", "Tóm tắt đã lưu.", "Đoạn đã lưu.");
     await page.reload();
     await expect(page.getByLabel("Tiêu đề", { exact: true })).toHaveValue("Khôi phục sau reload");
-    await expect(page.getByTestId("content-block").first().getByLabel(/^Nội dung/)).toHaveValue("Đoạn đã lưu.");
+    await expect(page.getByTestId("content-block").first().getByLabel(/^Nội dung/)).toHaveText("Đoạn đã lưu.");
     expect(backend.versionsOf(backend.bySlug("khoi-phuc")!.id)).toHaveLength(1);
   });
 
@@ -834,7 +834,7 @@ test.describe("Docs-style editor (Trình soạn v3)", () => {
     await expect(page).toHaveURL(/post=[0-9a-f-]{36}/);
     expect(backend.bySlug("chay-hanh-lang-tang-3")).toBeTruthy();
     await expect(page.getByRole("toolbar", { name: "Định dạng bài" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "In đậm" })).toBeDisabled(); // waits for BE#172
+    await expect(page.getByRole("button", { name: "In đậm" })).toBeDisabled(); // nothing to format until the caret is in text
   });
 
   test("Enter opens a paragraph, '/' turns it into a block, the toolbar restyles it and undo brings it back", async ({ page }) => {
@@ -916,5 +916,117 @@ test.describe("Docs-style editor (Trình soạn v3)", () => {
     await page.keyboard.press("Control+s");
     await expect(page.getByText("Đã lưu bản nháp").first()).toBeVisible();
     expect(backend.versionsOf(backend.bySlug("xem-truoc")!.id)[0].title).toBe("Tiêu đề chưa lưu");
+  });
+});
+
+test.describe("formatted text, dividers and uploaded images (BE#171, BE#172)", () => {
+  /** Puts the caret at `from` in a field and selects up to `to` with the keyboard. */
+  async function selectRange(field: Locator, from: number, to: number) {
+    await field.click();
+    await field.press("Home");
+    for (let i = 0; i < from; i += 1) await field.press("ArrowRight");
+    for (let i = from; i < to; i += 1) await field.press("Shift+ArrowRight");
+  }
+
+  test("toolbar and shortcuts format a selection; colour, link and a divider are saved as runs", async ({ page }) => {
+    const backend = await setup(page);
+    await createDraft(page, "dinh-dang", "Định dạng chữ", "Tóm tắt.", "Thoát hiểm qua cầu thang bộ");
+    const blocks = page.getByTestId("content-block");
+    const text = blocks.first().getByLabel(/^Nội dung/);
+    const bold = page.getByRole("button", { name: "In đậm" });
+    // "bộ" (25–27) in bold from the toolbar; the button shows it as pressed.
+    await selectRange(text, 25, 27);
+    await bold.click();
+    await expect(text.locator("strong")).toHaveText("bộ");
+    await expect(bold).toHaveAttribute("aria-pressed", "true");
+    // Ctrl+I with the caret inside a word formats that word.
+    await selectRange(text, 2, 2);
+    await text.press("Control+i");
+    await expect(text.locator("em")).toHaveText("Thoát");
+    // "cầu" in red from the colour palette.
+    await selectRange(text, 15, 18);
+    await page.getByRole("button", { name: "Màu chữ", exact: true }).click();
+    await page.getByRole("button", { name: "Màu chữ: Đỏ" }).click();
+    await expect(text.locator('[data-color="danger"]')).toHaveText("cầu");
+    // "thang" links to an https page; anything else is refused in the box.
+    await selectRange(text, 19, 24);
+    await page.getByRole("button", { name: "Gắn liên kết", exact: true }).click();
+    const box = page.locator(".doc-link-box");
+    await box.getByLabel("Liên kết").fill("javascript:alert(1)");
+    await box.getByRole("button", { name: "Gắn liên kết" }).click();
+    await expect(box.getByRole("alert")).toContainText("https://");
+    await box.getByLabel("Liên kết").fill("https://pccc.gov.vn/thoat-hiem");
+    await box.getByRole("button", { name: "Gắn liên kết" }).click();
+    await expect(text.locator("[data-link]")).toHaveText("thang");
+    // A divider goes after the block, with a paragraph to keep writing.
+    await page.getByRole("button", { name: "Đường kẻ" }).click();
+    await expect(blocks.nth(1)).toHaveAttribute("data-block-type", "divider");
+    const after = blocks.nth(2).getByLabel(/^Nội dung/);
+    await expect(after).toBeFocused();
+    await after.pressSequentially("Kết bài.");
+    await page.getByRole("button", { name: "Lưu bản nháp" }).click();
+    await expect(page.getByText("Đã lưu bản nháp").first()).toBeVisible();
+    const sent = backend.callsTo("PUT", /\/api\/admin\/learn\/versions\/[^/]+$/).at(-1)!.body as { blocks: Array<Record<string, unknown>> };
+    expect(sent.blocks[0]).not.toHaveProperty("text"); // runs OR text, never both (TEXT_OR_RUNS)
+    const saved = backend.versionsOf(backend.bySlug("dinh-dang")!.id)[0].blocks as Array<Record<string, unknown>>;
+    expect(saved[0]).toEqual({ type: "paragraph", text: "Thoát hiểm qua cầu thang bộ", runs: [
+      { text: "Thoát", marks: ["italic"] }, { text: " hiểm qua " }, { text: "cầu", color: "danger" }, { text: " " },
+      { text: "thang", link: "https://pccc.gov.vn/thoat-hiem" }, { text: " " }, { text: "bộ", marks: ["bold"] },
+    ] });
+    expect(saved[1]).toEqual({ type: "divider" });
+    expect(saved[2]).toEqual({ type: "paragraph", text: "Kết bài." });
+    // The saved version comes back formatted, and the reader preview shows it.
+    await expect(text.locator("strong")).toHaveText("bộ");
+    await page.getByRole("button", { name: "Xem như người đọc" }).click();
+    const preview = page.getByTestId("learn-reader-preview");
+    await expect(preview.locator("strong")).toHaveText("bộ");
+    await expect(preview.getByRole("link", { name: "thang" })).toHaveAttribute("href", "https://pccc.gov.vn/thoat-hiem");
+    await expect(preview.locator("hr.learn-divider")).toHaveCount(1);
+  });
+
+  test("a list item keeps its own formatting (items + itemRuns)", async ({ page }) => {
+    const backend = await setup(page);
+    await createDraft(page, "muc-dam", "Danh sách đậm", "Tóm tắt.", "Đoạn đầu.");
+    const blocks = page.getByTestId("content-block");
+    const first = blocks.first().getByLabel(/^Nội dung/);
+    await first.click();
+    await first.press("End");
+    await first.press("Enter");
+    await blocks.nth(1).getByLabel(/^Nội dung/).pressSequentially("/cham");
+    await blocks.nth(1).getByLabel(/^Nội dung/).press("Enter");
+    const item = blocks.nth(1).getByLabel("Mục 1");
+    await item.pressSequentially("Gọi 114");
+    await selectRange(item, 4, 7);
+    await item.press("Control+b");
+    await expect(item.locator("strong")).toHaveText("114");
+    await page.keyboard.press("Control+s");
+    await expect(page.getByText("Đã lưu bản nháp").first()).toBeVisible();
+    const saved = backend.versionsOf(backend.bySlug("muc-dam")!.id)[0].blocks as Array<Record<string, unknown>>;
+    expect(saved[1]).toEqual({ type: "list", ordered: false, items: ["Gọi 114"], itemRuns: [[{ text: "Gọi " }, { text: "114", marks: ["bold"] }]] });
+  });
+
+  test("uploads a block image and a cover from the computer; a file over 5 MB is refused before any request", async ({ page }) => {
+    const backend = await setup(page);
+    await createDraft(page, "co-anh", "Bài có ảnh", "Tóm tắt.", "Đoạn đầu.");
+    await page.getByRole("button", { name: "Chèn ảnh" }).click();
+    const image = page.getByTestId("content-block").last();
+    await expect(image).toHaveAttribute("data-block-type", "image");
+    await image.getByLabel("Tải ảnh lên từ máy").setInputFiles({ name: "loi-thoat.png", mimeType: "image/png", buffer: PNG_1X1 });
+    await expect(image.getByLabel(/^Đường dẫn ảnh/)).toHaveValue(/^https:\/\/api\.test\/api\/learn\/media\/images\/[0-9a-f-]{36}$/);
+    await expect(image.getByTestId("image-preview")).toBeVisible();
+    await image.getByLabel(/^Mô tả ảnh/).fill("Biển chỉ lối thoát");
+    const intent = backend.callsTo("POST", /upload-intent$/)[0];
+    expect(intent.headers["idempotency-key"]).toBeTruthy();
+    expect(intent.body).toMatchObject({ fileName: "loi-thoat.png", contentType: "image/png", sizeBytes: PNG_1X1.length, sha256: expect.stringMatching(/^[0-9a-f]{64}$/) });
+    await page.getByLabel("Tải ảnh bìa từ máy").setInputFiles({ name: "bia.png", mimeType: "image/png", buffer: PNG_1X1 });
+    await expect(page.getByTestId("cover-preview")).toBeVisible();
+    await image.getByLabel("Đổi ảnh: tải ảnh khác từ máy").setInputFiles({ name: "qua-lon.png", mimeType: "image/png", buffer: Buffer.alloc(5 * 1024 * 1024 + 1) });
+    await expect(image.getByText(/lớn hơn 5 MB/)).toBeVisible();
+    expect(backend.callsTo("POST", /upload-intent$/)).toHaveLength(2);
+    await page.getByRole("button", { name: "Lưu bản nháp" }).click();
+    await expect(page.getByText("Đã lưu bản nháp").first()).toBeVisible();
+    const saved = backend.versionsOf(backend.bySlug("co-anh")!.id)[0];
+    expect(saved.coverImageUrl).toMatch(/^https:\/\/api\.test\/api\/learn\/media\/images\//);
+    expect(saved.blocks.at(-1)).toMatchObject({ type: "image", url: expect.stringMatching(/^https:\/\/api\.test\//), alt: "Biển chỉ lối thoát" });
   });
 });
