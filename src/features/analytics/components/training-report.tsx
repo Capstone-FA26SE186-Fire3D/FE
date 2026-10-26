@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ChartCard, legendOf } from "@/components/charts/chart-card";
-import { colorAt, seriesColor, shortDate, type Series } from "@/components/charts/chart-config";
-import { AreaChart, Donut, GroupedBars } from "@/components/charts/lazy";
+import { colorAt, seriesColor, type Series } from "@/components/charts/chart-config";
+import { Donut, GroupedBars } from "@/components/charts/lazy";
 import { RankedBars } from "@/components/charts/ranked-bars";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/dialog";
@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { isVietnamese } from "@/api/error-text";
 import { routes } from "@/configs/routes";
 import { fmt, formatRate, formatSeconds } from "../format";
+import { fillPeriods, periodTick, periodTitle } from "../periods";
 import { OUTCOMES, type AiUsage, type GroupBy, type TrainingReport } from "../types";
 import { GROUP_LABELS } from "./filters";
 import { EmptyReport, KpiTile, MiniStat, Num, outcomeLabels, ReportTable } from "./charts";
@@ -84,8 +85,10 @@ export function TrainingReportView({ data, groupBy: requestedGroup, organization
   const groupBy = data.groupBy ?? requestedGroup ?? null;
   const timeSeries = Boolean(groupBy && TIME_GROUPS.has(groupBy));
   const timeline = data.cohorts && timeSeries ? data.cohorts : null;
-  const periods = timeline?.map((row) => ({ period: row.label, plays: row.plays, completed: row.completed, passed: row.passed })) ?? [];
-  const spark = (pick: (row: NonNullable<typeof timeline>[number]) => number) => timeline?.map(pick);
+  // The server lists only periods with sessions; the columns and sparklines need the quiet periods as zeros too.
+  const filled = timeline && groupBy ? fillPeriods(timeline, groupBy, data.from, data.to) : null;
+  const periods = filled?.map((row) => ({ period: row.key, plays: row.plays, completed: row.completed, passed: row.passed })) ?? [];
+  const spark = (pick: (row: NonNullable<typeof filled>[number]) => number) => filled?.map(pick);
   // Figma also shows a "+12%" delta chip on the first tile: the API has no previous-period figure, so no delta is drawn.
 
   const outcomeTotal = OUTCOMES.reduce((sum, outcome) => sum + data.outcomes[outcome], 0);
@@ -110,7 +113,7 @@ export function TrainingReportView({ data, groupBy: requestedGroup, organization
         <ChartCard title={`Phiên theo ${(timeSeries && groupBy ? GROUP_LABELS[groupBy] : GROUP_LABELS.day).toLowerCase()}`} description="Lượt chơi · Có kết quả · Đạt" legend={legendOf(periodSeries, colorAt)} height={190} empty={periods.length === 0}
           emptyText={groupBy && !timeSeries ? "Nhóm theo công trình/kịch bản không có trục thời gian; xem bảng nhóm bên dưới." : "Chưa có dữ liệu trong khoảng này"} data-testid="chart-periods"
           table={timeline && <CohortTable rows={timeline} />}>
-          <AreaChart data={periods} xKey="period" series={periodSeries} height={190} formatX={shortDate} />
+          <GroupedBars data={periods} xKey="period" series={periodSeries} height={190} overlap formatX={periodTick} tooltipLabel={(key) => periodTitle(key, groupBy ?? "day")} />
         </ChartCard>
 
         <ChartCard title="Kết quả phiên" description="Do máy chủ ghi nhận" empty={outcomeTotal === 0} emptyText="Chưa có phiên nào có kết quả trong khoảng này" data-testid="chart-outcomes"
