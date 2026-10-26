@@ -48,6 +48,10 @@ const issueMessages: Record<string, string> = {
   SOURCES_INVALID: "Tối đa 20 nguồn, vai trò là Nguồn chính, Tham khảo hoặc Bản ghi lời, không trùng nhau.",
   TYPE_INVALID: "Có khối nội dung không xác định được loại. Xóa khối đó rồi thêm lại.",
   CONTENT_TOO_LARGE: "Nội dung bài tối đa 256 KB.",
+  TEXT_OR_RUNS: "Đoạn chữ bị gửi hai lần (có và không định dạng). Gõ lại đoạn này rồi lưu.",
+  RUNS_INVALID: "Đoạn này đổi định dạng quá nhiều lần (tối đa 200 đoạn chữ khác kiểu). Bỏ bớt định dạng.",
+  MARK_UNSUPPORTED: "Kiểu chữ không được hỗ trợ: chỉ có đậm, nghiêng, gạch chân và gạch ngang.",
+  COLOR_UNSUPPORTED: "Màu không được hỗ trợ: chọn một màu trong bảng màu của trình soạn.",
 };
 
 /** A backend validation issue as the editor shows it: Vietnamese explanation plus the code and path for support. */

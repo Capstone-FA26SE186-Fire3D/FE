@@ -34,6 +34,12 @@ const MARKUP = /<\s*[a-zA-Z/!?]/;
 const YOUTUBE = /^[A-Za-z0-9_-]{11}$/;
 const NUMERIC = /^[0-9]{8,25}$/;
 const HANDLE = /^@[A-Za-z0-9._]{2,24}$/;
+const MARKS = ["bold", "italic", "underline", "strike"];
+const TONES = ["default", "ember", "danger", "warning", "success", "info"];
+/** A 1×1 PNG: what uploaded Learn images answer with. */
+export const PNG_1X1 = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64");
+/** Host of the presigned PUT URLs the model hands out for Learn image uploads. */
+export const STORAGE_HOST = "https://storage.test";
 
 export function canonicalize(input: string): { provider: string; videoId: string; canonicalUrl: string } | null {
   let uri: URL;
@@ -68,6 +74,8 @@ export class LearnBackend {
   situations: Situation[] = [];
   sources: Source[] = [];
   bookmarks: Array<{ postId: string; at: string }> = [];
+  /** Learn image uploads (BE#171): intent → PUT to STORAGE_HOST → complete. */
+  uploads: Array<{ id: string; contentType: string; sizeBytes: number; put: boolean; completed: boolean }> = [];
   private receipts = new Map<string, { hash: string; reply: { status: number; json: unknown; etag?: string } }>();
   private overrides: Array<{ method: string; pattern: RegExp; reply: Reply }> = [];
   private counter = 1;
@@ -196,22 +204,55 @@ export class LearnBackend {
     let videos = 0;
     const raw = Array.isArray(body.blocks) ? body.blocks : [];
     if (raw.length === 0 || raw.length > 200) add("FIELD_REQUIRED", "$.blocks", "Use 1-200 blocks.");
+    // BE#172: `text` or `runs` (both is TEXT_OR_RUNS); stored as the joined `text` plus `runs` only when formatted.
+    const rich = (block: Json, path: string, max: number): Json | null => {
+      if (block.runs === undefined) { const t = text(block.text, `${path}.text`, max); return t ? { text: t } : null; }
+      if (block.text !== undefined) { add("TEXT_OR_RUNS", path, "Use text or runs, not both."); return null; }
+      return runs(block.runs, `${path}.runs`, max);
+    };
+    const runs = (value: unknown, path: string, max: number): Json | null => {
+      if (!Array.isArray(value) || value.length === 0 || value.length > 200) { add("RUNS_INVALID", path, "Use 1-200 runs."); return null; }
+      const clean: Json[] = [];
+      value.forEach((entry, position) => {
+        const run = (typeof entry === "object" && entry !== null ? entry : {}) as Json;
+        const at = `${path}[${position}]`;
+        if (typeof run.text !== "string" || !run.text) { add("STRING_INVALID", `${at}.text`, "Run text is required."); return; }
+        if (MARKUP.test(run.text)) { add("MARKUP_NOT_ALLOWED", `${at}.text`, "HTML is not accepted."); return; }
+        const out: Json = { text: run.text };
+        const marks = Array.isArray(run.marks) ? run.marks : [];
+        if (marks.some((mark) => !MARKS.includes(String(mark)))) add("MARK_UNSUPPORTED", `${at}.marks`, "Unsupported mark.");
+        else if (marks.length) out.marks = MARKS.filter((mark) => marks.includes(mark));
+        for (const key of ["color", "highlight"]) {
+          if (run[key] === undefined) continue;
+          if (!TONES.includes(String(run[key]))) add("COLOR_UNSUPPORTED", `${at}.${key}`, "Use a theme token.");
+          else if (run[key] !== "default") out[key] = run[key];
+        }
+        if (run.link !== undefined) { const link = https(run.link, `${at}.link`, true); if (link) out.link = link; }
+        clean.push(out);
+      });
+      const joined = clean.map((run) => String(run.text)).join("").trim();
+      if (!joined || joined.length > max) { add("STRING_INVALID", path, `Use 1-${max} characters.`); return null; }
+      const formatted = clean.some((run) => Object.keys(run).length > 1);
+      return formatted ? { text: joined, runs: clean } : { text: joined };
+    };
     raw.forEach((item, index) => {
       const path = `$.blocks[${index}]`;
       const block = (typeof item === "object" && item !== null ? item : null) as Json | null;
       if (!block || typeof block.type !== "string") { add("TYPE_INVALID", path, "Each block is an object with a type."); return; }
-      const allowed: Record<string, string[]> = { heading: ["type", "text", "level"], paragraph: ["type", "text"], list: ["type", "ordered", "items"], callout: ["type", "tone", "text"], image: ["type", "url", "alt"], video: ["type", "url"] };
+      const allowed: Record<string, string[]> = { heading: ["type", "text", "runs", "level"], paragraph: ["type", "text", "runs"], list: ["type", "ordered", "items"], callout: ["type", "tone", "text", "runs"], image: ["type", "url", "alt"], video: ["type", "url"], divider: ["type"] };
       const fields = allowed[block.type];
-      if (!fields) { add("VALUE_UNSUPPORTED", `${path}.type`, "Use heading, paragraph, list, callout, image or video."); return; }
+      if (!fields) { add("VALUE_UNSUPPORTED", `${path}.type`, "Use heading, paragraph, list, callout, image, video or divider."); return; }
       for (const name of Object.keys(block)) if (!fields.includes(name)) add("FIELD_UNKNOWN", `${path}.${name}`, "Field is not defined for this block type.");
-      if (block.type === "heading") { const level = Number(block.level); if (!(level >= 2 && level <= 4)) add("VALUE_UNSUPPORTED", `${path}.level`, "Heading level is 2, 3 or 4."); const t = text(block.text, `${path}.text`, 200); if (t) blocks.push({ type: "heading", text: t, level }); }
-      else if (block.type === "paragraph") { const t = text(block.text, `${path}.text`, 5000); if (t) blocks.push({ type: "paragraph", text: t }); }
-      else if (block.type === "callout") { const tone = block.tone; if (!["info", "warning", "danger"].includes(String(tone))) add("VALUE_UNSUPPORTED", `${path}.tone`, "Tone is info, warning or danger."); const t = text(block.text, `${path}.text`, 2000); if (t && tone) blocks.push({ type: "callout", tone, text: t }); }
+      if (block.type === "heading") { const level = Number(block.level); if (!(level >= 2 && level <= 4)) add("VALUE_UNSUPPORTED", `${path}.level`, "Heading level is 2, 3 or 4."); const t = rich(block, path, 200); if (t) blocks.push({ type: "heading", ...t, level }); }
+      else if (block.type === "paragraph") { const t = rich(block, path, 5000); if (t) blocks.push({ type: "paragraph", ...t }); }
+      else if (block.type === "divider") blocks.push({ type: "divider" });
+      else if (block.type === "callout") { const tone = block.tone; if (!["info", "warning", "danger"].includes(String(tone))) add("VALUE_UNSUPPORTED", `${path}.tone`, "Tone is info, warning or danger."); const t = rich(block, path, 2000); if (t && tone) blocks.push({ type: "callout", tone, ...t }); }
       else if (block.type === "list") {
         const items = Array.isArray(block.items) ? block.items : [];
         if (items.length === 0 || items.length > 50) add("FIELD_REQUIRED", `${path}.items`, "Use 1-50 items.");
-        const clean = items.map((entry, position) => text(entry, `${path}.items[${position}]`, 1000)).filter((entry): entry is string => entry !== null);
-        blocks.push({ type: "list", ordered: block.ordered === true, items: clean });
+        const clean = items.map((entry, position) => (typeof entry === "object" && entry !== null ? runs((entry as Json).runs, `${path}.items[${position}].runs`, 1000) : (() => { const t = text(entry, `${path}.items[${position}]`, 1000); return t ? { text: t } : null; })())).filter((entry): entry is Json => entry !== null);
+        const itemRuns = clean.some((entry) => entry.runs) ? { itemRuns: clean.map((entry) => entry.runs ?? [{ text: entry.text }]) } : {};
+        blocks.push({ type: "list", ordered: block.ordered === true, items: clean.map((entry) => entry.text), ...itemRuns });
       } else if (block.type === "image") { const url = https(block.url, `${path}.url`, true); const alt = text(block.alt, `${path}.alt`, 300); if (url && alt) blocks.push({ type: "image", url, alt }); }
       else if (block.type === "video") {
         const media = typeof block.url === "string" ? canonicalize(block.url) : null;
@@ -368,6 +409,24 @@ export class LearnBackend {
         return { status: 201, json: { id: created.id, slug: created.slug, name: created.name, description: created.description } };
       });
     }
+    if (method === "POST" && path === "/api/admin/learn/media/images/upload-intent") {
+      const input = (body ?? {}) as Json;
+      return this.withKey(headers["idempotency-key"], "LearnImage", input, true, () => {
+        const contentType = String(input.contentType ?? ""); const sizeBytes = Number(input.sizeBytes);
+        if (!["image/jpeg", "image/png", "image/webp"].includes(contentType) || !(sizeBytes >= 1 && sizeBytes <= 5 * 1024 * 1024) || !/^[0-9a-f]{64}$/.test(String(input.sha256 ?? ""))) return this.problem(400, "VALIDATION_ERROR", "The image does not meet the upload rules.");
+        const upload = { id: this.id("1a6e0000"), contentType, sizeBytes, put: false, completed: false };
+        this.uploads.push(upload);
+        return { status: 200, json: { uploadId: upload.id, uploadUrl: `${STORAGE_HOST}/learn/staging/${upload.id}?signature=test`, headers: { "Content-Type": contentType }, expiresAt: "2099-01-01T00:00:00Z" } };
+      });
+    }
+    const completeUpload = /^\/api\/admin\/learn\/media\/images\/([^/]+)\/complete$/.exec(path);
+    if (method === "POST" && completeUpload) {
+      const upload = this.uploads.find((item) => item.id === completeUpload[1]);
+      if (!upload) return this.problem(404, "NOT_FOUND", "Upload not found.");
+      if (!upload.put) return this.problem(409, "LEARN_UPLOAD_MISSING", "PUT the file to uploadUrl before completing.");
+      upload.completed = true;
+      return { status: 200, json: { imageId: upload.id, url: `https://api.test/api/learn/media/images/${upload.id}`, width: 1, height: 1, contentType: upload.contentType, sizeBytes: upload.sizeBytes } };
+    }
     if (method === "POST" && path === "/api/admin/learn/media/validate") {
       const media = typeof (body as Json | undefined)?.url === "string" ? canonicalize((body as Json).url as string) : null;
       return media ? { status: 200, json: media } : this.problem(422, "LEARN_MEDIA_INVALID", "Use a full YouTube, Facebook or TikTok video URL.");
@@ -497,11 +556,24 @@ function lower(headers: Record<string, string>) { return Object.fromEntries(Obje
 
 /** Routes every Learn/knowledge-source request to the backend model. Auth endpoints and everything else fall through. */
 export async function installLearnBackend(page: Page, backend: LearnBackend) {
+  // Presigned PUT of a Learn image upload: the browser sends the file with exactly the intent's Content-Type.
+  await page.route(`${STORAGE_HOST}/**`, async (route: Route) => {
+    const request = route.request();
+    const id = /\/learn\/staging\/([^/?]+)/.exec(new URL(request.url()).pathname)?.[1];
+    const upload = backend.uploads.find((item) => item.id === id);
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "PUT", "Access-Control-Allow-Headers": "Content-Type" } });
+    if (request.method() !== "PUT" || !upload || request.headers()["content-type"] !== upload.contentType) return route.fulfill({ status: 403, body: "" });
+    upload.put = true;
+    return route.fulfill({ status: 200, headers: { "Access-Control-Allow-Origin": "*" }, body: "" });
+  });
   await page.route("**/api/**", async (route: Route) => {
     const request = route.request();
     const url = new URL(request.url());
     const path = url.pathname;
     if (!/^\/api\/(learn|admin\/learn|admin\/knowledge-sources)/.test(path)) return route.fallback();
+    // A completed Learn image: the real API redirects to a signed S3 URL; the model serves the bytes directly.
+    const image = /^\/api\/learn\/media\/images\/([^/]+)$/.exec(path);
+    if (request.method() === "GET" && image) return backend.uploads.some((item) => item.id === image[1] && item.completed) ? route.fulfill({ status: 200, contentType: "image/png", body: PNG_1X1 }) : route.fulfill({ status: 404, body: "" });
     const headers = lower(request.headers());
     let body: unknown;
     try { body = request.postDataJSON(); } catch { body = undefined; }

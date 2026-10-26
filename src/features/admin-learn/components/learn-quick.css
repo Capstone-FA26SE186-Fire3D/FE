@@ -59,7 +59,9 @@
 .doc-paper textarea::placeholder, .doc-block input::placeholder { color: var(--dim); }
 .doc-title textarea { font-size: clamp(28px, 3vw, 38px); font-weight: 600; line-height: 1.2; letter-spacing: -.02em; }
 .doc-lede textarea { color: var(--muted) !important; font-size: 18px; line-height: 1.6; }
+.doc-paper > .doc-cover { display: grid; gap: 8px; margin-left: 36px; }
 .doc-cover input { border-style: dashed; background: transparent; font-size: 13px; }
+.doc-cover-preview { width: 100%; max-height: 260px; object-fit: cover; border-radius: 12px; background: var(--surface); }
 .doc-rule { height: 1px; margin-block: 10px 6px; border: 0; background: var(--line); }
 
 .doc-blocks { display: grid; gap: 4px; min-width: 0; }
@@ -164,9 +166,46 @@
 .doc-list li { display: flex; align-items: baseline; gap: 8px; }
 .doc-list-marker { flex: none; min-width: 22px; color: var(--ember); font-size: 17px; font-weight: 600; text-align: right; }
 .doc-list[data-ordered="false"] .doc-list-marker { font-size: 20px; line-height: 1; }
+.doc-list .rt-input { flex: 1 1 auto; min-width: 0; min-height: 0; padding: 4px 6px; border-color: transparent; background: transparent; font-size: 17px; line-height: 1.6; }
+.doc-list .rt-input:hover { background: var(--hover); }
+.doc-list .rt-input:focus { border-color: transparent; box-shadow: inset 2px 0 0 var(--ember); }
 .doc-list input { flex: 1 1 auto; min-width: 0; min-height: 0; padding: 4px 6px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text); font: inherit; font-size: 17px; line-height: 1.6; }
 .doc-list input:hover { background: var(--hover); }
 .doc-list input:focus { outline: none; box-shadow: inset 2px 0 0 var(--ember); }
 .doc-list input::placeholder { color: var(--dim); }
 .doc-list-kind { width: 150px; min-height: 32px; font-size: 13px; opacity: 0; transition: opacity .15s; }
 .doc-block:hover .doc-list-kind, .doc-block:focus-within .doc-list-kind { opacity: 1; }
+
+/* Formatted text fields (BE#172): a contentEditable that looks like the form's inputs; inside the page it is seamless. */
+.rt-input { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 9px; background: var(--bg-soft); color: var(--text); font-size: 14px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; outline: 0; cursor: text; transition: border-color 150ms ease, box-shadow 150ms ease; }
+.rt-input:focus { border-color: var(--ember); box-shadow: 0 0 0 3px var(--ember-soft); }
+.rt-input:empty::before { content: attr(data-placeholder); color: var(--dim); pointer-events: none; }
+.rt-input[aria-disabled="true"], fieldset:disabled .rt-input { opacity: .7; cursor: not-allowed; }
+.rt-input .rt-link { cursor: text; }
+.doc-block .doc-block-body .rt-input { min-height: 0; padding: 4px 6px; border-color: transparent; border-radius: 6px; background: transparent; box-shadow: none; }
+.doc-block .doc-block-body .rt-input:hover { background: var(--hover); }
+.doc-block .doc-block-body .rt-input:focus { border-color: transparent; background: transparent; box-shadow: inset 2px 0 0 var(--ember); }
+.doc-block[data-block-type="paragraph"] .rt-input { font-size: 17px; line-height: 1.7; }
+.doc-block[data-level="2"] .rt-input { font-size: 25px; font-weight: 600; letter-spacing: -.02em; line-height: 1.3; }
+.doc-block[data-level="3"] .rt-input { font-size: 21px; font-weight: 600; line-height: 1.35; }
+.doc-block[data-level="4"] .rt-input { font-size: 18px; font-weight: 600; line-height: 1.4; }
+.doc-block[data-block-type="callout"] .rt-input { font-weight: 500; font-size: 15px; line-height: 1.6; }
+.doc-block .doc-list .rt-input { font-size: 17px; line-height: 1.6; }
+
+.doc-divider { height: 0; margin: 14px 6px; border: 0; border-top: 1px solid var(--line-strong); }
+.image-preview { width: 100%; max-height: 320px; object-fit: contain; border-radius: 10px; background: var(--surface); }
+
+/* Toolbar pop-overs: colour swatches and the link box */
+.doc-tool-anchor { position: relative; display: inline-flex; }
+.doc-pop { position: absolute; left: 50%; top: calc(100% + 8px); z-index: 30; display: grid; gap: 8px; min-width: 220px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-raised); box-shadow: 0 14px 32px rgba(0, 0, 0, .35); transform: translateX(-50%); }
+.doc-pop-head { margin: 0; color: var(--dim); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.doc-swatches { display: grid; grid-template-columns: repeat(6, 32px); gap: 6px; }
+.doc-swatch { position: relative; display: inline-grid; place-items: center; width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); font-weight: 650; }
+.doc-swatch:hover { border-color: var(--line-strong); background: var(--hover); }
+.doc-swatch[aria-pressed="true"] { border-color: var(--ember); }
+.doc-swatch-check { position: absolute; right: 2px; bottom: 2px; color: var(--ember); }
+.doc-link-box { width: min(320px, 80vw); }
+.doc-link-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.doc-link-actions button { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--text); font-size: 13px; }
+.doc-link-actions .doc-link-apply { border-color: var(--ember); background: var(--ember); color: #1a0f08; font-weight: 600; }
+.doc-link-actions .doc-link-remove { margin-right: auto; color: var(--danger); }

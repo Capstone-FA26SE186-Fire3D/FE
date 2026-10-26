@@ -2,7 +2,7 @@ import { apiClient } from "@/api/client";
 import { ApiError } from "@/api/types/common";
 import { bool, isRecord, kindOf, list, num, parsePage, parseSituationRef, parseSourceRef, str, strOrNull } from "@/features/learn/parse";
 import { POST_STATUSES, type PostStatus } from "@/features/learn/types";
-import type { AdminPost, AdminSituation, AdminVersion, CreatePostInput, KnowledgeSource, LifecycleOperation, MediaDescriptor, Page, SourceStatus, VersionInput, VersionStatus, VersionSummary, WithEtag } from "./types";
+import type { AdminPost, AdminSituation, AdminVersion, CreatePostInput, KnowledgeSource, LearnImage, LifecycleOperation, MediaDescriptor, Page, SourceStatus, VersionInput, VersionStatus, VersionSummary, WithEtag } from "./types";
 
 /*
  * Learn CMS over the real contract: /api/admin/learn/* and /api/admin/knowledge-sources (PlatformAdmin).
@@ -72,6 +72,12 @@ const requireVersion = (raw: unknown): AdminVersion => {
   if (!version) throw new ApiError("Máy chủ trả về phiên bản không đọc được.", 502, undefined, undefined, "LEARN_VERSION_MALFORMED");
   return version;
 };
+
+/** Lowercase hex SHA-256 of a file (Learn images are at most 5 MB, so one digest call is fine). */
+async function sha256Hex(file: Blob): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 
 const sourceStatus = (value: unknown): SourceStatus => (value === "Approved" || value === "Retired" ? value : "Draft");
 
@@ -144,6 +150,24 @@ export const learnAdminApi = {
     const raw = await apiClient.request<unknown>("/api/admin/learn/media/validate", { headers: auth(accessToken), method: "POST", json: { url }, signal });
     if (!isRecord(raw) || typeof raw.canonicalUrl !== "string") throw new ApiError("Máy chủ trả về kết quả kiểm tra không đọc được.", 502, undefined, undefined, "LEARN_MEDIA_MALFORMED");
     return { provider: str(raw.provider), videoId: str(raw.videoId), canonicalUrl: raw.canonicalUrl };
+  },
+
+  /**
+   * Uploads a cover or block image (BE#171): intent (Idempotency-Key, name, type, size, sha256) → PUT to the presigned URL
+   * with exactly the returned headers → complete, which checks the bytes. The url is a stable public address on the API.
+   */
+  async uploadImage(accessToken: string, file: File, idempotencyKey: string): Promise<LearnImage> {
+    const intent = await apiClient.request<unknown>("/api/admin/learn/media/images/upload-intent", {
+      headers: auth(accessToken), method: "POST", idempotencyKey,
+      json: { fileName: file.name || "anh", contentType: file.type, sizeBytes: file.size, sha256: await sha256Hex(file) },
+    });
+    if (!isRecord(intent) || typeof intent.uploadId !== "string" || typeof intent.uploadUrl !== "string") throw new ApiError("Máy chủ trả về phiên tải ảnh không đọc được.", 502, undefined, undefined, "LEARN_UPLOAD_MALFORMED");
+    const headers = isRecord(intent.headers) ? Object.fromEntries(Object.entries(intent.headers).filter((entry): entry is [string, string] => typeof entry[1] === "string")) : { "Content-Type": file.type };
+    const put = await fetch(intent.uploadUrl, { method: "PUT", body: file, headers });
+    if (!put.ok) throw new ApiError("Không tải được ảnh lên kho lưu trữ.", put.status, undefined, undefined, "LEARN_UPLOAD_PUT_FAILED");
+    const done = await apiClient.request<unknown>(`/api/admin/learn/media/images/${encodeURIComponent(intent.uploadId)}/complete`, { headers: auth(accessToken), method: "POST" });
+    if (!isRecord(done) || typeof done.url !== "string") throw new ApiError("Máy chủ trả về ảnh không đọc được.", 502, undefined, undefined, "LEARN_IMAGE_MALFORMED");
+    return { imageId: str(done.imageId), url: done.url, width: num(done.width), height: num(done.height) };
   },
 
   /** Editor catalog: `visibility=Common` so tenant sources never enter a Learn draft. */
