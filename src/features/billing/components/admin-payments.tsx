@@ -5,7 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { ChartCard } from "@/components/charts/chart-card";
-import { Donut } from "@/components/charts/lazy";
+import { StatusBreakdown, type StatusPart } from "@/components/charts/status-breakdown";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
@@ -31,7 +31,8 @@ const GUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a
 /** Start of the 30-day window, read when a request runs (not during render). */
 const since30 = () => new Date(Date.now() - 30 * 86_400_000).toISOString();
 const PAYMENT_STATUSES = Object.keys(paymentLabels);
-const toneColor: Record<string, string> = { Paid: "var(--success)", Pending: "var(--warning)", Cancelled: "var(--danger)", Expired: "var(--dim)", Failed: "var(--danger)" };
+/** One colour per state (Cancelled and Failed used to share red): money in, waiting, failed, and two neutral endings told apart by texture. */
+const toneColor: Record<string, Pick<StatusPart, "color" | "pattern">> = { Paid: { color: "var(--success)" }, Pending: { color: "var(--warning)" }, Failed: { color: "var(--danger)" }, Cancelled: { color: "var(--muted)" }, Expired: { color: "var(--dim)", pattern: "stripes" } };
 
 /** Everything about one payment: checkout (link), payment (money) and provisioning (service) apart, plus reconcile. */
 function PaymentDetail({ accessToken, checkoutId, paymentRequestId, onChanged }: { accessToken: string; checkoutId: string; paymentRequestId: string; onChanged: () => void }) {
@@ -83,7 +84,7 @@ function PaymentDetail({ accessToken, checkoutId, paymentRequestId, onChanged }:
 }
 
 /**
- * Donut "Thanh toán theo trạng thái" (Figma 53:1540): one `totalCount` per payment status from the payment-request ledger
+ * "Thanh toán theo trạng thái" (Figma 53:1540, a status breakdown since 26/10): one `totalCount` per payment status from the payment-request ledger
  * over the last 30 days (page size 1). Counts come from the server, never from the page on screen.
  */
 function PaymentStatusDonut({ accessToken }: { accessToken: string }) {
@@ -92,11 +93,12 @@ function PaymentStatusDonut({ accessToken }: { accessToken: string }) {
   const loading = counts.loading && !counts.data;
   const failed = counts.error !== undefined && !counts.data;
   const byStatus = Object.fromEntries(counts.data ?? []);
-  const slices = PAYMENT_STATUSES.map((status) => ({ key: status, label: paymentLabels[status]?.label ?? status, value: byStatus[status] ?? 0, color: toneColor[status] ?? "var(--info)" }));
+  const slices: StatusPart[] = PAYMENT_STATUSES.map((status) => ({ key: status, label: paymentLabels[status]?.label ?? status, value: byStatus[status] ?? 0, ...(toneColor[status] ?? { color: "var(--info)" }) }));
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
-  return <ChartCard title="Thanh toán theo trạng thái" description="30 ngày gần nhất · yêu cầu thanh toán PayOS" height={170} loading={loading} empty={!loading && (failed || total === 0)} emptyText={failed ? "Chưa đọc được số lượng theo trạng thái" : "Chưa có yêu cầu thanh toán trong 30 ngày"} data-testid="payments-status-chart"
+  return <ChartCard title="Thanh toán theo trạng thái" description="30 ngày gần nhất · yêu cầu thanh toán PayOS" height={124} loading={loading} empty={!loading && (failed || total === 0)} emptyText={failed ? "Chưa đọc được số lượng theo trạng thái" : "Chưa có yêu cầu thanh toán trong 30 ngày"} data-testid="payments-status-chart"
     table={<table className="ops-table"><caption className="ops-sr-only">Thanh toán theo trạng thái</caption><thead><tr><th>Trạng thái</th><th>Số yêu cầu</th></tr></thead><tbody>{slices.map((slice) => <tr key={slice.key}><td>{slice.label}</td><td>{formatNumber(slice.value)}</td></tr>)}</tbody></table>}>
-    <Donut slices={slices} center={{ value: formatNumber(total), caption: "yêu cầu" }} />
+    <StatusBreakdown parts={slices} unit="yêu cầu thanh toán" format={formatNumber}
+      headline={<>Đã nhận tiền <strong>{formatNumber(byStatus.Paid ?? 0)}</strong> / {formatNumber(total)} yêu cầu</>} />
   </ChartCard>;
 }
 
