@@ -1,5 +1,6 @@
 "use client";
 
+import { capabilityName } from "@/configs/capability-labels";
 import { Archive, ArchiveRestore, FilePlus2, FolderOpen, Library, Search } from "lucide-react";
 import { useState } from "react";
 
@@ -112,7 +113,7 @@ export function ItemsList({ accessToken, reloadKey, onOpen, onNewVersion, onCrea
     { key: "kind", header: "Loại", width: 150, hideBelow: 900, render: (item) => <StatusBadge tone={kindTone[item.kind]}>{kindLabel[item.kind]}</StatusBadge> },
     { key: "version", header: "Phiên bản xuất bản", width: 150, render: (item) => (item.latestPublished ? `v${item.latestPublished.versionNumber}` : shownVersion(item) ? `— (nháp v${shownVersion(item)!.number})` : "—") },
     { key: "status", header: "Trạng thái", width: 150, render: (item) => { const status = itemStatus(item); return <StatusBadge tone={status.tone}>{status.label}</StatusBadge>; } },
-    { key: "capabilities", header: "Năng lực yêu cầu", hideBelow: 1200, render: (item) => (item.latestPublished ? (item.latestPublished.requiredCapabilities.length ? item.latestPublished.requiredCapabilities.join(" · ") : "Không khai báo") : "—") },
+    { key: "capabilities", header: "Năng lực yêu cầu", hideBelow: 1200, render: (item) => (item.latestPublished ? (item.latestPublished.requiredCapabilities.length ? item.latestPublished.requiredCapabilities.map(capabilityName).join(" · ") : "Không khai báo") : "—") },
     { key: "updated", header: "Cập nhật", width: 170, hideBelow: 768, render: (item) => formatDateTime(item.updatedAt) },
   ];
 
@@ -152,7 +153,7 @@ export function ItemsList({ accessToken, reloadKey, onOpen, onNewVersion, onCrea
       {state && ` Bộ lọc trạng thái chỉ áp dụng cho ${loaded.length} mục của trang đang mở.`}
     </p>
     <div style={{ marginTop: 18 }}>
-      <Alert tone="info" title="Thêm thông tin thiết bị không tự thêm chức năng trong game">
+      <Alert tone="info" title="Thêm thông tin thiết bị không tự thêm chức năng trong ứng dụng huấn luyện">
         Chỉ đối tượng mà ứng dụng FET3D đang hỗ trợ mới dùng được trong kịch bản; thông tin thiết bị chỉ để mô tả và hiển thị.
       </Alert>
     </div>

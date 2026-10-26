@@ -257,7 +257,7 @@ test.describe("published versions are immutable", () => {
     const backend = await setup(page, (b) => { b.seedPost("bat-bien", { title: "Bản một", status: "Published" }); });
     const post = backend.bySlug("bat-bien")!;
     await page.goto(`/admin/learn?post=${post.id}`);
-    await expect(page.getByText("Đang xem bản đã xuất bản (bất biến)")).toBeVisible();
+    await expect(page.getByText("Đang xem bản đã xuất bản (không sửa được)")).toBeVisible();
     await expect(page.getByRole("button", { name: "Lưu bản nháp" })).toHaveCount(0);
     await expect(page.getByLabel("Tiêu đề", { exact: true })).toBeDisabled();
 
@@ -286,7 +286,7 @@ test.describe("published versions are immutable", () => {
     expect(post.publishedVersionId).toBe(v2.id);
     // Editing the first version through the API is refused: the UI never even offers it.
     await page.goto(`/admin/learn?post=${post.id}&version=${v1.id}`);
-    await expect(page.getByText("Đang xem bản đã xuất bản (bất biến)")).toBeVisible();
+    await expect(page.getByText("Đang xem bản đã xuất bản (không sửa được)")).toBeVisible();
     await tab(page, "Phiên bản & Xuất bản").click();
     const versions = page.getByRole("table", { name: "Các phiên bản của bài" });
     await expect(versions.getByText("Đang công khai")).toHaveCount(1);
@@ -514,7 +514,7 @@ test.describe("media", () => {
     const dialog = await openNew(page);
     await fillBasics(dialog, "co-html", "Có html", "Tóm tắt.", "Xin chào <script>alert(1)</script>");
     await dialog.getByTestId("create-post").click();
-    await expect(dialog.getByText("Chỉ nhận văn bản thuần: không dùng thẻ HTML, iframe hay script.").first()).toBeVisible();
+    await expect(dialog.getByText("Chỉ nhận chữ thường: không dán mã trang web.").first()).toBeVisible();
     expect(backend.callsTo("POST", /\/posts$/)).toHaveLength(0);
     await dialog.getByLabel(/^Đoạn mở đầu/).fill("1 < 2 vẫn là văn bản");
     await dialog.getByTestId("create-post").click();
@@ -522,7 +522,7 @@ test.describe("media", () => {
     // In the editor the same rule holds for every block.
     await addParagraph(page, "<b>đậm</b>");
     await page.getByRole("button", { name: "Lưu bản nháp" }).click();
-    await expect(page.getByText("Chỉ nhận văn bản thuần: không dùng thẻ HTML, iframe hay script.").first()).toBeVisible();
+    await expect(page.getByText("Chỉ nhận chữ thường: không dán mã trang web.").first()).toBeVisible();
     expect(backend.callsTo("PUT", /\/versions\//)).toHaveLength(0);
   });
 });
@@ -655,7 +655,7 @@ test.describe("statuses in the list", () => {
     await page.goto("/admin/learn");
     await postsTable(page).getByRole("row").filter({ hasText: "dang-cong-khai" }).click();
     const pane = quickDrawer(page);
-    await expect(pane.getByText("Bản đã xuất bản là bất biến")).toBeVisible();
+    await expect(pane.getByText("Bản đã xuất bản không sửa được nữa")).toBeVisible();
     await expect(pane.getByRole("button", { name: "Lưu nháp" })).toHaveCount(0);
     await expect(pane.getByRole("button", { name: "Hiện lại" })).toHaveCount(0);
     await pane.getByRole("button", { name: "Ẩn bài" }).click();

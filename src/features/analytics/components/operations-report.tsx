@@ -103,7 +103,7 @@ export function OperationsReportView({ data, scope, organizationId }: { data: Op
           <thead><tr><th>Trạng thái</th><Num header>Số yêu cầu</Num></tr></thead>
           <tbody>{tickets.map((item) => <tr key={item.status}><td>{ticketStatusLabel(item.status)}</td><Num>{fmt(item.count)}</Num></tr>)}</tbody>
         </ReportTable>}>
-        <Donut size={140} slices={ticketSlices} center={{ value: fmt(ticketsTotal), caption: "ticket" }} />
+        <Donut size={140} slices={ticketSlices} center={{ value: fmt(ticketsTotal), caption: "yêu cầu" }} />
       </ChartCard>
     </div>
 

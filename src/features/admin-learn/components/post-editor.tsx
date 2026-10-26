@@ -192,13 +192,13 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
         commandDone(intent);
         setPost(result);
         try { applyVersion(await learnAdminApi.getVersion(accessToken, version.data.id)); } catch { onReload(); }
-        toast.notify({ tone: "success", title: "Đã xuất bản", description: `Phiên bản ${version.data.versionNumber} của bài “${result.data.slug}” · bài ${postStatusView[result.data.publicationStatus].label.toLowerCase()}` });
+        toast.notify({ tone: "success", title: "Đã xuất bản", description: `Phiên bản ${version.data.versionNumber} · bài ${postStatusView[result.data.publicationStatus].label.toLowerCase()}` });
       } else if (operation.kind === "lifecycle") {
         const intent = { op: operation.operation, postId: post.data.id, etag: post.etag };
         const result = await learnAdminApi.lifecycle(accessToken, post.data.id, operation.operation, post.etag, commandKey(intent));
         commandDone(intent);
         setPost(result);
-        toast.notify({ tone: "success", title: lifecycleCopy[operation.operation].done, description: `${result.data.slug} · ${postStatusView[result.data.publicationStatus].label}` });
+        toast.notify({ tone: "success", title: lifecycleCopy[operation.operation].done, description: `Bài hiện ${postStatusView[result.data.publicationStatus].label.toLowerCase()}` });
       } else if (operation.kind === "newVersion") {
         const input = toVersionInput(form);
         const intent = { op: "create-version", postId: post.data.id, input };
@@ -241,7 +241,6 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
   const versionColumns: DataColumn<VersionSummary>[] = [
     { key: "version", header: "Phiên bản", primary: true, render: (item) => <CellTitle title={`v${item.versionNumber}`} sub={item.title} /> },
     { key: "status", header: "Trạng thái", width: 260, render: (item) => <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}><StatusBadge tone={versionStatusView[item.status].tone}>{versionStatusView[item.status].label}</StatusBadge>{post.data.publishedVersionId === item.id && <StatusBadge tone="ember">Đang công khai</StatusBadge>}{version?.data.id === item.id && <StatusBadge tone="info">Đang mở</StatusBadge>}</span> },
-    { key: "etag", header: "ETag", width: 90, hideBelow: 1100, render: (item) => <code className="ops-mono">{`"${item.revision}"`}</code> },
     { key: "updated", header: "Cập nhật", width: 170, hideBelow: 768, render: (item) => formatDateTime(item.updatedAt) },
   ];
   const versionMenu = (item: VersionSummary) => [
@@ -258,7 +257,7 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
       <div className="learn-editor-head-text">
         <p className="learn-eyebrow">Bài học · {kindLabel[form.kind]}{version ? ` · v${version.data.versionNumber} (${versionStatusView[version.data.status].label.toLowerCase()})` : ""}</p>
         <h2>{title}</h2>
-        <p className="learn-list-note">{post.data.slug}</p>
+        <p className="learn-list-note">Đường dẫn rút gọn: {post.data.slug}</p>
       </div>
       <div className="learn-editor-head-actions">
         <StatusBadge tone={statusView.tone}>{statusView.label}</StatusBadge>
@@ -288,9 +287,9 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
 
     {screen === "content" && <div className="learn-editor">
       <div className="ops-stack learn-editor-main">
-        {!isDraft && status !== "Deleted" && version && <Alert tone="info" title="Đang xem bản đã xuất bản (bất biến)" action={<Button size="sm" className="mt-3" disabled={busy} onClick={() => start({ kind: "newVersion" })}><FilePlus2 size={16} aria-hidden="true" />Tạo bản nháp mới từ v{version.data.versionNumber}</Button>}>Không sửa trực tiếp bản đã xuất bản. Tạo bản nháp mới để chỉnh sửa; bản công khai hiện tại giữ nguyên tới khi bản mới được xuất bản.</Alert>}
-        {status === "Deleted" && <Alert tone="warning" title="Bài đã bị xóa mềm">Khôi phục bài (thẻ Trạng thái hoặc “Phiên bản & Xuất bản”) trước khi sửa, tạo bản nháp hay xuất bản.</Alert>}
-        <Panel title="Khối nội dung" description="Văn bản thuần, danh sách, ảnh https và liên kết video YouTube/Facebook/TikTok. Không nhận HTML, iframe hay script." bodyClassName="ops-stack">
+        {!isDraft && status !== "Deleted" && version && <Alert tone="info" title="Đang xem bản đã xuất bản (không sửa được)" action={<Button size="sm" className="mt-3" disabled={busy} onClick={() => start({ kind: "newVersion" })}><FilePlus2 size={16} aria-hidden="true" />Tạo bản nháp mới từ v{version.data.versionNumber}</Button>}>Không sửa trực tiếp bản đã xuất bản. Tạo bản nháp mới để chỉnh sửa; bản công khai hiện tại giữ nguyên tới khi bản mới được xuất bản.</Alert>}
+        {status === "Deleted" && <Alert tone="warning" title="Bài đã bị xóa (vẫn khôi phục được)">Khôi phục bài (thẻ Trạng thái hoặc “Phiên bản & Xuất bản”) trước khi sửa, tạo bản nháp hay xuất bản.</Alert>}
+        <Panel title="Khối nội dung" description="Chữ, danh sách, ảnh và liên kết video YouTube/Facebook/TikTok. Không dán mã trang web." bodyClassName="ops-stack">
           <fieldset disabled={busy} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
             <BlockEditor blocks={form.blocks} disabled={readOnly} issues={shownIssues} checks={media.checks} onCheck={(blockId, url) => void media.check(blockId, url)} onChange={(blocks) => setForm((current) => ({ ...current, blocks }))} />
           </fieldset>
@@ -316,7 +315,6 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
             { label: "Phiên bản đang mở", value: version ? `v${version.data.versionNumber}` : "—" },
             { label: "Bản công khai", value: post.data.publishedVersion ? `v${post.data.publishedVersion.versionNumber}` : "Chưa có" },
             { label: "Lưu lần cuối", value: formatDateTime(version?.data.updatedAt ?? post.data.updatedAt) },
-            { label: "ETag", value: <code className="ops-mono">{version?.etag ?? post.etag}</code> },
           ]} />
           <p className="learn-list-note">{statusView.visibility}</p>
           {lifecycleButtons.length > 0 && <div className="learn-actions-col">{lifecycleButtons}</div>}
@@ -329,7 +327,7 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
       <DataTable caption="Các phiên bản của bài" data-testid="learn-versions-table" columns={versionColumns} rows={versions} rowKey={(item) => item.id}
         onRowClick={(item) => { if (version?.data.id !== item.id) guard(() => onOpenVersion(item.id)); }}
         rowMenu={versionMenu}
-        toolbar={<div><strong style={{ fontSize: 15 }}>Lịch sử phiên bản</strong><p className="learn-list-note">Bản đã xuất bản bất biến; mỗi lần sửa nội dung tạo một bản nháp mới. Bấm một phiên bản để mở.</p></div>}
+        toolbar={<div><strong style={{ fontSize: 15 }}>Lịch sử phiên bản</strong><p className="learn-list-note">Bản đã xuất bản không sửa được nữa; mỗi lần sửa nội dung tạo một bản nháp mới. Bấm một phiên bản để mở.</p></div>}
         empty={<EmptyState icon={FilePlus2} title="Bài chưa có phiên bản" description="Tạo bản nháp đầu tiên từ thẻ Nội dung." />} />
       <PublishPanel post={post.data} postEtag={post.etag} version={version?.data ?? null} versionEtag={version?.etag ?? null} dirty={dirty} busy={busy}
         publishBlockers={publishBlockers}
@@ -340,7 +338,7 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
 
     {operation && <Modal open onOpenChange={(open) => { if (!open) closeOperation(); }} size="sm"
       title={operation.kind === "publish" ? "Xuất bản bản nháp này?" : operation.kind === "newVersion" ? "Tạo bản nháp mới?" : operationCopy?.title ?? ""}
-      description={operation.kind === "publish" ? "Bản nháp trở thành bản công khai và bất biến. Muốn sửa tiếp phải tạo bản nháp mới." : operation.kind === "newVersion" ? "Bản nháp mới được tạo từ nội dung đang hiển thị ở đây. Bản công khai hiện tại giữ nguyên." : lifecycleBody(operation.operation, !!post.data.publishedVersionId)}
+      description={operation.kind === "publish" ? "Bản nháp trở thành bản công khai và không sửa được nữa. Muốn sửa tiếp phải tạo bản nháp mới." : operation.kind === "newVersion" ? "Bản nháp mới được tạo từ nội dung đang hiển thị ở đây. Bản công khai hiện tại giữ nguyên." : lifecycleBody(operation.operation, !!post.data.publishedVersionId)}
       footer={<>
         <Button variant="quiet" onClick={closeOperation} disabled={busy}>Hủy</Button>
         {operationError?.kind === "stale"

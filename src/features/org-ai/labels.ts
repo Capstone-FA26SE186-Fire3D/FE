@@ -114,7 +114,7 @@ const CODE: Record<string, string> = {
   PRECONDITION_FAILED: "Nguồn vừa được thay đổi ở nơi khác (phiên bản không còn khớp). Hãy tải bản mới rồi thao tác lại.",
   PRECONDITION_REQUIRED: "Thiếu thông tin phiên bản. Tải lại dữ liệu rồi thử lại.",
   INVALID_IF_MATCH: "Thông tin phiên bản không hợp lệ. Tải lại dữ liệu rồi thử lại.",
-  IDEMPOTENCY_KEY_CONFLICT: "Khóa chống gửi trùng đã được dùng cho nội dung khác. Tải lại trang để tạo khóa mới.",
+  IDEMPOTENCY_KEY_CONFLICT: "Thao tác này đã được gửi với nội dung khác. Tải lại trang rồi thử lại.",
   IDEMPOTENCY_KEY_REQUIRED: "Yêu cầu thiếu khóa chống gửi trùng. Tải lại trang rồi thử lại.",
   NOT_FOUND: "Không tìm thấy mục này trong phạm vi của bạn (có thể đã bị xóa hoặc thuộc tổ chức khác).",
   VALIDATION_ERROR: "Thông tin nhập chưa hợp lệ.",

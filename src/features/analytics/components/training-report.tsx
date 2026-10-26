@@ -127,7 +127,7 @@ export function TrainingReportView({ data, groupBy: requestedGroup, organization
       </div>
 
       <div className={styles.trio}>
-        <ChartCard title="Theo kịch bản" description="Top 8 theo lượt chơi" height={120} empty={scenarios.length === 0} emptyText="Chưa có kịch bản nào có lượt chơi trong kỳ" data-testid="chart-scenarios"
+        <ChartCard title="Theo kịch bản" description="8 kịch bản nhiều lượt chơi nhất" height={120} empty={scenarios.length === 0} emptyText="Chưa có kịch bản nào có lượt chơi trong kỳ" data-testid="chart-scenarios"
           actions={scenarios.length > 0 && <Button size="sm" variant="secondary" onClick={() => setScenarioTable(true)}>Xem bảng</Button>}>
           <RankedBars label="Lượt chơi theo kịch bản" rows={scenarios.slice(0, 8).map((row) => ({ key: row.scenarioId, label: scenarioName(row), value: row.plays, hint: `Có kết quả ${fmt(row.completed)} · Đạt ${fmt(row.passed)}` }))} />
         </ChartCard>
@@ -140,7 +140,7 @@ export function TrainingReportView({ data, groupBy: requestedGroup, organization
           <GroupedBars data={modes} xKey="mode" series={modeSeries} height={150} />
         </ChartCard>
 
-        <ChartCard title="Thời lượng phiên" description="Từ lúc khởi chạy đến lúc kết thúc (giờ máy chủ)" height={120} data-testid="chart-duration">
+        <ChartCard title="Thời lượng phiên" description="Từ lúc khởi chạy đến lúc kết thúc" height={120} data-testid="chart-duration">
           <div className={styles.miniRow}>
             <MiniStat label="Trung bình" value={formatSeconds(data.duration.averageSeconds)} />
             <MiniStat label="Trung vị" value={formatSeconds(data.duration.medianSeconds)} />

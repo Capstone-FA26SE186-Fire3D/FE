@@ -128,13 +128,13 @@ function QuickBody({ accessToken, initial, onClose, onOpenEditor, onChanged, onR
         commandDone(intent);
         setPost(result);
         try { apply(await learnAdminApi.getVersion(accessToken, version.data.id)); } catch { onReload(); }
-        toast.notify({ tone: "success", title: "Đã xuất bản", description: `Phiên bản ${version.data.versionNumber} của bài “${result.data.slug}” · bài ${postStatusView[result.data.publicationStatus].label.toLowerCase()}` });
+        toast.notify({ tone: "success", title: "Đã xuất bản", description: `Phiên bản ${version.data.versionNumber} · bài ${postStatusView[result.data.publicationStatus].label.toLowerCase()}` });
       } else if (operation.kind === "lifecycle") {
         const intent = { op: operation.operation, postId: post.data.id, etag: post.etag };
         const result = await learnAdminApi.lifecycle(accessToken, post.data.id, operation.operation, post.etag, commandKey(intent));
         commandDone(intent);
         setPost(result);
-        toast.notify({ tone: "success", title: lifecycleCopy[operation.operation].done, description: `${result.data.slug} · ${postStatusView[result.data.publicationStatus].label}` });
+        toast.notify({ tone: "success", title: lifecycleCopy[operation.operation].done, description: `Bài hiện ${postStatusView[result.data.publicationStatus].label.toLowerCase()}` });
       }
       setOperation(null);
       onChanged();
@@ -152,7 +152,7 @@ function QuickBody({ accessToken, initial, onClose, onOpenEditor, onChanged, onR
 
   return <Drawer open onOpenChange={(open) => { if (!open && !busy) onClose(); }} size="md" data-testid={DRAWER_ID}
     title={heading}
-    description={[kind ? kindLabel[kind] : null, post.data.slug, version ? `v${version.data.versionNumber}` : null, `cập nhật ${formatDateTime(post.data.updatedAt)}`].filter(Boolean).join(" · ")}
+    description={[kind ? kindLabel[kind] : null, version ? `v${version.data.versionNumber}` : null, `cập nhật ${formatDateTime(post.data.updatedAt)}`].filter(Boolean).join(" · ")}
     eyebrow={<>
       <StatusBadge tone={statusView.tone}>{statusView.label}</StatusBadge>
       {version && <StatusBadge tone={versionStatusView[version.data.status].tone}>{versionStatusView[version.data.status].label}</StatusBadge>}
@@ -168,8 +168,8 @@ function QuickBody({ accessToken, initial, onClose, onOpenEditor, onChanged, onR
         <Field label="Tiêu đề" hint={readOnly ? undefined : "Hiển thị công khai khi xuất bản."} error={showIssues ? issueFor("$.title") : undefined}>{(p) => <Input {...p} value={form.title} readOnly={readOnly} maxLength={255} onChange={(event) => setForm({ ...form, title: event.target.value })} />}</Field>
         <Field label="Tóm tắt" error={showIssues ? issueFor("$.summary") : undefined}>{(p) => <Textarea {...p} rows={4} value={form.summary} readOnly={readOnly} maxLength={2000} onChange={(event) => setForm({ ...form, summary: event.target.value })} />}</Field>
         <Field label="Tình huống" hint="Tối đa 20; chỉ chọn được tình huống đang hoạt động." error={showIssues ? issueFor("$.situationIds") : undefined}>{(p) => <SituationPicker {...p} accessToken={accessToken} selected={form.situations} disabled={readOnly || busy} onChange={(situations) => setForm({ ...form, situations })} />}</Field>
-        {status === "Deleted" && <Alert tone="warning" title="Bài đã bị xóa mềm">Khôi phục bài trước khi sửa hoặc xuất bản.</Alert>}
-        {!isDraft && status !== "Deleted" && <Alert tone="info" title="Bản đã xuất bản là bất biến">Mở trình soạn để tạo bản nháp mới từ nội dung này; bản công khai giữ nguyên tới khi bản mới được xuất bản.</Alert>}
+        {status === "Deleted" && <Alert tone="warning" title="Bài đã bị xóa (vẫn khôi phục được)">Khôi phục bài trước khi sửa hoặc xuất bản.</Alert>}
+        {!isDraft && status !== "Deleted" && <Alert tone="info" title="Bản đã xuất bản không sửa được nữa">Mở trình soạn để tạo bản nháp mới từ nội dung này; bản công khai giữ nguyên tới khi bản mới được xuất bản.</Alert>}
         {showIssues && otherIssues.length > 0 && !readOnly && <Alert tone="danger" title="Nội dung còn điểm cần sửa trong trình soạn"><ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc" }}>{otherIssues.map((issue, index) => <li key={`${issue.path}-${index}`}>{issue.message}</li>)}</ul></Alert>}
       </>}
       {error && <Alert tone={error.kind === "stale" ? "warning" : "danger"} title={error.title} action={error.kind === "stale" ? <Button size="sm" variant="secondary" className="mt-3" onClick={onReload}>Tải lại bài</Button> : undefined}>
@@ -189,7 +189,7 @@ function QuickBody({ accessToken, initial, onClose, onOpenEditor, onChanged, onR
 
     {operation && <Modal open onOpenChange={(open) => { if (!open) closeOperation(); }} size="sm"
       title={operation.kind === "publish" ? "Xuất bản bản nháp này?" : copy?.title ?? ""}
-      description={operation.kind === "publish" ? "Bản nháp trở thành bản công khai và bất biến. Muốn sửa tiếp phải tạo bản nháp mới." : lifecycleBody((operation as { operation: LifecycleOperation }).operation, !!post.data.publishedVersionId)}
+      description={operation.kind === "publish" ? "Bản nháp trở thành bản công khai và không sửa được nữa. Muốn sửa tiếp phải tạo bản nháp mới." : lifecycleBody((operation as { operation: LifecycleOperation }).operation, !!post.data.publishedVersionId)}
       footer={<>
         <Button variant="quiet" onClick={closeOperation} disabled={busy}>Hủy</Button>
         {operationError?.kind === "stale"

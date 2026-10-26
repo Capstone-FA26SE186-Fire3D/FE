@@ -100,7 +100,7 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
   const orgItems = organizations.data?.items ?? [];
   const orgOptions: ComboboxOption[] = orgItems.map((organization) => ({ value: organization.id, label: organization.name, hint: organization.slug }));
   const orgName = (id: string | null | undefined) => orgItems.find((organization) => organization.id === id)?.name;
-  const orgCell = (id: string | null | undefined) => orgName(id) ?? (id ? `${id.slice(0, 8)}…` : "—");
+  const orgCell = (id: string | null | undefined) => orgName(id) ?? (id ? "Tổ chức không còn tồn tại" : "—");
   const filtering = Boolean(urlSearch || role || active || organizationId);
   const saving = submitState !== "idle";
 

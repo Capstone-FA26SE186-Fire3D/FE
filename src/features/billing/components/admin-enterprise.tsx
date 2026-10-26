@@ -268,7 +268,7 @@ export function EnterpriseAdminSection({ accessToken }: { accessToken: string })
   };
 
   const columns: DataColumn<EnterpriseRequest>[] = [
-    { key: "organization", header: "Tổ chức", primary: true, render: (item) => <CellTitle title={orgName[item.organizationId] ?? item.organizationId.slice(0, 8)} sub={formatDateTime(item.createdAt)} /> },
+    { key: "organization", header: "Tổ chức", primary: true, render: (item) => <CellTitle title={orgName[item.organizationId] ?? "Tổ chức không còn tồn tại"} sub={formatDateTime(item.createdAt)} /> },
     { key: "need", header: "Nhu cầu", width: 220, render: (item) => <CellTitle title={`${item.requestedBuildingCount} công trình${item.requestedDurationMonths ? ` · ${item.requestedDurationMonths} tháng` : ""}`} sub={item.notes ? <span className="bill-wrap">{item.notes}</span> : undefined} /> },
     { key: "contact", header: "Liên hệ", width: 240, hideBelow: 1000, render: (item) => <CellTitle title={item.contactName} sub={`${item.contactEmail}${item.contactPhone ? ` · ${item.contactPhone}` : ""}`} /> },
     { key: "status", header: "Trạng thái", width: 170, render: (item) => <CellTitle title={<EnterpriseStatusBadge status={item.status} />} sub={item.assignedTo ? "Đã phân công" : undefined} /> },
@@ -301,13 +301,13 @@ export function EnterpriseAdminSection({ accessToken }: { accessToken: string })
     <p className="bill-hint">Bấm hàng để xử lý trong ngăn bên phải; menu “···” đổi trạng thái ngay trên danh sách.</p>
 
     <Drawer open={Boolean(requestId)} onOpenChange={(open) => { if (!open) setParams({ request: null }); }} size="lg" data-testid="enterprise-drawer" title="Xử lý yêu cầu doanh nghiệp" description="Nếu có người khác vừa sửa yêu cầu, bạn sẽ được báo và nội dung đang nhập vẫn được giữ.">
-      {requestId && <EnterpriseDetail key={requestId} accessToken={accessToken} requestId={requestId} orgName={selected ? orgName[selected.organizationId] ?? selected.organizationId.slice(0, 8) : "Tổ chức"} onChanged={list.reload} onOpenQuotation={(id) => setParams({ tab: "quotes", quotation: id, request: null, page: null })} />}
+      {requestId && <EnterpriseDetail key={requestId} accessToken={accessToken} requestId={requestId} orgName={selected ? orgName[selected.organizationId] ?? "Tổ chức không còn tồn tại" : "Tổ chức"} onChanged={list.reload} onOpenQuotation={(id) => setParams({ tab: "quotes", quotation: id, request: null, page: null })} />}
     </Drawer>
 
     <ConfirmDialog open={quick !== null} onOpenChange={(open) => { if (!open && !quickBusy) setQuick(null); }} busy={quickBusy} tone="danger"
       title={quick?.kind === "reject" ? "Từ chối yêu cầu?" : "Hủy yêu cầu?"} description="Không hoàn tác. Không tạo thanh toán hay dịch vụ; báo giá đã tạo (nếu có) không bị hủy."
       confirmLabel={quick?.kind === "reject" ? "Từ chối" : "Hủy yêu cầu"} cancelLabel="Quay lại" onConfirm={() => { if (quick) void quickPatch(quick); }}>
-      {quick && <p className="bill-muted">{orgName[quick.request.organizationId] ?? quick.request.organizationId.slice(0, 8)} · {quick.request.requestedBuildingCount} công trình · {quick.request.contactName}</p>}
+      {quick && <p className="bill-muted">{orgName[quick.request.organizationId] ?? "Tổ chức không còn tồn tại"} · {quick.request.requestedBuildingCount} công trình · {quick.request.contactName}</p>}
     </ConfirmDialog>
   </div>;
 }

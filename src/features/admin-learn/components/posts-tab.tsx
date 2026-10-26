@@ -86,15 +86,15 @@ export function PostsTab({ accessToken, onOpen, onCreate }: { accessToken: strin
         const version = action.loaded?.version;
         if (!version) return;
         const intent = { op: "publish-version", versionId: version.data.id, etag: version.etag };
-        const result = await learnAdminApi.publishVersion(accessToken, version.data.id, version.etag, commandKey(intent));
+        await learnAdminApi.publishVersion(accessToken, version.data.id, version.etag, commandKey(intent));
         commandDone(intent);
-        toast.notify({ tone: "success", title: "Đã xuất bản", description: `Phiên bản ${version.data.versionNumber} của bài “${result.data.slug}”` });
+        toast.notify({ tone: "success", title: "Đã xuất bản", description: `Phiên bản ${version.data.versionNumber}` });
       } else {
         const etag = etagFor(action.post.revision);
         const intent = { op: action.op, postId: action.post.id, etag };
         const result = await learnAdminApi.lifecycle(accessToken, action.post.id, action.op, etag, commandKey(intent));
         commandDone(intent);
-        toast.notify({ tone: "success", title: lifecycleCopy[action.op].done, description: `${result.data.slug} · ${postStatusView[result.data.publicationStatus].label}` });
+        toast.notify({ tone: "success", title: lifecycleCopy[action.op].done, description: `Bài hiện ${postStatusView[result.data.publicationStatus].label.toLowerCase()}` });
       }
       setAction(null);
       list.reload();
@@ -155,7 +155,7 @@ export function PostsTab({ accessToken, onOpen, onCreate }: { accessToken: strin
 
     {action && <Modal open onOpenChange={(open) => { if (!open && !actionBusy) { setAction(null); setActionError(null); } }} size="sm"
       title={action.op === "publish" ? "Xuất bản bản nháp này?" : copy?.title ?? ""}
-      description={action.op === "publish" ? "Bản nháp trở thành bản công khai và bất biến. Muốn sửa tiếp phải tạo bản nháp mới." : lifecycleBody(action.op, !!action.post.publishedVersionId)}
+      description={action.op === "publish" ? "Bản nháp trở thành bản công khai và không sửa được nữa. Muốn sửa tiếp phải tạo bản nháp mới." : lifecycleBody(action.op, !!action.post.publishedVersionId)}
       footer={<>
         <Button variant="quiet" disabled={actionBusy} onClick={() => { setAction(null); setActionError(null); }}>Hủy</Button>
         {actionError?.kind === "stale"

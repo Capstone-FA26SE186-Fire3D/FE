@@ -32,7 +32,7 @@ export type FormActions = ReturnType<typeof useFormActions>;
 export const issuesFrom = (list: ReadonlyArray<{ code: string; path: string; message: string }>): FormIssues => list.map((item) => ({ ...item, source: "client" as const }));
 
 function CapabilitiesField({ capabilities, onChange, error, disabled, kind }: { capabilities: string[]; onChange: (next: string[]) => void; error?: string; disabled?: boolean; kind: LibraryKind }) {
-  return <StringList label="Năng lực yêu cầu" items={capabilities} maxLength={128} disabled={disabled} testId="capabilities" error={error} addLabel="Thêm năng lực" placeholder="Ví dụ: cover.nose"
+  return <StringList label="Năng lực yêu cầu" items={capabilities} maxLength={128} disabled={disabled} testId="capabilities" error={error} addLabel="Thêm năng lực" placeholder="Ví dụ: door.exit (Cửa thoát)"
     hint={kind === "Equipment"
       ? "Chỉ là khai báo yêu cầu, chưa được kiểm tra với ứng dụng FET3D và KHÔNG thêm năng lực vào ứng dụng. Năng lực chỉ có khi ứng dụng đã hỗ trợ."
       : "Khai báo tùy chọn, chưa được kiểm tra với ứng dụng FET3D."}

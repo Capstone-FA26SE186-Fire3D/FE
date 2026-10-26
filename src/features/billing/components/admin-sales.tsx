@@ -39,7 +39,7 @@ const emptyLine: LineForm = { startsAt: "", learnerLimit: "", oneTimePrice: "", 
 const isWhole = (value: string) => /^\d+$/.test(value.trim());
 
 function policyLabel(policy: QuotaPolicy) {
-  return `${policy.quotaUnit} · ${policy.id.slice(0, 8)}`;
+  return `${policy.quotaUnit} · áp dụng từ ${formatDateTime(policy.effectiveFrom)}`;
 }
 
 /**
@@ -214,7 +214,7 @@ export function QuotationsSection({ accessToken }: { accessToken: string }) {
 
   const columns: DataColumn<Quotation>[] = [
     { key: "number", header: "Báo giá", primary: true, render: (item) => <CellTitle title={item.quotationNumber} sub={summarize(item)} /> },
-    { key: "organization", header: "Tổ chức", width: 200, render: (item) => orgName[item.organizationId] ?? item.organizationId.slice(0, 8) },
+    { key: "organization", header: "Tổ chức", width: 200, render: (item) => orgName[item.organizationId] ?? "Tổ chức không còn tồn tại" },
     { key: "status", header: "Trạng thái", width: 170, render: (item) => <QuotationStatusBadge status={item.status} /> },
     { key: "validUntil", header: "Hiệu lực đến", width: 180, hideBelow: 1000, render: (item) => formatDateTime(item.validUntil) },
     { key: "total", header: "Tổng thanh toán", width: 170, align: "right", render: (item) => <CellTitle title={formatVnd(item.totalAmount)} sub={item.taxAmount === null ? "ước tính" : undefined} /> },

@@ -8,7 +8,9 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SupportCode } from "@/components/ui/support-code";
+import { capabilityLabel } from "@/configs/capability-labels";
 import { routes } from "@/configs/routes";
+import { modeLabel } from "@/features/training-history/labels";
 import { formatDateTime, formatNumber, formatQuota } from "@/features/billing/format";
 import { isObject, type JsonObject } from "@/features/scenario-editor/store/json";
 import { KIND_META, type ObjectKind } from "@/features/scenario-editor/v1/contract";
@@ -55,7 +57,7 @@ export function Citations({ request, admin }: { request: AiRequest; admin?: bool
     <ul className={styles.list}>
       {citations.map((citation, index) => {
         const source = sources.find((item) => item.kind === citation.kind && item.id === citation.id);
-        const title = citation.title ?? source?.title ?? `${sourceKindLabel(citation.kind)} · ${citation.id.slice(0, 8)}`;
+        const title = citation.title ?? source?.title ?? `${sourceKindLabel(citation.kind)} (chưa có tên)`;
         const version = citation.versionLabel ?? source?.versionLabel;
         const target = citationHref(citation.link ?? source?.link, admin ? "admin" : "workspace");
         return <li key={`${citation.kind}:${citation.id}:${index}`} className={styles.item} data-testid="ai-citation">
@@ -67,7 +69,7 @@ export function Citations({ request, admin }: { request: AiRequest; admin?: bool
           <span className={styles.dim}>
             {sourceKindLabel(citation.kind)}{version ? ` · phiên bản ${version}` : ""}{citation.locator ? ` · vị trí: ${citation.locator}` : ""}{typeof citation.relevance === "number" ? ` · độ liên quan ${Math.round(citation.relevance * 100)}%` : ""}
           </span>
-          {source?.contentHash && <span className={styles.dim}>Mã nội dung <span className={styles.mono}>{source.contentHash.slice(0, 12)}…</span></span>}
+          {source?.contentHash && <SupportCode id={source.contentHash} />}
         </li>;
       })}
     </ul>
@@ -95,7 +97,7 @@ export function Usage({ request, admin, trainee }: { request: AiRequest; admin?:
       <dt>Đơn vị</dt><dd>{unit ?? "—"} <span className={styles.dim}>(do hệ thống quy định)</span></dd>
       <dt>Đã giữ chỗ</dt><dd>{request.reservedUnits !== undefined ? formatQuota(request.reservedUnits, unit) : "—"}</dd>
       <dt>Đã tính</dt><dd>{request.consumedUnits !== undefined ? formatQuota(request.consumedUnits, unit) : isInFlight(request.status) || request.status === "NeedsReconcile" ? "Chưa có (chưa chốt)" : "—"}</dd>
-      {admin && request.allocations && request.allocations.length > 0 && <><dt>Theo đợt cấp</dt><dd>{request.allocations.map((allocation) => `${allocation.grantId.slice(0, 8)}: giữ ${formatNumber(allocation.reservedUnits)}, tính ${allocation.consumedUnits === null ? "—" : formatNumber(allocation.consumedUnits)} (${ALLOCATION_STATUS[allocation.status] ?? "khác"})`).join(" · ")}</dd></>}
+      {admin && request.allocations && request.allocations.length > 0 && <><dt>Theo đợt cấp</dt><dd>{request.allocations.map((allocation, index) => `Đợt ${index + 1}: giữ ${formatNumber(allocation.reservedUnits)}, tính ${allocation.consumedUnits === null ? "—" : formatNumber(allocation.consumedUnits)} (${ALLOCATION_STATUS[allocation.status] ?? "khác"})`).join(" · ")}</dd></>}
     </dl>
     {!admin && !trainee && <p className={styles.dim}>Hạn mức được giữ chỗ trước và chốt theo mức dùng thực tế; số dư và lịch sử nằm ở <Link href={BILLING_AI_HREF}>Hạn mức AI</Link>.</p>}
     {trainee && <p className={styles.dim}>Mỗi câu hỏi giữ chỗ trong hạn mức hôm nay của bạn và chốt theo mức dùng thực tế; phần không dùng được trả lại.</p>}
@@ -114,7 +116,7 @@ export function DraftPreview({ state, notes }: { state: JsonObject; notes: strin
       <dt>Tên</dt><dd>{typeof state.name === "string" ? state.name : "Chưa có"}</dd>
       {typeof state.timeLimitSeconds === "number" && <><dt>Giới hạn thời gian</dt><dd>{formatNumber(state.timeLimitSeconds)} giây</dd></>}
       {typeof state.runtimeVersion === "string" && <><dt>Phiên bản ứng dụng</dt><dd>{state.runtimeVersion}</dd></>}
-      {isObject(state.modePolicy) && Array.isArray(state.modePolicy.allowedModes) && <><dt>Chế độ cho phép</dt><dd>{state.modePolicy.allowedModes.join(", ")}</dd></>}
+      {isObject(state.modePolicy) && Array.isArray(state.modePolicy.allowedModes) && <><dt>Chế độ cho phép</dt><dd>{state.modePolicy.allowedModes.map((mode) => modeLabel(String(mode))).join(", ")}</dd></>}
       {rubric && <><dt>Tiêu chí chấm điểm</dt><dd>{criteria} tiêu chí{typeof rubric.pass_threshold === "number" ? ` · ngưỡng đạt ${rubric.pass_threshold}` : ""} <span className={styles.dim}>(đề xuất của AI, chưa phải quyết định của tổ chức)</span></dd></>}
       {geometry && <><dt>Mô hình đã ghim</dt><dd>{typeof geometry.artifactId === "string" ? "Có" : "Không rõ"}</dd></>}
     </dl>
@@ -128,8 +130,8 @@ export function DraftPreview({ state, notes }: { state: JsonObject; notes: strin
           const placement = isObject(object.placement) ? object.placement : {};
           const kind = typeof object.kind === "string" ? object.kind : "?";
           return <li key={index} className={styles.item}>
-            <span className={styles.itemTitle}>{typeof object.id === "string" ? object.id : "?"} · {KIND_META[kind as ObjectKind]?.label ?? "Đối tượng khác"}{typeof object.label === "string" && object.label ? ` · ${object.label}` : ""}</span>
-            <span className={styles.dim}>Tầng {typeof placement.floorId === "string" ? placement.floorId : "?"}{typeof object.anchorId === "string" ? ` · Gắn phần tử IFC ${object.anchorId}` : ""}{isObject(object.capability) && typeof object.capability.id === "string" ? ` · khả năng ${object.capability.id}` : ""}</span>
+            <span className={styles.itemTitle}>{KIND_META[kind as ObjectKind]?.label ?? "Đối tượng khác"}{typeof object.label === "string" && object.label ? ` · ${object.label}` : ""}</span>
+            <span className={styles.dim}>{typeof placement.floorId === "string" ? `Tầng ${/(-?\d+)$/.exec(placement.floorId)?.[1] !== undefined ? Number(/(-?\d+)$/.exec(placement.floorId)![1]) : placement.floorId}` : "Chưa chọn tầng"}{typeof object.anchorId === "string" ? " · gắn vào cấu kiện IFC" : ""}{isObject(object.capability) && typeof object.capability.id === "string" ? ` · ${capabilityLabel(object.capability.id)}` : ""}</span>
           </li>;
         })}</ul>}
     </div>
@@ -153,10 +155,10 @@ export function RequestView({ request, admin, trainee, onApply, extra }: { reque
       <span className={styles.dim}>{formatDateTime(request.createdAt)}</span>
     </div>
     <dl className={styles.meta}>
-      <dt>Mã yêu cầu</dt><dd><CopyId value={request.requestId} /></dd>
+      <dt>Mã yêu cầu (gửi khi cần hỗ trợ)</dt><dd><CopyId value={request.requestId} /></dd>
       {request.completedAt && <><dt>Hoàn tất lúc</dt><dd>{formatDateTime(request.completedAt)}</dd></>}
       {request.input?.buildingName && <><dt>Công trình</dt><dd>{request.input.buildingName}</dd></>}
-      {request.input?.revisionId && <><dt>Bản IFC đã ghim</dt><dd className={styles.mono} title={request.input.revisionId}>{request.input.revisionId.slice(0, 8)}…</dd></>}
+      {request.input?.revisionId && <><dt>Bản IFC</dt><dd title={request.input.revisionId}>Bản đang dùng lúc gửi yêu cầu</dd></>}
     </dl>
     {request.input?.text && <section className={styles.section} aria-label="Nội dung đã gửi" data-testid="ai-input">
       <h3>{request.operation === "ScenarioDraft" ? "Yêu cầu đã gửi" : "Câu hỏi đã gửi"}</h3>

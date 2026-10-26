@@ -64,7 +64,7 @@ export function NewPostModal({ accessToken, onClose, onCreated }: { accessToken:
     try {
       const result = await learnAdminApi.createPost(accessToken, input, commandKey(intent));
       commandDone(intent);
-      toast.notify({ tone: "success", title: publishNow ? "Đã tạo và xuất bản bài" : "Đã tạo bản nháp", description: result.data.slug });
+      toast.notify({ tone: "success", title: publishNow ? "Đã tạo và xuất bản bài" : "Đã tạo bản nháp", description: form.title || undefined });
       onCreated(result.data.id);
     } catch (cause) {
       const view = describeLearnError(cause);
@@ -78,7 +78,7 @@ export function NewPostModal({ accessToken, onClose, onCreated }: { accessToken:
   const leave = () => { if (busy) return; if (started) setLeaving(true); else onClose(); };
 
   return <>
-    <Modal open onOpenChange={(open) => { if (!open) leave(); }} size="lg" title="Bài mới" description="Tạo bản nháp đầu tiên rồi soạn tiếp trong trình soạn. Bản đã xuất bản là bất biến." data-testid="learn-new-post"
+    <Modal open onOpenChange={(open) => { if (!open) leave(); }} size="lg" title="Bài mới" description="Tạo bản nháp đầu tiên rồi soạn tiếp trong trình soạn. Bản đã xuất bản không sửa được nữa." data-testid="learn-new-post"
       footer={<>
         <Button type="button" variant="quiet" disabled={busy} onClick={leave}>Hủy</Button>
         <SubmitButton type="submit" form={formId} state={busy ? "busy" : "idle"} data-testid="create-post">{busy ? (publishNow ? "Đang xuất bản…" : "Đang tạo…") : error?.kind === "retry" ? "Thử lại" : publishNow ? "Tạo và xuất bản ngay" : "Tạo bản nháp"}</SubmitButton>

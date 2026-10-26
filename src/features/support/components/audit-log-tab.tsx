@@ -6,7 +6,7 @@ import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { CellTitle, DataTable, type DataColumn } from "@/components/ui/data-table";
+import { DataTable, type DataColumn } from "@/components/ui/data-table";
 import { Drawer } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field, Input } from "@/components/ui/field";
@@ -33,7 +33,7 @@ const shortDay = (day: string) => { const match = /^(\d{4})-(\d{2})-(\d{2})$/.ex
 function validate(values: FilterValues): FilterErrors {
   const errors: FilterErrors = {};
   for (const key of ["actorId", "organizationId", "targetId", "correlationId"] as const) {
-    if (values[key] && !isGuid(values[key])) errors[key] = "Mã định danh chưa đúng. Hãy dán đủ mã gồm 36 ký tự.";
+    if (values[key] && !isGuid(values[key])) errors[key] = "Mã chưa đúng. Hãy dán đủ mã lấy từ chi tiết một thao tác.";
   }
   if (values.from || values.to) {
     if (!values.from || !values.to) errors[values.from ? "to" : "from"] = "Chọn đủ cả hai ngày hoặc để trống cả hai (mặc định 30 ngày gần nhất).";
@@ -49,7 +49,7 @@ function validate(values: FilterValues): FilterErrors {
 function GuidChip({ label, fieldLabel, value, error, onChange }: { label: string; fieldLabel: string; value: string; error?: string; onChange: (value: string) => void }) {
   return <ChipPopover label={label} value={value ? short(value) : "tất cả"} active={Boolean(value)} dataValue={value} panelLabel={`Bộ lọc ${label.toLowerCase()}`}>
     {(close) => <div className={styles.chipForm}>
-      <Field label={fieldLabel} hint="Mã định danh gồm 36 ký tự." error={error}>{(p) => <Input {...p} value={value} onChange={(event) => onChange(event.target.value.trim())} placeholder="Dán mã định danh" spellCheck={false} autoComplete="off" className="font-mono" />}</Field>
+      <Field label={fieldLabel} hint="Mở chi tiết một thao tác rồi bấm “Lọc” cạnh mã, hoặc dán mã lấy từ đó." error={error}>{(p) => <Input {...p} value={value} onChange={(event) => onChange(event.target.value.trim())} placeholder="Dán mã" spellCheck={false} autoComplete="off" className="font-mono" />}</Field>
       <div className={styles.actions}>{value && <Button type="button" size="sm" variant="quiet" onClick={() => onChange("")}>Bỏ</Button>}<Button type="button" size="sm" variant="secondary" onClick={close}>Xong</Button></div>
     </div>}
   </ChipPopover>;
@@ -79,7 +79,7 @@ function Filters({ initial, onApply, onClear, busy }: { initial: FilterValues; o
     <div className={styles.auditFilters}>
       <ChipPopover label="Thời gian" value={rangeValue} active={Boolean(values.from || values.to)} dataValue={values.from && values.to ? `${values.from}..${values.to}` : ""} panelLabel="Khoảng thời gian">
         {(close) => <div className={styles.chipForm}>
-          <Field label="Từ ngày" hint={`Tối đa ${MAX_RANGE_DAYS} ngày, tính theo giờ quốc tế (UTC).`} error={errors.from}>{(p) => <Input {...p} type="date" value={values.from} onChange={(event) => set("from")(event.target.value)} />}</Field>
+          <Field label="Từ ngày" hint={`Tối đa ${MAX_RANGE_DAYS} ngày, tính theo giờ quốc tế (chậm 7 giờ so với giờ Việt Nam).`} error={errors.from}>{(p) => <Input {...p} type="date" value={values.from} onChange={(event) => set("from")(event.target.value)} />}</Field>
           <Field label="Đến ngày" error={errors.to}>{(p) => <Input {...p} type="date" value={values.to} onChange={(event) => set("to")(event.target.value)} />}</Field>
           <div className={styles.actions}>{(values.from || values.to) && <Button type="button" size="sm" variant="quiet" onClick={() => setValues((current) => ({ ...current, from: "", to: "" }))}>Bỏ</Button>}<Button type="button" size="sm" variant="secondary" onClick={close}>Xong</Button></div>
         </div>}
@@ -88,7 +88,7 @@ function Filters({ initial, onApply, onClear, busy }: { initial: FilterValues; o
       <GuidChip label="Tổ chức" fieldLabel="Mã tổ chức" value={values.organizationId} error={errors.organizationId} onChange={set("organizationId")} />
       <GuidChip label="Người thực hiện" fieldLabel="Mã người thực hiện" value={values.actorId} error={errors.actorId} onChange={set("actorId")} />
       <GuidChip label="Đối tượng" fieldLabel="Mã đối tượng" value={values.targetId} error={errors.targetId} onChange={set("targetId")} />
-      <GuidChip label="Truy vết" fieldLabel="Mã truy vết" value={values.correlationId} error={errors.correlationId} onChange={set("correlationId")} />
+      <GuidChip label="Nhóm thao tác" fieldLabel="Mã nhóm thao tác" value={values.correlationId} error={errors.correlationId} onChange={set("correlationId")} />
       <Button type="button" size="sm" variant={dirty ? "primary" : "secondary"} onClick={submit} disabled={busy}>Áp dụng bộ lọc</Button>
       {(filtering || dirty) && <Button type="button" size="sm" variant="quiet" onClick={onClear}>Xóa bộ lọc</Button>}
     </div>
@@ -131,9 +131,9 @@ export function AuditLogTab({ accessToken }: { accessToken: string }) {
   const columns: DataColumn<AuditLog>[] = [
     { key: "time", header: "Thời điểm", primary: true, width: 180, render: (log) => formatDateTime(log.createdAt) },
     { key: "action", header: "Hành động", width: 150, render: (log) => <StatusBadge tone="neutral">{auditActionLabel(log.action)}</StatusBadge> },
-    { key: "target", header: "Đối tượng", render: (log) => <CellTitle title={auditTargetLabel(log.targetEntity)} sub={<span className={styles.mono} title={log.targetId ?? undefined}>{short(log.targetId)}</span>} /> },
-    { key: "actor", header: "Người thực hiện", hideBelow: 900, render: (log) => log.actorDisplayName?.trim() ? <CellTitle title={log.actorDisplayName} sub={<span className={styles.mono} title={log.userId ?? undefined}>{short(log.userId)}</span>} /> : <span className={styles.mono} title={log.userId ?? undefined}>{log.userId ? short(log.userId) : "Hệ thống"}</span> },
-    { key: "organization", header: "Tổ chức", hideBelow: 1100, render: (log) => log.organizationName?.trim() ? <CellTitle title={log.organizationName} sub={<span className={styles.mono} title={log.organizationId ?? undefined}>{short(log.organizationId)}</span>} /> : <span className={styles.mono} title={log.organizationId ?? undefined}>{short(log.organizationId)}</span> },
+    { key: "target", header: "Đối tượng", render: (log) => <span title={log.targetId ?? undefined}>{auditTargetLabel(log.targetEntity)}</span> },
+    { key: "actor", header: "Người thực hiện", hideBelow: 900, render: (log) => <span title={log.userId ?? undefined}>{log.actorDisplayName?.trim() || (log.userId ? "Chưa có tên hiển thị" : "Hệ thống")}</span> },
+    { key: "organization", header: "Tổ chức", hideBelow: 1100, render: (log) => <span title={log.organizationId ?? undefined}>{log.organizationName?.trim() || (log.organizationId ? "Chưa có tên hiển thị" : "—")}</span> },
   ];
 
   return <>

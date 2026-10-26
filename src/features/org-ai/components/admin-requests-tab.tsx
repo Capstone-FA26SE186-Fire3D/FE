@@ -68,17 +68,17 @@ function AdminDetail({ accessToken, request, refresh, orgName }: { accessToken: 
       <h3>Thông tin quản trị</h3>
       <dl className="ops-kv" data-testid="ai-admin-meta">
         <dt>Tổ chức</dt><dd>{request.audience === "trainee" ? "Học viên (không tính vào hạn mức tổ chức)" : orgName(request.organizationId)}</dd>
-        <dt>Người gửi</dt><dd className={styles.mono}>{request.actorUserId ?? "—"}</dd>
-        <dt>Chính sách</dt><dd className={styles.mono}>{request.policyId ?? "—"}</dd>
+        <dt>Người gửi</dt><dd>{!request.actorUserId ? "—" : request.audience === "trainee" ? "Học viên" : "Tài khoản tổ chức"}</dd>
         <dt>Số lần gửi</dt><dd>{request.attempts ?? "—"}</dd>
         {request.failureCode && <><dt>Lỗi</dt><dd>{failureText(request.failureCode)}<SupportCode code={request.failureCode} /></dd></>}
         <dt>Đối soát yêu cầu lúc</dt><dd>{reconcileAt ? formatDateTime(reconcileAt) : "Chưa"}</dd>
         <dt>Cập nhật lúc</dt><dd>{formatDateTime(request.updatedAt)}</dd>
       </dl>
-      {request.providerResult !== undefined && <div>
-        <strong>Kết quả gốc từ nhà cung cấp AI (chỉ quản trị FET3D thấy)</strong>
+      <SupportCode id={request.requestId} detail={[request.actorUserId ? `người gửi ${request.actorUserId}` : null, request.policyId ? `chính sách ${request.policyId}` : null].filter(Boolean).join(" · ") || undefined} />
+      {request.providerResult !== undefined && <details className="support-code">
+        <summary>Thông tin kỹ thuật từ nhà cung cấp AI (chỉ quản trị FET3D thấy)</summary>
         <pre className={styles.json} data-testid="ai-provider-result">{JSON.stringify(request.providerResult, null, 2)}</pre>
-      </div>}
+      </details>}
     </section>
 
     {request.status === "NeedsReconcile" && <section className={styles.section} aria-label="Đối soát">
@@ -140,14 +140,14 @@ export function AdminRequestsTab({ accessToken, usage }: { accessToken: string; 
   );
   const organizations = useAsyncData("admin-ai:orgs", () => accountsApi.organizations(accessToken));
   const orgNames = useMemo(() => Object.fromEntries((organizations.data?.items ?? []).map((item) => [item.id, item.name])), [organizations.data]);
-  const orgName = (id: string | undefined) => (id ? orgNames[id] ?? `${id.slice(0, 8)}…` : "—");
+  const orgName = (id: string | undefined) => (id ? orgNames[id] ?? "Tổ chức không còn tồn tại" : "—");
   const items = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
   const filtering = Boolean(status || operation || audience || organizationId);
   const open = (id: string) => setParams({ request: id });
 
   const columns: DataColumn<AiRequest>[] = [
-    { key: "request", header: "Yêu cầu", primary: true, render: (item) => <CellTitle title={`${operationLabel(item.operation)} · ${formatDateTime(item.createdAt)}`} sub={<span className={styles.mono}>{item.requestId.slice(0, 8)}…</span>} /> },
+    { key: "request", header: "Yêu cầu", primary: true, render: (item) => <CellTitle title={operationLabel(item.operation)} sub={formatDateTime(item.createdAt)} /> },
     { key: "organization", header: "Tổ chức", width: 200, render: (item) => item.audience === "trainee" ? <CellTitle title="Học viên" sub="không tính vào hạn mức tổ chức" /> : orgName(item.organizationId) },
     { key: "status", header: "Trạng thái", width: 190, render: (item) => <CellTitle title={<StatusBadge tone={statusTone(item.status, item.resultType)}>{statusLabel(item.status, item.resultType)}</StatusBadge>} sub={item.reconcileRequestedAt ? "Đã yêu cầu đối soát" : undefined} /> },
     { key: "usage", header: "Sử dụng", width: 150, hideBelow: 900, render: (item) => (item.consumedUnits !== undefined ? formatQuota(item.consumedUnits, item.quotaUnit) : item.reservedUnits !== undefined ? `Giữ chỗ ${formatQuota(item.reservedUnits, item.quotaUnit)}` : "—") },

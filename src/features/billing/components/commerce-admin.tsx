@@ -42,7 +42,7 @@ function LookupModal({ open, onClose, onFound }: { open: boolean; onClose: () =>
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const id = value.trim();
-    if (!GUID.test(id)) { setError("Mã chưa đúng. Dán đủ mã lượt thanh toán gồm 36 ký tự."); return; }
+    if (!GUID.test(id)) { setError("Mã chưa đúng. Dán đủ mã lượt thanh toán lấy ở chi tiết thanh toán."); return; }
     setError("");
     setValue("");
     onFound(id);
@@ -50,7 +50,7 @@ function LookupModal({ open, onClose, onFound }: { open: boolean; onClose: () =>
   return <Modal open={open} onOpenChange={(next) => { if (!next) onClose(); }} size="sm" title="Tra cứu thanh toán" description="Dán mã lượt thanh toán (từ tổ chức, nhật ký thao tác hoặc bộ phận hỗ trợ); chi tiết mở trong ngăn bên phải."
     footer={<><Button type="button" variant="quiet" onClick={onClose}>Hủy</Button><Button type="submit" form={formId}><Search size={16} aria-hidden="true" />Tra cứu</Button></>}>
     <form id={formId} onSubmit={submit} noValidate>
-      <Field label="Mã lượt thanh toán" error={error || undefined}>{(p) => <Input {...p} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" value={value} onChange={(event) => setValue(event.target.value)} autoComplete="off" spellCheck={false} className="font-mono" />}</Field>
+      <Field label="Mã lượt thanh toán" error={error || undefined}>{(p) => <Input {...p} placeholder="Dán mã lượt thanh toán" value={value} onChange={(event) => setValue(event.target.value)} autoComplete="off" spellCheck={false} className="font-mono" />}</Field>
     </form>
   </Modal>;
 }

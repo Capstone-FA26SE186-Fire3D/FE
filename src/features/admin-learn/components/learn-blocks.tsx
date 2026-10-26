@@ -3,6 +3,7 @@
 import { ArrowDown, ArrowUp, Film, Heading2, ImageIcon, ListOrdered, MessageSquareWarning, Pilcrow, Plus, ShieldCheck, Trash2, TriangleAlert, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { SupportCode } from "@/components/ui/support-code";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { blockLabel, extraFieldNames, isKnownType, KNOWN_TYPES, newBlock, updateFields, type EditorBlock, type KnownType } from "../blocks";
@@ -28,13 +29,13 @@ function VideoFields({ block, onChange, check, onCheck }: { block: EditorBlock; 
     </Field>
     <div aria-live="polite" data-testid="media-result">
       {current?.state === "ok" && current.descriptor && <div style={{ display: "grid", gap: 6, padding: 12, border: "1px solid var(--line)", borderRadius: 10, background: "var(--bg-soft)" }}>
-        <span style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}><StatusBadge tone="success">Hợp lệ</StatusBadge><StatusBadge tone="info">{current.descriptor.provider}</StatusBadge><span className="ops-field-hint">Mã video: {current.descriptor.videoId}</span></span>
+        <span style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}><StatusBadge tone="success">Hợp lệ</StatusBadge><StatusBadge tone="info">{current.descriptor.provider}</StatusBadge></span>
         <span className="ops-field-hint" style={{ overflowWrap: "anywhere" }}>Liên kết chuẩn: <a href={current.descriptor.canonicalUrl} target="_blank" rel="noopener noreferrer" style={{ color: "var(--ember)" }}>{current.descriptor.canonicalUrl}</a></span>
         <span className="ops-field-hint">Người đọc thấy thẻ liên kết sang {current.descriptor.provider} cùng phần tóm tắt của bài; video không được nhúng trong trang.</span>
       </div>}
       {current?.state === "invalid" && <p role="alert" className="ops-field-error" style={{ margin: 0 }}><TriangleAlert size={14} aria-hidden="true" style={{ verticalAlign: "-2px" }} /> {current.message}</p>}
       {current?.state === "error" && <p role="alert" className="ops-field-error" style={{ margin: 0 }}>Chưa kiểm tra được: {current.message}. Bấm “Kiểm tra liên kết” để thử lại; máy chủ vẫn kiểm tra khi lưu.</p>}
-      {!current && savedProvider && <span className="ops-field-hint">Đã lưu: {savedProvider}{text(block.fields.videoId) ? ` · ${text(block.fields.videoId)}` : ""}. Người đọc thấy thẻ liên kết, không nhúng video.</span>}
+      {!current && savedProvider && <span className="ops-field-hint">Đã lưu video {savedProvider}. Người đọc thấy thẻ liên kết, không nhúng video.</span>}
     </div>
   </>;
 }
@@ -64,8 +65,8 @@ function BlockFields({ block, onChange, check, onCheck }: { block: EditorBlock; 
     </div>;
     case "video": return <VideoFields block={block} onChange={onChange} check={check} onCheck={onCheck} />;
     default: return <div style={{ display: "grid", gap: 8 }}>
-      <p className="ops-field-hint" style={{ margin: 0 }}>Khối loại “{block.type}” không có trong danh sách khối được hỗ trợ. Nội dung được giữ nguyên khi lưu và máy chủ sẽ quyết định; có thể xóa khối này.</p>
-      <pre style={{ margin: 0, padding: 10, maxHeight: 160, overflow: "auto", border: "1px solid var(--line)", borderRadius: 8, background: "var(--bg-soft)", fontSize: 12, whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{JSON.stringify(block.fields, null, 2)}</pre>
+      <p className="ops-field-hint" style={{ margin: 0 }}>Khối này không còn được hỗ trợ trong trình soạn. Nội dung được giữ nguyên khi lưu; nếu máy chủ từ chối, hãy xóa khối này.</p>
+      <SupportCode code={block.type} detail={JSON.stringify(block.fields)} />
     </div>;
   }
 }
@@ -89,7 +90,7 @@ function BlockCard({ block, index, total, onChange, onMove, onRemove, issues, ch
       </span>
     </div>
     <BlockFields block={block} onChange={onChange} check={check} onCheck={onCheck} />
-    {known && extras.length > 0 && <p className="ops-field-hint" style={{ margin: 0 }} data-testid="block-extras">Trường lạ được giữ nguyên khi lưu: {extras.join(", ")}. Máy chủ sẽ từ chối nếu trường đó không thuộc loại khối này.</p>}
+    {known && extras.length > 0 && <p className="ops-field-hint" style={{ margin: 0 }} data-testid="block-extras">Khối có thông tin thừa (được giữ nguyên); máy chủ có thể từ chối khi lưu. Nếu vậy, hãy tạo lại khối này.<SupportCode detail={extras.join(", ")} /></p>}
     {issues.length > 0 && <ul role="alert" style={{ margin: 0, paddingLeft: 18, listStyle: "disc" }} className="ops-field-error">{issues.map((issue, position) => <li key={`${issue.path}-${position}`}>{issue.message}</li>)}</ul>}
   </li>;
 }

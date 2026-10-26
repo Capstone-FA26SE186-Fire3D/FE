@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
 import { libraryAdminApi } from "@/features/library/api";
 import { VersionPreview } from "@/features/library/components/version-preview";
-import { describeLibraryError, translateIssue, type LibraryErrorView, type LibraryIssue } from "@/features/library/errors";
+import { describeLibraryError, issueFieldLabel, translateIssue, type LibraryErrorView, type LibraryIssue } from "@/features/library/errors";
 import { checkForm, describeDifferences, emptyForm, fingerprint, formFromVersion, inputFromForm, type VersionForm } from "@/features/library/payload";
 import { kindLabel, type LibraryItem, type LibraryVersion, type WithEtag } from "@/features/library/types";
 import { scenarioEditorApi } from "@/features/scenario-editor/api";
@@ -26,7 +26,7 @@ type Conflict = { latest: WithEtag<LibraryVersion>; differences: string[] };
 function ErrorBody({ view }: { view: LibraryErrorView }) {
   return <span style={{ display: "grid", gap: 6 }}>
     <span>{view.message}</span>
-    {view.issues.length > 0 && <ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc" }}>{view.issues.map((issue, index) => <li key={`${issue.path}-${index}`}><code>{issue.path}</code>: {translateIssue(issue)}</li>)}</ul>}
+    {view.issues.length > 0 && <ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc" }}>{view.issues.map((issue, index) => <li key={`${issue.path}-${index}`}>{issueFieldLabel(issue.path)}: {translateIssue(issue)}</li>)}</ul>}
   </span>;
 }
 

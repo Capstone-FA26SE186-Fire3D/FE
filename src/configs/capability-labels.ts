@@ -29,3 +29,8 @@ const CAPABILITY_LABELS: Record<string, string> = {
 export function capabilityLabel(id: string | null | undefined): string {
   return (id && CAPABILITY_LABELS[id]) || "Loại khác";
 }
+
+/** For text an admin typed (library requirements): the plain name when known, otherwise what they wrote. */
+export function capabilityName(id: string): string {
+  return CAPABILITY_LABELS[id] ?? id;
+}

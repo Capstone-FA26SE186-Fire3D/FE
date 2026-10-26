@@ -304,9 +304,9 @@ test.describe("rubric sample lifecycle", () => {
     await page.getByTestId("save-version").click();
     const field = page.getByTestId("group-rubric");
     await expect(field.getByRole("alert").filter({ hasText: "Phiên bản tiêu chí chấm điểm này không được hỗ trợ" })).toBeVisible();
-    await expect(field.getByRole("alert")).toContainText('chuỗi, ví dụ "1"');
+    await expect(field.getByRole("alert")).toContainText("Chọn một phiên bản trong danh sách");
     await expect(page.getByTestId("version-name")).toHaveValue("Tên đang sửa");
-    await expect(page.getByRole("alert").filter({ hasText: "Nội dung chưa đạt yêu cầu" }).getByText("$.payload.rubric.schema_version")).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: "Nội dung chưa đạt yêu cầu" }).getByText("Phiên bản tiêu chí:", { exact: false })).toBeVisible();
     expect(backend.versions[0].name).toBe("Rubric cơ bản");
   });
 

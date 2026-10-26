@@ -51,7 +51,7 @@ export function PoliciesSection({ accessToken }: { accessToken: string }) {
     const found: Record<string, string> = {};
     const fromIso = localInputToIso(from);
     const untilIso = until ? localInputToIso(until) : null;
-    if (!UNIT.test(unit.trim())) found.quotaUnit = "Đơn vị gồm chữ thường, số, gạch dưới hoặc gạch ngang, bắt đầu bằng chữ (1–50 ký tự).";
+    if (!UNIT.test(unit.trim())) found.quotaUnit = "Viết liền không dấu, bắt đầu bằng chữ, tối đa 50 ký tự (ví dụ: luot-hoi).";
     if (!fromIso) found.effectiveFrom = "Chọn thời điểm bắt đầu hiệu lực.";
     if (until && (!untilIso || !fromIso || new Date(untilIso) <= new Date(fromIso))) found.effectiveUntil = "Thời điểm kết thúc phải sau thời điểm bắt đầu, hoặc để trống nếu không giới hạn.";
     setErrors(found);
@@ -72,7 +72,7 @@ export function PoliciesSection({ accessToken }: { accessToken: string }) {
   const total = list.data?.totalCount ?? 0;
 
   const columns: DataColumn<QuotaPolicy>[] = [
-    { key: "version", header: "Phiên bản", primary: true, render: (item) => <CellTitle title={<span className="bill-mono">{item.id.slice(0, 8)}</span>} /> },
+    { key: "version", header: "Phiên bản", primary: true, render: (item) => <CellTitle title={`Áp dụng từ ${formatDateTime(item.effectiveFrom)}`} /> },
     { key: "unit", header: "Đơn vị", width: 140, render: (item) => item.quotaUnit },
     { key: "period", header: "Hiệu lực", width: 240, render: (item) => <CellTitle title={formatDateTime(item.effectiveFrom)} sub={`đến ${item.effectiveUntil ? formatDateTime(item.effectiveUntil) : "không giới hạn"}`} /> },
     { key: "audience", header: "Đối tượng", width: 220, hideBelow: 900, render: (item) => <CellTitle title={`${AUDIENCE[item.audience] ?? "Khác"} · ${POLICY_KIND[item.policyKind] ?? "Khác"}`} sub={ROLLOVER[item.rollover] ?? "Khác"} /> },

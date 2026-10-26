@@ -20,7 +20,7 @@ import { formatCount } from "@/features/admin-overview/format";
 import { organizationsApi } from "@/features/organizations/api";
 import { formatDateTime } from "@/utils/date-range";
 import { describeReadError, reviewsApi } from "../api";
-import { parseStatusParam, shortId, statusLabel, statusTone } from "../format";
+import { parseStatusParam, statusLabel, statusTone } from "../format";
 import type { ReviewStatus, ReviewSummary } from "../types";
 import { ReviewDrawer } from "./review-detail";
 import "./reviews.css";
@@ -85,7 +85,7 @@ export function ReviewsModule() {
   const orgOptions = useMemo<ComboboxOption[]>(() => {
     const options = orgItems.map((organization) => ({ value: organization.id, label: organization.name }));
     // A deep-linked id outside the first 100 active organizations keeps its value so the filter is not silently dropped.
-    if (organizationId && !orgItems.some((organization) => organization.id === organizationId)) options.unshift({ value: organizationId, label: `Tổ chức ${shortId(organizationId)}` });
+    if (organizationId && !orgItems.some((organization) => organization.id === organizationId)) options.unshift({ value: organizationId, label: "Tổ chức đang lọc" });
     return options;
   }, [orgItems, organizationId]);
   const needle = stripAccents(search.trim());
