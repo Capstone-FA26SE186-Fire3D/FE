@@ -21,7 +21,7 @@ const PAGE_SIZE = 10;
 
 const sourceLabel: Record<string, string> = { BuildingService: "Gói công trình", Upgrade: "Nâng cấp", TopUp: "Nạp thêm trả trước" };
 const grantStatus: Record<string, { label: string; tone: Tone }> = { Scheduled: { label: "Chưa đến kỳ", tone: "info" }, Active: { label: "Đang hiệu lực", tone: "success" }, Expired: { label: "Đã hết hạn", tone: "neutral" } };
-const usageStatus: Record<string, { label: string; tone: Tone }> = { Reserved: { label: "Đang giữ chỗ", tone: "info" }, Settled: { label: "Đã tính", tone: "success" }, Released: { label: "Đã hoàn lại", tone: "neutral" } };
+const usageStatus: Record<string, { label: string; tone: Tone }> = { Reserved: { label: "Đang tạm trừ", tone: "info" }, Settled: { label: "Đã tính", tone: "success" }, Released: { label: "Đã hoàn lại", tone: "neutral" } };
 
 const short = (id: string) => id.slice(0, 8);
 
@@ -35,21 +35,21 @@ function UnitBalance({ unit }: { unit: AiQuotaUnitBalance }) {
   return <section className="org-card ops-stack" data-testid="quota-unit" data-unit={unit.quotaUnit} data-available={unit.available} aria-label={`Hạn mức ${quotaUnitLabel(unit.quotaUnit)}`}>
     <div className="bill-row"><span className="ops-field-label"><Gauge size={14} aria-hidden="true" style={{ verticalAlign: "-2px", marginRight: 6 }} />Đơn vị: {quotaUnitLabel(unit.quotaUnit)}</span><span className="bill-dim">Đơn vị không quy đổi lẫn nhau</span></div>
     <div className="bill-kpis bill-kpis-6">
-      <Kpi label="Còn dùng được" value={unit.available} hint="= đã cấp − giữ chỗ − đã dùng" testId="quota-available" />
+      <Kpi label="Còn dùng được" value={unit.available} hint="= đã cấp − đang tạm trừ − đã dùng" testId="quota-available" />
       <Kpi label="Đã cấp (còn hiệu lực)" value={unit.granted} />
-      <Kpi label="Đang giữ chỗ" value={unit.reserved} />
+      <Kpi label="Đang tạm trừ" value={unit.reserved} />
       <Kpi label="Đã dùng" value={unit.consumed} />
       <Kpi label="Đã hết hạn chưa dùng" value={unit.expired} hint="Không cộng dồn sang kỳ sau" />
       <Kpi label="Sắp có hiệu lực" value={unit.scheduled} />
     </div>
-    <div className="bill-meter" role="img" aria-label={`Đã dùng hoặc giữ chỗ ${used} trên ${unit.granted} ${quotaUnitLabel(unit.quotaUnit)}`}><span style={{ width: `${percent}%` }} /></div>
+    <div className="bill-meter" role="img" aria-label={`Đã dùng hoặc đang tạm trừ ${used} trên ${unit.granted} ${quotaUnitLabel(unit.quotaUnit)}`}><span style={{ width: `${percent}%` }} /></div>
   </section>;
 }
 
 const grantColumns: DataColumn<AiQuotaGrant>[] = [
   { key: "source", header: "Nguồn", primary: true, render: (grant) => <span data-testid="quota-grant" data-source={grant.sourceKind} style={{ display: "block" }}><CellTitle title={sourceLabel[grant.sourceKind] ?? "Khác"} sub={`${grant.buildingId ? `Công trình ${short(grant.buildingId)}` : "Cấp cho tổ chức"} · thanh toán ${short(grant.paymentTransactionId)}`} /></span> },
   { key: "granted", header: "Đã cấp", width: 130, align: "right", render: (grant) => <span className="bill-money">{formatQuota(grant.quotaUnits, grant.quotaUnit)}</span> },
-  { key: "reserved", header: "Giữ chỗ", width: 100, align: "right", hideBelow: 1100, render: (grant) => <span className="bill-money">{formatNumber(grant.reserved)}</span> },
+  { key: "reserved", header: "Tạm trừ", width: 100, align: "right", hideBelow: 1100, render: (grant) => <span className="bill-money">{formatNumber(grant.reserved)}</span> },
   { key: "consumed", header: "Đã dùng", width: 100, align: "right", hideBelow: 1100, render: (grant) => <span className="bill-money">{formatNumber(grant.consumed)}</span> },
   { key: "available", header: "Còn lại", width: 100, align: "right", render: (grant) => <span className="bill-money">{formatNumber(grant.available)}</span> },
   { key: "period", header: "Hiệu lực", width: 190, hideBelow: 900, render: (grant) => <CellTitle title={<span style={{ fontWeight: 400 }}>{formatDateTime(grant.startsAt)}</span>} sub={`đến ${formatDateTime(grant.endsAt)}`} /> },
@@ -58,7 +58,7 @@ const grantColumns: DataColumn<AiQuotaGrant>[] = [
 
 const usageColumns: DataColumn<AiUsageEntry>[] = [
   { key: "request", header: "Yêu cầu", primary: true, render: (entry) => <CellTitle title={short(entry.requestId)} sub={`đợt cấp ${short(entry.grantId)}`} /> },
-  { key: "reserved", header: "Giữ chỗ", width: 130, align: "right", render: (entry) => <span className="bill-money">{formatQuota(entry.reservedUnits, entry.quotaUnit)}</span> },
+  { key: "reserved", header: "Tạm trừ", width: 130, align: "right", render: (entry) => <span className="bill-money">{formatQuota(entry.reservedUnits, entry.quotaUnit)}</span> },
   { key: "consumed", header: "Đã tính", width: 110, align: "right", render: (entry) => <span className="bill-money">{entry.consumedUnits === null ? "—" : formatNumber(entry.consumedUnits)}</span> },
   { key: "status", header: "Trạng thái", width: 140, render: (entry) => <StatusBadge tone={(usageStatus[entry.status] ?? { tone: "neutral" as Tone }).tone}>{usageStatus[entry.status]?.label ?? "Không rõ"}</StatusBadge> },
   { key: "time", header: "Thời điểm", width: 170, hideBelow: 900, render: (entry) => formatDateTime(entry.settledAt ?? entry.createdAt) },
@@ -135,10 +135,10 @@ export function AiQuotaView({ accessToken, organizationId, onTopUp, onOpenQuotat
     </section>}
 
     <section className="ops-stack" aria-labelledby="quota-usage-title">
-      <div><h2 id="quota-usage-title" className="org-card-title" style={{ margin: 0 }}>Lịch sử sử dụng</h2><p className="bill-dim" style={{ margin: "4px 0 0" }}>Mỗi yêu cầu AI giữ chỗ trước, rồi tính theo mức dùng thực tế hoặc hoàn lại phần chưa dùng.</p></div>
+      <div><h2 id="quota-usage-title" className="org-card-title" style={{ margin: 0 }}>Lịch sử sử dụng</h2><p className="bill-dim" style={{ margin: "4px 0 0" }}>Mỗi yêu cầu AI tạm trừ trước, rồi tính theo mức dùng thực tế hoặc hoàn lại phần chưa dùng.</p></div>
       {usage.error !== undefined && <Alert tone="danger" title="Không tải được lịch sử sử dụng" action={<Button size="sm" variant="secondary" className="mt-3" onClick={usage.reload}>Thử lại</Button>}>{billingErrorText(usage.error)}</Alert>}
       <DataTable caption="Lịch sử sử dụng hạn mức AI" data-testid="quota-usage" columns={usageColumns} rows={usage.data?.items ?? []} rowKey={(entry) => entry.allocationId} loading={usage.loading && !usage.data}
-        empty={<EmptyState icon={Gauge} title="Chưa có lượt dùng AI" description="Mỗi yêu cầu AI tính phí sẽ hiện ở đây sau khi được giữ chỗ hoặc trừ vào hạn mức." />}
+        empty={<EmptyState icon={Gauge} title="Chưa có lượt dùng AI" description="Mỗi yêu cầu AI tính phí sẽ hiện ở đây sau khi được tạm trừ hoặc trừ vào hạn mức." />}
         pagination={(usage.data?.totalCount ?? 0) > PAGE_SIZE ? { page: usagePage, pageSize: PAGE_SIZE, totalCount: usage.data?.totalCount ?? 0, onPageChange: setUsagePage } : undefined} />
     </section>
   </div>;

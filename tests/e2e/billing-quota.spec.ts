@@ -30,7 +30,7 @@ test.describe("organization AI quota (mock)", () => {
     await expect(grants.nth(2)).toContainText("Nâng cấp");
     await expect(grants.nth(2)).toContainText("Đã hết hạn");
     const usage = page.getByTestId("quota-usage").locator("tbody tr");
-    await expect(usage.nth(0)).toContainText("Đang giữ chỗ");
+    await expect(usage.nth(0)).toContainText("Đang tạm trừ");
     await expect(usage.nth(1)).toContainText("Đã tính");
     await expect(usage.nth(1)).toContainText("62");
     // No overage vocabulary anywhere on the screen.

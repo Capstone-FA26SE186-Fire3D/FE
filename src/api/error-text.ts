@@ -112,7 +112,7 @@ const FIELD_TEXT: Record<string, string> = {
   aipolicyversionid: "Hãy chọn phiên bản chính sách AI.",
   quotaunit: "Đơn vị hạn mức chưa hợp lệ.",
   dailyunits: "Hạn mức mỗi ngày chưa hợp lệ.",
-  reserveunits: "Mức giữ chỗ chưa hợp lệ.",
+  reserveunits: "Mức tạm trừ chưa hợp lệ.",
   unitprice: "Đơn giá chưa hợp lệ.",
   effectivefrom: "Thời điểm bắt đầu chưa hợp lệ.",
   effectiveuntil: "Thời điểm kết thúc chưa hợp lệ.",

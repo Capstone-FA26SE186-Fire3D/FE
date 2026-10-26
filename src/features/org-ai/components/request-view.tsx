@@ -95,12 +95,12 @@ export function Usage({ request, admin, trainee }: { request: AiRequest; admin?:
     <h3>Mức sử dụng</h3>
     <dl className={styles.meta}>
       <dt>Đơn vị</dt><dd>{unit ?? "—"} <span className={styles.dim}>(do hệ thống quy định)</span></dd>
-      <dt>Đã giữ chỗ</dt><dd>{request.reservedUnits !== undefined ? formatQuota(request.reservedUnits, unit) : "—"}</dd>
+      <dt>Đã tạm trừ</dt><dd>{request.reservedUnits !== undefined ? formatQuota(request.reservedUnits, unit) : "—"}</dd>
       <dt>Đã tính</dt><dd>{request.consumedUnits !== undefined ? formatQuota(request.consumedUnits, unit) : isInFlight(request.status) || request.status === "NeedsReconcile" ? "Chưa có (chưa chốt)" : "—"}</dd>
       {admin && request.allocations && request.allocations.length > 0 && <><dt>Theo đợt cấp</dt><dd>{request.allocations.map((allocation, index) => `Đợt ${index + 1}: giữ ${formatNumber(allocation.reservedUnits)}, tính ${allocation.consumedUnits === null ? "—" : formatNumber(allocation.consumedUnits)} (${ALLOCATION_STATUS[allocation.status] ?? "khác"})`).join(" · ")}</dd></>}
     </dl>
-    {!admin && !trainee && <p className={styles.dim}>Hạn mức được giữ chỗ trước và chốt theo mức dùng thực tế; số dư và lịch sử nằm ở <Link href={BILLING_AI_HREF}>Hạn mức AI</Link>.</p>}
-    {trainee && <p className={styles.dim}>Mỗi câu hỏi giữ chỗ trong hạn mức hôm nay của bạn và chốt theo mức dùng thực tế; phần không dùng được trả lại.</p>}
+    {!admin && !trainee && <p className={styles.dim}>Hạn mức được tạm trừ trước và chốt theo mức dùng thực tế; số dư và lịch sử nằm ở <Link href={BILLING_AI_HREF}>Hạn mức AI</Link>.</p>}
+    {trainee && <p className={styles.dim}>Mỗi câu hỏi tạm trừ trong hạn mức hôm nay của bạn và chốt theo mức dùng thực tế; phần không dùng được trả lại.</p>}
   </section>;
 }
 
@@ -168,11 +168,11 @@ export function RequestView({ request, admin, trainee, onApply, extra }: { reque
     {isInFlight(request.status) && <Alert tone="info" title={request.status === "Accepted" ? "Yêu cầu đang chờ xử lý" : "Dịch vụ AI đang xử lý"}>Trang tự cập nhật khi có kết quả. Không cần gửi lại.</Alert>}
 
     {request.status === "NeedsReconcile" && <Alert tone="warning" title="Chưa rõ kết quả, đang chờ đối soát">
-      {failure ?? "Hệ thống chưa xác nhận được kết quả từ dịch vụ AI."} {trainee ? "Phần lượt hỏi" : "Hạn mức"} của yêu cầu này đang được giữ chỗ và không bị tính hay hoàn lại tự động; quản trị FET3D sẽ đối soát. Không gửi lại câu hỏi này để tránh trừ trùng.
+      {failure ?? "Hệ thống chưa xác nhận được kết quả từ dịch vụ AI."} {trainee ? "Phần lượt hỏi" : "Hạn mức"} của yêu cầu này đang được tạm trừ và không bị tính hay hoàn lại tự động; quản trị FET3D sẽ đối soát. Không gửi lại câu hỏi này để tránh trừ trùng.
       {!admin && <SupportCode code={request.failureCode ?? undefined} id={request.requestId} />}
     </Alert>}
 
-    {request.status === "Failed" && <Alert tone="danger" title="Yêu cầu thất bại">{failure ?? "Dịch vụ AI không trả được kết quả."} {trainee ? "Phần lượt hỏi đã giữ chỗ được trả lại." : "Xem phần hoàn lại hạn mức ở lịch sử sử dụng của Hạn mức AI."}{!admin && <SupportCode code={request.failureCode ?? undefined} id={request.requestId} />}</Alert>}
+    {request.status === "Failed" && <Alert tone="danger" title="Yêu cầu thất bại">{failure ?? "Dịch vụ AI không trả được kết quả."} {trainee ? "Phần lượt hỏi đã tạm trừ được trả lại." : "Xem phần hoàn lại hạn mức ở lịch sử sử dụng của Hạn mức AI."}{!admin && <SupportCode code={request.failureCode ?? undefined} id={request.requestId} />}</Alert>}
 
     {request.resultWithheld && <div data-testid="ai-withheld"><Alert tone="info" title="Không còn hiển thị câu trả lời">Bài tập huấn hoặc bài học bạn hỏi kèm không còn truy cập được (đã hết quyền, bị gỡ hoặc ẩn), nên câu trả lời và trích dẫn không còn được hiển thị.</Alert></div>}
 
