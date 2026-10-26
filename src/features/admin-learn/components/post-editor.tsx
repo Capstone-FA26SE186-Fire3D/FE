@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowLeft, FilePlus2, RefreshCw, Send } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, CircleAlert, CircleCheck, Eye, FilePlus2, PenLine, RefreshCw, Send } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { formatDateTime } from "@/components/ops/detail-parts";
 import { Alert } from "@/components/ui/alert";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { CellTitle, DataTable, type DataColumn } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Field, Input, Textarea } from "@/components/ui/field";
 import { Panel } from "@/components/ui/panel";
 import { SkeletonDetail } from "@/components/ui/skeleton";
 import { SubmitButton } from "@/components/ui/spinner";
@@ -26,7 +27,10 @@ import { lifecycleBody, lifecycleCopy, lifecycleFor, postStatusView, publishBloc
 import type { AdminPost, AdminVersion, LifecycleOperation, VersionSummary, WithEtag } from "../types";
 import { isMediaRefused, useMediaChecks } from "../use-media-checks";
 import { useSourceFlags } from "../use-source-flags";
+import { wordCount } from "../doc-actions";
 import { ContentFields } from "./content-fields";
+import { DocToolbar } from "./doc-toolbar";
+import { ReaderPreview } from "./reader-preview";
 import { BlockEditor } from "./learn-blocks";
 import { PublishPanel } from "./publish-panel";
 import { SourcePicker } from "./source-picker";
@@ -89,6 +93,12 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
   const [leaving, setLeaving] = useState<(() => void) | null>(null);
   const [operation, setOperation] = useState<Operation | null>(null);
   const [operationError, setOperationError] = useState<LearnErrorView | null>(null);
+  const [view, setView] = useState<"edit" | "preview">("edit");
+  const [active, setActive] = useState(-1);
+  const [focusId, setFocusId] = useState<string | null>(null);
+  // Page-wide undo/redo (block moves and type changes too); typing within a field coalesces into one step.
+  const [history, setHistory] = useState<{ past: EditorContent[]; future: EditorContent[] }>({ past: [], future: [] });
+  const lastEdit = useRef(0);
   const media = useMediaChecks(accessToken);
   const { flags, known } = useSourceFlags(accessToken, form.sources);
 
@@ -232,6 +242,35 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
   };
 
   const guard = (go: () => void) => (dirty ? setLeaving(() => go) : go());
+  /** Every edit on the page goes through here so it can be undone. */
+  const edit = (update: (current: EditorContent) => EditorContent) => {
+    const now = Date.now();
+    const next = update(form);
+    // Adding, removing, moving or retyping a block is always its own step; typing in one field coalesces.
+    const shape = (content: EditorContent) => content.blocks.map((block) => `${block.id}:${block.type}:${String(block.fields.level ?? "")}:${String(block.fields.ordered ?? "")}:${String(block.fields.tone ?? "")}`).join("|");
+    if (shape(next) !== shape(form) || now - lastEdit.current > 700) setHistory((log) => ({ past: [...log.past.slice(-99), form], future: [] }));
+    lastEdit.current = now;
+    setForm(next);
+  };
+  const undo = () => { const previous = history.past.at(-1); if (!previous) return; setHistory({ past: history.past.slice(0, -1), future: [...history.future, form] }); lastEdit.current = 0; setForm(previous); };
+  const redo = () => { const next = history.future.at(-1); if (!next) return; setHistory({ past: [...history.past, form], future: history.future.slice(0, -1) }); lastEdit.current = 0; setForm(next); };
+  const saveRef = useRef(save);
+  useEffect(() => { saveRef.current = save; });
+  // Ctrl/⌘+S saves the draft, like a document editor.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); void saveRef.current(); } };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+  const words = wordCount(form.blocks, form.summary);
+  const readiness: Array<{ ok: boolean; text: string }> = [
+    { ok: !!form.title.trim() && !!form.summary.trim(), text: form.title.trim() && form.summary.trim() ? "Có tiêu đề và tóm tắt" : "Cần tiêu đề và tóm tắt" },
+    { ok: form.blocks.length > 0, text: `${form.blocks.length} khối nội dung · ${words} chữ · ${Math.max(1, Math.round(words / 200))} phút đọc` },
+    ...(form.kind === "Video" ? [{ ok: form.blocks.some((block) => block.type === "video"), text: form.blocks.some((block) => block.type === "video") ? "Có khối video" : "Bài Video cần ít nhất một khối video" }] : []),
+    { ok: !!form.coverImageUrl.trim(), text: form.coverImageUrl.trim() ? "Có ảnh bìa" : "Chưa có ảnh bìa (không bắt buộc)" },
+    { ok: sourceProblems.length === 0, text: form.sources.length ? (sourceProblems.length ? `${sourceProblems.length} nguồn chưa đủ điều kiện` : `${form.sources.length} nguồn đủ điều kiện`) : "Chưa trích nguồn (không bắt buộc)" },
+    ...(clientIssues.length ? [{ ok: false, text: `Còn ${clientIssues.length} điểm chưa hợp lệ` }] : []),
+  ];
   const conflictPublished = conflict?.latest.data.status === "Published";
   const statusView = postStatusView[status];
   const versions = [...(post.data.versions ?? [])].sort((a, b) => b.versionNumber - a.versionNumber);
@@ -260,6 +299,10 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
         <p className="learn-list-note">Đường dẫn rút gọn: {post.data.slug}</p>
       </div>
       <div className="learn-editor-head-actions">
+        {screen === "content" && <div className="doc-mode" role="group" aria-label="Chế độ xem">
+          <button type="button" aria-pressed={view === "edit"} onClick={() => setView("edit")}><PenLine size={15} aria-hidden="true" />Soạn</button>
+          <button type="button" aria-pressed={view === "preview"} onClick={() => setView("preview")}><Eye size={15} aria-hidden="true" />Xem như người đọc</button>
+        </div>}
         <StatusBadge tone={statusView.tone}>{statusView.label}</StatusBadge>
         {dirty && <StatusBadge tone="warning">Chưa lưu</StatusBadge>}
         {!readOnly && <SubmitButton state={saveState} disabled={busy || !dirty} doneLabel="Đã lưu" onClick={() => void save()}>Lưu bản nháp</SubmitButton>}
@@ -285,26 +328,38 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
       {showIssues && refusedVideo && <Alert tone="danger" title="Có liên kết video không hợp lệ">Sửa hoặc xóa khối video đó trước khi lưu.</Alert>}
     </div>}
 
-    {screen === "content" && <div className="learn-editor">
+    {screen === "content" && <div className="learn-editor doc-editor">
       <div className="ops-stack learn-editor-main">
         {!isDraft && status !== "Deleted" && version && <Alert tone="info" title="Đang xem bản đã xuất bản (không sửa được)" action={<Button size="sm" className="mt-3" disabled={busy} onClick={() => start({ kind: "newVersion" })}><FilePlus2 size={16} aria-hidden="true" />Tạo bản nháp mới từ v{version.data.versionNumber}</Button>}>Không sửa trực tiếp bản đã xuất bản. Tạo bản nháp mới để chỉnh sửa; bản công khai hiện tại giữ nguyên tới khi bản mới được xuất bản.</Alert>}
         {status === "Deleted" && <Alert tone="warning" title="Bài đã bị xóa (vẫn khôi phục được)">Khôi phục bài (thẻ Trạng thái hoặc “Phiên bản & Xuất bản”) trước khi sửa, tạo bản nháp hay xuất bản.</Alert>}
-        <Panel title="Khối nội dung" description="Chữ, danh sách, ảnh và liên kết video YouTube/Facebook/TikTok. Không dán mã trang web." bodyClassName="ops-stack">
-          <fieldset disabled={busy} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
-            <BlockEditor blocks={form.blocks} disabled={readOnly} issues={shownIssues} checks={media.checks} onCheck={(blockId, url) => void media.check(blockId, url)} onChange={(blocks) => setForm((current) => ({ ...current, blocks }))} />
+        {view === "preview" ? <div className="doc-paper doc-paper-preview"><ReaderPreview form={form} checks={media.checks} /></div> : <>
+          {!readOnly && <DocToolbar blocks={form.blocks} active={active} disabled={busy} canUndo={history.past.length > 0} canRedo={history.future.length > 0} onUndo={undo} onRedo={redo}
+            onBlocks={(blocks, id) => { edit((current) => ({ ...current, blocks })); if (id) { setFocusId(id); setActive(blocks.findIndex((block) => block.id === id)); } }} />}
+          <fieldset disabled={busy || readOnly} className="doc-paper" aria-label="Trang soạn bài">
+            <Field label="Ảnh bìa (https, không bắt buộc)" className="doc-cover" error={issueFor("$.coverImageUrl")}>{(p) => <Input {...p} inputMode="url" placeholder="Dán đường dẫn ảnh bìa https (tải ảnh từ máy: sắp có)" value={form.coverImageUrl} onChange={(event) => edit((current) => ({ ...current, coverImageUrl: event.target.value }))} />}</Field>
+            <Field label="Tiêu đề" required className="doc-title" error={issueFor("$.title")}>{(p) => <Textarea {...p} rows={1} maxLength={255} placeholder="Tiêu đề bài" value={form.title} onChange={(event) => edit((current) => ({ ...current, title: event.target.value.replace(/\n/g, " ") }))} />}</Field>
+            <Field label="Tóm tắt" required className="doc-lede" hint={`${form.summary.length}/2000 · hiện ở danh sách bài và dưới video`} error={issueFor("$.summary")}>{(p) => <Textarea {...p} rows={2} maxLength={2000} placeholder="Tóm tắt một–hai câu cho người đọc" value={form.summary} onChange={(event) => edit((current) => ({ ...current, summary: event.target.value }))} />}</Field>
+            <hr className="doc-rule" />
+            <BlockEditor doc blocks={form.blocks} disabled={readOnly} issues={shownIssues} checks={media.checks} onCheck={(blockId, url) => void media.check(blockId, url)} active={active} onActive={setActive} focusId={focusId}
+              onChange={(blocks) => edit((current) => ({ ...current, blocks }))} />
           </fieldset>
-        </Panel>
+        </>}
         <Panel title="Nguồn trích dẫn" description="Bản nháp có thể trích nguồn dùng chung chưa duyệt; muốn xuất bản thì mọi nguồn phải đã duyệt và còn hiệu lực." bodyClassName="ops-stack">
           <SourcePicker accessToken={accessToken} selected={form.sources} flags={flags} known={known} disabled={readOnly || busy}
-            onAdd={(source) => setForm((current) => current.sources.some((entry) => entry.sourceId === source.id && entry.role === "Reference") ? current : { ...current, sources: [...current.sources, { sourceId: source.id, role: "Reference", locator: {}, title: source.title, versionLabel: source.versionLabel }] })}
-            onRemove={(index) => setForm((current) => ({ ...current, sources: current.sources.filter((_, position) => position !== index) }))}
-            onRole={(index, role) => setForm((current) => ({ ...current, sources: current.sources.map((entry, position) => (position === index ? { ...entry, role } : entry)) }))} />
+            onAdd={(source) => edit((current) => current.sources.some((entry) => entry.sourceId === source.id && entry.role === "Reference") ? current : { ...current, sources: [...current.sources, { sourceId: source.id, role: "Reference", locator: {}, title: source.title, versionLabel: source.versionLabel }] })}
+            onRemove={(index) => edit((current) => ({ ...current, sources: current.sources.filter((_, position) => position !== index) }))}
+            onRole={(index, role) => edit((current) => ({ ...current, sources: current.sources.map((entry, position) => (position === index ? { ...entry, role } : entry)) }))} />
           {issueFor("$.sources") && <p role="alert" className="ops-field-error" style={{ margin: 0 }}>{issueFor("$.sources")}</p>}
         </Panel>
       </div>
       <aside className="ops-stack learn-editor-side" aria-label="Thông tin và trạng thái bài">
         <Panel title="Thông tin bài" bodyClassName="ops-stack">
-          <ContentFields accessToken={accessToken} form={form} onChange={(update) => setForm(update)} readOnly={readOnly} busy={busy} issues={shownIssues} />
+          <ContentFields accessToken={accessToken} form={form} onChange={edit} readOnly={readOnly} busy={busy} issues={shownIssues} onPage />
+          <p className="learn-list-note">Đường dẫn: fet3d.io.vn/learn/{post.data.slug} · không đổi được sau khi tạo.</p>
+        </Panel>
+        <Panel title="Sẵn sàng xuất bản" bodyClassName="ops-stack" data-testid="learn-readiness">
+          <ul className="doc-ready">{readiness.map((item) => <li key={item.text} data-ok={item.ok}>{item.ok ? <CircleCheck size={15} aria-hidden="true" /> : <CircleAlert size={15} aria-hidden="true" />}<span>{item.text}</span></li>)}</ul>
+          {dirty && <p className="learn-list-note">Có thay đổi chưa lưu · Ctrl+S để lưu bản nháp.</p>}
         </Panel>
         <Panel title="Trạng thái" bodyClassName="ops-stack">
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
@@ -320,6 +375,9 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
           {lifecycleButtons.length > 0 && <div className="learn-actions-col">{lifecycleButtons}</div>}
           {isDraft && status !== "Deleted" && publishReasons.length > 0 && <ul className="learn-reasons">{publishReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>}
         </Panel>
+        {!readOnly && <Panel title="Phím tắt" bodyClassName="doc-keys">
+          <p><kbd>/</kbd> Chèn khối</p><p><kbd>Enter</kbd> Đoạn mới</p><p><kbd>Shift</kbd>+<kbd>Enter</kbd> Xuống dòng</p><p><kbd>Ctrl</kbd>+<kbd>S</kbd> Lưu bản nháp</p>
+        </Panel>}
       </aside>
     </div>}
 
