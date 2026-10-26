@@ -20,7 +20,7 @@ import { useToast } from "@/components/ui/toast";
 import { organizationsApi } from "@/features/organizations/api";
 import { billingApi } from "../api";
 import { billingErrorText, isStatus } from "../errors";
-import { formatDateTime, formatNumber, formatVnd, isoToLocalInput, localInputToIso } from "../format";
+import { formatDateTime, formatNumber, formatVnd, isoToLocalInput, localInputToIso, quotaUnitLabel } from "../format";
 import type { IssuePeriodInput, IssueQuotationInput, QuotaPolicy, Quotation, WithEtag } from "../types";
 import { CheckoutHistory, purposeLabel } from "./payment-states";
 import { QuotationCancel } from "./quotation-cancel";
@@ -39,7 +39,7 @@ const emptyLine: LineForm = { startsAt: "", learnerLimit: "", oneTimePrice: "", 
 const isWhole = (value: string) => /^\d+$/.test(value.trim());
 
 function policyLabel(policy: QuotaPolicy) {
-  return `${policy.quotaUnit} · áp dụng từ ${formatDateTime(policy.effectiveFrom)}`;
+  return `${quotaUnitLabel(policy.quotaUnit)} · áp dụng từ ${formatDateTime(policy.effectiveFrom)}`;
 }
 
 /**

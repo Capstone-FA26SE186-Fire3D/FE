@@ -20,7 +20,7 @@ import { buildingsApi } from "@/features/buildings/api";
 import { billingApi } from "../api";
 import { summarizeEntitlements, type EntitlementSummary, type ServiceState } from "../entitlements";
 import { billingErrorText } from "../errors";
-import { formatDate, formatDateTime, formatNumber, formatVnd } from "../format";
+import { formatDate, formatDateTime, formatNumber, formatVnd, quotaUnitLabel } from "../format";
 import type { Entitlement, Quotation, WithEtag } from "../types";
 import { AiQuotaView } from "./ai-quota-view";
 import { CheckoutPanel } from "./checkout-panel";
@@ -59,9 +59,9 @@ function QuotaSummary({ accessToken, refreshKey, onTopUp, onOpen }: { accessToke
       const used = unit.reserved + unit.consumed;
       const percent = unit.granted > 0 ? Math.min(100, Math.round((used / unit.granted) * 100)) : 100;
       return <div key={unit.quotaUnit} className="bill-quota-unit">
-        <div className="bill-row"><span className="bill-muted">Đã dùng ({unit.quotaUnit})</span><strong className="bill-quota-figure">{formatNumber(used)} / {formatNumber(unit.granted)}</strong></div>
-        <div className="bill-meter" role="img" aria-label={`Đã dùng hoặc giữ chỗ ${used} trên ${unit.granted} ${unit.quotaUnit}`}><span style={{ width: `${percent}%` }} /></div>
-        <span className="bill-dim">Còn dùng được {formatNumber(unit.available)} {unit.quotaUnit}</span>
+        <div className="bill-row"><span className="bill-muted">Đã dùng ({quotaUnitLabel(unit.quotaUnit)})</span><strong className="bill-quota-figure">{formatNumber(used)} / {formatNumber(unit.granted)}</strong></div>
+        <div className="bill-meter" role="img" aria-label={`Đã dùng hoặc giữ chỗ ${used} trên ${unit.granted} ${quotaUnitLabel(unit.quotaUnit)}`}><span style={{ width: `${percent}%` }} /></div>
+        <span className="bill-dim">Còn dùng được {formatNumber(unit.available)} {quotaUnitLabel(unit.quotaUnit)}</span>
       </div>;
     })}
   </section>;

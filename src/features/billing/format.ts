@@ -12,9 +12,24 @@ export function formatNumber(value: number | null | undefined) {
   return typeof value === "number" && Number.isFinite(value) ? integer.format(value) : "—";
 }
 
-/** Quota is shown in the unit the policy names (e.g. "1.200 tokens"); units never combine. */
+/** Readable names of the quota unit codes admins type (no accents, e.g. "luot-hoi"); never shown raw to users. */
+const UNIT_LABELS: Record<string, string> = {
+  "luot-hoi": "lượt hỏi",
+  "luot": "lượt",
+  "luot-ai": "lượt AI",
+};
+
+/** A quota unit as people read it: a known name, else the code with "-"/"_" as spaces (the code itself stays for admins' forms). */
+export function quotaUnitLabel(unit: string | null | undefined): string {
+  if (!unit) return "";
+  const code = unit.trim();
+  return UNIT_LABELS[code.toLowerCase()] ?? code.replace(/[-_]+/g, " ");
+}
+
+/** Quota is shown in the unit the policy names (e.g. "1.200 lượt hỏi"); units never combine. */
 export function formatQuota(value: number | null | undefined, unit: string | null | undefined) {
-  return `${formatNumber(value)}${unit ? ` ${unit}` : ""}`;
+  const label = quotaUnitLabel(unit);
+  return `${formatNumber(value)}${label ? ` ${label}` : ""}`;
 }
 
 /** BE `DateTime` values are UTC but may arrive without a designator; treat those as UTC, not local time. */

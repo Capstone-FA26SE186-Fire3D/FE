@@ -15,7 +15,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
 import { billingApi } from "../api";
 import { billingErrorText, isStatus } from "../errors";
-import { formatDate, formatNumber, formatVnd, isoToLocalInput, localInputToIso } from "../format";
+import { formatDate, formatNumber, formatVnd, isoToLocalInput, localInputToIso, quotaUnitLabel } from "../format";
 import type { DiscountInput, DiscountKind, DiscountRule, PackageInput, QuotaPolicy, ServicePackage } from "../types";
 import { keepEdits } from "@/utils/keep-edits";
 import "../billing.css";
@@ -39,7 +39,7 @@ const DURATION_OPTIONS = [{ value: "6", label: "6 tháng" }, { value: "12", labe
 
 /** Policy options are read from the immutable policy list; the unit lives on the policy, not the package. */
 function policyLabel(policy: QuotaPolicy) {
-  return `${policy.quotaUnit} · từ ${formatDate(policy.effectiveFrom)} đến ${policy.effectiveUntil ? formatDate(policy.effectiveUntil) : "không giới hạn"}`;
+  return `${quotaUnitLabel(policy.quotaUnit)} · từ ${formatDate(policy.effectiveFrom)} đến ${policy.effectiveUntil ? formatDate(policy.effectiveUntil) : "không giới hạn"}`;
 }
 
 /**
@@ -141,7 +141,7 @@ export function PackagesSection({ accessToken }: { accessToken: string }) {
     { key: "price", header: "Đơn giá/tháng", width: 150, align: "right", render: (item) => formatVnd(item.unitPrice) },
     { key: "duration", header: "Thời hạn", width: 110, render: (item) => `${item.durationMonths} tháng` },
     { key: "learners", header: "Học viên/kỳ", width: 120, align: "right", hideBelow: 900, render: (item) => formatNumber(item.learnerLimit ?? null) },
-    { key: "quota", header: "Hạn mức AI", width: 200, hideBelow: 1100, render: (item) => <CellTitle title={item.aiQuotaUnits != null ? formatNumber(item.aiQuotaUnits) : "—"} sub={item.aiPolicyVersionId ? (policyById(item.aiPolicyVersionId) ? `${policyById(item.aiPolicyVersionId)!.quotaUnit} · từ ${formatDate(policyById(item.aiPolicyVersionId)!.effectiveFrom)}` : "Chính sách không còn trong danh sách") : undefined} /> },
+    { key: "quota", header: "Hạn mức AI", width: 200, hideBelow: 1100, render: (item) => <CellTitle title={item.aiQuotaUnits != null ? formatNumber(item.aiQuotaUnits) : "—"} sub={item.aiPolicyVersionId ? (policyById(item.aiPolicyVersionId) ? `${quotaUnitLabel(policyById(item.aiPolicyVersionId)!.quotaUnit)} · từ ${formatDate(policyById(item.aiPolicyVersionId)!.effectiveFrom)}` : "Chính sách không còn trong danh sách") : undefined} /> },
     { key: "sale", header: "Bán hàng", width: 260, render: (item) => <span className="bill-states"><StatusBadge tone={item.isActive ? "success" : "neutral"}>{item.isActive ? "Đang bán" : "Tạm ẩn"}</StatusBadge><StatusBadge tone={item.isPurchasable ? "success" : "warning"}>{item.isPurchasable ? "Đủ điều kiện bán" : "Không bán được"}</StatusBadge></span> },
   ];
 

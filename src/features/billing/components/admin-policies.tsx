@@ -14,7 +14,7 @@ import { Field, Input } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { billingApi } from "../api";
 import { billingErrorText } from "../errors";
-import { formatDateTime, localInputToIso } from "../format";
+import { formatDateTime, localInputToIso, quotaUnitLabel } from "../format";
 import type { QuotaPolicy } from "../types";
 import "../billing.css";
 
@@ -59,7 +59,7 @@ export function PoliciesSection({ accessToken }: { accessToken: string }) {
     lock.current = true; setSaving(true); setFormError("");
     try {
       const created = await billingApi.createQuotaPolicy(accessToken, { quotaUnit: unit.trim(), effectiveFrom: fromIso as string, effectiveUntil: untilIso });
-      toast.notify({ tone: "success", title: "Đã tạo phiên bản chính sách", description: `Đơn vị ${created.quotaUnit}. Phiên bản không thể sửa; muốn thay đổi hãy tạo phiên bản mới.` });
+      toast.notify({ tone: "success", title: "Đã tạo phiên bản chính sách", description: `Đơn vị ${quotaUnitLabel(created.quotaUnit)}. Phiên bản không thể sửa; muốn thay đổi hãy tạo phiên bản mới.` });
       setOpen(false);
       list.reload();
     } catch (cause) {
@@ -73,7 +73,7 @@ export function PoliciesSection({ accessToken }: { accessToken: string }) {
 
   const columns: DataColumn<QuotaPolicy>[] = [
     { key: "version", header: "Phiên bản", primary: true, render: (item) => <CellTitle title={`Áp dụng từ ${formatDateTime(item.effectiveFrom)}`} /> },
-    { key: "unit", header: "Đơn vị", width: 140, render: (item) => item.quotaUnit },
+    { key: "unit", header: "Đơn vị", width: 140, render: (item) => <CellTitle title={quotaUnitLabel(item.quotaUnit)} sub={quotaUnitLabel(item.quotaUnit) !== item.quotaUnit ? `mã nhập: ${item.quotaUnit}` : undefined} /> },
     { key: "period", header: "Hiệu lực", width: 240, render: (item) => <CellTitle title={formatDateTime(item.effectiveFrom)} sub={`đến ${item.effectiveUntil ? formatDateTime(item.effectiveUntil) : "không giới hạn"}`} /> },
     { key: "audience", header: "Đối tượng", width: 220, hideBelow: 900, render: (item) => <CellTitle title={`${AUDIENCE[item.audience] ?? "Khác"} · ${POLICY_KIND[item.policyKind] ?? "Khác"}`} sub={ROLLOVER[item.rollover] ?? "Khác"} /> },
   ];

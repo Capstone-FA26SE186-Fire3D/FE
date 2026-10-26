@@ -6,7 +6,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { SkeletonRows } from "@/components/ui/skeleton";
 import { billingApi } from "@/features/billing/api";
-import { formatDateTime, formatNumber, formatQuota } from "@/features/billing/format";
+import { formatDateTime, formatNumber, formatQuota, quotaUnitLabel } from "@/features/billing/format";
 
 import { orgAiApi } from "../api";
 import { aiErrorText, operationLabel } from "../labels";
@@ -34,7 +34,7 @@ export function AiQuotaCard({ accessToken }: { accessToken: string }) {
         {units.map((unit) => <div key={unit.quotaUnit} className="org-sub-card" data-testid="ai-rail-quota">
           <span className="org-meta">Còn lại</span>
           <p className="org-big">{formatQuota(unit.available, null)}</p>
-          <p style={{ margin: 0 }}>đơn vị {unit.quotaUnit}</p>
+          <p style={{ margin: 0 }}>{quotaUnitLabel(unit.quotaUnit)}</p>
           <dl className={styles.meta} style={{ marginTop: 10 }}>
             <dt>Đã cấp</dt><dd>{formatNumber(unit.granted)}</dd>
             <dt>Đang giữ chỗ</dt><dd>{formatNumber(unit.reserved)}</dd>
