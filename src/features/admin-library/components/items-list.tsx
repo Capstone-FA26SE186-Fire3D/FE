@@ -113,7 +113,7 @@ export function ItemsList({ accessToken, reloadKey, onOpen, onNewVersion, onCrea
     { key: "kind", header: "Loại", width: 150, hideBelow: 900, render: (item) => <StatusBadge tone={kindTone[item.kind]}>{kindLabel[item.kind]}</StatusBadge> },
     { key: "version", header: "Phiên bản xuất bản", width: 150, render: (item) => (item.latestPublished ? `v${item.latestPublished.versionNumber}` : shownVersion(item) ? `— (nháp v${shownVersion(item)!.number})` : "—") },
     { key: "status", header: "Trạng thái", width: 150, render: (item) => { const status = itemStatus(item); return <StatusBadge tone={status.tone}>{status.label}</StatusBadge>; } },
-    { key: "capabilities", header: "Năng lực yêu cầu", hideBelow: 1200, render: (item) => (item.latestPublished ? (item.latestPublished.requiredCapabilities.length ? item.latestPublished.requiredCapabilities.map(capabilityName).join(" · ") : "Không khai báo") : "—") },
+    { key: "capabilities", header: "Yêu cầu", hideBelow: 1200, render: (item) => (item.latestPublished ? (item.latestPublished.requiredCapabilities.length ? item.latestPublished.requiredCapabilities.map(capabilityName).join(" · ") : "Chưa ghi") : "—") },
     { key: "updated", header: "Cập nhật", width: 170, hideBelow: 768, render: (item) => formatDateTime(item.updatedAt) },
   ];
 

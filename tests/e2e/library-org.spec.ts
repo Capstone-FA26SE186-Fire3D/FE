@@ -90,7 +90,7 @@ test.describe("/workspace/library (read only)", () => {
     const drawer = page.getByRole("dialog");
     // centered popup: the item name is the dialog title, the body holds the version details.
     await expect(drawer.getByRole("heading", { name: "Bình CO2 5 kg" })).toBeVisible();
-    await expect(drawer.getByTestId("version-preview")).toContainText("Không thêm năng lực cho ứng dụng");
+    await expect(drawer.getByTestId("version-preview")).toContainText("Không thêm tính năng cho ứng dụng");
     await expect(drawer).toContainText("Áp dụng là sao chép");
     expect(backend.calls.filter((call) => call.path.startsWith("/api/admin"))).toEqual([]);
   });
@@ -129,7 +129,7 @@ test.describe("/workspace/library (read only)", () => {
     await expect(page).toHaveURL(/q=co2/);
     await expect(page.getByTestId("org-item-BINH-CO2")).toBeVisible();
     await expect(page.getByTestId("org-item-MAT-NA")).toHaveCount(0);
-    await expect(page.getByRole("status").filter({ hasText: "Máy chủ chưa lọc theo tên hoặc năng lực" })).toContainText("Có 1 mẫu khớp");
+    await expect(page.getByRole("status").filter({ hasText: "Máy chủ chưa lọc theo tên hoặc yêu cầu" })).toContainText("Có 1 mẫu khớp");
 
     await page.getByLabel("Tìm mẫu").fill("khói"); // matches the name of MAT-NA, not its code
     await expect(page.getByTestId("org-item-MAT-NA")).toBeVisible();
@@ -137,14 +137,14 @@ test.describe("/workspace/library (read only)", () => {
 
     await page.getByRole("button", { name: "Xóa bộ lọc" }).click();
     await expect(page).not.toHaveURL(/q=/);
-    const capability = page.getByRole("combobox", { name: "Năng lực yêu cầu" });
+    const capability = page.getByRole("combobox", { name: "Yêu cầu" });
     await capability.click();
     await page.getByRole("option", { name: "equipment.extinguisher" }).click();
     await expect(page).toHaveURL(/cap=equipment\.extinguisher/);
     await expect(page.getByTestId("org-item-BINH-CO2")).toBeVisible();
     await expect(page.getByTestId("org-item-MAT-NA")).toHaveCount(0);
     await capability.click();
-    await page.getByRole("option", { name: "Không yêu cầu năng lực" }).click();
+    await page.getByRole("option", { name: "Không có yêu cầu" }).click();
     await expect(page.getByTestId("org-item-TEMPLATE-SO-TAN")).toBeVisible();
     await expect(page.getByTestId("org-item-BINH-CO2")).toHaveCount(0);
 
@@ -152,7 +152,7 @@ test.describe("/workspace/library (read only)", () => {
     await expect(page.getByRole("heading", { name: "Không có mẫu khớp bộ lọc" })).toBeVisible();
     await page.reload();
     await expect(page.getByLabel("Tìm mẫu")).toHaveValue("không-có-gì");
-    await expect(page.getByRole("combobox", { name: "Năng lực yêu cầu" })).toContainText("Không yêu cầu năng lực");
+    await expect(page.getByRole("combobox", { name: "Yêu cầu" })).toContainText("Không có yêu cầu");
   });
 
   test("deep link to an item that is not published (or was deactivated) says it is unavailable; the Draft is not leaked", async ({ page }) => {
@@ -332,7 +332,7 @@ test.describe("apply to the draft in the v1 editor", () => {
     await expect(page.getByTestId("apply-group-equipment:label")).toHaveAttribute("data-status", "new");
     await expect(page.getByTestId("equipment-reference")).toContainText("Bình chữa cháy CO2.");
     await expect(page.getByTestId("equipment-reference")).toContainText("Khối lượng (kg)");
-    await expect(page.getByTestId("library-preview")).toContainText("Phiên bản ứng dụng của bản nháp chưa hỗ trợ năng lực: cover.nose");
+    await expect(page.getByTestId("library-preview")).toContainText("Phiên bản ứng dụng của bản nháp chưa có: cover.nose");
     await expect(page.getByTestId("apply-group-equipment:capability")).toHaveAttribute("data-status", "same"); // already equals the runtime's own entry
     await page.getByTestId("apply-open").click();
     await page.getByTestId("apply-confirm").click();
@@ -354,7 +354,7 @@ test.describe("apply to the draft in the v1 editor", () => {
     await page.getByTestId("object-item-5").click();
     await choose(page, "Equipment", "MAT-NA");
     await expect(page.getByTestId("apply-group-equipment:capability")).toHaveCount(0);
-    await expect(page.getByTestId("library-preview")).toContainText("chưa hỗ trợ năng lực: cover.nose");
+    await expect(page.getByTestId("library-preview")).toContainText("chưa có: cover.nose");
     await page.getByTestId("apply-open").click();
     await page.getByTestId("apply-confirm").click();
     await page.getByTestId("save").click();

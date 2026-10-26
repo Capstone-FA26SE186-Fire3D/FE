@@ -18,7 +18,7 @@ export const kindLabel: Record<LibraryKind, string> = {
 export const kindHint: Record<LibraryKind, string> = {
   ScenarioTemplate: "Phần nội dung của kịch bản: tên, mục tiêu, hướng dẫn, thời gian, chế độ, tiêu chí chấm điểm (không gồm vị trí trên mô hình).",
   RubricSample: "Bộ tiêu chí chấm điểm (rubric) mẫu; chỉ số lấy từ danh mục chỉ số của hệ thống.",
-  Equipment: "Mô tả và thuộc tính hiển thị của thiết bị. Không thêm năng lực cho ứng dụng.",
+  Equipment: "Mô tả và thuộc tính hiển thị của thiết bị. Không thêm tính năng cho ứng dụng.",
 };
 
 export const isKind = (value: unknown): value is LibraryKind => (LIBRARY_KINDS as readonly string[]).includes(value as string);

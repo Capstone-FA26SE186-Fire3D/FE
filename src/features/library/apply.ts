@@ -3,6 +3,7 @@ import type { CapabilityOption } from "@/features/scenario-editor/v1/catalog";
 import { LIMITS, MODE_LABEL, TRAINING_MODES, type TrainingMode } from "@/features/scenario-editor/v1/contract";
 import { TEMPLATE_FIELDS, ignoredTemplateParts, templateFieldLabel, type TemplateField } from "./payload";
 import type { LibraryVersion } from "./types";
+import { capabilityName } from "@/configs/capability-labels";
 
 /*
  * Planning how a PUBLISHED library version would change the open draft. Pure: it reads the draft and the version and returns
@@ -182,11 +183,11 @@ function planEquipment(version: LibraryVersion, context: ApplyContext): ApplyPla
   const required = version.requiredCapabilities;
   if (required.length > 0) {
     const offered = context.runtimeCapabilities;
-    if (!offered) notes.push(`Thiết bị yêu cầu năng lực: ${required.join(", ")}. Chọn phiên bản ứng dụng (thẻ Kịch bản) để kiểm tra.`);
+    if (!offered) notes.push(`Thiết bị yêu cầu: ${required.map(capabilityName).join(", ")}. Chọn phiên bản ứng dụng (thẻ Kịch bản) để kiểm tra.`);
     else {
       const usable = required.flatMap((id) => offered.filter((item) => item.id === id && item.objectKinds.includes("Equipment")));
       const missing = required.filter((id) => !offered.some((item) => item.id === id));
-      if (missing.length > 0) notes.push(`Phiên bản ứng dụng của bản nháp chưa hỗ trợ năng lực: ${missing.join(", ")}. Mẫu không tự thêm năng lực cho ứng dụng.`);
+      if (missing.length > 0) notes.push(`Phiên bản ứng dụng của bản nháp chưa có: ${missing.map(capabilityName).join(", ")}. Mẫu không tự thêm tính năng cho ứng dụng.`);
       const candidate = usable[0];
       if (candidate) {
         const status: GroupStatus = !object.capability ? "new" : object.capability.id === candidate.id && object.capability.version === candidate.version ? "same" : "different";
@@ -194,11 +195,11 @@ function planEquipment(version: LibraryVersion, context: ApplyContext): ApplyPla
         // Parameters belong to one capability: a different capability starts with none (same as the capability picker).
         if (object.capability?.id !== candidate.id) writes.push({ path: ["objects", object.index, "parameters"], value: undefined });
         groups.push({
-          id: "equipment:capability", label: "Năng lực (gợi ý)", status,
-          current: object.capability ? `${object.capability.id}@${object.capability.version}` : NONE, incoming: `${candidate.id}@${candidate.version} (từ danh mục của ứng dụng)`,
+          id: "equipment:capability", label: "Tính năng (gợi ý)", status,
+          current: object.capability ? capabilityName(object.capability.id) : NONE, incoming: `${capabilityName(candidate.id)} (từ danh mục của ứng dụng)`,
           options: status === "new" ? ["fill", "keep"] : status === "same" ? ["keep"] : ["keep", "replace"], defaultAction: "keep",
           writes: status === "same" ? {} : status === "new" ? { fill: writes } : { replace: writes },
-          notes: ["Chỉ chọn năng lực mà ứng dụng đã hỗ trợ cho Thiết bị; tham số nhập sau ở thẻ Đối tượng."], warnings: [],
+          notes: ["Chỉ chọn tính năng mà ứng dụng đã có cho Thiết bị; thông số nhập sau ở thẻ Đối tượng."], warnings: [],
         });
       }
     }
