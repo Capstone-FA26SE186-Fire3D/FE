@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { isVietnamese } from "@/api/error-text";
 import { routes } from "@/configs/routes";
 import { fmt, formatRate, formatSeconds } from "../format";
+import { quotaUnitLabel } from "@/features/billing/format";
 import { fillPeriods, periodTick, periodTitle } from "../periods";
 import { OUTCOMES, type AiUsage, type GroupBy, type TrainingReport } from "../types";
 import { GROUP_LABELS } from "./filters";
@@ -61,7 +62,7 @@ const outcomeColor = { Passed: seriesColor.passed, NotPassed: seriesColor.notPas
 function AiUsageCard({ usage }: { usage: AiUsage }) {
   const settled = usage.settledUnits;
   const statuses = Object.entries(usage.requests).filter(([status]) => !LEGACY_AI_STATUSES.has(status));
-  const quota = (items: AiUsage["settledUnits"]) => (items.length ? items.map((item) => `${fmt(item.units)} ${item.quotaUnit}`).join(" · ") : "0");
+  const quota = (items: AiUsage["settledUnits"]) => (items.length ? items.map((item) => `${fmt(item.units)} ${quotaUnitLabel(item.quotaUnit)}`).join(" · ") : "0");
   return <Panel title="Sử dụng AI" description="Hạn mức AI đã dùng và chốt trong kỳ; phần đang giữ chỗ và cần đối soát là số hiện tại, tính riêng." data-testid="card-ai-usage">
     <div className={styles.miniRow}>
       <MiniStat label="Đã chốt (trong kỳ)" value={quota(settled)} hint={settled.length ? undefined : "Chưa dùng hạn mức nào trong kỳ"} />

@@ -17,7 +17,7 @@ import { Field, Input } from "@/components/ui/field";
 import { FilterChip, FilterChips } from "@/components/ui/filter-chip";
 import { StatusBadge, type Tone } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
-import { formatDateTime, formatNumber } from "@/features/billing/format";
+import { formatDateTime, formatNumber, quotaUnitLabel } from "@/features/billing/format";
 
 import { adminAiApi } from "../api";
 import { aiErrorText, fieldIssue, operationLabel } from "../labels";
@@ -117,7 +117,7 @@ function PolicyModal({ open, accessToken, onCreated, onClose }: { open: boolean;
       <Field label="Thao tác" required error={server("$.operation", "operation")}>
         {(props) => <Combobox {...props} aria-label="Thao tác" value={form.operation} onChange={(value) => setForm((current) => ({ ...current, operation: value }))} placeholder="Chọn thao tác…" groupLabel="Thao tác" options={ADMIN_AI_OPERATIONS.map((value) => ({ value, label: operationLabel(value) }))} />}
       </Field>
-      <Field label="Đơn vị hạn mức" required hint="Khớp đơn vị hạn mức đã cấp (ví dụ đơn vị trong chính sách hạn mức của gói). Hệ thống không quy đổi giữa tiền và token." error={server("$.quotaUnit", "quotaUnit")}>
+      <Field label="Đơn vị hạn mức" required hint="Viết liền không dấu, khớp đơn vị hạn mức đã cấp. Ví dụ luot-hoi, người dùng sẽ thấy là “lượt hỏi”. Hệ thống không quy đổi giữa tiền và token." error={server("$.quotaUnit", "quotaUnit")}>
         {(props) => <Input {...props} value={form.quotaUnit} onChange={set("quotaUnit")} autoComplete="off" spellCheck={false} />}
       </Field>
       <div className={styles.grid2}>
@@ -148,7 +148,7 @@ export function AdminPoliciesTab({ accessToken }: { accessToken: string }) {
 
   const columns: DataColumn<AiPolicy>[] = [
     { key: "operation", header: "Thao tác", primary: true, render: (policy) => <CellTitle title={operationLabel(policy.operation)} /> },
-    { key: "unit", header: "Đơn vị", width: 110, render: (policy) => policy.quotaUnit },
+    { key: "unit", header: "Đơn vị", width: 130, render: (policy) => <CellTitle title={quotaUnitLabel(policy.quotaUnit)} sub={quotaUnitLabel(policy.quotaUnit) !== policy.quotaUnit ? `mã nhập: ${policy.quotaUnit}` : undefined} /> },
     { key: "reserve", header: "Giữ chỗ", width: 110, align: "right", render: (policy) => formatNumber(policy.reserveUnits) },
     { key: "chars", header: "Ký tự tối đa", width: 120, align: "right", hideBelow: 1100, render: (policy) => formatNumber(policy.maxInputChars) },
     { key: "sources", header: "Nguồn tối đa", width: 120, align: "right", hideBelow: 1100, render: (policy) => formatNumber(policy.maxSources) },
