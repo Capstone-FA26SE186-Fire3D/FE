@@ -187,7 +187,7 @@ function rubricShape(rubric: Json, out: Issue[]) {
     if (typeof criterion.mandatory !== "boolean") out.push(issue(criterion.mandatory === undefined ? "FIELD_REQUIRED" : "TYPE_INVALID", `${path}.mandatory`, "Cần cờ bắt buộc đúng/sai."));
     if (!finite(criterion.weight) || criterion.weight < 0) out.push(issue(criterion.weight === undefined ? "FIELD_REQUIRED" : "NUMBER_OUT_OF_RANGE", `${path}.weight`, "Trọng số là số không âm."));
     if (!finite(criterion.threshold)) out.push(issue(criterion.threshold === undefined ? "FIELD_REQUIRED" : "NUMBER_INVALID", `${path}.threshold`, "Ngưỡng là một số."));
-    if (typeof criterion.operator !== "string" || !(RUBRIC_OPERATORS as readonly string[]).includes(criterion.operator)) out.push(issue(criterion.operator === undefined ? "FIELD_REQUIRED" : "VALUE_UNSUPPORTED", `${path}.operator`, "Chọn gte, lte hoặc eq."));
+    if (typeof criterion.operator !== "string" || !(RUBRIC_OPERATORS as readonly string[]).includes(criterion.operator)) out.push(issue(criterion.operator === undefined ? "FIELD_REQUIRED" : "VALUE_UNSUPPORTED", `${path}.operator`, "Chọn phép so sánh ≥, ≤ hoặc =."));
     if (criterion.description !== undefined && !printable(criterion.description, LIMITS.criterionDescriptionMax)) out.push(issue("STRING_INVALID", `${path}.description`, `Mô tả dùng 1–${LIMITS.criterionDescriptionMax} ký tự.`));
   });
 }

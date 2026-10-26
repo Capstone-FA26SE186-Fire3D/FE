@@ -131,7 +131,7 @@ export function BillingWorkspace() {
   }, [entitlements.data]);
   const serviceRows = useMemo<ServiceRow[]>(() => {
     const ids = new Set<string>([...buildingItems.map((item) => item.id), ...entitlementsByBuilding.keys()]);
-    return [...ids].map((buildingId) => ({ buildingId, name: nameOf[buildingId] ?? `Công trình ${buildingId.slice(0, 8)}`, summary: summarizeEntitlements(entitlementsByBuilding.get(buildingId) ?? []) }));
+    return [...ids].map((buildingId) => ({ buildingId, name: nameOf[buildingId] ?? "Công trình không còn trong danh sách", summary: summarizeEntitlements(entitlementsByBuilding.get(buildingId) ?? []) }));
   }, [buildingItems, entitlementsByBuilding, nameOf]);
   const needle = urlSearch.trim().toLowerCase();
   const shownServices = serviceRows.filter((row) => (!needle || row.name.toLowerCase().includes(needle)) && (!stateFilter || row.summary.state === stateFilter));
