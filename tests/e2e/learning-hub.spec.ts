@@ -243,13 +243,16 @@ test("history is a real view with no demo content", async ({ page }) => {
   expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.includes("prototype")))).toEqual([]);
 });
 
-test("an article page offers saving and an ask-AI link into the Q&A with the article", async ({ page }) => {
+test("an article page offers saving and opens the floating Trợ lý AI with the article as context", async ({ page }) => {
   await restore(page, "trainee");
   await page.goto(`/learn/${slug}`);
   await expect(page.getByRole("heading", { level: 1, name: "Đọc không gian trước khi hành động" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Lưu bài viết" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Hỏi về bài này" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Hỏi AI về bài này" })).toHaveAttribute("href", `/learning-hub?view=questions&article=${slug}`);
+  await page.getByRole("button", { name: "Hỏi Trợ lý AI về bài này" }).click();
+  const panel = page.getByRole("dialog", { name: /Trợ lý AI/ });
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText("Đọc không gian trước khi hành động");
 });
 
 test("logout returns home even on backend failure and the Q&A view respects reduced motion", async ({ page }) => {
@@ -379,13 +382,15 @@ test.describe("saved posts (real bookmark API)", () => {
 });
 
 for (const width of [375, 640, 820, 1024, 1440]) {
-  test(`Learn grid columns at ${width}px and article links`, async ({ page }, testInfo) => {
+  test(`Learn featured layout at ${width}px and article links`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
     await restore(page, "guest");
     await page.goto("/learn");
-    await expect(page.locator(".learn-card")).toHaveCount(3);
-    const columns = await page.locator(".learn-grid").evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(" ").length);
-    expect(columns).toBe(width >= 1024 ? 3 : width >= 640 ? 2 : 1);
+    // Three posts on an unfiltered first page: the newest is featured, the other two sit in the "Mới đăng" list.
+    await expect(page.locator("[data-learn-post]")).toHaveCount(3);
+    await expect(page.getByRole("complementary", { name: "Mới đăng" }).locator("li")).toHaveCount(2);
+    const columns = await page.locator(".lv2-hero").evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(" ").length);
+    expect(columns).toBe(width >= 1024 ? 2 : 1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     await page.screenshot({ path: testInfo.outputPath(`learn-${width}.png`), fullPage: true });
     await page.getByRole("link", { name: "Đọc Đọc không gian trước khi hành động", exact: true }).click();
