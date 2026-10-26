@@ -61,6 +61,15 @@ async function openAssistant(page: Page) {
   return panel;
 }
 
+test("the allowance names the unit in words: the code luot-hoi reads as “lượt hỏi”", async ({ page }) => {
+  const ai = new TraineeAiBackend();
+  ai.quota = { ...ai.quota, quotaUnit: "luot-hoi", dailyUnits: 20, usedUnits: 0, remainingUnits: 20, estimatedReserve: 1 };
+  await restore(page, "trainee", (backend) => { backend.seedPost("don-vi", { title: "Đơn vị hạn mức", status: "Published" }); }, ai);
+  await page.goto("/learning-hub?view=questions&article=don-vi");
+  await expect(page.getByTestId("trainee-ai-quota")).toContainText("Hôm nay còn 20 lượt hỏi / 20 lượt hỏi");
+  await expect(page.getByTestId("ai-chat-panel")).not.toContainText("luot-hoi");
+});
+
 test("the bubble shows today's allowance, asks with the article as context and polls the answer with a Learn citation", async ({ page }) => {
   const ai = new TraineeAiBackend();
   let ids = { post: "", version: "" };

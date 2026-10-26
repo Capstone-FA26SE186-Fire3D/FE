@@ -12,7 +12,7 @@ import { SkeletonKpis } from "@/components/ui/skeleton";
 import { StatusBadge, type Tone } from "@/components/ui/status-badge";
 import { billingApi } from "../api";
 import { billingErrorText } from "../errors";
-import { formatDateTime, formatNumber, formatQuota } from "../format";
+import { formatDateTime, formatNumber, formatQuota, quotaUnitLabel } from "../format";
 import type { AiQuotaGrant, AiQuotaUnitBalance, AiUsageEntry, Quotation } from "../types";
 import { QuotationStatusBadge } from "./quotation-snapshot";
 import "../billing.css";
@@ -32,8 +32,8 @@ function Kpi({ label, value, hint, testId }: { label: string; value: number; hin
 function UnitBalance({ unit }: { unit: AiQuotaUnitBalance }) {
   const used = unit.reserved + unit.consumed;
   const percent = unit.granted > 0 ? Math.min(100, Math.round((used / unit.granted) * 100)) : 100;
-  return <section className="org-card ops-stack" data-testid="quota-unit" data-unit={unit.quotaUnit} data-available={unit.available} aria-label={`Hạn mức đơn vị ${unit.quotaUnit}`}>
-    <div className="bill-row"><span className="ops-field-label"><Gauge size={14} aria-hidden="true" style={{ verticalAlign: "-2px", marginRight: 6 }} />Đơn vị: {unit.quotaUnit}</span><span className="bill-dim">Đơn vị không quy đổi lẫn nhau</span></div>
+  return <section className="org-card ops-stack" data-testid="quota-unit" data-unit={unit.quotaUnit} data-available={unit.available} aria-label={`Hạn mức ${quotaUnitLabel(unit.quotaUnit)}`}>
+    <div className="bill-row"><span className="ops-field-label"><Gauge size={14} aria-hidden="true" style={{ verticalAlign: "-2px", marginRight: 6 }} />Đơn vị: {quotaUnitLabel(unit.quotaUnit)}</span><span className="bill-dim">Đơn vị không quy đổi lẫn nhau</span></div>
     <div className="bill-kpis bill-kpis-6">
       <Kpi label="Còn dùng được" value={unit.available} hint="= đã cấp − giữ chỗ − đã dùng" testId="quota-available" />
       <Kpi label="Đã cấp (còn hiệu lực)" value={unit.granted} />
@@ -42,7 +42,7 @@ function UnitBalance({ unit }: { unit: AiQuotaUnitBalance }) {
       <Kpi label="Đã hết hạn chưa dùng" value={unit.expired} hint="Không cộng dồn sang kỳ sau" />
       <Kpi label="Sắp có hiệu lực" value={unit.scheduled} />
     </div>
-    <div className="bill-meter" role="img" aria-label={`Đã dùng hoặc giữ chỗ ${used} trên ${unit.granted} ${unit.quotaUnit}`}><span style={{ width: `${percent}%` }} /></div>
+    <div className="bill-meter" role="img" aria-label={`Đã dùng hoặc giữ chỗ ${used} trên ${unit.granted} ${quotaUnitLabel(unit.quotaUnit)}`}><span style={{ width: `${percent}%` }} /></div>
   </section>;
 }
 
@@ -113,7 +113,7 @@ export function AiQuotaView({ accessToken, organizationId, onTopUp, onOpenQuotat
       action={onTopUp ? <Button size="sm" variant="secondary" className="mt-3" onClick={onTopUp}>Nạp thêm hạn mức AI</Button> : undefined}>
       {units.length === 0
         ? "Tổ chức chưa được cấp hạn mức AI. Chưa gửi được yêu cầu AI tính phí cho tới khi có hạn mức từ gói công trình hoặc lần nạp thêm đã thanh toán."
-        : `Đơn vị ${exhausted.map((unit) => unit.quotaUnit).join(", ")} đã hết hạn mức. Chưa gửi được yêu cầu AI tính phí mới; hệ thống không tính vượt mức và không ghi nợ.`}
+        : `Đơn vị ${exhausted.map((unit) => quotaUnitLabel(unit.quotaUnit)).join(", ")} đã hết hạn mức. Chưa gửi được yêu cầu AI tính phí mới; hệ thống không tính vượt mức và không ghi nợ.`}
       {onTopUp ? " Nạp thêm, thanh toán xong và chờ kích hoạt rồi mới dùng tiếp." : ""}
     </Alert></div>}
 
