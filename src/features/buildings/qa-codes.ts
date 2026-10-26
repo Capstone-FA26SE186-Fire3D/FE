@@ -6,9 +6,9 @@ export type QaAction = "equipment" | "reupload" | "editor";
 export type QaGuide = { title: string; guidance: string | null; action?: QaAction };
 
 const CODES: Record<string, QaGuide> = {
-  IFC_NO_BODY_GEOMETRY: { title: "Cấu kiện không có hình khối 3D", guidance: "Xuất lại IFC có biểu diễn 3D (Body) cho tường, sàn, cửa và cầu thang.", action: "reupload" },
+  IFC_NO_BODY_GEOMETRY: { title: "Cấu kiện không có hình khối 3D", guidance: "Xuất lại IFC có hình khối 3D cho tường, sàn, cửa và cầu thang.", action: "reupload" },
   IFC_BODY_NONSTANDARD_CONTEXT: { title: "Hình khối 3D được xuất theo cách không chuẩn", guidance: null },
-  IFC_NO_SPACES: { title: "Mô hình không có phòng (IfcSpace)", guidance: "Bật xuất phòng/vùng (rooms/zones) trong phần mềm thiết kế rồi tải lại IFC.", action: "reupload" },
+  IFC_NO_SPACES: { title: "Mô hình không có phòng", guidance: "Bật xuất phòng trong phần mềm thiết kế rồi tải lại IFC.", action: "reupload" },
   IFC_SPACE_UNNAMED: { title: "Phòng chưa có tên", guidance: "Đặt tên phòng trong mô hình, hoặc ghi chú/phân loại phòng trong trình soạn kịch bản." },
   IFC_EXIT_UNKNOWN: { title: "Chưa xác định được cửa thoát ra ngoài", guidance: "Chọn một cửa có sẵn làm lối thoát ở mục Thiết bị phát hiện từ IFC; không cần tải lại IFC.", action: "equipment" },
   IFC_NO_FIRE_EQUIPMENT: { title: "IFC không có thiết bị báo cháy/chữa cháy", guidance: "Đặt thiết bị trong trình soạn kịch bản.", action: "editor" },

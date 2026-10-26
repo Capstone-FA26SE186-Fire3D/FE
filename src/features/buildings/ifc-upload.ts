@@ -168,7 +168,7 @@ export function classifyUploadError(stage: IfcUploadStage, cause: unknown): IfcU
   if (cause instanceof TypeError) {
     return new IfcUploadError(stage, "Mất kết nối tới máy chủ. Kiểm tra mạng rồi thử lại.", { retryable: true });
   }
-  return new IfcUploadError(stage, cause instanceof Error ? cause.message : "Không thể hoàn tất bước này.", { retryable: true });
+  return new IfcUploadError(stage, "Không thể hoàn tất bước này. Hãy thử lại.", { retryable: true });
 }
 
 export type InitiatedUpload = {

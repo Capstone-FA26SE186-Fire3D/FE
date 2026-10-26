@@ -82,7 +82,7 @@ export function PreviewPanel({ accessToken, buildingId, revisionId, reloadKey, h
   } else if (data && hasRuntimePreview(data)) {
     body = <>
       <RuntimePreviewViewer key={data.downloadUrl} downloadUrl={data.downloadUrl} onLoadError={renewUrl} highlight={highlight} semanticMapping={data.semanticMapping} />
-      {highlight && highlight.length > 0 && <p className="bd-preview-highlight" data-testid="preview-highlight-ids">Đang đánh dấu: <span className="ops-mono">{highlight.slice(0, 5).join(", ")}{highlight.length > 5 ? ` và ${highlight.length - 5} cấu kiện khác` : ""}</span></p>}
+      {highlight && highlight.length > 0 && <p className="bd-preview-highlight" data-testid="preview-highlight-ids">Đang đánh dấu {highlight.length} cấu kiện</p>}
     </>;
   } else {
     body = <Alert tone="warning" title="Chưa mở được bản xem trước 3D">Hệ thống chưa gửi được liên kết tải mô hình. Hãy bấm Tải lại sau ít phút.</Alert>;
