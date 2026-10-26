@@ -255,6 +255,8 @@ kbd { display: inline-block; min-width: 18px; padding: 1px 5px; border: 1px soli
 
 /* ───────── Loading: spinner, blocks, skeleton layouts, reveal ───────── */
 .ops-submit { position: relative; min-width: 120px; }
+/* The label (icon + text) stays on one line: the icon used to wrap above the text in narrow footers. */
+.ops-submit > span { display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
 .ops-submit[data-state="done"] { background: var(--success); color: var(--ember-foreground); }
 .ops-submit-check { animation: ops-pop-check 320ms cubic-bezier(.2,.8,.2,1); }
 @keyframes ops-pop-check { from { transform: scale(.4); opacity: 0; } }

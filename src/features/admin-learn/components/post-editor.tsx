@@ -27,9 +27,11 @@ import { lifecycleBody, lifecycleCopy, lifecycleFor, postStatusView, publishBloc
 import type { AdminPost, AdminVersion, LifecycleOperation, VersionSummary, WithEtag } from "../types";
 import { isMediaRefused, useMediaChecks } from "../use-media-checks";
 import { useSourceFlags } from "../use-source-flags";
-import { wordCount } from "../doc-actions";
+import { wordCount, type RichSelection } from "../doc-actions";
+import { httpsUrl } from "@/features/learn/safe-url";
 import { ContentFields } from "./content-fields";
 import { DocToolbar } from "./doc-toolbar";
+import { ImageUpload } from "./image-upload";
 import { ReaderPreview } from "./reader-preview";
 import { BlockEditor } from "./learn-blocks";
 import { PublishPanel } from "./publish-panel";
@@ -96,10 +98,13 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
   const [view, setView] = useState<"edit" | "preview">("edit");
   const [active, setActive] = useState(-1);
   const [focusId, setFocusId] = useState<string | null>(null);
+  // The caret or selection in a text field, for the toolbar's text tools (cleared when the focus leaves the blocks' text).
+  const [richSelection, setRichSelection] = useState<RichSelection | null>(null);
   // Page-wide undo/redo (block moves and type changes too); typing within a field coalesces into one step.
   const [history, setHistory] = useState<{ past: EditorContent[]; future: EditorContent[] }>({ past: [], future: [] });
   const lastEdit = useRef(0);
   const media = useMediaChecks(accessToken);
+  const uploadImage = (file: File, idempotencyKey: string) => learnAdminApi.uploadImage(accessToken, file, idempotencyKey).then((image) => image.url);
   const { flags, known } = useSourceFlags(accessToken, form.sources);
 
   const status = post.data.publicationStatus;
@@ -110,6 +115,7 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
   const clientIssues = checkContent(form);
   const refusedVideo = form.blocks.some((block) => block.type === "video" && isMediaRefused(media.checks, block.id, block.fields.url));
   const shownIssues: ContentIssue[] = [...(showIssues ? clientIssues : []), ...(serverIssues && serverIssues.print === print ? serverIssues.issues : [])];
+  const coverPreview = httpsUrl(form.coverImageUrl.trim());
   const issueFor = (path: string) => shownIssues.find((issue) => issue.path === path)?.message;
 
   const sourceProblems = form.sources.flatMap((entry) => {
@@ -333,14 +339,20 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
         {!isDraft && status !== "Deleted" && version && <Alert tone="info" title="Đang xem bản đã xuất bản (không sửa được)" action={<Button size="sm" className="mt-3" disabled={busy} onClick={() => start({ kind: "newVersion" })}><FilePlus2 size={16} aria-hidden="true" />Tạo bản nháp mới từ v{version.data.versionNumber}</Button>}>Không sửa trực tiếp bản đã xuất bản. Tạo bản nháp mới để chỉnh sửa; bản công khai hiện tại giữ nguyên tới khi bản mới được xuất bản.</Alert>}
         {status === "Deleted" && <Alert tone="warning" title="Bài đã bị xóa (vẫn khôi phục được)">Khôi phục bài (thẻ Trạng thái hoặc “Phiên bản & Xuất bản”) trước khi sửa, tạo bản nháp hay xuất bản.</Alert>}
         {view === "preview" ? <div className="doc-paper doc-paper-preview"><ReaderPreview form={form} checks={media.checks} /></div> : <>
-          {!readOnly && <DocToolbar blocks={form.blocks} active={active} disabled={busy} canUndo={history.past.length > 0} canRedo={history.future.length > 0} onUndo={undo} onRedo={redo}
+          {!readOnly && <DocToolbar blocks={form.blocks} active={active} selection={richSelection} disabled={busy} canUndo={history.past.length > 0} canRedo={history.future.length > 0} onUndo={undo} onRedo={redo}
             onBlocks={(blocks, id) => { edit((current) => ({ ...current, blocks })); if (id) { setFocusId(id); setActive(blocks.findIndex((block) => block.id === id)); } }} />}
-          <fieldset disabled={busy || readOnly} className="doc-paper" aria-label="Trang soạn bài">
-            <Field label="Ảnh bìa (https, không bắt buộc)" className="doc-cover" error={issueFor("$.coverImageUrl")}>{(p) => <Input {...p} inputMode="url" placeholder="Dán đường dẫn ảnh bìa https (tải ảnh từ máy: sắp có)" value={form.coverImageUrl} onChange={(event) => edit((current) => ({ ...current, coverImageUrl: event.target.value }))} />}</Field>
+          <fieldset disabled={busy || readOnly} className="doc-paper" aria-label="Trang soạn bài" onFocusCapture={(event) => { if (!(event.target as HTMLElement).closest("[data-rich-key]")) setRichSelection(null); }}>
+            <div className="doc-cover">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {coverPreview && <img className="doc-cover-preview" src={coverPreview} alt="" referrerPolicy="no-referrer" data-testid="cover-preview" />}
+              {!readOnly && <ImageUpload label={coverPreview ? "Đổi ảnh bìa: tải ảnh khác từ máy" : "Tải ảnh bìa từ máy"} upload={uploadImage} onUrl={(url) => edit((current) => ({ ...current, coverImageUrl: url }))} disabled={busy} compact />}
+              <Field label="Ảnh bìa (https, không bắt buộc)" error={issueFor("$.coverImageUrl")}>{(p) => <Input {...p} inputMode="url" placeholder="Hoặc dán đường dẫn ảnh bìa https" value={form.coverImageUrl} onChange={(event) => edit((current) => ({ ...current, coverImageUrl: event.target.value }))} />}</Field>
+            </div>
             <Field label="Tiêu đề" required className="doc-title" error={issueFor("$.title")}>{(p) => <Textarea {...p} rows={1} maxLength={255} placeholder="Tiêu đề bài" value={form.title} onChange={(event) => edit((current) => ({ ...current, title: event.target.value.replace(/\n/g, " ") }))} />}</Field>
             <Field label="Tóm tắt" required className="doc-lede" hint={`${form.summary.length}/2000 · hiện ở danh sách bài và dưới video`} error={issueFor("$.summary")}>{(p) => <Textarea {...p} rows={2} maxLength={2000} placeholder="Tóm tắt một–hai câu cho người đọc" value={form.summary} onChange={(event) => edit((current) => ({ ...current, summary: event.target.value }))} />}</Field>
             <hr className="doc-rule" />
             <BlockEditor doc blocks={form.blocks} disabled={readOnly} issues={shownIssues} checks={media.checks} onCheck={(blockId, url) => void media.check(blockId, url)} active={active} onActive={setActive} focusId={focusId}
+              onRichSelect={setRichSelection} onUndo={undo} onRedo={redo} uploadImage={readOnly ? undefined : uploadImage}
               onChange={(blocks) => edit((current) => ({ ...current, blocks }))} />
           </fieldset>
         </>}
@@ -376,7 +388,7 @@ function EditorBody({ accessToken, initialPost, initialVersion, screen, onTab, o
           {isDraft && status !== "Deleted" && publishReasons.length > 0 && <ul className="learn-reasons">{publishReasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>}
         </Panel>
         {!readOnly && <Panel title="Phím tắt" bodyClassName="doc-keys">
-          <p><kbd>/</kbd> Chèn khối</p><p><kbd>Enter</kbd> Đoạn mới</p><p><kbd>Shift</kbd>+<kbd>Enter</kbd> Xuống dòng</p><p><kbd>Ctrl</kbd>+<kbd>S</kbd> Lưu bản nháp</p>
+          <p><kbd>/</kbd> Chèn khối</p><p><kbd>Enter</kbd> Đoạn mới</p><p><kbd>Shift</kbd>+<kbd>Enter</kbd> Xuống dòng</p><p><kbd>Ctrl</kbd>+<kbd>B</kbd> <kbd>I</kbd> <kbd>U</kbd> Đậm, nghiêng, gạch chân</p><p><kbd>Ctrl</kbd>+<kbd>Z</kbd> Hoàn tác · <kbd>Ctrl</kbd>+<kbd>Y</kbd> Làm lại</p><p><kbd>Ctrl</kbd>+<kbd>S</kbd> Lưu bản nháp</p>
         </Panel>}
       </aside>
     </div>}

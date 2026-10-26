@@ -75,6 +75,9 @@ export type KnowledgeSource = {
   canPublishReference: boolean;
 };
 
+/** A completed Learn image upload (BE#171); `url` goes into `coverImageUrl` or an image block. */
+export type LearnImage = { imageId: string; url: string; width: number; height: number };
+
 export type MediaDescriptor = { provider: string; videoId: string; canonicalUrl: string };
 
 /** Wire form of a version for POST /posts (inside `version`), POST /posts/{id}/versions and PUT /versions/{id}. */

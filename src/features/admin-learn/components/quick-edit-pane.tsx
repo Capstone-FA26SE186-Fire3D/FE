@@ -6,7 +6,7 @@ import { useAsyncData } from "@/api/use-async-data";
 import { formatDateTime } from "@/components/ops/detail-parts";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Drawer, Modal } from "@/components/ui/dialog";
+import { Modal } from "@/components/ui/dialog";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { SkeletonDetail } from "@/components/ui/skeleton";
 import { SubmitButton } from "@/components/ui/spinner";
@@ -28,7 +28,7 @@ type Operation = { kind: "publish" } | { kind: "lifecycle"; operation: Lifecycle
 const DRAWER_ID = "learn-quick-drawer";
 
 /**
- * "Sửa nhanh" drawer (Figma 53:1009), opened by a row click (`?quick=<id>`): title, summary and situations of the post's
+ * "Sửa nhanh" popup (Figma 53:1009; a centered dialog like the other editors since 26/10), opened by a row click (`?quick=<id>`): title, summary and situations of the post's
  * working version (newest Draft, else the newest version), save, publish and the lifecycle commands its status allows,
  * plus "Mở trình soạn đầy đủ". It loads the post detail on open because the list only carries the published version.
  * Every write goes through the same api functions, ETags and Idempotency-Key intents as the full editor.
@@ -40,11 +40,11 @@ export function QuickEditDrawer({ accessToken, postId, fallbackName, onClose, on
   const loaded = useAsyncData<LoadedPost>(`learn-quick:${postId}:${rev}`, (signal) => loadPostWithVersion(accessToken, postId, "", signal), true, { keepPrevious: false });
   const view = loaded.error !== undefined && !loaded.data ? describeLearnError(loaded.error) : null;
   if (loaded.data) return <QuickBody key={`${loaded.data.post.data.id}:${loaded.data.version?.data.id ?? "none"}:${rev}`} accessToken={accessToken} initial={loaded.data} onClose={onClose} onOpenEditor={() => onOpenEditor(postId)} onChanged={onChanged} onReload={() => setRev((value) => value + 1)} />;
-  return <Drawer open onOpenChange={(open) => { if (!open) onClose(); }} size="md" data-testid={DRAWER_ID} title={fallbackName} description="Sửa nhanh tiêu đề, tóm tắt và tình huống." footer={<Button variant="quiet" onClick={onClose}>Đóng</Button>}>
+  return <Modal open onOpenChange={(open) => { if (!open) onClose(); }} size="md" data-testid={DRAWER_ID} title={fallbackName} description="Sửa nhanh tiêu đề, tóm tắt và tình huống." footer={<Button variant="quiet" onClick={onClose}>Đóng</Button>}>
     {view
       ? <Alert tone="danger" title={view.kind === "notFound" ? "Không tìm thấy bài" : "Không tải được bài"} action={view.kind === "notFound" ? undefined : <Button size="sm" variant="secondary" className="mt-3" onClick={loaded.reload}>Thử lại</Button>}>{view.message}</Alert>
       : <SkeletonDetail rows={5} />}
-  </Drawer>;
+  </Modal>;
 }
 
 function QuickBody({ accessToken, initial, onClose, onOpenEditor, onChanged, onReload }: { accessToken: string; initial: LoadedPost; onClose: () => void; onOpenEditor: () => void; onChanged: () => void; onReload: () => void }) {
@@ -150,7 +150,7 @@ function QuickBody({ accessToken, initial, onClose, onOpenEditor, onChanged, onR
   const copy = operation?.kind === "lifecycle" ? lifecycleCopy[operation.operation] : null;
   const kind = version?.data.kind ?? post.data.publishedVersion?.kind;
 
-  return <Drawer open onOpenChange={(open) => { if (!open && !busy) onClose(); }} size="md" data-testid={DRAWER_ID}
+  return <Modal open onOpenChange={(open) => { if (!open && !busy) onClose(); }} size="md" data-testid={DRAWER_ID}
     title={heading}
     description={[kind ? kindLabel[kind] : null, version ? `v${version.data.versionNumber}` : null, `cập nhật ${formatDateTime(post.data.updatedAt)}`].filter(Boolean).join(" · ")}
     eyebrow={<>
@@ -201,5 +201,5 @@ function QuickBody({ accessToken, initial, onClose, onOpenEditor, onChanged, onR
         {operationError && <Alert tone={operationError.kind === "stale" ? "warning" : "danger"} title={operationError.title}>{operationError.message}</Alert>}
       </div>
     </Modal>}
-  </Drawer>;
+  </Modal>;
 }

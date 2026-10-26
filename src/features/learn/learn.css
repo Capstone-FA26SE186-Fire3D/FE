@@ -107,6 +107,7 @@ ul.learn-list { list-style: disc; }
 .learn-callout[data-tone="warning"] { border-left-color: #f0b44c; }
 .learn-callout[data-tone="danger"] { border-left-color: #ff8f8f; }
 .learn-figure { margin: 0 0 24px; }
+.learn-divider { height: 0; margin: 28px 0; border: 0; border-top: 1px solid var(--line-strong, rgba(255, 255, 255, .18)); }
 .learn-figure img { display: block; max-width: 100%; height: auto; border-radius: 12px; background: var(--surface); }
 .learn-figure figcaption { margin-top: 8px; color: var(--muted); font-size: 13px; }
 .learn-video { display: grid; gap: 10px; margin: 0 0 24px; padding: 18px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); }

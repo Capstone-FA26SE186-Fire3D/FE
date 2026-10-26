@@ -166,6 +166,25 @@ test.describe("reader", () => {
     await expect(page.getByText("QCVN 06:2022")).toBeVisible();
   });
 
+  test("formatted runs, list item runs and dividers render as a fixed set of elements; unsafe links and tokens are dropped", async ({ page }) => {
+    await setup(page, "guest", (b) => { b.seedPost("co-dinh-dang", { title: "Có định dạng", status: "Published", blocks: [
+      { type: "paragraph", text: "Đi cầu thang bộ ngay", runs: [{ text: "Đi " }, { text: "cầu thang bộ", marks: ["bold", "underline"], color: "danger" }, { text: " ngay", highlight: "warning", link: "https://pccc.gov.vn/a" }] },
+      { type: "divider" },
+      { type: "list", ordered: false, items: ["Gọi 114", "Che mũi"], itemRuns: [[{ text: "Gọi " }, { text: "114", marks: ["bold"] }], [{ text: "Che mũi", link: "javascript:alert(1)", color: "#ff0000" }]] },
+    ] }); });
+    await page.goto("/learn/co-dinh-dang");
+    const body = page.locator(".article-body");
+    await expect(body.locator("p strong u")).toHaveText("cầu thang bộ");
+    await expect(body.locator('[data-color="danger"]')).toHaveText("cầu thang bộ");
+    const link = body.getByRole("link", { name: "ngay" });
+    await expect(link).toHaveAttribute("href", "https://pccc.gov.vn/a");
+    await expect(link).toHaveAttribute("rel", /noopener/);
+    await expect(body.locator("hr.learn-divider")).toHaveCount(1);
+    await expect(body.locator("ul.learn-list li").first().locator("strong")).toHaveText("114");
+    await expect(body.locator("ul.learn-list li").nth(1)).toHaveText("Che mũi");
+    await expect(body.locator("ul.learn-list li").nth(1).locator("a, [data-color]")).toHaveCount(0);
+  });
+
   test("tab title and description follow the post (basic SEO)", async ({ page }) => {
     await setup(page, "guest", rich);
     await page.goto("/learn/doc-day-du");

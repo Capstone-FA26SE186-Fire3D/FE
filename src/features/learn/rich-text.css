@@ -1,0 +1,14 @@
+/* Formatted text (BE#172): theme colour and highlight tokens, shared by the public reader and the Learn editor. */
+.rt-run[data-color="ember"] { color: var(--ember, #ee8654); }
+.rt-run[data-color="danger"] { color: var(--danger, #ff8f8f); }
+.rt-run[data-color="warning"] { color: var(--warning, #f2c14e); }
+.rt-run[data-color="success"] { color: var(--success, #5fd08a); }
+.rt-run[data-color="info"] { color: var(--info, #7fb7ff); }
+.rt-run[data-highlight] { padding: 0 .12em; border-radius: 3px; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.rt-run[data-highlight="ember"] { background: var(--ember-soft, rgba(238, 134, 84, .18)); }
+.rt-run[data-highlight="danger"] { background: var(--danger-soft, rgba(255, 143, 143, .18)); }
+.rt-run[data-highlight="warning"] { background: var(--warning-soft, rgba(242, 193, 78, .2)); }
+.rt-run[data-highlight="success"] { background: var(--success-soft, rgba(95, 208, 138, .18)); }
+.rt-run[data-highlight="info"] { background: var(--info-soft, rgba(127, 183, 255, .18)); }
+.rt-link { color: var(--ember, #ee8654); text-decoration: underline; text-underline-offset: 2px; }
+.rt-link:hover { text-decoration-thickness: 2px; }
