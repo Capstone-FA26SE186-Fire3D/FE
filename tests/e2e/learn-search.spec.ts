@@ -9,11 +9,11 @@ import { fold, installLearnBackend, LearnBackend, signIn } from "./learn-mock";
  */
 
 const LIST = /^\/api\/learn\/posts$/;
-const cards = (page: Page) => page.locator(".learn-card");
+const cards = (page: Page) => page.locator("[data-learn-post]");
 const count = (page: Page) => page.locator(".learn-result-count");
 const box = (page: Page) => page.getByRole("searchbox", { name: "Tìm bài học" });
 const listCalls = (backend: LearnBackend) => backend.callsTo("GET", LIST).map((call) => new URLSearchParams(call.search));
-const titles = (page: Page) => cards(page).locator("h2").allTextContents();
+const titles = (page: Page) => cards(page).locator("[data-learn-title]").allTextContents();
 
 async function setup(page: Page, seed: (backend: LearnBackend) => void) {
   const backend = new LearnBackend();
