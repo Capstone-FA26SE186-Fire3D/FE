@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
+import { LIBRARY_USE_PARAM } from "@/features/library/use-param";
 import { AI_PROPOSAL_PARAM } from "@/features/org-ai/proposal-param";
 
 import "./editor.css";
@@ -28,14 +29,15 @@ export function ScenarioEditor({ buildingId, scenarioId }: { buildingId: string;
   const params = useSearchParams();
   const pathname = usePathname();
   const draftId = params.get("draft");
-  // A stored AI proposal chosen on /workspace/ai follows the author to the draft they open; it is only a request id.
+  // A stored AI proposal chosen on /workspace/ai, or a sample chosen on /workspace/library, follows the author to the draft they open; both are ids only.
   const aiRequest = params.get(AI_PROPOSAL_PARAM);
+  const carried = [AI_PROPOSAL_PARAM, LIBRARY_USE_PARAM].flatMap((name) => { const value = params.get(name); return value ? [`&${name}=${encodeURIComponent(value)}`] : []; }).join("");
   const probe = useDraftProbe(accessToken, draftId);
   const backHref = `${routes.workspaceBuildings}/${buildingId}/scenarios/${scenarioId}`;
 
   if (!accessToken) return <EditorSkeleton />;
   if (!draftId) {
-    return <DraftStart accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} onOpen={(id) => window.history.replaceState(null, "", `${pathname}?draft=${encodeURIComponent(id)}${aiRequest ? `&${AI_PROPOSAL_PARAM}=${encodeURIComponent(aiRequest)}` : ""}`)} />;
+    return <DraftStart accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} onOpen={(id) => window.history.replaceState(null, "", `${pathname}?draft=${encodeURIComponent(id)}${carried}`)} />;
   }
   const state = probe.state;
   if (state.phase === "loading") return <EditorSkeleton />;
