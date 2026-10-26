@@ -56,6 +56,8 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
 
   const training = useAsyncData(`training:${trainingKey}`, (signal) => analyticsApi.training(accessToken as string, scope, range, signal, requestFilters), enabled && tab === "training", { keepWhenDenied: true });
   const operations = useAsyncData(`operations:${key}`, (signal) => analyticsApi.operations(accessToken as string, scope, range, signal), enabled && tab === "operations", { keepWhenDenied: true });
+  // The operations tab's "Hoạt động huấn luyện theo ngày" line chart: daily cohorts of the same period, without the training filters.
+  const activity = useAsyncData(`activity:${key}`, (signal) => analyticsApi.training(accessToken as string, scope, range, signal, { groupBy: "day" }), enabled && tab === "operations", { keepWhenDenied: true });
   const revenue = useAsyncData(`revenue:${key}`, (signal) => analyticsApi.revenue(accessToken as string, range, signal), enabled && tab === "revenue" && variant === "platform", { keepWhenDenied: true });
   const names = useAsyncData("analytics:organization-names", () => accountsApi.organizations(accessToken as string).then((page) => new Map(page.items.map((item) => [item.id, item.name]))), enabled && tab === "training" && variant === "platform");
 
@@ -116,7 +118,7 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
       {toolbar}
       <RangeError message={rangeError} />
       <TabsContent value="training">{!rangeError && <ReportShell query={training} title="báo cáo huấn luyện">{(data) => <TrainingReportView data={data} groupBy={requestFilters.groupBy} organizationNames={names.data} showOrganizationLinks={variant === "platform"} />}</ReportShell>}</TabsContent>
-      <TabsContent value="operations">{!rangeError && <ReportShell query={operations} title="báo cáo vận hành">{(data) => <OperationsReportView data={data} scope={variant === "organization" ? "organization" : variant === "platform" ? "platform" : "admin-organization"} organizationId={organizationId} />}</ReportShell>}</TabsContent>
+      <TabsContent value="operations">{!rangeError && <ReportShell query={operations} title="báo cáo vận hành">{(data) => <OperationsReportView data={data} scope={variant === "organization" ? "organization" : variant === "platform" ? "platform" : "admin-organization"} organizationId={organizationId} activity={{ report: activity.data, loading: activity.loading && !activity.data, failed: activity.error !== undefined && !activity.data }} />}</ReportShell>}</TabsContent>
       {variant === "platform" && <TabsContent value="revenue">{!rangeError && <ReportShell query={revenue} title="báo cáo doanh thu">{(data) => <RevenueReportView data={data} />}</ReportShell>}</TabsContent>}
     </Tabs>
   </div>;

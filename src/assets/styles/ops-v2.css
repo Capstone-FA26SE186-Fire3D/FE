@@ -201,6 +201,7 @@ kbd { display: inline-block; min-width: 18px; padding: 1px 5px; border: 1px soli
 /* ───────── Chart kit ───────── */
 .ops-chart-card { display: grid; gap: 14px; min-width: 0; padding: 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); contain: layout style; }
 .ops-chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.ops-chart-head > .ops-actions { flex: none; white-space: nowrap; }
 .ops-chart-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
 .ops-chart-head p { margin: 2px 0 0; color: var(--dim); font-size: 12px; }
 .ops-chart-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: -4px 0 0; padding: 0; list-style: none; color: var(--muted); font-size: 12px; }
