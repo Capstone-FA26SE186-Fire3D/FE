@@ -226,7 +226,7 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
       </div>
     </div>
     {versions.loading && !versions.data && <SkeletonRows rows={4} label="Đang tải phiên bản…" />}
-    {versions.data && items.length === 0 && <EmptyState icon={GitCommitVertical} title="Chưa có phiên bản nào" description="Hoàn tất bản nháp ở trình soạn kịch bản rồi tạo phiên bản bất biến đầu tiên." action={<Button onClick={openSnapshot} onPointerEnter={() => void loadSnapshotDialog()} disabled={!canAct}><Camera size={16} aria-hidden="true" />Tạo phiên bản đầu tiên</Button>} />}
+    {versions.data && items.length === 0 && <EmptyState icon={GitCommitVertical} title="Chưa có phiên bản nào" description="Hoàn tất bản nháp ở trình soạn kịch bản rồi tạo phiên bản bất biến đầu tiên." />}
     <ul className="ver-version-list">
       {items.map((item) => {
         const gate = item.reviewStatus ? approvalGate(item.reviewStatus, item.rejectReason) : undefined;

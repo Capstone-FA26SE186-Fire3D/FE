@@ -92,7 +92,7 @@ export function PoliciesSection({ accessToken }: { accessToken: string }) {
         <Button variant="quiet" onClick={list.reload} disabled={list.loading} aria-label="Tải lại danh sách"><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
         <Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo phiên bản</Button>
       </>}
-      empty={<EmptyState icon={Gauge} title="Chưa có chính sách hạn mức" description="Tạo phiên bản đầu tiên (đơn vị và khoảng hiệu lực) trước khi cấu hình gói có hạn mức AI hoặc phát hành báo giá nạp thêm." action={<Button onClick={openCreate}>Tạo phiên bản</Button>} />}
+      empty={<EmptyState icon={Gauge} title="Chưa có chính sách hạn mức" description="Tạo phiên bản đầu tiên (đơn vị và khoảng hiệu lực) trước khi cấu hình gói có hạn mức AI hoặc phát hành báo giá nạp thêm." />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
 

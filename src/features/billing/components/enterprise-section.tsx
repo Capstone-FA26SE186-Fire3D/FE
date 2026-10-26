@@ -141,7 +141,7 @@ export function EnterpriseSection({ accessToken, defaultEmail, defaultName, onOp
       rowKey={(item) => item.id}
       loading={list.loading && !list.data}
       onRowClick={(item) => setParams({ request: item.id }, "replace")}
-      empty={<EmptyState icon={Mail} title="Chưa có yêu cầu" description="Yêu cầu bạn gửi sẽ hiện ở đây cùng trạng thái xử lý." action={<Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo yêu cầu</Button>} />}
+      empty={<EmptyState icon={Mail} title="Chưa có yêu cầu" description="Yêu cầu bạn gửi sẽ hiện ở đây cùng trạng thái xử lý." />}
       pagination={(list.data?.totalCount ?? 0) > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: list.data?.totalCount ?? 0, onPageChange: setPage } : undefined}
     />
 

@@ -239,7 +239,7 @@ test.describe("Admin AI: knowledge sources", () => {
     await open(page, mock, "/admin/ai?tab=sources");
     await page.getByTestId("source-new").click();
     const form = page.getByRole("form", { name: "Đăng ký nguồn tri thức" });
-    await form.getByLabel("Tính mã nội dung từ tệp").setInputFiles({ name: "doc.txt", mimeType: "text/plain", buffer: Buffer.from("abc") });
+    await form.getByLabel("Chọn tệp để tính mã nội dung").setInputFiles({ name: "doc.txt", mimeType: "text/plain", buffer: Buffer.from("abc") });
     // SHA-256("abc")
     await expect(form.getByLabel("Mã kiểm tra tài liệu")).toHaveValue("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     expect(mock.calls.filter((call) => call.method === "POST")).toHaveLength(0);

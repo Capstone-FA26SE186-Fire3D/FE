@@ -178,6 +178,10 @@ export function AccountProfile() {
   const uploadAvatar = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
+    await uploadAvatarFile(file);
+  };
+  /** Shared by the file picker and a drop on the "Đổi ảnh đại diện" button. */
+  const uploadAvatarFile = async (file: File | undefined) => {
     if (!file || !accessToken || !profile || !profileEtag) return;
     if (!supportedAvatarTypes.includes(file.type) || file.size > maxAvatarBytes) {
       setProblem("avatar", { message: "Ảnh đại diện phải là JPEG, PNG hoặc WebP và không vượt quá 5 MB.", fields: {}, stale: false });
@@ -241,7 +245,8 @@ export function AccountProfile() {
           <div style={{ minWidth: 0 }}><h2 style={{ margin: 0, fontSize: 18, overflowWrap: "anywhere" }}>{displayName}</h2><p style={{ margin: "3px 0 0", color: "var(--muted)", overflowWrap: "anywhere" }}>{displayUser?.email}</p></div>
         </div>
         <div className="ops-actions">
-          <label className="ops-file-button" data-disabled={avatarLocked ? "true" : undefined}>
+          <label className="ops-file-button" data-disabled={avatarLocked ? "true" : undefined} title="Bấm để chọn ảnh hoặc kéo thả ảnh vào đây"
+            onDragOver={(event) => { if (!avatarLocked) event.preventDefault(); }} onDrop={(event) => { event.preventDefault(); if (!avatarLocked) void uploadAvatarFile(event.dataTransfer.files?.[0]); }}>
             <Camera size={16} aria-hidden="true" />{saving.avatar ? "Đang tải ảnh…" : "Đổi ảnh đại diện"}
             <input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => void uploadAvatar(event)} disabled={avatarLocked} />
           </label>

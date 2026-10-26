@@ -871,6 +871,39 @@ test.describe("Docs-style editor (Trình soạn v3)", () => {
     await expect(blocks).toHaveCount(1);
   });
 
+  test("a numbered list is one line per item: numbers follow, Enter adds an item, Enter on an empty last item leaves the list", async ({ page }) => {
+    const backend = await setup(page);
+    await createDraft(page, "danh-sach", "Danh sách số", "Tóm tắt.", "Đoạn đầu.");
+    const blocks = page.getByTestId("content-block");
+    const first = blocks.first().getByLabel(/^Nội dung/);
+    await first.click();
+    await first.press("End");
+    await first.press("Enter");
+    await blocks.nth(1).getByLabel(/^Nội dung/).pressSequentially("/so");
+    await blocks.nth(1).getByLabel(/^Nội dung/).press("Enter");
+    const list = blocks.nth(1);
+    await expect(list).toHaveAttribute("data-block-type", "list");
+    const item1 = list.getByLabel("Mục 1");
+    await expect(item1).toBeFocused();
+    await item1.pressSequentially("Kiểm tra cửa");
+    await item1.press("Enter");
+    await list.getByLabel("Mục 2").pressSequentially("Che mũi");
+    await list.getByLabel("Mục 2").press("Enter");
+    await list.getByLabel("Mục 3").pressSequentially("Không đi thang máy");
+    await expect(list.locator(".doc-list-marker")).toHaveText(["1.", "2.", "3."]);
+    await list.getByLabel("Mục 3").press("Enter");
+    await list.getByLabel("Mục 4").press("Enter"); // empty last item: the list ends, a paragraph follows
+    await expect(list.locator(".doc-list-marker")).toHaveCount(3);
+    await expect(blocks).toHaveCount(3);
+    await expect(blocks.nth(2)).toHaveAttribute("data-block-type", "paragraph");
+    await expect(blocks.nth(2).getByLabel(/^Nội dung/)).toBeFocused();
+    await blocks.nth(2).getByLabel(/^Nội dung/).fill("Kết bài.");
+    await page.getByRole("button", { name: "Lưu bản nháp" }).click();
+    await expect(page.getByText("Đã lưu bản nháp").first()).toBeVisible();
+    const saved = backend.versionsOf(backend.bySlug("danh-sach")!.id)[0].blocks as Array<Record<string, unknown>>;
+    expect(saved[1]).toMatchObject({ type: "list", ordered: true, items: ["Kiểm tra cửa", "Che mũi", "Không đi thang máy"] });
+  });
+
   test("'Xem như người đọc' shows the unsaved page as the reader will see it; Ctrl+S saves", async ({ page }) => {
     const backend = await setup(page);
     await createDraft(page, "xem-truoc", "Xem trước bài", "Tóm tắt để xem.", "Nội dung để xem.");

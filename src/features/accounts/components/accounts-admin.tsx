@@ -211,7 +211,7 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
           <Combobox aria-label="Tổ chức" value={organizationId} onChange={(value) => setParams({ organizationId: value })} options={orgOptions} placeholder="Tổ chức: tất cả" searchPlaceholder="Tìm tổ chức…" groupLabel="Tổ chức" loading={organizations.loading && !organizations.data} clearable data-testid="accounts-organization-filter" />
         </div>
       </>}
-      empty={<EmptyState icon={filtering ? Search : Users} title={filtering ? "Không có tài khoản phù hợp." : "Chưa có tài khoản"} description={filtering ? "Thử đổi từ khóa hoặc bộ lọc." : "Tạo tài khoản đầu tiên cho tổ chức hoặc học viên."} action={!filtering ? <Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo tài khoản</Button> : undefined} />}
+      empty={<EmptyState icon={filtering ? Search : Users} title={filtering ? "Không có tài khoản phù hợp." : "Chưa có tài khoản"} description={filtering ? "Thử đổi từ khóa hoặc bộ lọc." : "Tạo tài khoản đầu tiên cho tổ chức hoặc học viên."} />}
       pagination={totalCount > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount, onPageChange: setPage } : undefined}
     />
     <p className="ops-field-hint" style={{ margin: "10px 0 0" }}>Vai trò và tổ chức không đổi được sau khi tạo.</p>

@@ -63,7 +63,7 @@ export function AdminAi() {
       title="AI và nguồn tri thức"
       description="Chính sách AI, nguồn tri thức đã duyệt và yêu cầu gần đây. AI chỉ trả lời dựa trên nguồn đã duyệt."
       breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "AI & nguồn tri thức" }]}
-      actions={<Button onClick={() => setParams({ ...clearTabParams(), tab: "sources", create: "1" })}><Plus size={16} aria-hidden="true" />Đăng ký nguồn</Button>}
+      actions={<Button data-testid="source-new" onClick={() => setParams({ ...clearTabParams(), tab: "sources", create: "1" })}><Plus size={16} aria-hidden="true" />Đăng ký nguồn</Button>}
     />
     <KpiRow label="Tổng quan AI">
       <KpiTile label="Nguồn tri thức" value={formatCount(sources.data?.total)} loading={sources.loading && !sources.data} hint={drafts.data ? `${formatCount(drafts.data.total)} chưa duyệt` : "Từ máy chủ"} />

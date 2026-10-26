@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { FileDrop } from "@/components/ui/file-drop";
 import { ask, upload, type ChatResponse } from "../api";
 
 export function RagConsole() {
@@ -10,7 +11,7 @@ export function RagConsole() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState<"upload" | "chat" | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [loaded, setLoaded] = useState<File | null>(null);
   const pending = useRef<AbortController | null>(null);
   useEffect(() => () => pending.current?.abort(), []);
 
@@ -29,14 +30,14 @@ export function RagConsole() {
       }
     } finally {
       pending.current = null;
-      if (!controller.signal.aborted) { setBusy(null); if (fileRef.current) fileRef.current.value = ""; }
+      if (!controller.signal.aborted) setBusy(null);
     }
   }
 
   return <Card className="rag-panel" aria-busy={busy !== null}>
-    <label className="rag-file flex flex-col gap-3">Tài liệu thử nghiệm (.txt, .md, .pdf)
-      <input ref={fileRef} className="block min-h-11 w-full min-w-0 text-xs text-[var(--muted)]" type="file" accept=".txt,.md,.pdf" disabled={busy !== null} onChange={event => void run("upload", event.target.files?.[0])} />
-    </label>
+    <div className="rag-file flex flex-col gap-3"><span>Tài liệu thử nghiệm (.txt, .md, .pdf)</span>
+      <FileDrop label="Chọn tài liệu thử nghiệm" accept=".txt,.md,.pdf" file={loaded} disabled={busy !== null} busy={busy === "upload" ? "Đang nạp tài liệu…" : undefined} rejectText="Chỉ nhận tệp .txt, .md hoặc .pdf." onFile={(file) => { if (file) { setLoaded(file); void run("upload", file); } }} compact />
+    </div>
     <textarea aria-label="Câu hỏi RAG" value={question} onChange={event => setQuestion(event.target.value)} placeholder="Hỏi về tài liệu đã nạp..." disabled={busy !== null} />
     <div className="flex flex-wrap items-center gap-3"><Button disabled={busy !== null || !question.trim()} onClick={() => void run("chat")}>{busy === "upload" ? "Đang nạp tài liệu..." : busy === "chat" ? "Đang hỏi..." : "Hỏi tài liệu"}</Button>
       {message && <p role={error ? "alert" : "status"} className="text-sm text-[var(--muted)]">{message}</p>}
