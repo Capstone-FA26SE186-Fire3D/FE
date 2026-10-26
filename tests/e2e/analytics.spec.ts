@@ -95,6 +95,11 @@ test.describe("organization analytics", () => {
     const periods = page.getByTestId("chart-periods");
     await expect(periods.getByRole("heading", { name: "Phiên theo ngày" })).toBeVisible();
     await expect(periods.getByRole("list", { name: "Chú giải" }).getByRole("listitem")).toHaveText([/Lượt chơi/, /Có kết quả/, /Đạt/]);
+    // Columns cover the whole period: the server sent only 01/10 and 02/10, the quiet days from 12/09 are zero columns.
+    const axis = periods.locator("svg.recharts-surface");
+    await expect(axis.getByText("12/09", { exact: true })).toBeVisible();
+    await expect(axis.getByText("12/10", { exact: true })).toBeVisible();
+    await expect(periods.locator(".recharts-bar")).toHaveCount(3);
     await periods.getByText("Xem bảng số liệu").click();
     await expect(periods.getByRole("table", { name: "Số liệu theo nhóm" }).getByRole("row", { name: /2026-10-02\s*28/ })).toBeVisible();
     const outcomes = page.getByTestId("chart-outcomes");
