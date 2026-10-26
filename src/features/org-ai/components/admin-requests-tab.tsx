@@ -8,7 +8,7 @@ import { useIdempotencyKey } from "@/api/idempotency";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { ChartCard } from "@/components/charts/chart-card";
-import { Donut } from "@/components/charts/lazy";
+import { StatusBreakdown } from "@/components/charts/status-breakdown";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
@@ -99,20 +99,21 @@ function AdminDetail({ accessToken, request, refresh, orgName }: { accessToken: 
 }
 
 /**
- * Donut "Yêu cầu theo trạng thái" from the platform training report (`aiUsage.requests`): counts the BE already computes
+ * "Yêu cầu theo trạng thái" (status breakdown) from the platform training report (`aiUsage.requests`): counts the BE already computes
  * for the last 30 days, never derived from the current page. Shown under the table (Figma places it beside it on 1440).
  */
 function StatusDonut({ usage }: { usage: RequestUsage }) {
   const slices = useMemo(() => {
     const counts = usage.data ?? {};
-    const known = AI_STATUSES.map((status) => ({ key: status, label: statusLabel(status), value: counts[status] ?? 0, color: toneColor(status) }));
+    const known = AI_STATUSES.map((status) => ({ key: status, label: statusLabel(status), value: counts[status] ?? 0, color: toneColor(status), pattern: status === "Accepted" ? "stripes" as const : undefined }));
     const extra = Object.entries(counts).filter(([status]) => !(AI_STATUSES as readonly string[]).includes(status)).map(([status, value]) => ({ key: status, label: statusLabel(status), value, color: "var(--dim)" }));
     return [...known, ...extra];
   }, [usage.data]);
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
-  return <ChartCard title="Yêu cầu theo trạng thái" description="30 ngày gần nhất · từ báo cáo sử dụng AI của máy chủ" height={170} loading={usage.loading} empty={!usage.loading && (usage.failed || !usage.data || total === 0)} emptyText={usage.failed ? "Chưa đọc được báo cáo sử dụng AI" : "Chưa có yêu cầu AI trong 30 ngày"} data-testid="ai-status-chart"
+  return <ChartCard title="Yêu cầu theo trạng thái" description="30 ngày gần nhất · từ báo cáo sử dụng AI của máy chủ" height={124} loading={usage.loading} empty={!usage.loading && (usage.failed || !usage.data || total === 0)} emptyText={usage.failed ? "Chưa đọc được báo cáo sử dụng AI" : "Chưa có yêu cầu AI trong 30 ngày"} data-testid="ai-status-chart"
     table={<table className="ops-table"><caption className="ops-sr-only">Yêu cầu theo trạng thái</caption><thead><tr><th>Trạng thái</th><th>Số yêu cầu</th></tr></thead><tbody>{slices.map((slice) => <tr key={slice.key}><td>{slice.label}</td><td>{formatNumber(slice.value)}</td></tr>)}</tbody></table>}>
-    <Donut slices={slices} center={{ value: formatNumber(total), caption: "yêu cầu" }} />
+    <StatusBreakdown parts={slices} unit="yêu cầu AI" format={formatNumber}
+      headline={<>Thành công <strong>{formatNumber(usage.data?.Succeeded ?? 0)}</strong> / {formatNumber(total)} yêu cầu</>} />
   </ChartCard>;
 }
 
@@ -121,6 +122,7 @@ function toneColor(status: string) {
     case "Succeeded": return "var(--success)";
     case "Failed": case "Rejected": return "var(--danger)";
     case "NeedsReconcile": return "var(--warning)";
+    case "Accepted": return "var(--dim)";
     default: return "var(--info)";
   }
 }
