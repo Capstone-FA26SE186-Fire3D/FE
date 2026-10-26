@@ -75,7 +75,7 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
     await expect(dialog.getByText(/Nội dung bạn nhập vẫn được giữ lại/)).toBeVisible();
     await dialog.getByLabel("Tên công trình", { exact: true }).fill("Công trình B");
     await dialog.getByRole("button", { name: "Tạo công trình", exact: true }).click();
-    await expect(dialog.getByText(/Khóa chống tạo trùng đã được dùng cho nội dung khác/)).toBeVisible();
+    await expect(dialog.getByText(/Thao tác này đã được gửi với nội dung khác/)).toBeVisible();
     await dialog.getByRole("button", { name: "Tạo công trình", exact: true }).click();
     await expect(page).toHaveURL(/\/workspace\/buildings\/building-1\?tab=ifc$/);
     expect(new Set(writes.map((write) => write.key)).size).toBe(3);
