@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { BUILDING_ID, SCENARIO_ID } from "../fixtures/scenario-editor/fixture-building";
 import { EDITOR_URL, installEditorMocks, newMock, type MockState } from "../fixtures/scenario-editor/mock-api";
 import { ARTIFACT_ID, GEOMETRY_HASH, SAMPLE_RUNTIME_CATALOG } from "../fixtures/scenario-editor/v1-fixtures";
 import { installLibraryBackend, LibraryBackend, signIn, type Actor } from "./library-mock";
@@ -46,14 +47,14 @@ async function openBrowse(page: Page, who: Actor = "org", seed: (b: LibraryBacke
 }
 
 type Opened = { backend: LibraryBackend; mock: MockState };
-async function openEditor(page: Page, options: { state?: Record<string, unknown>; seed?: (b: LibraryBackend) => void; actor?: Actor } = {}): Promise<Opened> {
+async function openEditor(page: Page, options: { state?: Record<string, unknown>; seed?: (b: LibraryBackend) => void; actor?: Actor; query?: (b: LibraryBackend) => string } = {}): Promise<Opened> {
   const backend = new LibraryBackend();
   (options.seed ?? seedLibrary)(backend);
   backend.actor = options.actor ?? "org";
   const mock = newMock({ state: options.state ?? partial(), previewKind: "v1", catalog: SAMPLE_RUNTIME_CATALOG });
   await installEditorMocks(page, mock);
   await installLibraryBackend(page, backend);
-  await page.goto(EDITOR_URL);
+  await page.goto(`${EDITOR_URL}${options.query ? options.query(backend) : ""}`);
   await expect(page.getByTestId("scenario-editor")).toHaveAttribute("data-draft-mode", "v1");
   return { backend, mock };
 }
@@ -87,11 +88,35 @@ test.describe("/workspace/library (read only)", () => {
     await page.getByRole("button", { name: "Xem mẫu BINH-CO2" }).click();
     await expect(page).toHaveURL(/item=/);
     const drawer = page.getByRole("dialog");
-    // v2 drawer: the item name is the drawer title, the body holds the version details.
+    // centered popup: the item name is the dialog title, the body holds the version details.
     await expect(drawer.getByRole("heading", { name: "Bình CO2 5 kg" })).toBeVisible();
     await expect(drawer.getByTestId("version-preview")).toContainText("Không thêm năng lực cho ứng dụng");
     await expect(drawer).toContainText("Áp dụng là sao chép");
     expect(backend.calls.filter((call) => call.path.startsWith("/api/admin"))).toEqual([]);
+  });
+
+  test("Dùng làm mẫu: pick a Building and scenario, then go to that scenario with the sample id (never the content) in the URL", async ({ page }) => {
+    const backend = await openBrowse(page);
+    await page.route("**/api/buildings?*", (route) => route.fulfill({ json: { items: [{ id: BUILDING_ID, name: "Tòa văn phòng A" }], total: 1, totalCount: 1, page: 1, pageSize: 100 } }));
+    await page.route(`**/api/buildings/${BUILDING_ID}/scenarios?*`, (route) => route.fulfill({ json: { items: [{ id: SCENARIO_ID, name: "Thoát hiểm tầng một" }], total: 1, totalCount: 1, page: 1, pageSize: 100 } }));
+    const item = backend.item("TEMPLATE-SO-TAN");
+    await page.goto(`/workspace/library?item=${item.id}`);
+    await page.getByTestId("use-sample").click();
+    const dialog = page.getByTestId("use-sample-dialog");
+    await expect(dialog.getByTestId("use-sample-building")).toHaveValue(BUILDING_ID);
+    await expect(dialog.getByTestId("use-sample-scenario")).toHaveValue(SCENARIO_ID);
+    await page.route(`**/workspace/buildings/${BUILDING_ID}/scenarios/${SCENARIO_ID}?*`, (route) => route.fulfill({ body: "editor" }));
+    await dialog.getByTestId("use-sample-open").click();
+    await expect(page).toHaveURL(new RegExp(`/workspace/buildings/${BUILDING_ID}/scenarios/${SCENARIO_ID}\\?useSample=ScenarioTemplate%3A${item.id}`));
+  });
+
+  test("the editor opened with ?useSample= shows the Library tab on that sample, writes nothing and drops the parameter", async ({ page }) => {
+    const { mock } = await openEditor(page, { query: (b) => `&useSample=ScenarioTemplate:${b.item("TEMPLATE-SO-TAN").id}` });
+    await expect(tab(page, "Thư viện")).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByTestId("library-preview")).toContainText("Template sơ tán văn phòng");
+    await expect(page).not.toHaveURL(/useSample=/);
+    await expect(status(page)).toHaveText("Đã lưu");
+    expect(mock.puts).toHaveLength(0);
   });
 
   test("search and required-capability filters live in the page and the URL, narrow only the loaded page and say so", async ({ page }) => {
