@@ -236,3 +236,10 @@ ul.learn-list { list-style: disc; }
   .lv2-featured-cover { aspect-ratio: 16 / 10; border-radius: 16px; }
   .lv2-recent-cover { flex-basis: 72px; width: 72px; height: 72px; }
 }
+/* Embedded player: a still frame until play, then the allowlisted iframe; TikTok is portrait. */
+.lv2-video-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.lv2-video-frame img:not(.learn-cover-art) { object-fit: cover; object-position: center; }
+.lv2-video-frame[data-portrait] { aspect-ratio: 9 / 16; width: min(100%, 340px); margin: 0 auto; background: #000; }
+button.lv2-video-play { top: 50%; width: 68px; height: 68px; border: 0; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.35); transition: transform .15s ease; }
+button.lv2-video-play:hover { transform: translate(-50%, -50%) scale(1.06); }
+button.lv2-video-play:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
