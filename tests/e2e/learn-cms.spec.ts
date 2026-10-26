@@ -427,7 +427,7 @@ test.describe("media", () => {
     const backend = await setup(page);
     await createDraft(page, "co-video", "Có video", "Tóm tắt video.");
     const post = backend.bySlug("co-video")!;
-    await pickOption(page, page.getByRole("combobox", { name: "Loại bài" }), /^Video$/);
+    await page.getByRole("radiogroup", { name: "Loại bài" }).getByRole("radio", { name: /^Video/ }).click();
     const block = await addBlock(page, "video");
     await block.getByLabel(/^Liên kết video/).fill("https://vimeo.com/123456");
     await block.getByLabel(/^Liên kết video/).blur();
@@ -455,7 +455,7 @@ test.describe("media", () => {
     const backend = await setup(page);
     const dialog = await openNew(page);
     await fillBasics(dialog, "video-ngay", "Video ngay", "Tóm tắt.", "Mở đầu.");
-    await pickOption(page, dialog.getByRole("combobox", { name: "Loại bài" }), /^Video$/);
+    await dialog.getByRole("radiogroup", { name: "Loại bài" }).getByRole("radio", { name: /^Video/ }).click();
     await dialog.getByLabel(/^Liên kết video/).fill("https://vimeo.com/123456");
     await dialog.getByTestId("create-post").click();
     await expect(dialog.getByText(/Dùng liên kết đầy đủ từ YouTube/).first()).toBeVisible();
@@ -817,3 +817,71 @@ for (const width of [1440, 375]) {
     });
   }
 }
+
+test.describe("Docs-style editor (Trình soạn v3)", () => {
+  test("the slug follows the title, the card preview updates, and the editor opens on a page", async ({ page }, testInfo) => {
+    const backend = await setup(page);
+    const dialog = await openNew(page);
+    await dialog.getByLabel("Tiêu đề", { exact: true }).fill("Cháy hành lang tầng 3");
+    await expect(dialog.getByLabel(/^Đường dẫn rút gọn/)).toHaveValue("chay-hanh-lang-tang-3");
+    await expect(dialog.locator(".newpost-card")).toContainText("Cháy hành lang tầng 3");
+    await dialog.getByRole("radiogroup", { name: "Loại bài" }).getByRole("radio", { name: /^Mẹo/ }).click();
+    await expect(dialog.getByRole("radio", { name: /^Mẹo/ })).toHaveAttribute("aria-checked", "true");
+    await dialog.getByLabel(/^Tóm tắt/).fill("Tóm tắt ngắn.");
+    await dialog.getByLabel(/^Đoạn mở đầu/).fill("Mở đầu.");
+    await page.screenshot({ path: testInfo.outputPath("cms-new-post.png") });
+    await dialog.getByRole("button", { name: "Tạo và mở trình soạn" }).click();
+    await expect(page).toHaveURL(/post=[0-9a-f-]{36}/);
+    expect(backend.bySlug("chay-hanh-lang-tang-3")).toBeTruthy();
+    await expect(page.getByRole("toolbar", { name: "Định dạng bài" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "In đậm" })).toBeDisabled(); // waits for BE#172
+  });
+
+  test("Enter opens a paragraph, '/' turns it into a block, the toolbar restyles it and undo brings it back", async ({ page }) => {
+    await setup(page);
+    await createDraft(page, "doc-mode", "Soạn như tài liệu", "Tóm tắt.", "Đoạn đầu.");
+    const blocks = page.getByTestId("content-block");
+    await expect(blocks).toHaveCount(1);
+    const first = blocks.first().getByLabel(/^Nội dung/);
+    await first.click();
+    await first.press("End");
+    await first.press("Enter");
+    await expect(blocks).toHaveCount(2);
+    const second = blocks.nth(1).getByLabel(/^Nội dung/);
+    await expect(second).toBeFocused();
+    await second.pressSequentially("/tieu");
+    const menu = page.getByRole("listbox", { name: "Chèn khối" });
+    await expect(menu.getByRole("option")).toHaveText([/Tiêu đề lớn/, /Tiêu đề nhỏ/]);
+    await second.press("Enter");
+    await expect(blocks.nth(1)).toHaveAttribute("data-block-type", "heading");
+    const heading = blocks.nth(1).getByLabel("Nội dung tiêu đề");
+    await expect(heading).toBeFocused();
+    await heading.fill("Mục chính");
+    await page.getByLabel("Kiểu đoạn").selectOption("paragraph");
+    await expect(blocks.nth(1)).toHaveAttribute("data-block-type", "paragraph");
+    await blocks.nth(1).getByLabel(/^Nội dung/).click();
+    await page.getByRole("button", { name: "Danh sách chấm" }).click();
+    await expect(blocks.nth(1)).toHaveAttribute("data-block-type", "list");
+    await page.getByRole("button", { name: "Hoàn tác" }).click();
+    await expect(blocks.nth(1)).toHaveAttribute("data-block-type", "paragraph");
+    // Backspace in an emptied paragraph removes it.
+    const empty = blocks.nth(1).getByLabel(/^Nội dung/);
+    await empty.fill("");
+    await empty.press("Backspace");
+    await expect(blocks).toHaveCount(1);
+  });
+
+  test("'Xem như người đọc' shows the unsaved page as the reader will see it; Ctrl+S saves", async ({ page }) => {
+    const backend = await setup(page);
+    await createDraft(page, "xem-truoc", "Xem trước bài", "Tóm tắt để xem.", "Nội dung để xem.");
+    await page.getByLabel("Tiêu đề", { exact: true }).fill("Tiêu đề chưa lưu");
+    await page.getByRole("button", { name: "Xem như người đọc" }).click();
+    const preview = page.getByTestId("learn-reader-preview");
+    await expect(preview.getByRole("heading", { level: 1 })).toHaveText("Tiêu đề chưa lưu");
+    await expect(preview).toContainText("Nội dung để xem.");
+    await page.getByRole("button", { name: "Soạn", exact: true }).click();
+    await page.keyboard.press("Control+s");
+    await expect(page.getByText("Đã lưu bản nháp").first()).toBeVisible();
+    expect(backend.versionsOf(backend.bySlug("xem-truoc")!.id)[0].title).toBe("Tiêu đề chưa lưu");
+  });
+});

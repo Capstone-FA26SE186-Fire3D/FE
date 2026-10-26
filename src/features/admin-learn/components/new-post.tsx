@@ -12,20 +12,45 @@ import { newBlock, updateFields, type EditorBlock } from "../blocks";
 import { commandDone, commandKey } from "../command-keys";
 import { checkContent, checkSlug, emptyContent, fingerprint, toVersionInput, type ContentIssue, type EditorContent } from "../content";
 import { describeLearnError, translateIssue, type LearnErrorView } from "../errors";
+import { KIND_ART, KIND_ART_SIZE } from "@/features/learn/kind-art";
+import { kindLabel } from "@/features/learn/types";
+import { slugFromTitle } from "../doc-actions";
 import { ContentFields } from "./content-fields";
+import "@/features/learn/learn.css";
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
 
+/** The card the post will get in the public list, drawn from what is typed (Figma "Bài mới v3"). */
+function CardPreview({ form }: { form: EditorContent }) {
+  return <div className="newpost-preview" aria-hidden="true">
+    <p className="newpost-preview-label">Xem trước thẻ bài</p>
+    <div className="newpost-card">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <span className="newpost-card-art"><img src={KIND_ART[form.kind]} alt="" width={KIND_ART_SIZE.width} height={KIND_ART_SIZE.height} /></span>
+      <div className="newpost-card-body">
+        <span className="lv2-kind" data-kind={form.kind}>{kindLabel[form.kind]}</span>
+        <strong>{form.title.trim() || "Tiêu đề bài"}</strong>
+        <p>{form.summary.trim() || "Tóm tắt một–hai câu hiện ở đây."}</p>
+        <small>Chưa xuất bản</small>
+      </div>
+    </div>
+    <div className="newpost-tip"><strong>Sau khi tạo</strong><p>Trình soạn mở ra để thêm tiêu đề phụ, danh sách, khung lưu ý, ảnh, video và ảnh bìa. Bản nháp chưa ai thấy cho tới khi bạn xuất bản.</p></div>
+  </div>;
+}
+
 /**
- * "Bài mới" modal (Figma 53:758 · create = Modal): slug, title, kind, summary, situations, the opening paragraph (the
- * backend requires at least one block) and, for a Video post, its link. "Xuất bản ngay" sends `publish:true`, which the
- * backend does atomically. One Idempotency-Key per intent; the author lands in the editor to add the rest.
+ * "Bài mới" modal (Figma "Bài mới v3"): kind as picture cards, title with a slug suggested from it (editable until it is
+ * typed by hand), summary, situations, the opening paragraph (the backend requires at least one block) and, for a Video
+ * post, its link; a live card preview on the right. "Xuất bản ngay" sends `publish:true`, which the backend does
+ * atomically. One Idempotency-Key per intent; the author lands in the editor to add the rest.
  */
 export function NewPostModal({ accessToken, onClose, onCreated }: { accessToken: string; onClose: () => void; onCreated: (postId: string) => void }) {
   const toast = useToast();
   const formId = useId();
   const [form, setForm] = useState<EditorContent>(() => ({ ...emptyContent(), blocks: [newBlock("paragraph")] }));
-  const [slug, setSlug] = useState("");
+  // The slug follows the title until the author types one.
+  const [typedSlug, setTypedSlug] = useState<string | null>(null);
+  const slug = typedSlug ?? slugFromTitle(form.title);
   const [publishNow, setPublishNow] = useState(false);
   const [showIssues, setShowIssues] = useState(false);
   const [serverIssues, setServerIssues] = useState<{ print: string; issues: ContentIssue[] } | null>(null);
@@ -78,19 +103,20 @@ export function NewPostModal({ accessToken, onClose, onCreated }: { accessToken:
   const leave = () => { if (busy) return; if (started) setLeaving(true); else onClose(); };
 
   return <>
-    <Modal open onOpenChange={(open) => { if (!open) leave(); }} size="lg" title="Bài mới" description="Tạo bản nháp đầu tiên rồi soạn tiếp trong trình soạn. Bản đã xuất bản không sửa được nữa." data-testid="learn-new-post"
+    <Modal open onOpenChange={(open) => { if (!open) leave(); }} size="xl" title="Bài mới" description="Điền vài thông tin chính; phần nội dung soạn tiếp trong trình soạn ngay sau khi tạo." data-testid="learn-new-post"
       footer={<>
         <Button type="button" variant="quiet" disabled={busy} onClick={leave}>Hủy</Button>
-        <SubmitButton type="submit" form={formId} state={busy ? "busy" : "idle"} data-testid="create-post">{busy ? (publishNow ? "Đang xuất bản…" : "Đang tạo…") : error?.kind === "retry" ? "Thử lại" : publishNow ? "Tạo và xuất bản ngay" : "Tạo bản nháp"}</SubmitButton>
+        <SubmitButton type="submit" form={formId} state={busy ? "busy" : "idle"} data-testid="create-post">{busy ? (publishNow ? "Đang xuất bản…" : "Đang tạo…") : error?.kind === "retry" ? "Thử lại" : publishNow ? "Tạo và xuất bản ngay" : "Tạo và mở trình soạn"}</SubmitButton>
       </>}>
-      <form id={formId} className="ops-stack" onSubmit={(event) => { event.preventDefault(); void create(); }} noValidate>
+      <form id={formId} className="newpost-grid" onSubmit={(event) => { event.preventDefault(); void create(); }} noValidate>
+        <div className="ops-stack newpost-form">
         {error && error.code !== "SLUG_EXISTS" && <Alert tone={error.kind === "stale" ? "warning" : "danger"} title={error.title}>
           <span style={{ display: "grid", gap: 6 }}><span>{error.message}</span>{error.issues.length > 0 && <ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc" }}>{error.issues.map((issue, index) => <li key={index}>{translateIssue(issue).message}</li>)}</ul>}</span>
         </Alert>}
         {showIssues && (clientIssues.length > 0 || checkSlug(slug)) && <Alert tone="danger" title="Còn điểm cần sửa trước khi tạo bài"><ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc" }}>{checkSlug(slug) && <li>{checkSlug(slug)}</li>}{clientIssues.map((issue, index) => <li key={`${issue.path}-${index}`}>{issue.message}</li>)}</ul></Alert>}
         <ContentFields accessToken={accessToken} form={form} onChange={setKindBlocks} readOnly={false} busy={busy} issues={shown} compact
-          slugField={<Field label="Đường dẫn rút gọn" required hint="Chữ thường không dấu, số và dấu gạch ngang. Không đổi được sau khi tạo." error={showIssues || error?.code === "SLUG_EXISTS" ? slugProblem : undefined}>
-            {(p) => <Input {...p} maxLength={180} value={slug} onChange={(event) => { setSlug(event.target.value.toLowerCase()); if (error?.code === "SLUG_EXISTS") setError(null); }} />}
+          slugField={<Field label="Đường dẫn rút gọn" required hint="Tự tạo từ tiêu đề; sửa nếu muốn. Chữ thường không dấu, số và dấu gạch ngang; không đổi được sau khi tạo." error={showIssues || error?.code === "SLUG_EXISTS" ? slugProblem : undefined}>
+            {(p) => <div className="newpost-slug"><span aria-hidden="true">fet3d.io.vn/learn/</span><Input {...p} maxLength={180} value={slug} onChange={(event) => { setTypedSlug(event.target.value.toLowerCase()); if (error?.code === "SLUG_EXISTS") setError(null); }} /></div>}
           </Field>} />
         <fieldset disabled={busy} className="ops-stack" style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
           {paragraph && <Field label="Đoạn mở đầu" required hint="Khối đoạn văn đầu tiên của bài (văn bản thuần). Thêm tiêu đề phụ, danh sách, ảnh và video trong trình soạn." error={issueFor("$.blocks[0].text") ?? issueFor("$.blocks")}>
@@ -99,11 +125,13 @@ export function NewPostModal({ accessToken, onClose, onCreated }: { accessToken:
           {video && <Field label="Liên kết video" required hint="Liên kết đầy đủ từ YouTube, Facebook hoặc TikTok (https). Hệ thống kiểm tra liên kết khi tạo bài." error={issueFor(`$.blocks[${videoIndex}].url`)}>
             {(p) => <Input {...p} inputMode="url" value={text(video.fields.url)} onChange={(event) => setBlock(updateFields(video, { url: event.target.value }))} />}
           </Field>}
-          <label className="learn-toggle">
-            <input type="checkbox" checked={publishNow} onChange={(event) => setPublishNow(event.target.checked)} />
-            <span>Xuất bản ngay<small>Bài công khai ngay khi tạo xong. Mọi nguồn trích dẫn phải đã được duyệt; bỏ chọn để lưu bản nháp và xuất bản sau.</small></span>
+          <label className="learn-toggle newpost-switch">
+            <input type="checkbox" role="switch" checked={publishNow} onChange={(event) => setPublishNow(event.target.checked)} />
+            <span>Xuất bản ngay<small>Bật: bài công khai ngay khi tạo xong (mọi nguồn trích dẫn phải đã được duyệt). Tắt: lưu bản nháp, xuất bản sau.</small></span>
           </label>
         </fieldset>
+        </div>
+        <CardPreview form={form} />
       </form>
     </Modal>
     <ConfirmDialog open={leaving} onOpenChange={setLeaving} title="Bỏ bài đang soạn?" description="Nội dung chưa được lưu và sẽ mất nếu đóng hộp thoại này." tone="danger" confirmLabel="Bỏ bài" cancelLabel="Tiếp tục soạn" onConfirm={() => { setLeaving(false); onClose(); }} />
