@@ -38,7 +38,7 @@ const titleOf = (post: AdminPost) => post.publishedVersion?.title ?? post.slug;
  * filter and pagination in the URL, and a "···" menu mirroring the drawer's status actions. The list endpoint embeds only
  * the published version, so a post that was never published shows its slug but no title until it is opened (BE#154).
  */
-export function PostsTab({ accessToken, onOpen, onCreate }: { accessToken: string; onOpen: (postId: string) => void; onCreate: () => void }) {
+export function PostsTab({ accessToken, onOpen }: { accessToken: string; onOpen: (postId: string) => void }) {
   const toast = useToast();
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const rawStatus = get("status");
@@ -143,7 +143,7 @@ export function PostsTab({ accessToken, onOpen, onCreate }: { accessToken: strin
           <FilterChip label="Trạng thái" value={status} onChange={(value) => setParams({ status: value })} options={POST_STATUSES.map((value) => ({ value, label: postStatusView[value].label }))} />
         </FilterChips>
       </>}
-      empty={<EmptyState icon={filtering ? Search : BookOpen} title={filtering ? "Không có bài phù hợp." : "Chưa có bài nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc. Tìm kiếm và lọc theo loại chỉ áp dụng cho trang đang mở." : "Tạo bài đầu tiên: lưu bản nháp rồi xuất bản khi nội dung và nguồn đã sẵn sàng."} action={!filtering && <Button size="sm" onClick={onCreate}>Tạo bài</Button>} />}
+      empty={<EmptyState icon={filtering ? Search : BookOpen} title={filtering ? "Không có bài phù hợp." : "Chưa có bài nào"} description={filtering ? "Thử đổi hoặc xóa bộ lọc. Tìm kiếm và lọc theo loại chỉ áp dụng cho trang đang mở." : "Tạo bài đầu tiên: lưu bản nháp rồi xuất bản khi nội dung và nguồn đã sẵn sàng."} />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
     <p className="learn-list-note" style={{ marginTop: 10 }}>

@@ -58,7 +58,7 @@ function useKindTotal(kind: LibraryKind, token: string, reloadKey: number) {
  * code search are applied by the server and live in the URL together with the page; the state filter only narrows the
  * page that is loaded and says so.
  */
-export function ItemsList({ accessToken, reloadKey, onOpen, onNewVersion, onCreate, onChanged }: { accessToken: string; reloadKey: number; onOpen: (itemId: string) => void; onNewVersion: (itemId: string) => void; onCreate: () => void; onChanged: () => void }) {
+export function ItemsList({ accessToken, reloadKey, onOpen, onNewVersion, onChanged }: { accessToken: string; reloadKey: number; onOpen: (itemId: string) => void; onNewVersion: (itemId: string) => void; onChanged: () => void }) {
   const toast = useToast();
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const rawKind = get("kind");
@@ -144,8 +144,7 @@ export function ItemsList({ accessToken, reloadKey, onOpen, onNewVersion, onCrea
         </FilterChips>
       </>}
       empty={<EmptyState icon={filtered ? Search : Library} title={filtered ? "Không có mục khớp bộ lọc." : "Thư viện chưa có mục nào"}
-        description={filtered ? "Thử đổi hoặc xóa bộ lọc." : "Chưa có mẫu nào. Thư viện không có dữ liệu sẵn: thêm mục (kịch bản mẫu, tiêu chí chấm mẫu hoặc thiết bị), tạo phiên bản và xuất bản để tổ chức dùng được. Tiêu chí chấm mẫu cần danh mục chỉ số chấm điểm đã được thiết lập trong hệ thống."}
-        action={!filtered && <Button size="sm" onClick={onCreate}>Thêm mục</Button>} />}
+        description={filtered ? "Thử đổi hoặc xóa bộ lọc." : "Chưa có mẫu nào. Thư viện không có dữ liệu sẵn: thêm mục (kịch bản mẫu, tiêu chí chấm mẫu hoặc thiết bị), tạo phiên bản và xuất bản để tổ chức dùng được. Tiêu chí chấm mẫu cần danh mục chỉ số chấm điểm đã được thiết lập trong hệ thống."} />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
     <p className="ops-field-hint" style={{ margin: "10px 0 0" }}>

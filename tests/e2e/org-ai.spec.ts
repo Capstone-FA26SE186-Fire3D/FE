@@ -71,7 +71,7 @@ test.describe("Organization AI page: history", () => {
     await expect(page.getByTestId("ai-rail-quota")).toContainText("Đã cấp");
     await expect(page.getByTestId("ai-limit-row")).toHaveCount(2);
     await expect(page.getByTestId("ai-limit-row").first()).toContainText("50 tokens");
-    await expect(page.getByRole("link", { name: "Nạp thêm hạn mức AI" })).toHaveAttribute("href", "/workspace/billing?tab=ai");
+    await expect(page.getByRole("link", { name: "Hạn mức AI & nạp thêm" })).toHaveAttribute("href", "/workspace/billing?tab=ai"); // one link, in the page header
   });
 
   test("history empty, filtered-empty and error states", async ({ page }) => {

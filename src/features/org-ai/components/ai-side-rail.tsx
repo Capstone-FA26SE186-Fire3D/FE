@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 
 import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
@@ -12,7 +11,6 @@ import { formatDateTime, formatNumber, formatQuota } from "@/features/billing/fo
 import { orgAiApi } from "../api";
 import { aiErrorText, operationLabel } from "../labels";
 import styles from "../org-ai.module.css";
-import { BILLING_AI_HREF } from "./request-view";
 
 /**
  * "Quota & giới hạn" tab of `/workspace/ai`: the organization's pooled prepaid quota (in the units the BE reports, never
@@ -47,7 +45,6 @@ export function AiQuotaCard({ accessToken }: { accessToken: string }) {
         </div>)}
       </div>
       {quota.data && <p className={styles.dim} style={{ marginTop: 10 }}>Số liệu lúc {formatDateTime(quota.data.asOf)}.</p>}
-      <div style={{ marginTop: 14 }}><Button asChild variant="secondary"><Link href={BILLING_AI_HREF}>Nạp thêm hạn mức AI</Link></Button></div>
     </section>
 
     <section className="org-card" aria-labelledby="org-ai-limits-title">

@@ -9,6 +9,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { blockLabel, extraFieldNames, isKnownType, KNOWN_TYPES, newBlock, updateFields, type EditorBlock, type KnownType } from "../blocks";
 import type { ContentIssue } from "../content";
 import { slashMatches, type SlashItem } from "../doc-actions";
+import { ListItems } from "./list-items";
 import type { MediaCheck } from "../use-media-checks";
 
 const icons: Record<KnownType, LucideIcon> = { heading: Heading2, paragraph: Pilcrow, list: ListOrdered, callout: MessageSquareWarning, image: ImageIcon, video: Film };
@@ -41,9 +42,13 @@ function VideoFields({ block, onChange, check, onCheck }: { block: EditorBlock; 
   </>;
 }
 
-type TextKeys = { onTextKey?: (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => void };
+type TextKeys = {
+  onTextKey?: (event: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  /** Docs mode: a list is edited one item per line; leaving it (Enter on an empty last item) opens a paragraph. */
+  doc?: boolean; onExitList?: (items: string[]) => void;
+};
 
-function BlockFields({ block, onChange, check, onCheck, onTextKey }: { block: EditorBlock; onChange: (block: EditorBlock) => void; check: MediaCheck | undefined; onCheck: (blockId: string, url: string) => void } & TextKeys) {
+function BlockFields({ block, onChange, check, onCheck, onTextKey, doc, onExitList }: { block: EditorBlock; onChange: (block: EditorBlock) => void; check: MediaCheck | undefined; onCheck: (blockId: string, url: string) => void } & TextKeys) {
   const set = (patch: Record<string, unknown>) => onChange(updateFields(block, patch));
   switch (block.type) {
     case "heading": return <div className="ops-form-grid">
@@ -53,6 +58,10 @@ function BlockFields({ block, onChange, check, onCheck, onTextKey }: { block: Ed
     case "paragraph": return <Field label="Nội dung" required hint="Chữ thường. Enter: đoạn mới · Shift+Enter: xuống dòng · gõ “/” để chèn khối.">{(p) => <Textarea {...p} rows={2} placeholder="Gõ nội dung, hoặc gõ “/” để chèn tiêu đề, danh sách, ảnh, video…" value={text(block.fields.text)} onKeyDown={onTextKey} onChange={(event) => set({ text: event.target.value })} />}</Field>;
     case "list": {
       const items = Array.isArray(block.fields.items) ? block.fields.items.map(text) : [""];
+      if (doc) return <div className="doc-list-wrap">
+        <ListItems items={items} ordered={block.fields.ordered === true} onChange={(next) => set({ items: next })} onExit={(next) => onExitList?.(next)} />
+        <Select aria-label="Kiểu danh sách" className="doc-list-kind" value={block.fields.ordered === true ? "ordered" : "bullets"} onChange={(event) => set({ ordered: event.target.value === "ordered" })}><option value="bullets">Gạch đầu dòng</option><option value="ordered">Đánh số</option></Select>
+      </div>;
       return <div className="ops-form-grid">
         <Field label="Các mục (mỗi dòng một mục)" required hint="Mỗi dòng một mục · tối đa 50 mục, mỗi mục tối đa 1000 ký tự." className="ops-span-all">{(p) => <Textarea {...p} rows={3} placeholder="Mỗi dòng một mục" value={items.join("\n")} onChange={(event) => set({ items: event.target.value.split("\n") })} />}</Field>
         <Field label="Kiểu danh sách">{(p) => <Select {...p} value={block.fields.ordered === true ? "ordered" : "bullets"} onChange={(event) => set({ ordered: event.target.value === "ordered" })}><option value="bullets">Gạch đầu dòng</option><option value="ordered">Đánh số</option></Select>}</Field>
@@ -91,7 +100,7 @@ function SlashMenu({ items, selected, onPick, id }: { items: SlashItem[]; select
 function BlockCard({ block, index, total, onChange, onMove, onRemove, onEnter, onEmptyBackspace, issues, check, onCheck, doc, active, onActive }: {
   block: EditorBlock; index: number; total: number; onChange: (block: EditorBlock) => void; onMove: (delta: -1 | 1) => void; onRemove: () => void;
   /** Docs mode: Enter in a heading or paragraph opens a new paragraph below; Backspace in an empty paragraph removes it. */
-  onEnter: () => void; onEmptyBackspace: () => void;
+  onEnter: (replaced?: EditorBlock) => void; onEmptyBackspace: () => void;
   issues: ContentIssue[]; check: MediaCheck | undefined; onCheck: (blockId: string, url: string) => void;
   doc: boolean; active: boolean; onActive: () => void;
 }) {
@@ -131,7 +140,7 @@ function BlockCard({ block, index, total, onChange, onMove, onRemove, onEnter, o
       </span>
     </div>
     <div className={doc ? "doc-block-body" : undefined}>
-      <BlockFields block={block} onChange={onChange} check={check} onCheck={onCheck} onTextKey={onTextKey} />
+      <BlockFields block={block} onChange={onChange} check={check} onCheck={onCheck} onTextKey={onTextKey} doc={doc} onExitList={(items) => onEnter(updateFields(block, { items }))} />
       {showMenu && <SlashMenu items={matches} selected={current} onPick={pick} id={`slash-${block.id}`} />}
     </div>
     {known && extras.length > 0 && <p className="ops-field-hint" style={{ margin: 0 }} data-testid="block-extras">Khối có thông tin thừa (được giữ nguyên); máy chủ có thể từ chối khi lưu. Nếu vậy, hãy tạo lại khối này.<SupportCode detail={extras.join(", ")} /></p>}
@@ -174,7 +183,13 @@ export function BlockEditor({ blocks, onChange, disabled, issues, checks, onChec
     <ol ref={list} style={{ margin: 0, padding: 0, display: "grid", gap: doc ? 2 : 12 }} aria-label="Các khối nội dung">
       {blocks.map((block, index) => <BlockCard key={block.id} block={block} index={index} total={blocks.length} issues={issuesFor(index)} check={checks[block.id]} onCheck={onCheck}
         doc={doc} active={index === active} onActive={() => onActive?.(index)}
-        onEnter={() => add(index, newBlock("paragraph"))}
+        onEnter={(replaced) => {
+          // One change for "leave the list": the trimmed list and the new paragraph together.
+          const paragraph = newBlock("paragraph");
+          const base = replaced ? blocks.map((item) => (item.id === replaced.id ? replaced : item)) : blocks;
+          focusNext.current = paragraph.id;
+          onChange([...base.slice(0, index + 1), paragraph, ...base.slice(index + 1)]);
+        }}
         onEmptyBackspace={() => { const neighbour = blocks[index - 1] ?? blocks[index + 1]; if (neighbour) focusNext.current = neighbour.id; onChange(blocks.filter((item) => item.id !== block.id)); }}
         onChange={(next) => { if (next.type !== block.type) focusNext.current = next.id; onChange(blocks.map((item) => (item.id === block.id ? next : item))); }}
         onMove={(delta) => move(index, delta)} onRemove={() => onChange(blocks.filter((item) => item.id !== block.id))} />)}

@@ -177,7 +177,7 @@ export function AdminPoliciesTab({ accessToken }: { accessToken: string }) {
       </>}
       empty={operation
         ? <EmptyState icon={SlidersHorizontal} title="Không có chính sách cho thao tác này" description="Đổi hoặc xóa bộ lọc thao tác." />
-        : <EmptyState icon={SlidersHorizontal} title="Chưa có chính sách AI" description="Không có chính sách đang hiệu lực thì yêu cầu AI của tổ chức bị từ chối. Tạo chính sách cho từng thao tác; hệ thống không có giá trị mặc định." action={<Button onClick={() => setCreating(true)}><Plus size={16} aria-hidden="true" />Tạo chính sách</Button>} />}
+        : <EmptyState icon={SlidersHorizontal} title="Chưa có chính sách AI" description="Không có chính sách đang hiệu lực thì yêu cầu AI của tổ chức bị từ chối. Tạo chính sách cho từng thao tác; hệ thống không có giá trị mặc định." />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
     <p className={styles.hint}>Chính sách không sửa được nên hàng không có menu thao tác. Trạng thái hiệu lực ở đây so theo giờ trên máy bạn; hệ thống quyết định chính sách áp dụng lúc gửi yêu cầu.</p>

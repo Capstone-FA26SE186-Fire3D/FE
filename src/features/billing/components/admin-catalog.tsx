@@ -164,7 +164,7 @@ export function PackagesSection({ accessToken }: { accessToken: string }) {
         <Button variant="quiet" onClick={list.reload} disabled={list.loading} aria-label="Tải lại danh sách"><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
         <Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo gói</Button>
       </>}
-      empty={<EmptyState icon={Tags} title="Chưa có gói dịch vụ" description="Tạo gói 6 hoặc 12 tháng đầu tiên (đơn giá/tháng, số học viên, hạn mức AI). Hệ thống không có giá hay hạn mức mặc định." action={<Button onClick={openCreate}>Tạo gói</Button>} />}
+      empty={<EmptyState icon={Tags} title="Chưa có gói dịch vụ" description="Tạo gói 6 hoặc 12 tháng đầu tiên (đơn giá/tháng, số học viên, hạn mức AI). Hệ thống không có giá hay hạn mức mặc định." />}
     />
     <p className="bill-hint">Bấm hàng để sửa gói; “Đang bán” là trạng thái bạn đặt, “Đủ điều kiện bán” do hệ thống kiểm tra.</p>
 
@@ -299,7 +299,7 @@ export function DiscountsSection({ accessToken }: { accessToken: string }) {
         <Button variant="quiet" onClick={list.reload} disabled={list.loading} aria-label="Tải lại danh sách"><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
         <Button onClick={openCreate}><Plus size={16} aria-hidden="true" />Tạo quy tắc</Button>
       </>}
-      empty={<EmptyState icon={Tags} title="Chưa có quy tắc giảm giá" description="Thêm quy tắc cho nhiều công trình hoặc thời hạn dài." action={<Button onClick={openCreate}>Tạo quy tắc</Button>} />}
+      empty={<EmptyState icon={Tags} title="Chưa có quy tắc giảm giá" description="Thêm quy tắc cho nhiều công trình hoặc thời hạn dài." />}
     />
 
     <Modal open={editing !== null} onOpenChange={(open) => { if (!open && !saving) setEditing(null); }} size="lg" title={editing?.item ? "Sửa quy tắc giảm giá" : "Tạo quy tắc giảm giá"} description="Lưu sẽ thay toàn bộ trường của quy tắc; báo giá đã phát hành không đổi."

@@ -112,7 +112,7 @@ function Editor({ accessToken, revisionId, snapshot }: { accessToken: string; re
     {loadingLatest && <p className="ops-muted" role="status">Đang tải bản mới nhất…</p>}
     {error && <Alert tone="danger">{error}</Alert>}
 
-    {rows.length === 0 ? <EmptyState icon={MessageSquarePlus} title="Chưa có ghi chú" description="Gắn ghi chú vào cấu kiện bằng mã cấu kiện IFC. Ghi chú được lưu riêng và không thay đổi mô hình." action={<Button variant="secondary" onClick={() => { setRows([{ id: newIdempotencyKey(), ifcGlobalId: "", label: "", note: null }]); }}><Plus size={16} aria-hidden="true" />Thêm ghi chú</Button>} /> : <div>
+    {rows.length === 0 ? <EmptyState icon={MessageSquarePlus} title="Chưa có ghi chú" description="Gắn ghi chú vào cấu kiện bằng mã cấu kiện IFC. Ghi chú được lưu riêng và không thay đổi mô hình." /> : <div>
       {rows.map((row, index) => {
         const e = showErrors ? errors.get(row.id) : undefined;
         return <div className="ops-annotation-row" key={row.id}>

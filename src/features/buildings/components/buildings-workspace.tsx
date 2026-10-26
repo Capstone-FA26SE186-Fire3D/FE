@@ -304,7 +304,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
 
   const empty: ReactNode = filtering
     ? <EmptyState icon={Search} title="Chưa có công trình phù hợp." description="Thử đổi từ khóa hoặc bộ lọc." />
-    : <EmptyState icon={Building2} title="Tạo công trình đầu tiên" description="Thêm công trình, tải lên mô hình IFC rồi xây dựng kịch bản sơ tán cho đúng không gian thật." action={<Button onClick={openCreate}><Plus size={16} aria-hidden="true" />{createLabel}</Button>} />;
+    : <EmptyState icon={Building2} title="Tạo công trình đầu tiên" description="Thêm công trình, tải lên mô hình IFC rồi xây dựng kịch bản sơ tán cho đúng không gian thật." />;
 
   const toolbar = <>
     <TableSearch value={searchText} onChange={setSearchText} placeholder="Tìm theo tên công trình" label="Tìm công trình" />
