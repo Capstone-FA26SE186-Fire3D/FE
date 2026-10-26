@@ -44,7 +44,7 @@ const issueMessages: Record<string, string> = {
   FIELD_UNKNOWN: "Trường này không thuộc loại mẫu đang dùng nên máy chủ từ chối.",
   FIELD_REQUIRED: "Trường này là bắt buộc.",
   STRING_INVALID: "Văn bản trống, quá dài hoặc chứa ký tự điều khiển.",
-  CAPABILITIES_INVALID: "Tối đa 50 năng lực, không trùng nhau, mỗi năng lực viết liền không dấu (tối đa 128 ký tự).",
+  CAPABILITIES_INVALID: "Tối đa 50 yêu cầu, không trùng nhau, mỗi yêu cầu viết liền không dấu (tối đa 128 ký tự).",
   PROPERTIES_INVALID: "Tối đa 50 thuộc tính; mỗi giá trị là chuỗi, số hoặc đúng/sai.",
   CONTENT_TOO_LARGE: "Nội dung tối đa 256 KB.",
   ID_DUPLICATE: "Mã bị trùng.",
@@ -56,7 +56,7 @@ const FIELD_NAMES: Record<string, string> = {
   name: "Tên", code: "Mã mục", description: "Mô tả", learningObjectives: "Mục tiêu học tập", learnerInstructions: "Hướng dẫn cho người học",
   timeLimitSeconds: "Thời gian tối đa", modePolicy: "Chế độ huấn luyện", rubric: "Tiêu chí chấm điểm", schema_version: "Phiên bản tiêu chí",
   pass_threshold: "Ngưỡng đạt", id: "Mã tiêu chí", metric: "Chỉ số", operator: "Phép so sánh", threshold: "Ngưỡng", weight: "Trọng số",
-  mandatory: "Bắt buộc", requiredCapabilities: "Năng lực yêu cầu", properties: "Thuộc tính", state: "Kịch bản mẫu", payload: "Nội dung",
+  mandatory: "Bắt buộc", requiredCapabilities: "Yêu cầu", properties: "Thuộc tính", state: "Kịch bản mẫu", payload: "Nội dung",
 };
 
 /** Plain name of one content field; a field this list does not know keeps its own name. */

@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams, useUrlSearch } from "@/api/use-url-params";
 import { formatDateTime } from "@/components/ops/detail-parts";
+import { capabilityName } from "@/configs/capability-labels";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
@@ -41,7 +42,7 @@ function ItemDialog({ accessToken, itemId, onClose }: { accessToken: string; ite
   const [using, setUsing] = useState(false);
   if (using && item) return <UseSampleDialog accessToken={accessToken} item={item} onClose={() => setUsing(false)} />;
   return <Modal open onOpenChange={(open) => { if (!open) onClose(); }} size="lg" title={version?.name ?? (item ? item.code : "Mẫu thư viện")} description={item ? `${kindLabel[item.kind]} · ${item.code}` : "Chỉ xem. Áp dụng vào kịch bản trong trình soạn thảo, thẻ Thư viện."}
-    eyebrow={version ? <><StatusBadge tone="success">Đã xuất bản · v{version.versionNumber}</StatusBadge>{version.requiredCapabilities.length > 0 && <StatusBadge tone="warning">Có yêu cầu năng lực</StatusBadge>}</> : undefined}
+    eyebrow={version ? <><StatusBadge tone="success">Đã xuất bản · v{version.versionNumber}</StatusBadge>{version.requiredCapabilities.length > 0 && <StatusBadge tone="warning">Có yêu cầu</StatusBadge>}</> : undefined}
     data-testid="org-item-dialog"
     footer={<>
       <Button variant="quiet" onClick={onClose}>Đóng</Button>
@@ -69,8 +70,8 @@ function ItemCard({ item, onOpen }: { item: LibraryItem; onOpen: () => void }) {
         <p className="org-lib-sub">{kindLabel[item.kind]} · <code className="org-lib-code">{item.code}</code></p>
       </div>
     </div>
-    <div className="org-lib-chips" aria-label="Năng lực yêu cầu">
-      {shown.length === 0 ? <span className="org-lib-chip" data-empty>Không yêu cầu năng lực</span> : shown.map((id) => <span key={id} className="org-lib-chip">{id}</span>)}
+    <div className="org-lib-chips" aria-label="Yêu cầu">
+      {shown.length === 0 ? <span className="org-lib-chip" data-empty>Không có yêu cầu</span> : shown.map((id) => <span key={id} className="org-lib-chip">{capabilityName(id)}</span>)}
       {capabilities.length > shown.length && <span className="org-lib-chip">+{capabilities.length - shown.length}</span>}
     </div>
     <div className="org-lib-foot">
@@ -103,10 +104,10 @@ export function LibraryBrowser() {
   });
   const narrowed = needle !== "" || capability !== "";
   const capabilityOptions: ComboboxOption[] = [
-    { value: "", label: "Tất cả", group: "Năng lực" },
-    { value: NO_CAPABILITY, label: "Không yêu cầu năng lực", group: "Năng lực" },
-    ...(capability && capability !== NO_CAPABILITY && !capabilities.includes(capability) ? [{ value: capability, label: capability, group: "Trong trang đã tải" }] : []),
-    ...capabilities.map((value) => ({ value, label: value, group: "Trong trang đã tải" })),
+    { value: "", label: "Tất cả", group: "Yêu cầu" },
+    { value: NO_CAPABILITY, label: "Không có yêu cầu", group: "Yêu cầu" },
+    ...(capability && capability !== NO_CAPABILITY && !capabilities.includes(capability) ? [{ value: capability, label: capabilityName(capability), group: "Trong trang đã tải" }] : []),
+    ...capabilities.map((value) => ({ value, label: capabilityName(value), group: "Trong trang đã tải" })),
   ];
 
   const header = <PageHeader title="Thư viện mẫu" description="Kịch bản mẫu, tiêu chí chấm mẫu và thiết bị game đã được ứng dụng FET3D hỗ trợ. Chỉ để tham khảo và dùng làm điểm xuất phát; bạn vẫn tự soạn được." eyebrow="Huấn luyện" breadcrumbs={[{ label: "Thư viện mẫu" }]} />;
@@ -119,11 +120,11 @@ export function LibraryBrowser() {
         items={[{ value: "all", label: "Tất cả", "data-testid": "filter-kind-all" }, ...LIBRARY_KINDS.map((value) => ({ value, label: kindLabel[value], count: kind === value && list.data ? list.data.total : undefined, "data-testid": `filter-kind-${value}` }))]} />
       <div className="org-lib-filters" role="search" aria-label="Lọc thư viện">
         <TableSearch value={searchText} onChange={setSearchText} label="Tìm mẫu" placeholder="Tìm theo mã hoặc tên mẫu" />
-        <Combobox aria-label="Năng lực yêu cầu" className="org-lib-cap" value={capability} onChange={(value) => setParams({ cap: value })} options={capabilityOptions} placeholder="Năng lực: Tất cả" searchPlaceholder="Tìm năng lực…" data-testid="filter-capability" />
+        <Combobox aria-label="Yêu cầu" className="org-lib-cap" value={capability} onChange={(value) => setParams({ cap: value })} options={capabilityOptions} placeholder="Năng lực: Tất cả" searchPlaceholder="Tìm năng lực…" data-testid="filter-capability" />
         {narrowed && <Button variant="quiet" onClick={() => { setSearchText(""); setParams({ q: null, cap: null }); }}>Xóa bộ lọc</Button>}
       </div>
     </div>
-    {narrowed && list.data && <p className="org-lib-hint" role="status">Máy chủ chưa lọc theo tên hoặc năng lực: kết quả chỉ tính trên {loaded.length} mẫu đã tải{list.data.total > loaded.length ? ` (trang ${page}/${Math.ceil(list.data.total / PAGE_SIZE)})` : ""}. Có {items.length} mẫu khớp.</p>}
+    {narrowed && list.data && <p className="org-lib-hint" role="status">Máy chủ chưa lọc theo tên hoặc yêu cầu: kết quả chỉ tính trên {loaded.length} mẫu đã tải{list.data.total > loaded.length ? ` (trang ${page}/${Math.ceil(list.data.total / PAGE_SIZE)})` : ""}. Có {items.length} mẫu khớp.</p>}
 
     {list.error !== undefined && (() => {
       const view = describeLibraryError(list.error);
