@@ -126,7 +126,7 @@ test.describe("Admin AI v7 details", () => {
     const form = page.getByRole("form", { name: "Tạo chính sách AI" });
     await form.getByLabel("Thao tác").click();
     await page.getByRole("option", { name: "Hỏi đáp của học viên", exact: true }).click();
-    await form.getByLabel("Đơn vị hạn mức").fill("tokens");
+    await form.getByLabel("Đơn vị hạn mức").selectOption("tokens");
     await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("50");
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("2000");
     await form.getByLabel("Số nguồn tối đa").fill("5");

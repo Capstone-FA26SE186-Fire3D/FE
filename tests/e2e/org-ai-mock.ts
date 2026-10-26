@@ -325,6 +325,20 @@ export async function mockAi(page: Page, mock: AiMock) {
       const operation = url.searchParams.get("operation");
       return route.fulfill({ json: page_(url, mock.policies.filter((item) => !operation || item.operation === operation)) });
     }
+    const endPolicy = /^\/api\/admin\/ai\/policies\/([^/]+)\/end$/.exec(path);
+    if (method === "POST" && endPolicy) {
+      const key = headers["idempotency-key"];
+      if (!key) return problem(route, 400, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key is required.");
+      const policy = mock.policies.find((item) => item.id === endPolicy[1]);
+      if (!policy) return problem(route, 404, "NOT_FOUND", "Policy not found.");
+      if (mock.adminReceipts.get(`end:${key}`)) return route.fulfill({ json: policy });
+      if (policy.effectiveUntil && new Date(policy.effectiveUntil as string).getTime() <= Date.now()) return problem(route, 409, "AI_POLICY_ENDED", "The policy has already ended.");
+      const until = (body as Rec | undefined)?.effectiveUntil as string | undefined;
+      if (until && new Date(until).getTime() <= Date.now()) return problem(route, 422, "AI_POLICY_END_INVALID", "effectiveUntil must not be in the past.");
+      policy.effectiveUntil = until ?? iso(0);
+      mock.adminReceipts.set(`end:${key}`, { requestId: policy.id as string });
+      return route.fulfill({ json: policy });
+    }
     if (method === "POST" && path === "/api/admin/ai/policies") {
       const key = headers["idempotency-key"];
       if (!key) return problem(route, 400, "IDEMPOTENCY_KEY_REQUIRED", "Idempotency-Key is required.");
@@ -334,6 +348,7 @@ export async function mockAi(page: Page, mock: AiMock) {
       const from = input.effectiveFrom ? new Date(input.effectiveFrom as string).getTime() : Date.now();
       const until = input.effectiveUntil ? new Date(input.effectiveUntil as string).getTime() : Infinity;
       const overlap = mock.policies.some((item) => item.operation === input.operation && from < (item.effectiveUntil ? new Date(item.effectiveUntil as string).getTime() : Infinity) && new Date(item.effectiveFrom as string).getTime() < until);
+      if (!["tokens", "requests"].includes(String(input.quotaUnit))) return problem(route, 422, "AI_QUOTA_UNIT_UNSUPPORTED", "Use tokens or requests.");
       if (overlap) return problem(route, 409, "AI_POLICY_OVERLAP", "Policy periods overlap.");
       if (input.operation === "TraineeAnswer" && !(Number(input.dailyUnits) >= Number(input.reserveUnits))) return problem(route, 422, "CONTENT_INVALID", "Invalid policy.", { issues: [{ code: "FIELD_INVALID", path: "$.dailyUnits", message: "dailyUnits is required for TraineeAnswer." }], errors: { dailyUnits: ["dailyUnits is required for TraineeAnswer."] } });
       const created = { id: `cccccccc-0000-4000-8000-${String(mock.policies.length + 10).padStart(12, "0")}`, operation: input.operation, quotaUnit: input.quotaUnit, reserveUnits: input.reserveUnits, maxInputChars: input.maxInputChars, maxSources: input.maxSources, dailyUnits: input.operation === "TraineeAnswer" ? input.dailyUnits : null, effectiveFrom: input.effectiveFrom ?? iso(0), effectiveUntil: input.effectiveUntil ?? null, createdAt: iso(0) };

@@ -236,7 +236,7 @@ export async function mockBilling(page: Page, mock: Mock) {
     if (method === "GET" && path === "/api/admin/billing/quota-policies") return send(200, page_(mock.policies, pageNo, pageSize));
     if (method === "POST" && path === "/api/admin/billing/quota-policies") {
       const input = body as { quotaUnit: string; effectiveFrom: string; effectiveUntil: string | null };
-      if (!/^[a-z][a-z0-9_-]{0,49}$/.test(input.quotaUnit)) return send(400, { code: "BILLING_VALIDATION_FAILED", title: "invalid", errors: { quotaUnit: ["Use a lowercase quota unit of 1-50 letters/digits/underscores/hyphens."] } });
+      if (!["tokens", "requests"].includes(input.quotaUnit)) return send(422, { code: "AI_QUOTA_UNIT_UNSUPPORTED", title: "Use tokens or requests." });
       const created = { id: `99999999-0000-0000-0000-0000000000${mock.policies.length + 10}`, audience: "organization", policyKind: "quota", quotaUnit: input.quotaUnit, effectiveFrom: input.effectiveFrom, effectiveUntil: input.effectiveUntil, rollover: "None" };
       mock.policies.push(created);
       return send(201, created);
