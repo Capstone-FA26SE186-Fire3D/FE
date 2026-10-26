@@ -282,7 +282,7 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError, highlight, sema
     </div>}
     {status === "context-lost" && <div className="ops-preview-overlay" role="alert">
       <TriangleAlert size={24} aria-hidden="true" style={{ color: "var(--warning)" }} />
-      <p className="ops-muted">Trình duyệt đã dừng ngữ cảnh đồ họa WebGL (thường do thiếu bộ nhớ GPU).</p>
+      <p className="ops-muted">Trình duyệt đã tạm dừng hiển thị 3D (thường do máy thiếu bộ nhớ đồ họa).</p>
       <Button size="sm" variant="secondary" onClick={() => { setStatus("loading"); setAttempt((value) => value + 1); }}><RefreshCw size={14} aria-hidden="true" />Khởi tạo lại</Button>
     </div>}
   </div>;

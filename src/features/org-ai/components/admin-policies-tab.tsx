@@ -39,7 +39,7 @@ const wholeNumber = (text: string) => (/^\d+$/.test(text.trim()) ? Number(text.t
 export function validatePolicy(form: Form): { errors: Errors; input?: CreateAiPolicyInput } {
   const errors: Errors = {};
   if (!(ADMIN_AI_OPERATIONS as readonly string[]).includes(form.operation)) errors.operation = "Chọn thao tác.";
-  if (!QUOTA_UNIT.test(form.quotaUnit.trim())) errors.quotaUnit = "Chữ thường không dấu, bắt đầu bằng chữ cái; gồm a-z, 0-9, _ hoặc -, tối đa 50 ký tự. Phải khớp đơn vị hạn mức đã cấp.";
+  if (!QUOTA_UNIT.test(form.quotaUnit.trim())) errors.quotaUnit = "Viết liền không dấu, bắt đầu bằng chữ, tối đa 50 ký tự (ví dụ: luot-hoi). Phải khớp đơn vị hạn mức đã cấp.";
   const reserve = wholeNumber(form.reserveUnits);
   if (!(reserve >= 1 && reserve <= 100_000_000)) errors.reserveUnits = "Số nguyên từ 1 đến 100.000.000.";
   const maxChars = wholeNumber(form.maxInputChars);

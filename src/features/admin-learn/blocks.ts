@@ -82,7 +82,7 @@ export function updateFields(block: EditorBlock, patch: Record<string, unknown>)
 
 /** The backend refuses any HTML-like tag in text (MARKUP_NOT_ALLOWED); a bare "<" such as "1 < 2" is fine. */
 export const MARKUP = /<\s*[a-zA-Z/!?]/;
-export const MARKUP_MESSAGE = "Chỉ nhận văn bản thuần: không dùng thẻ HTML, iframe hay script.";
+export const MARKUP_MESSAGE = "Chỉ nhận chữ thường: không dán mã trang web.";
 
 /** Local checks that mirror what the backend enforces, for instant feedback. The backend stays the authority. */
 export type BlockIssue = { index: number; path: string; message: string };

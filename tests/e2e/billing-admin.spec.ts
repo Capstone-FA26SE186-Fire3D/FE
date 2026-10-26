@@ -86,7 +86,7 @@ test.describe("admin commerce (mock)", () => {
     await page.getByLabel("Đơn vị hạn mức").fill("Tokens VN");
     await page.getByLabel("Hiệu lực từ").fill("2026-11-01T08:00");
     await page.getByRole("button", { name: "Tạo phiên bản" }).last().click();
-    await expect(page.getByText(/Đơn vị gồm chữ thường/)).toBeVisible();
+    await expect(page.getByText(/Viết liền không dấu, bắt đầu bằng chữ/)).toBeVisible();
     await page.getByLabel("Đơn vị hạn mức").fill("credits");
     await page.getByLabel("Hiệu lực đến").fill("2026-10-01T08:00");
     await page.getByRole("button", { name: "Tạo phiên bản" }).last().click();

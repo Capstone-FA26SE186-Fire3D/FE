@@ -3,6 +3,9 @@ import { Alert } from "@/components/ui/alert";
 import { Panel } from "@/components/ui/panel";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table } from "@/components/ui/table";
+import { SupportCode } from "@/components/ui/support-code";
+import { fieldName } from "@/features/library/errors";
+import { metricName } from "@/features/training-history/labels";
 import type { ReviewDetail } from "../types";
 
 const JSON_LIMIT = 30000;
@@ -11,8 +14,8 @@ const operatorLabel: Record<string, string> = { gte: "≥", lte: "≤", eq: "=" 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 function describe(value: unknown): string {
-  if (Array.isArray(value)) return `Danh sách · ${value.length} phần tử`;
-  if (isRecord(value)) return `Đối tượng · ${Object.keys(value).length} trường`;
+  if (Array.isArray(value)) return `${value.length} mục`;
+  if (isRecord(value)) return `${Object.keys(value).length} thông tin`;
   if (typeof value === "string") return value.length > 80 ? `${value.slice(0, 80)}…` : value || "(rỗng)";
   return String(value);
 }
@@ -22,7 +25,7 @@ function JsonText({ value, label }: { value: unknown; label: string }) {
   const text = JSON.stringify(value, null, 2) ?? "null";
   const cut = text.length > JSON_LIMIT;
   return <>
-    <pre className="rev-code" tabIndex={0} aria-label={`${label} (dữ liệu gốc, chỉ đọc)`}>{cut ? text.slice(0, JSON_LIMIT) : text}</pre>
+    <pre className="rev-code" tabIndex={0} aria-label={`${label} (thông tin kỹ thuật, chỉ đọc)`}>{cut ? text.slice(0, JSON_LIMIT) : text}</pre>
     {cut && <p className="rev-note">Đã cắt bớt {text.length - JSON_LIMIT} ký tự cuối để trang không bị chậm.</p>}
   </>;
 }
@@ -37,8 +40,8 @@ export function JsonSummary({ value, label }: { value: unknown; label: string })
   return <ul className="rev-json-list">
     {entries.map(([key, item]) => <li key={key}>
       {isRecord(item) || Array.isArray(item)
-        ? <details className="rev-json"><summary><span className="rev-json-key">{key}</span><span className="rev-json-sum">{describe(item)}</span></summary><JsonText value={item} label={`${label} · ${key}`} /></details>
-        : <div className="rev-json-flat"><span className="rev-json-key">{key}</span><span className="rev-json-sum">{describe(item)}</span></div>}
+        ? <details className="rev-json"><summary><span className="rev-json-key">{fieldName(key)}</span><span className="rev-json-sum">{describe(item)}</span></summary><JsonText value={item} label={`${label} · ${fieldName(key)}`} /></details>
+        : <div className="rev-json-flat"><span className="rev-json-key">{fieldName(key)}</span><span className="rev-json-sum">{describe(item)}</span></div>}
     </li>)}
   </ul>;
 }
@@ -60,10 +63,9 @@ function Rubric({ value }: { value: unknown }) {
     {threshold !== undefined && <p className="rev-note">Ngưỡng đạt: <strong>{String(threshold)}</strong></p>}
     {criteria.length
       ? <Table caption="Tiêu chí chấm điểm đã khóa">
-        <thead><tr><th>Tiêu chí</th><th>Chỉ số</th><th>Điều kiện</th><th>Trọng số</th><th>Bắt buộc</th></tr></thead>
+        <thead><tr><th>Tiêu chí</th><th>Điều kiện</th><th>Trọng số</th><th>Bắt buộc</th></tr></thead>
         <tbody>{(criteria as Record<string, unknown>[]).map((criterion, index) => <tr key={`${String(criterion.id ?? index)}-${index}`}>
-          <td className="ops-cell-primary">{String(criterion.id ?? "—")}</td>
-          <td>{String(criterion.metric ?? "—")}</td>
+          <td className="ops-cell-primary">{criterion.metric !== undefined ? metricName(String(criterion.metric)) : "—"}<SupportCode code={criterion.id !== undefined ? String(criterion.id) : undefined} /></td>
           <td>{criterion.operator !== undefined ? `${operatorLabel[String(criterion.operator)] ?? String(criterion.operator)} ${String(criterion.threshold ?? "")}` : "—"}</td>
           <td>{String(criterion.weight ?? "—")}</td>
           <td>{criterion.mandatory ? <StatusBadge tone="info">Bắt buộc</StatusBadge> : "Không"}</td>

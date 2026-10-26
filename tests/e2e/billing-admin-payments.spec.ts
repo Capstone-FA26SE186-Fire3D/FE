@@ -71,7 +71,7 @@ test.describe("admin payments ledger (mock)", () => {
     await openChip(page, "Mã báo giá");
     await page.getByRole("textbox", { name: "Mã báo giá" }).fill("khong-phai-guid");
     await page.getByRole("button", { name: "Áp dụng", exact: true }).click();
-    await expect(page.getByText("Mã báo giá chưa đúng. Dán đủ mã gồm 36 ký tự.")).toBeVisible();
+    await expect(page.getByText("Mã báo giá chưa đúng. Dán đủ mã lấy ở chi tiết báo giá.")).toBeVisible();
     const before = callsTo(mock, "GET", "/api/admin/payments/payos/checkouts").length;
     await page.getByRole("textbox", { name: "Mã báo giá" }).fill(ids.quote);
     await page.getByRole("button", { name: "Áp dụng", exact: true }).click();

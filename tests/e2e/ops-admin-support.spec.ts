@@ -373,7 +373,7 @@ test.describe("audit log", () => {
     await stage("Người thực hiện", "Mã người thực hiện", g(1));
     await stage("Tổ chức", "Mã tổ chức", g(2));
     await stage("Đối tượng", "Mã đối tượng", g(3));
-    await stage("Truy vết", "Mã truy vết", g(4));
+    await stage("Nhóm thao tác", "Mã nhóm thao tác", g(4));
     await page.getByRole("button", { name: "Áp dụng bộ lọc" }).click();
     await expect.poll(() => queries.length).toBe(2);
     const q = queries[1];
@@ -387,7 +387,7 @@ test.describe("audit log", () => {
     await stage("Thời gian", "Từ ngày", "2026-09-01");
     await stage("Tổ chức", "Mã tổ chức", "not-a-guid");
     await page.getByRole("button", { name: "Áp dụng bộ lọc" }).click();
-    await expect(page.getByText(/Mã định danh chưa đúng/).first()).toBeVisible();
+    await expect(page.getByText(/Mã chưa đúng/).first()).toBeVisible();
     expect(queries).toHaveLength(before);
   });
 

@@ -8,6 +8,7 @@ import { useIdempotencyKey } from "@/api/idempotency";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams, useUrlSearch } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
+import { SupportCode } from "@/components/ui/support-code";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { CellTitle, DataTable, TableSearch, type DataColumn } from "@/components/ui/data-table";
@@ -70,7 +71,7 @@ export function validateSource(form: Form): { errors: Errors; input?: CreateKnow
   const title = plainText(form.title.trim(), 500);
   if (title) errors.title = title;
   if (!VERSION_LABEL.test(form.versionLabel.trim())) errors.versionLabel = "1–100 ký tự gồm chữ, số, dấu chấm, gạch ngang hoặc gạch dưới.";
-  if (!SHA256.test(form.sourceHash.trim().toLowerCase())) errors.sourceHash = "Mã nội dung phải gồm đúng 64 ký tự 0–9 hoặc a–f.";
+  if (!SHA256.test(form.sourceHash.trim().toLowerCase())) errors.sourceHash = "Mã kiểm tra chưa đúng. Chọn tệp bên dưới để hệ thống tự tính.";
   const uri = sourceUriProblem(form.sourceUri);
   if (uri) errors.sourceUri = uri;
   if (form.jurisdiction.trim()) { const problem = plainText(form.jurisdiction.trim(), 100); if (problem) errors.jurisdiction = problem; }
@@ -156,7 +157,7 @@ function SourceModal({ open, accessToken, organizations, onCreated, onClose }: {
         <Field label="Nhãn phiên bản" required hint="Ví dụ năm ban hành hoặc số hiệu." error={show("$.versionLabel", "versionLabel")}>{(props) => <Input {...props} value={form.versionLabel} onChange={set("versionLabel")} autoComplete="off" />}</Field>
         <Field label="Phạm vi pháp lý/khu vực" error={show("$.jurisdiction", "jurisdiction")}>{(props) => <Input {...props} value={form.jurisdiction} onChange={set("jurisdiction")} maxLength={100} />}</Field>
       </div>
-      <Field label="Mã nội dung (SHA-256) của tài liệu" required hint="Dán mã 64 ký tự hoặc chọn tệp bên dưới để tính ngay trong trình duyệt." error={show("$.sourceHash", "sourceHash")}>
+      <Field label="Mã kiểm tra tài liệu" required hint="Chọn tệp bên dưới để tự tính ngay trong trình duyệt (tệp không bị tải lên)." error={show("$.sourceHash", "sourceHash")}>
         {(props) => <Input {...props} value={form.sourceHash} onChange={set("sourceHash")} autoComplete="off" spellCheck={false} className="font-mono" />}
       </Field>
       <Field label="Tính mã nội dung từ tệp" hint={hashing ?? "Chỉ tính cục bộ; tệp không rời trình duyệt."}>
@@ -212,7 +213,7 @@ function SourceDetail({ accessToken, id, orgName, onChanged }: { accessToken: st
       <dl className="ops-kv">
         <dt>Phạm vi dùng</dt><dd>{visibilityLabel(source.visibility)}{source.visibility === "Organization" ? ` · ${orgName(source.organizationId)}` : ""}</dd>
         <dt>Phiên bản</dt><dd>{source.versionLabel}</dd>
-        <dt>Mã nội dung</dt><dd className={styles.mono} title={source.sourceHash}>{source.sourceHash.slice(0, 12)}…</dd>
+        <dt>Mã kiểm tra tài liệu</dt><dd><SupportCode id={source.sourceHash} /></dd>
         <dt>Liên kết</dt><dd>{source.sourceUri ? <span className={styles.mono}>{source.sourceUri}</span> : "Không có"}</dd>
         <dt>Pháp lý/khu vực</dt><dd>{source.jurisdiction || "Không nêu"}</dd>
         <dt>Hiệu lực</dt><dd>{source.effectiveFrom ? formatDateTime(source.effectiveFrom) : "Ngay"} – {source.effectiveUntil ? formatDateTime(source.effectiveUntil) : "không giới hạn"}</dd>

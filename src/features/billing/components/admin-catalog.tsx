@@ -39,7 +39,7 @@ const DURATION_OPTIONS = [{ value: "6", label: "6 tháng" }, { value: "12", labe
 
 /** Policy options are read from the immutable policy list; the unit lives on the policy, not the package. */
 function policyLabel(policy: QuotaPolicy) {
-  return `${policy.quotaUnit} · từ ${formatDate(policy.effectiveFrom)} đến ${policy.effectiveUntil ? formatDate(policy.effectiveUntil) : "không giới hạn"} (${policy.id.slice(0, 8)})`;
+  return `${policy.quotaUnit} · từ ${formatDate(policy.effectiveFrom)} đến ${policy.effectiveUntil ? formatDate(policy.effectiveUntil) : "không giới hạn"}`;
 }
 
 /**
@@ -64,7 +64,7 @@ export function PackagesSection({ accessToken }: { accessToken: string }) {
   const policyById = (id: string | null | undefined) => policyItems.find((item) => item.id === id);
   const policyOptions = [
     ...policyItems.map((policy) => ({ value: policy.id, label: policyLabel(policy) })),
-    ...(form.aiPolicyVersionId && !policyById(form.aiPolicyVersionId) ? [{ value: form.aiPolicyVersionId, label: `Chính sách ${form.aiPolicyVersionId.slice(0, 8)}` }] : []),
+    ...(form.aiPolicyVersionId && !policyById(form.aiPolicyVersionId) ? [{ value: form.aiPolicyVersionId, label: "Chính sách không còn trong danh sách" }] : []),
   ];
 
   const openCreate = () => { setForm(emptyPackage); setErrors({}); setFormError(""); setConflict(false); setEditing({ item: null, etag: null }); };
@@ -141,7 +141,7 @@ export function PackagesSection({ accessToken }: { accessToken: string }) {
     { key: "price", header: "Đơn giá/tháng", width: 150, align: "right", render: (item) => formatVnd(item.unitPrice) },
     { key: "duration", header: "Thời hạn", width: 110, render: (item) => `${item.durationMonths} tháng` },
     { key: "learners", header: "Học viên/kỳ", width: 120, align: "right", hideBelow: 900, render: (item) => formatNumber(item.learnerLimit ?? null) },
-    { key: "quota", header: "Hạn mức AI", width: 200, hideBelow: 1100, render: (item) => <CellTitle title={item.aiQuotaUnits != null ? formatNumber(item.aiQuotaUnits) : "—"} sub={item.aiPolicyVersionId ? `${policyById(item.aiPolicyVersionId)?.quotaUnit ?? "chính sách"} · ${item.aiPolicyVersionId.slice(0, 8)}` : undefined} /> },
+    { key: "quota", header: "Hạn mức AI", width: 200, hideBelow: 1100, render: (item) => <CellTitle title={item.aiQuotaUnits != null ? formatNumber(item.aiQuotaUnits) : "—"} sub={item.aiPolicyVersionId ? (policyById(item.aiPolicyVersionId) ? `${policyById(item.aiPolicyVersionId)!.quotaUnit} · từ ${formatDate(policyById(item.aiPolicyVersionId)!.effectiveFrom)}` : "Chính sách không còn trong danh sách") : undefined} /> },
     { key: "sale", header: "Bán hàng", width: 260, render: (item) => <span className="bill-states"><StatusBadge tone={item.isActive ? "success" : "neutral"}>{item.isActive ? "Đang bán" : "Tạm ẩn"}</StatusBadge><StatusBadge tone={item.isPurchasable ? "success" : "warning"}>{item.isPurchasable ? "Đủ điều kiện bán" : "Không bán được"}</StatusBadge></span> },
   ];
 
@@ -210,7 +210,7 @@ export function DiscountsSection({ accessToken }: { accessToken: string }) {
   const [formError, setFormError] = useState("");
   const [conflict, setConflict] = useState(false);
   const [saving, setSaving] = useState(false);
-  const packageName = (id: string | null) => (id ? packages.data?.find((item) => item.id === id)?.name ?? id.slice(0, 8) : "Mọi gói");
+  const packageName = (id: string | null) => (id ? packages.data?.find((item) => item.id === id)?.name ?? "Gói không còn tồn tại" : "Mọi gói");
 
   const openCreate = () => { setForm(emptyDiscount); setErrors({}); setFormError(""); setConflict(false); setEditing({ item: null, etag: null }); };
   const openEdit = async (item: DiscountRule) => {

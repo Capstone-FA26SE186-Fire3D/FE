@@ -1,5 +1,6 @@
 "use client";
 
+import { SupportCode } from "@/components/ui/support-code";
 import { BarChart3, Building2, Pencil, RefreshCw, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
@@ -142,10 +143,10 @@ export function OrganizationDetail({ id, accessToken, onLoaded, onSaved }: { id:
       { label: "Địa chỉ", value: dash(organization.address) },
       { label: "Số điện thoại", value: dash(organization.phoneNumber) },
       ...(hasCounts ? [{ label: "Quy mô", value: `${organization.buildingCount ?? "—"} công trình · ${organization.accountCount ?? "—"} tài khoản` }] : []),
-      { label: "Mã định danh", value: <span className="adm-mono" title={organization.id}>{organization.id.slice(0, 8)}…</span> },
       { label: "Tạo lúc", value: formatDate(organization.createdAt) },
       { label: "Cập nhật", value: formatDate(organization.updatedAt) },
     ]} />}
+    {!edits && <SupportCode id={organization.id} />}
 
     {edits && <form onSubmit={submit} noValidate className="ops-stack" aria-label="Sửa hồ sơ tổ chức">
       {staleEtag !== null && <Alert tone="warning" title={reloaded ? "Đã tải bản mới nhất" : "Hồ sơ vừa được thay đổi ở nơi khác"} action={!reloaded && <Button type="button" size="sm" variant="secondary" className="mt-3" onClick={reload} disabled={loading}>{loading ? "Đang tải…" : "Tải bản mới để đối chiếu"}</Button>}>

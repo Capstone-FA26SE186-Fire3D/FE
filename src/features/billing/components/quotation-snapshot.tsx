@@ -66,7 +66,7 @@ export function QuotationSnapshot({ quotation, organizationName }: { quotation: 
       <div><dt>Số lượng yêu cầu</dt><dd>{topUp?.requestedQuotaUnits != null ? formatNumber(topUp.requestedQuotaUnits) : "Không nêu"}</dd></div>
       <div><dt>Số lượng được cấp</dt><dd>{topUp?.quotaUnits != null ? formatQuota(topUp.quotaUnits, topUp.quotaUnit) : "Chờ quản trị FET3D chốt khi phát hành"}</dd></div>
       <div><dt>Hiệu lực hạn mức</dt><dd>{topUp?.startsAt && topUp.endsAt ? `${formatDateTime(topUp.startsAt)} – ${formatDateTime(topUp.endsAt)}` : "Chờ phát hành"}</dd></div>
-      <div><dt>Chính sách</dt><dd className="bill-wrap">{topUp?.policyVersionId ? `Phiên bản ${topUp.policyVersionId.slice(0, 8)}` : "Chờ phát hành"}</dd></div>
+      <div><dt>Chính sách</dt><dd className="bill-wrap">{topUp?.policyVersionId ? "Đã chốt khi phát hành báo giá" : "Chờ phát hành"}</dd></div>
     </dl> : <Table className="bill-table" caption={`Các dòng của báo giá ${quotation.quotationNumber}`}>
       <thead><tr><th>Công trình</th><th>Gói / kỳ</th><th>Học viên · hạn mức AI</th><th className="bill-money">{upgrade ? "Phí" : "Đơn giá/tháng"}</th><th className="bill-money">Tạm tính</th><th className="bill-money">Giảm giá</th><th className="bill-money">Thành tiền</th></tr></thead>
       <tbody>

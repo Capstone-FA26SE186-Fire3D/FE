@@ -83,7 +83,7 @@ export function PeriodMeta({ data, hasRange, urlFrom, urlTo }: { data: { from: s
     {data ? <>
       <span>Khoảng thời gian: <strong>{formatDateTime(data.from)}</strong> – <strong>{formatDateTime(data.to)}</strong>{hasRange ? "" : " (mặc định 30 ngày gần nhất)"}</span>
       <span>Cập nhật lúc <strong>{formatDateTime(data.asOf)}</strong></span>
-      <span>Ngày chọn tính theo UTC</span>
+      <span>Ngày tính theo giờ quốc tế (chậm 7 giờ so với giờ Việt Nam)</span>
     </> : <span>Khoảng thời gian: {hasRange ? `${urlFrom} – ${urlTo}` : "30 ngày gần nhất (mặc định)"}</span>}
   </p>;
 }

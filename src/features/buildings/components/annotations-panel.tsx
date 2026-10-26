@@ -32,7 +32,7 @@ function rowErrors(rows: Row[]) {
   const errors = new Map<string, { ifcGlobalId?: string; label?: string; note?: string }>();
   for (const row of rows) {
     const entry: { ifcGlobalId?: string; label?: string; note?: string } = {};
-    if (!row.ifcGlobalId.trim()) entry.ifcGlobalId = "Nhập IFC GlobalId.";
+    if (!row.ifcGlobalId.trim()) entry.ifcGlobalId = "Nhập mã cấu kiện IFC.";
     else if (row.ifcGlobalId.length > 255) entry.ifcGlobalId = "Tối đa 255 ký tự.";
     if (!row.label.trim()) entry.label = "Nhập nhãn.";
     else if (row.label.length > 200) entry.label = "Tối đa 200 ký tự.";
@@ -71,7 +71,7 @@ function Editor({ accessToken, revisionId, snapshot }: { accessToken: string; re
       setBaseVersion(saved.version);
       setSavedItems(payload);
       setConflict(null);
-      toast.notify({ tone: "success", title: "Đã lưu ghi chú", description: `Phiên bản ${saved.version}.` });
+      toast.notify({ tone: "success", title: "Đã lưu ghi chú", description: `${saved.data.items.length} ghi chú.` });
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 412) {
         // Keep what the user typed; fetch the newer version so they can compare.
@@ -106,13 +106,13 @@ function Editor({ accessToken, revisionId, snapshot }: { accessToken: string; re
       <Button size="sm" variant="secondary" onClick={useRemote}>Dùng bản mới (bỏ thay đổi của tôi)</Button>
       <Button size="sm" variant="quiet" onClick={keepMine}>Giữ bản của tôi để ghi đè</Button>
     </div>}>
-      Nội dung bạn đang soạn vẫn được giữ nguyên. Bản mới có {conflict.data.items.length} ghi chú (phiên bản {conflict.version}); chọn một hướng xử lý trước khi lưu lại.
-      {conflict.data.items.length > 0 && <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>{conflict.data.items.slice(0, 5).map((item) => <li key={item.id}>{item.label} <span className="ops-mono">({item.ifcGlobalId})</span></li>)}{conflict.data.items.length > 5 && <li>… và {conflict.data.items.length - 5} mục khác</li>}</ul>}
+      Nội dung bạn đang soạn vẫn được giữ nguyên. Bản mới có {conflict.data.items.length} ghi chú; chọn một hướng xử lý trước khi lưu lại.
+      {conflict.data.items.length > 0 && <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>{conflict.data.items.slice(0, 5).map((item) => <li key={item.id}>{item.label}</li>)}{conflict.data.items.length > 5 && <li>… và {conflict.data.items.length - 5} mục khác</li>}</ul>}
     </Alert>}
     {loadingLatest && <p className="ops-muted" role="status">Đang tải bản mới nhất…</p>}
     {error && <Alert tone="danger">{error}</Alert>}
 
-    {rows.length === 0 ? <EmptyState icon={MessageSquarePlus} title="Chưa có ghi chú" description="Gắn ghi chú vào cấu kiện bằng mã cấu kiện IFC (GlobalId). Ghi chú được lưu riêng và không thay đổi mô hình." action={<Button variant="secondary" onClick={() => { setRows([{ id: newIdempotencyKey(), ifcGlobalId: "", label: "", note: null }]); }}><Plus size={16} aria-hidden="true" />Thêm ghi chú</Button>} /> : <div>
+    {rows.length === 0 ? <EmptyState icon={MessageSquarePlus} title="Chưa có ghi chú" description="Gắn ghi chú vào cấu kiện bằng mã cấu kiện IFC. Ghi chú được lưu riêng và không thay đổi mô hình." action={<Button variant="secondary" onClick={() => { setRows([{ id: newIdempotencyKey(), ifcGlobalId: "", label: "", note: null }]); }}><Plus size={16} aria-hidden="true" />Thêm ghi chú</Button>} /> : <div>
       {rows.map((row, index) => {
         const e = showErrors ? errors.get(row.id) : undefined;
         return <div className="ops-annotation-row" key={row.id}>
@@ -127,7 +127,7 @@ function Editor({ accessToken, revisionId, snapshot }: { accessToken: string; re
     <div className="ops-actions">
       <Button variant="secondary" disabled={rows.length >= MAX_ITEMS || busy} onClick={() => { setRows((current) => [...current, { id: newIdempotencyKey(), ifcGlobalId: "", label: "", note: null }]); }}><Plus size={16} aria-hidden="true" />Thêm ghi chú</Button>
       <Button onClick={() => void save()} disabled={busy || !dirty || conflict !== null}><Save size={16} aria-hidden="true" />{busy ? "Đang lưu…" : "Lưu ghi chú"}</Button>
-      <span className="ops-muted">{rows.length}/{MAX_ITEMS} · phiên bản {baseVersion}{dirty ? " · có thay đổi chưa lưu" : ""}</span>
+      <span className="ops-muted">{rows.length}/{MAX_ITEMS} ghi chú{dirty ? " · có thay đổi chưa lưu" : ""}</span>
     </div>
   </div>;
 }

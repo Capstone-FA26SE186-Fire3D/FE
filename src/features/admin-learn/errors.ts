@@ -36,7 +36,7 @@ export function issuesOf(error: unknown): Issue[] {
 }
 
 const issueMessages: Record<string, string> = {
-  MARKUP_NOT_ALLOWED: "Chỉ nhận văn bản thuần: không dùng thẻ HTML, iframe hay script.",
+  MARKUP_NOT_ALLOWED: "Chỉ nhận chữ thường: không dán mã trang web.",
   LEARN_MEDIA_INVALID: "Dùng liên kết đầy đủ từ YouTube, Facebook hoặc TikTok (không nhận liên kết rút gọn).",
   FIELD_UNKNOWN: "Khối có thông tin không thuộc loại khối đang dùng. Xóa khối đó rồi thêm lại.",
   VALUE_UNSUPPORTED: "Giá trị hoặc loại khối không được hỗ trợ.",
@@ -73,7 +73,7 @@ const messages: Record<string, { kind: LearnErrorKind; title: string; message: s
 
 export function describeLearnError(error: unknown): LearnErrorView {
   if (!(error instanceof ApiError)) {
-    return { kind: "retry", code: null, title: "Không kết nối được tới máy chủ", message: "Nội dung của bạn được giữ nguyên. Thử lại sẽ dùng cùng mã thao tác nên không bị ghi hai lần.", issues: [] };
+    return { kind: "retry", code: null, title: "Không kết nối được tới máy chủ", message: "Nội dung của bạn được giữ nguyên. Thử lại sẽ không tạo bản trùng.", issues: [] };
   }
   const issues = issuesOf(error);
   const code = error.code ?? null;
@@ -84,7 +84,7 @@ export function describeLearnError(error: unknown): LearnErrorView {
   if (error.status === 404) return { kind: "notFound", code, title: "Không tìm thấy", message: "Bài hoặc phiên bản này không còn tồn tại.", issues };
   const known = code ? messages[code] : undefined;
   if (known) return { ...known, code, issues };
-  if (error.status === 429 || error.status === 503) return { kind: "retry", code, title: "Máy chủ đang bận", message: error.retryAfterSeconds ? `Thử lại sau ${error.retryAfterSeconds} giây. Cùng mã thao tác sẽ được dùng lại.` : "Thử lại sau ít phút. Cùng mã thao tác sẽ được dùng lại.", issues };
+  if (error.status === 429 || error.status === 503) return { kind: "retry", code, title: "Máy chủ đang bận", message: error.retryAfterSeconds ? `Thử lại sau ${error.retryAfterSeconds} giây; thử lại sẽ không tạo bản trùng.` : "Thử lại sau ít phút; thử lại sẽ không tạo bản trùng.", issues };
   if (error.status === 409) return { kind: "conflict", code, title: "Trạng thái không cho phép", message: error.message, issues };
   if (error.status === 422 || error.status === 400) return { kind: "invalid", code, title: "Dữ liệu chưa hợp lệ", message: error.message, issues };
   return { kind: "retry", code, title: "Không thể hoàn tất", message: error.status >= 500 ? "Máy chủ đang gặp lỗi. Nội dung của bạn vẫn được giữ; bấm thử lại an toàn, không bị ghi hai lần." : `${error.message} Nội dung của bạn vẫn được giữ.`, issues };

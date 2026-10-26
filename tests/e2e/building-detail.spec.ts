@@ -182,7 +182,7 @@ test.describe("IFC upload stepper", () => {
     await page.getByLabel("Chọn tệp IFC").setInputFiles(ifc());
     await page.getByRole("button", { name: "Tải lên và xử lý" }).click();
     await expect(page.getByText(/tạm tắt/)).toBeVisible();
-    await expect(page.getByRole("button", { name: /^Thử lại \(\d+s\)/ })).toBeDisabled();
+    await expect(page.getByRole("button", { name: /^Thử lại \(còn \d+ giây\)/ })).toBeDisabled();
     await expect(page.getByRole("button", { name: "Thử lại", exact: true })).toBeEnabled({ timeout: 6000 });
     await page.getByRole("button", { name: "Thử lại", exact: true }).click();
     await expect(page.getByText("Đã gửi xử lý IFC")).toBeVisible();
