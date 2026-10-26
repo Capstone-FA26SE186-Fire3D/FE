@@ -19,7 +19,7 @@ test.describe("organization AI quota (mock)", () => {
     await expect(units).toHaveCount(2);
     // Units are never combined: 650 tokens and 15 requests, not 665.
     await expect(units.filter({ hasText: "Đơn vị: tokens" }).getByTestId("quota-available")).toHaveText("650");
-    await expect(units.filter({ hasText: "Đơn vị: requests" }).getByTestId("quota-available")).toHaveText("15");
+    await expect(units.filter({ hasText: "Đơn vị: lượt hỏi" }).getByTestId("quota-available")).toHaveText("15");
     await expect(page.getByText("665")).toHaveCount(0);
     await expect(units.first()).toContainText("120");
     await expect(units.first()).toContainText("Không cộng dồn sang kỳ sau");

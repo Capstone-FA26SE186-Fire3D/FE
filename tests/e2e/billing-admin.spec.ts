@@ -83,11 +83,10 @@ test.describe("admin commerce (mock)", () => {
     // Immutable versions: the row is neither clickable nor has a "···" menu.
     await expect(quotaPolicyRows(page).getByRole("button")).toHaveCount(0);
     await page.getByRole("button", { name: "Tạo phiên bản", exact: true }).first().click();
-    await page.getByLabel("Đơn vị hạn mức").fill("Tokens VN");
     await page.getByLabel("Hiệu lực từ").fill("2026-11-01T08:00");
     await page.getByRole("button", { name: "Tạo phiên bản" }).last().click();
-    await expect(page.getByText(/Viết liền không dấu, bắt đầu bằng chữ/)).toBeVisible();
-    await page.getByLabel("Đơn vị hạn mức").fill("credits");
+    await expect(page.getByText("Chọn đơn vị: lượt hỏi hoặc token.")).toBeVisible();
+    await page.getByLabel("Đơn vị hạn mức").selectOption("requests");
     await page.getByLabel("Hiệu lực đến").fill("2026-10-01T08:00");
     await page.getByRole("button", { name: "Tạo phiên bản" }).last().click();
     await expect(page.getByText(/Thời điểm kết thúc phải sau thời điểm bắt đầu/)).toBeVisible();
@@ -95,7 +94,7 @@ test.describe("admin commerce (mock)", () => {
     await page.getByRole("button", { name: "Tạo phiên bản" }).last().click();
     await expect(quotaPolicyRows(page)).toHaveCount(2);
     const body = callsTo(mock, "POST", "/api/admin/billing/quota-policies")[0].body as { quotaUnit: string; effectiveFrom: string; effectiveUntil: string | null };
-    expect(body.quotaUnit).toBe("credits");
+    expect(body.quotaUnit).toBe("requests");
     expect(body.effectiveFrom).toMatch(/Z$/);
     expect(body.effectiveUntil).toBeNull();
     // Reload recovers from the server list.

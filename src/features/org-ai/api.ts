@@ -83,9 +83,17 @@ export const adminAiApi = {
   listPolicies(accessToken: string, filters: AiPolicyFilters, signal?: AbortSignal) {
     return apiClient.request<AiPolicyPage>("/api/admin/ai/policies", { headers: auth(accessToken), query: { ...filters }, signal });
   },
-  /** Policies are immutable: a change is a new period for the operation (overlap -> 409 AI_POLICY_OVERLAP). */
+  /** Policies are immutable except for ending them: a change is a new period for the operation (overlap -> 409 AI_POLICY_OVERLAP). */
   createPolicy(accessToken: string, input: CreateAiPolicyInput, idempotencyKey: string) {
     return apiClient.request<AiPolicy>("/api/admin/ai/policies", { headers: auth(accessToken), json: input, idempotencyKey });
+  },
+
+  /**
+   * Ends a policy (BE#176): only `effectiveUntil` changes, default now. It must not be in the past and must be earlier than the
+   * current end (422 AI_POLICY_END_INVALID); an ended policy is 409 AI_POLICY_ENDED. The next policy may start from that instant.
+   */
+  endPolicy(accessToken: string, policyId: string, effectiveUntil: string | null, idempotencyKey: string) {
+    return apiClient.request<AiPolicy>(`/api/admin/ai/policies/${encodeURIComponent(policyId)}/end`, { headers: auth(accessToken), json: effectiveUntil ? { effectiveUntil } : {}, idempotencyKey });
   },
 
   listKnowledgeSources(accessToken: string, filters: KnowledgeSourceFilters, signal?: AbortSignal) {

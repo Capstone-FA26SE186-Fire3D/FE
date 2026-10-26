@@ -138,17 +138,16 @@ test.describe("Admin AI: policies", () => {
 
     await form.getByLabel("Thao tác").click();
     await page.getByRole("option", { name: "Đề xuất kịch bản", exact: true }).click();
-    await form.getByLabel("Đơn vị hạn mức").fill("Tokens");
     await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("0");
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("20001");
     await form.getByLabel("Số nguồn tối đa").fill("101");
     await page.getByTestId("policy-create").click();
-    await expect(form.getByText(/Viết liền không dấu, bắt đầu bằng chữ/)).toBeVisible();
+    await expect(form.getByText("Chọn đơn vị: lượt hỏi hoặc token.")).toBeVisible();
     await expect(form.getByText("Số nguyên từ 1 đến 20.000.")).toBeVisible();
     await expect(form.getByText("Số nguyên từ 1 đến 100.", { exact: true })).toBeVisible();
     expect(calls(mock, "POST", "/api/admin/ai/policies")).toHaveLength(0);
 
-    await form.getByLabel("Đơn vị hạn mức").fill("tokens");
+    await form.getByLabel("Đơn vị hạn mức").selectOption("tokens");
     await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("120");
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("6000");
     await form.getByLabel("Số nguồn tối đa").fill("12");
@@ -158,8 +157,8 @@ test.describe("Admin AI: policies", () => {
     expect(posts).toHaveLength(1);
     expect(posts[0].headers["idempotency-key"]).toMatch(/\S+/);
     expect(posts[0].body).toEqual({ operation: "ScenarioDraft", quotaUnit: "tokens", reserveUnits: 120, maxInputChars: 6000, maxSources: 12 });
-    // Policies are immutable: no edit control or row menu exists on a row.
-    await expect(policyRows(page).getByRole("button")).toHaveCount(0);
+    // Policies are immutable: no edit control on a row; the row menu only ends the policy.
+    await expect(policyRows(page).getByRole("button", { name: /sửa/i })).toHaveCount(0);
   });
 
   test("an overlapping period is refused with 409 and the typed values stay; a lost response retries with the same key", async ({ page }) => {
@@ -169,7 +168,7 @@ test.describe("Admin AI: policies", () => {
     const form = page.getByRole("form", { name: "Tạo chính sách AI" });
     await form.getByLabel("Thao tác").click();
     await page.getByRole("option", { name: "Hỏi đáp", exact: true }).click();
-    await form.getByLabel("Đơn vị hạn mức").fill("tokens");
+    await form.getByLabel("Đơn vị hạn mức").selectOption("tokens");
     await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("10");
     await form.getByLabel("Số ký tự đầu vào tối đa").fill("100");
     await form.getByLabel("Số nguồn tối đa").fill("5");
@@ -181,6 +180,46 @@ test.describe("Admin AI: policies", () => {
     await page.getByTestId("policy-create").click();
     await expect(form.getByText("Phải sau thời điểm bắt đầu hiệu lực.")).toBeVisible();
     expect(calls(mock, "POST", "/api/admin/ai/policies")).toHaveLength(1);
+  });
+});
+
+test.describe("Admin AI: ending a policy", () => {
+  test("the row menu ends a running policy once (same key on retry), then a new period can start from that instant", async ({ page }) => {
+    const mock = newAiMock();
+    await open(page, mock, "/admin/ai?tab=policies");
+    await expect(policyRows(page)).toHaveCount(1);
+    await expect(policyRows(page)).toContainText("không có ngày kết thúc");
+    await policyRows(page).first().getByRole("button", { name: /thao tác|menu/i }).click();
+    await page.getByRole("menuitem", { name: "Kết thúc chính sách" }).click();
+    const dialog = page.getByRole("alertdialog").or(page.getByRole("dialog")).filter({ hasText: "Kết thúc chính sách" });
+    await expect(dialog).toContainText("Không hoàn tác được");
+    // A time in the past is refused before any request.
+    await dialog.getByTestId("policy-end-at").fill("2020-01-01T00:00");
+    await expect(dialog.getByText("Chọn thời điểm sau bây giờ.")).toBeVisible();
+    await dialog.getByTestId("policy-end-at").fill("");
+    await dialog.getByRole("button", { name: "Kết thúc ngay" }).click();
+    await expect(page.getByText("Đã kết thúc chính sách AI")).toBeVisible();
+    const ends = calls(mock, "POST", `/api/admin/ai/policies/${ids.policy}/end`);
+    expect(ends).toHaveLength(1);
+    expect(ends[0].headers["idempotency-key"]).toMatch(/\S+/);
+    expect(ends[0].body).toEqual({});
+    await expect(policyRows(page).first()).toContainText("Đã hết hạn");
+    // The ended row offers no second end.
+    await policyRows(page).first().getByRole("button", { name: /thao tác|menu/i }).click();
+    await expect(page.getByRole("menuitem", { name: /Kết thúc chính sách/ })).toBeDisabled();
+    await page.keyboard.press("Escape");
+    // A new period for the same operation no longer overlaps.
+    await page.getByTestId("policy-new").click();
+    const form = page.getByRole("form", { name: "Tạo chính sách AI" });
+    await form.getByLabel("Thao tác").click();
+    await page.getByRole("option", { name: "Hỏi đáp", exact: true }).click();
+    await form.getByLabel("Đơn vị hạn mức").selectOption("requests");
+    await form.getByLabel("Giữ chỗ mỗi yêu cầu").fill("1");
+    await form.getByLabel("Số ký tự đầu vào tối đa").fill("2000");
+    await form.getByLabel("Số nguồn tối đa").fill("100");
+    await page.getByTestId("policy-create").click();
+    await expect(policyRows(page)).toHaveCount(2);
+    await expect(policyRows(page).first()).toContainText("lượt hỏi");
   });
 });
 
