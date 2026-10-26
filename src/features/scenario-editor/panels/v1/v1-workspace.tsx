@@ -19,6 +19,7 @@ import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import { AiProposalApply } from "@/features/org-ai/components/ai-proposal-apply";
 import { AI_PROPOSAL_PARAM } from "@/features/org-ai/proposal-param";
+import { LIBRARY_USE_PARAM, parseLibraryUse } from "@/features/library/use-param";
 import { revisionLabel } from "@/features/buildings/pipeline";
 
 import { scenarioEditorApi, type LoadedDraft } from "../../api";
@@ -67,8 +68,12 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const gesture = useRef(0);
   const revisionId = initial.draft.revisionId;
 
-  const [panelTab, setPanelTab] = useState<PanelTab>("object");
-  const [mobileTab, setMobileTab] = useState<MobileTab>("model");
+  // "Dùng làm mẫu" on /workspace/library arrives as ?useSample=<kind>:<itemId>: the Library tab opens on that sample's preview; nothing is applied yet.
+  const searchParams = useSearchParams();
+  const [sampleUse] = useState(() => parseLibraryUse(searchParams.get(LIBRARY_USE_PARAM)));
+  const [panelTab, setPanelTab] = useState<PanelTab>(sampleUse ? "library" : "object");
+  // The editor mounts only after the draft loads (client side), so the phone layout can be read once here.
+  const [mobileTab, setMobileTab] = useState<MobileTab>(() => (sampleUse && window.matchMedia("(max-width: 767px)").matches ? "props" : "model"));
   const [treeOpen, setTreeOpen] = useState(false);
   const [conflictOpen, setConflictOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
@@ -80,7 +85,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const [modelStatus, setModelStatus] = useState<ModelStatus>({ phase: "none" });
   const [pick, setPick] = useState<{ name: string; point: Point3 } | null>(null);
   const [applied, setApplied] = useState<AppliedSample[]>([]);
-  const [libraryUi, setLibraryUi] = useState<LibraryUi>(initialLibraryUi);
+  const [libraryUi, setLibraryUi] = useState<LibraryUi>(sampleUse ? { ...initialLibraryUi, kind: sampleUse.kind, chosen: sampleUse.itemId, nonce: 1 } : initialLibraryUi);
   const isMobile = useMediaQuery("(max-width: 767px)");
   const isDesktop = useMediaQuery("(min-width: 1100px)");
 
@@ -101,7 +106,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const guard = useLeaveGuard(dirty);
 
   // "Áp dụng vào bản nháp" from the AI page arrives as ?aiRequest=<id>: the proposal is re-read from the server and applied only after a confirmed preview.
-  const aiRequestId = useSearchParams().get(AI_PROPOSAL_PARAM);
+  const aiRequestId = searchParams.get(AI_PROPOSAL_PARAM);
   const [aiDismissed, setAiDismissed] = useState(false);
   const aiFloorIds = useMemo(() => (geometry ? new Set(geometry.floors.map((floor) => floor.id)) : null), [geometry]);
   const closeAiProposal = useCallback(() => {
@@ -110,6 +115,13 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
     url.searchParams.delete(AI_PROPOSAL_PARAM);
     window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
+
+  useEffect(() => {
+    if (!searchParams.has(LIBRARY_USE_PARAM)) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete(LIBRARY_USE_PARAM);
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+  }, [searchParams]);
 
   const geometryState: GeometryState = reading.kind === "valid" ? "valid" : reading.kind === "reprocess" ? "reprocess" : reading.kind === "invalid" ? "invalid"
     : (preview.phase === "idle" || preview.phase === "loading") && !preview.preview ? "loading" : "not-ready";

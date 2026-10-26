@@ -1,6 +1,7 @@
 "use client";
 
 import { FileText, Library, Search } from "lucide-react";
+import { useState } from "react";
 
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams, useUrlSearch } from "@/api/use-url-params";
@@ -9,18 +10,18 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Combobox, type ComboboxOption } from "@/components/ui/combobox";
 import { TableSearch } from "@/components/ui/data-table";
-import { Drawer } from "@/components/ui/dialog";
+import { Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { PageHeader } from "@/components/ui/page-header";
 import { SkeletonDetail, SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SubTabs } from "@/components/ui/sub-tabs";
 import { Pagination } from "@/components/ui/table";
-import { Tooltip } from "@/components/ui/tooltip";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { libraryApi } from "../api";
 import { describeLibraryError } from "../errors";
 import { LIBRARY_KINDS, isKind, kindLabel, type LibraryItem } from "../types";
+import { UseSampleDialog } from "./use-sample-dialog";
 import { VersionPreview } from "./version-preview";
 import "./library-filters.css";
 import { LoadingBlock } from "@/components/ui/spinner";
@@ -30,19 +31,21 @@ import { LoadingBlock } from "@/components/ui/spinner";
 const PAGE_SIZE = 100;
 const NO_CAPABILITY = "none";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const USE_AS_TEMPLATE_HINT = "“Dùng làm mẫu” chỉ dùng được bên trong trình soạn kịch bản. Mở một công trình, vào trình soạn và chọn thẻ Thư viện để áp dụng.";
+const USE_AS_TEMPLATE_HINT = "“Dùng làm mẫu” mở trình soạn của kịch bản bạn chọn ngay tại mẫu này; bạn xem trước rồi mới áp dụng vào bản nháp.";
 
-function ItemDrawer({ accessToken, itemId, onClose }: { accessToken: string; itemId: string; onClose: () => void }) {
+function ItemDialog({ accessToken, itemId, onClose }: { accessToken: string; itemId: string; onClose: () => void }) {
   const query = useAsyncData(`library-org-item:${itemId}`, (signal) => libraryApi.getItem(accessToken, itemId, signal), true, { keepPrevious: false });
   const item = query.data;
   const version = item?.latestPublished ?? null;
   const view = query.error !== undefined && !item ? describeLibraryError(query.error) : null;
-  return <Drawer open onOpenChange={(open) => { if (!open) onClose(); }} size="md" title={version?.name ?? (item ? item.code : "Mẫu thư viện")} description={item ? `${kindLabel[item.kind]} · ${item.code}` : "Chỉ xem. Áp dụng vào kịch bản trong trình soạn thảo, thẻ Thư viện."}
+  const [using, setUsing] = useState(false);
+  if (using && item) return <UseSampleDialog accessToken={accessToken} item={item} onClose={() => setUsing(false)} />;
+  return <Modal open onOpenChange={(open) => { if (!open) onClose(); }} size="lg" title={version?.name ?? (item ? item.code : "Mẫu thư viện")} description={item ? `${kindLabel[item.kind]} · ${item.code}` : "Chỉ xem. Áp dụng vào kịch bản trong trình soạn thảo, thẻ Thư viện."}
     eyebrow={version ? <><StatusBadge tone="success">Đã xuất bản · v{version.versionNumber}</StatusBadge>{version.requiredCapabilities.length > 0 && <StatusBadge tone="warning">Có yêu cầu năng lực</StatusBadge>}</> : undefined}
-    data-testid="org-item-drawer"
+    data-testid="org-item-dialog"
     footer={<>
       <Button variant="quiet" onClick={onClose}>Đóng</Button>
-      <Tooltip content={USE_AS_TEMPLATE_HINT}><span style={{ display: "inline-flex" }}><Button disabled aria-describedby="org-lib-use-hint" style={{ pointerEvents: "none" }}>Dùng làm mẫu</Button></span></Tooltip>
+      <Button disabled={!version} onClick={() => setUsing(true)} aria-describedby="org-lib-use-hint" data-testid="use-sample">Dùng làm mẫu</Button>
     </>}>
     {!item && !view && <SkeletonDetail rows={6} label="Đang tải mẫu…" />}
     {view && <Alert tone="danger" title={view.kind === "notFound" ? "Mẫu không còn khả dụng" : "Không tải được mẫu"} action={view.kind === "notFound" ? undefined : <Button size="sm" variant="secondary" className="mt-3" onClick={query.reload}>Thử lại</Button>}>{view.kind === "notFound" ? "Mẫu đã ngừng dùng hoặc chưa có phiên bản đã xuất bản." : view.message}</Alert>}
@@ -51,7 +54,7 @@ function ItemDrawer({ accessToken, itemId, onClose }: { accessToken: string; ite
       <Alert tone="info" title="Áp dụng là sao chép">Khi bạn áp dụng, nội dung được sao chép vào bản nháp của bạn sau bước xem trước. Cập nhật mẫu về sau không đổi kịch bản đã soạn hoặc đã phát hành.</Alert>
       <p id="org-lib-use-hint" className="ops-field-hint" style={{ margin: 0 }}>{USE_AS_TEMPLATE_HINT}</p>
     </div>}
-  </Drawer>;
+  </Modal>;
 }
 
 function ItemCard({ item, onOpen }: { item: LibraryItem; onOpen: () => void }) {
@@ -136,6 +139,6 @@ export function LibraryBrowser() {
 
     <p className="org-lib-note">{USE_AS_TEMPLATE_HINT} Thêm thiết bị vào thư viện không tự bổ sung khả năng gameplay: chỉ những đối tượng mà ứng dụng FET3D đang hỗ trợ mới đặt được.</p>
 
-    {selected && UUID.test(selected) && accessToken && <ItemDrawer accessToken={accessToken} itemId={selected} onClose={() => setParams({ item: null })} />}
+    {selected && UUID.test(selected) && accessToken && <ItemDialog accessToken={accessToken} itemId={selected} onClose={() => setParams({ item: null })} />}
   </div>;
 }
