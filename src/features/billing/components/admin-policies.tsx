@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { CellTitle, DataTable, type DataColumn } from "@/components/ui/data-table";
 import { Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, Input } from "@/components/ui/field";
+import { Field, Input, Select } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { billingApi } from "../api";
 import { billingErrorText } from "../errors";
@@ -19,7 +19,11 @@ import type { QuotaPolicy } from "../types";
 import "../billing.css";
 
 const PAGE_SIZE = 20;
-const UNIT = /^[a-z][a-z0-9_-]{0,49}$/;
+/** Package/top-up AI grants must use a unit the AI service can settle (BE#176): requests or tokens. */
+const UNITS = [
+  { value: "requests", label: "Lượt hỏi (requests): mỗi câu hỏi tính 1" },
+  { value: "tokens", label: "Token (tokens): theo lượng chữ AI đọc và viết" },
+] as const;
 const AUDIENCE: Record<string, string> = { organization: "Tổ chức" };
 const POLICY_KIND: Record<string, string> = { quota: "Hạn mức trả trước" };
 const ROLLOVER: Record<string, string> = { None: "Không cộng dồn sang kỳ sau" };
@@ -51,7 +55,7 @@ export function PoliciesSection({ accessToken }: { accessToken: string }) {
     const found: Record<string, string> = {};
     const fromIso = localInputToIso(from);
     const untilIso = until ? localInputToIso(until) : null;
-    if (!UNIT.test(unit.trim())) found.quotaUnit = "Viết liền không dấu, bắt đầu bằng chữ, tối đa 50 ký tự (ví dụ: luot-hoi).";
+    if (!UNITS.some((item) => item.value === unit)) found.quotaUnit = "Chọn đơn vị: lượt hỏi hoặc token.";
     if (!fromIso) found.effectiveFrom = "Chọn thời điểm bắt đầu hiệu lực.";
     if (until && (!untilIso || !fromIso || new Date(untilIso) <= new Date(fromIso))) found.effectiveUntil = "Thời điểm kết thúc phải sau thời điểm bắt đầu, hoặc để trống nếu không giới hạn.";
     setErrors(found);
@@ -99,7 +103,10 @@ export function PoliciesSection({ accessToken }: { accessToken: string }) {
     <Modal open={open} onOpenChange={(next) => { if (!next && !saving) setOpen(false); }} title="Tạo phiên bản chính sách" description="Không thể sửa hay xóa sau khi tạo. Đơn vị là lựa chọn nghiệp vụ rõ ràng; hệ thống không quy đổi giữa các đơn vị."
       footer={<><Button type="button" variant="quiet" onClick={() => setOpen(false)} disabled={saving}>Hủy</Button><Button type="submit" form={formId} disabled={saving}>{saving ? "Đang tạo…" : "Tạo phiên bản"}</Button></>}>
       <form id={formId} onSubmit={submit} noValidate className="ops-stack">
-        <Field label="Đơn vị hạn mức" required error={errors.quotaUnit} hint="Ví dụ do bạn quy định (chữ thường, 1–50 ký tự).">{(p) => <Input {...p} maxLength={50} autoComplete="off" value={unit} onChange={(event) => setUnit(event.target.value)} />}</Field>
+        <Field label="Đơn vị hạn mức" required error={errors.quotaUnit} hint="Phải trùng đơn vị của chính sách AI (mục AI & nguồn tri thức → Chính sách), nếu không tổ chức có hạn mức vẫn không hỏi được.">{(p) => <Select {...p} value={unit} onChange={(event) => setUnit(event.target.value)}>
+          <option value="">Chọn đơn vị…</option>
+          {UNITS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+        </Select>}</Field>
         <div className="ops-form-grid">
           <Field label="Hiệu lực từ" required error={errors.effectiveFrom} hint="Theo giờ địa phương.">{(p) => <Input {...p} type="datetime-local" value={from} onChange={(event) => setFrom(event.target.value)} />}</Field>
           <Field label="Hiệu lực đến" error={errors.effectiveUntil} hint="Để trống nếu không giới hạn.">{(p) => <Input {...p} type="datetime-local" value={until} onChange={(event) => setUntil(event.target.value)} />}</Field>

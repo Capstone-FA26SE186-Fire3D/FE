@@ -15,6 +15,7 @@ export function formatNumber(value: number | null | undefined) {
 /** Readable names of the quota unit codes admins type (no accents, e.g. "luot-hoi"); never shown raw to users. */
 const UNIT_LABELS: Record<string, string> = {
   "luot-hoi": "lượt hỏi",
+  "requests": "lượt hỏi",
   "luot": "lượt",
   "luot-ai": "lượt AI",
 };

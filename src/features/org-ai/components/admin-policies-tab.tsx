@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { CircleStop, Plus, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { useId, useRef, useState, type FormEvent } from "react";
 
 import { useUrlParams } from "@/api/use-url-params";
@@ -11,9 +11,9 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { CellTitle, DataTable, type DataColumn } from "@/components/ui/data-table";
-import { Modal } from "@/components/ui/dialog";
+import { ConfirmDialog, Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, Input } from "@/components/ui/field";
+import { Field, Input, Select } from "@/components/ui/field";
 import { FilterChip, FilterChips } from "@/components/ui/filter-chip";
 import { StatusBadge, type Tone } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
@@ -24,7 +24,11 @@ import { aiErrorText, fieldIssue, operationLabel } from "../labels";
 import { ADMIN_AI_OPERATIONS, urlFilter, type AiPolicy, type CreateAiPolicyInput } from "../types";
 import styles from "../org-ai.module.css";
 
-const QUOTA_UNIT = /^[a-z][a-z0-9_-]{0,49}$/;
+/** The only units the AI service can settle (BE#176): one question = one unit, or the tokens the model read and wrote. */
+const QUOTA_UNITS = [
+  { value: "requests", label: "Lượt hỏi (requests): mỗi câu hỏi tính 1" },
+  { value: "tokens", label: "Token (tokens): theo lượng chữ AI đọc và viết" },
+] as const;
 
 const PAGE_SIZE = 20;
 
@@ -39,7 +43,7 @@ const wholeNumber = (text: string) => (/^\d+$/.test(text.trim()) ? Number(text.t
 export function validatePolicy(form: Form): { errors: Errors; input?: CreateAiPolicyInput } {
   const errors: Errors = {};
   if (!(ADMIN_AI_OPERATIONS as readonly string[]).includes(form.operation)) errors.operation = "Chọn thao tác.";
-  if (!QUOTA_UNIT.test(form.quotaUnit.trim())) errors.quotaUnit = "Viết liền không dấu, bắt đầu bằng chữ, tối đa 50 ký tự (ví dụ: luot-hoi). Phải khớp đơn vị hạn mức đã cấp.";
+  if (!QUOTA_UNITS.some((unit) => unit.value === form.quotaUnit)) errors.quotaUnit = "Chọn đơn vị: lượt hỏi hoặc token.";
   const reserve = wholeNumber(form.reserveUnits);
   if (!(reserve >= 1 && reserve <= 100_000_000)) errors.reserveUnits = "Số nguyên từ 1 đến 100.000.000.";
   const maxChars = wholeNumber(form.maxInputChars);
@@ -65,6 +69,9 @@ export function validatePolicy(form: Form): { errors: Errors; input?: CreateAiPo
     },
   };
 }
+
+/** A policy can still be ended while its period has not finished (open-ended or ending later). */
+const endable = (policy: AiPolicy, now: number) => !policy.effectiveUntil || new Date(policy.effectiveUntil).getTime() > now;
 
 function periodState(policy: AiPolicy, now: number): { label: string; tone: Tone } {
   const from = new Date(policy.effectiveFrom).getTime();
@@ -110,18 +117,21 @@ function PolicyModal({ open, accessToken, onCreated, onClose }: { open: boolean;
   };
   const server = (path: string, key: keyof Form) => errors[key] ?? fieldIssue(error, path);
 
-  return <Modal open={open} onOpenChange={(next) => { if (!next && !busy) onClose(); }} size="lg" title="Tạo chính sách AI" description="Một kỳ hiệu lực cho một thao tác; không sửa được sau khi tạo."
+  return <Modal open={open} onOpenChange={(next) => { if (!next && !busy) onClose(); }} size="lg" title="Tạo chính sách AI" description="Một kỳ hiệu lực cho một thao tác; không sửa được sau khi tạo, chỉ kết thúc được."
     footer={<><Button type="button" variant="quiet" onClick={onClose} disabled={busy}>Hủy</Button><Button type="submit" form={formId} disabled={busy} data-testid="policy-create">{busy ? "Đang tạo…" : "Tạo chính sách"}</Button></>}>
     <form id={formId} className={styles.stack} onSubmit={submit} aria-label="Tạo chính sách AI" noValidate>
-      <Alert tone="info" title="Không sửa được sau khi tạo">Chính sách không sửa được sau khi tạo. Muốn đổi, tạo kỳ hiệu lực mới cho thao tác đó (các kỳ của cùng thao tác không được chồng nhau). Không có giá trị mặc định: mọi con số do bạn quyết định.</Alert>
+      <Alert tone="info" title="Không sửa được sau khi tạo">Chính sách không sửa được sau khi tạo. Muốn đổi, kết thúc chính sách đang chạy (menu ··· ở cuối hàng) rồi tạo chính sách mới từ thời điểm đó; các kỳ của cùng thao tác không được chồng nhau. Không có giá trị mặc định: mọi con số do bạn quyết định.</Alert>
       <Field label="Thao tác" required error={server("$.operation", "operation")}>
         {(props) => <Combobox {...props} aria-label="Thao tác" value={form.operation} onChange={(value) => setForm((current) => ({ ...current, operation: value }))} placeholder="Chọn thao tác…" groupLabel="Thao tác" options={ADMIN_AI_OPERATIONS.map((value) => ({ value, label: operationLabel(value) }))} />}
       </Field>
-      <Field label="Đơn vị hạn mức" required hint="Viết liền không dấu, khớp đơn vị hạn mức đã cấp. Ví dụ luot-hoi, người dùng sẽ thấy là “lượt hỏi”. Hệ thống không quy đổi giữa tiền và token." error={server("$.quotaUnit", "quotaUnit")}>
-        {(props) => <Input {...props} value={form.quotaUnit} onChange={set("quotaUnit")} autoComplete="off" spellCheck={false} />}
+      <Field label="Đơn vị hạn mức" required hint="Phải trùng đơn vị hạn mức AI mà gói dịch vụ cấp cho tổ chức. Hệ thống không quy đổi giữa hai đơn vị." error={server("$.quotaUnit", "quotaUnit")}>
+        {(props) => <Select {...props} value={form.quotaUnit} onChange={set("quotaUnit")}>
+          <option value="">Chọn đơn vị…</option>
+          {QUOTA_UNITS.map((unit) => <option key={unit.value} value={unit.value}>{unit.label}</option>)}
+        </Select>}
       </Field>
       <div className={styles.grid2}>
-        <Field label="Giữ chỗ mỗi yêu cầu" required error={server("$.reserveUnits", "reserveUnits")}>{(props) => <Input {...props} inputMode="numeric" value={form.reserveUnits} onChange={set("reserveUnits")} />}</Field>
+        <Field label="Giữ chỗ mỗi yêu cầu" required hint="Số đơn vị tạm khóa khi gửi một câu hỏi, để hạn mức không bị dùng quá. AI trả lời xong chỉ trừ phần thực dùng, phần dư trả lại; lỗi thì trả lại hết." error={server("$.reserveUnits", "reserveUnits")}>{(props) => <Input {...props} inputMode="numeric" value={form.reserveUnits} onChange={set("reserveUnits")} />}</Field>
         <Field label="Số ký tự đầu vào tối đa" required error={server("$.maxInputChars", "maxInputChars")}>{(props) => <Input {...props} inputMode="numeric" value={form.maxInputChars} onChange={set("maxInputChars")} />}</Field>
         <Field label="Số nguồn tối đa" required error={server("$.maxSources", "maxSources")}>{(props) => <Input {...props} inputMode="numeric" value={form.maxSources} onChange={set("maxSources")} />}</Field>
         {form.operation === "TraineeAnswer" && <Field label="Hạn mức mỗi học viên mỗi ngày" required hint="Tính theo ngày giờ Việt Nam; gồm phần đã tính và phần đang giữ chỗ. Không lấy từ hạn mức của tổ chức." error={server("$.dailyUnits", "dailyUnits")}>{(props) => <Input {...props} inputMode="numeric" value={form.dailyUnits} onChange={set("dailyUnits")} data-testid="policy-daily-units" />}</Field>}
@@ -135,16 +145,55 @@ function PolicyModal({ open, accessToken, onCreated, onClose }: { open: boolean;
   </Modal>;
 }
 
-/** Policy versions (immutable: no row action, no edit); the "Thao tác" chip filters on the server. */
+/**
+ * "Kết thúc chính sách" (BE#176): sets only the end of the period, now by default or at a chosen later time. The next policy
+ * for the operation can then start from that instant. One Idempotency-Key per dialog, so a retry never ends twice.
+ */
+function EndPolicyDialog({ policy, accessToken, onEnded, onClose }: { policy: AiPolicy; accessToken: string; onEnded: (policy: AiPolicy) => void; onClose: () => void }) {
+  const { keyFor, done } = useIdempotencyKey();
+  const [at, setAt] = useState("");
+  const [error, setError] = useState<unknown>();
+  const [busy, setBusy] = useState(false);
+  // Compared with when the dialog opened; the server checks again against its own clock.
+  const [openedAt] = useState(() => Date.now());
+  const invalid = at !== "" && (Number.isNaN(new Date(at).getTime()) || new Date(at).getTime() <= openedAt);
+  const confirm = async () => {
+    if (busy || invalid) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      const until = at ? toIso(at) : null;
+      const ended = await adminAiApi.endPolicy(accessToken, policy.id, until, keyFor({ id: policy.id, until }));
+      done();
+      onEnded(ended);
+    } catch (cause) {
+      setError(cause);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <ConfirmDialog open onOpenChange={(open) => { if (!open && !busy) onClose(); }} tone="danger" busy={busy} confirmDisabled={invalid}
+    title={`Kết thúc chính sách “${operationLabel(policy.operation)}”?`} confirmLabel={at ? "Đặt thời điểm kết thúc" : "Kết thúc ngay"}
+    description="Sau thời điểm kết thúc, yêu cầu AI mới của thao tác này bị từ chối cho tới khi có chính sách mới. Yêu cầu đã gửi vẫn dùng chính sách cũ. Không hoàn tác được."
+    onConfirm={confirm}>
+    <Field label="Kết thúc lúc" hint="Để trống: kết thúc ngay bây giờ." error={invalid ? "Chọn thời điểm sau bây giờ." : undefined}>
+      {(props) => <Input {...props} type="datetime-local" value={at} onChange={(event) => setAt(event.target.value)} data-testid="policy-end-at" />}
+    </Field>
+    {error !== undefined && <Alert tone="danger" title="Chưa kết thúc được chính sách">{aiErrorText(error)}</Alert>}
+  </ConfirmDialog>;
+}
+
+/** Policy versions: immutable except for ending them from the row menu; the "Thao tác" chip filters on the server. */
 export function AdminPoliciesTab({ accessToken }: { accessToken: string }) {
   const toast = useToast();
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const operation = urlFilter(get("operation"), ADMIN_AI_OPERATIONS);
   const list = useAsyncData(`admin-ai:policies:${page}:${operation}`, (signal) => adminAiApi.listPolicies(accessToken, { page, pageSize: PAGE_SIZE, operation: operation || undefined }, signal));
   const [creating, setCreating] = useState(false);
+  const [ending, setEnding] = useState<AiPolicy | null>(null);
   const items = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
-  const [now] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
 
   const columns: DataColumn<AiPolicy>[] = [
     { key: "operation", header: "Thao tác", primary: true, render: (policy) => <CellTitle title={operationLabel(policy.operation)} /> },
@@ -166,13 +215,16 @@ export function AdminPoliciesTab({ accessToken }: { accessToken: string }) {
       rowKey={(policy) => policy.id}
       loading={list.loading && !list.data}
       rowTone={(policy) => (periodState(policy, now).label === "Đã hết hạn" ? "muted" : undefined)}
+      rowMenu={(policy) => [endable(policy, now)
+        ? { label: "Kết thúc chính sách", icon: CircleStop, tone: "danger" as const, onSelect: () => setEnding(policy) }
+        : { label: "Kết thúc chính sách", icon: CircleStop, disabled: true, hint: "Chính sách đã hết hiệu lực.", onSelect: () => undefined }]}
       error={list.error !== undefined ? <Alert tone="danger" title="Không tải được chính sách AI" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{aiErrorText(list.error)}</Alert> : undefined}
       toolbar={<>
         <FilterChips label="Bộ lọc chính sách">
           <FilterChip label="Thao tác" value={operation} onChange={(value) => setParams({ operation: value })} options={ADMIN_AI_OPERATIONS.map((value) => ({ value, label: operationLabel(value) }))} />
         </FilterChips>
         <span className="ops-toolbar-grow" />
-        <Button variant="quiet" onClick={list.reload} disabled={list.loading} aria-label="Tải lại danh sách"><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
+        <Button variant="quiet" onClick={() => { setNow(Date.now()); list.reload(); }} disabled={list.loading} aria-label="Tải lại danh sách"><RefreshCw size={16} aria-hidden="true" />Tải lại</Button>
         <Button onClick={() => setCreating(true)} data-testid="policy-new"><Plus size={16} aria-hidden="true" />Tạo chính sách</Button>
       </>}
       empty={operation
@@ -180,7 +232,8 @@ export function AdminPoliciesTab({ accessToken }: { accessToken: string }) {
         : <EmptyState icon={SlidersHorizontal} title="Chưa có chính sách AI" description="Không có chính sách đang hiệu lực thì yêu cầu AI của tổ chức bị từ chối. Tạo chính sách cho từng thao tác; hệ thống không có giá trị mặc định." />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
-    <p className={styles.hint}>Chính sách không sửa được nên hàng không có menu thao tác. Trạng thái hiệu lực ở đây so theo giờ trên máy bạn; hệ thống quyết định chính sách áp dụng lúc gửi yêu cầu.</p>
+    <p className={styles.hint}>Chính sách không sửa được. Muốn đổi số liệu: mở menu ··· ở cuối hàng, chọn “Kết thúc chính sách”, rồi tạo chính sách mới. Trạng thái hiệu lực ở đây so theo giờ trên máy bạn; hệ thống quyết định chính sách áp dụng lúc gửi yêu cầu.</p>
+    {ending && <EndPolicyDialog policy={ending} accessToken={accessToken} onClose={() => setEnding(null)} onEnded={() => { setEnding(null); setNow(Date.now()); list.reload(); toast.notify({ tone: "success", title: "Đã kết thúc chính sách AI", description: "Tạo chính sách mới cho thao tác này nếu muốn tiếp tục cho phép yêu cầu AI." }); }} />}
 
     <PolicyModal open={creating} accessToken={accessToken} onClose={() => setCreating(false)} onCreated={() => { setCreating(false); list.reload(); toast.notify({ tone: "success", title: "Đã tạo chính sách AI" }); }} />
   </div>;
