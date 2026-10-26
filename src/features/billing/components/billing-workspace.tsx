@@ -60,7 +60,7 @@ function QuotaSummary({ accessToken, refreshKey, onTopUp, onOpen }: { accessToke
       const percent = unit.granted > 0 ? Math.min(100, Math.round((used / unit.granted) * 100)) : 100;
       return <div key={unit.quotaUnit} className="bill-quota-unit">
         <div className="bill-row"><span className="bill-muted">Đã dùng ({quotaUnitLabel(unit.quotaUnit)})</span><strong className="bill-quota-figure">{formatNumber(used)} / {formatNumber(unit.granted)}</strong></div>
-        <div className="bill-meter" role="img" aria-label={`Đã dùng hoặc giữ chỗ ${used} trên ${unit.granted} ${quotaUnitLabel(unit.quotaUnit)}`}><span style={{ width: `${percent}%` }} /></div>
+        <div className="bill-meter" role="img" aria-label={`Đã dùng hoặc đang tạm trừ ${used} trên ${unit.granted} ${quotaUnitLabel(unit.quotaUnit)}`}><span style={{ width: `${percent}%` }} /></div>
         <span className="bill-dim">Còn dùng được {formatNumber(unit.available)} {quotaUnitLabel(unit.quotaUnit)}</span>
       </div>;
     })}

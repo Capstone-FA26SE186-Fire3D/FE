@@ -63,11 +63,11 @@ function AiUsageCard({ usage }: { usage: AiUsage }) {
   const settled = usage.settledUnits;
   const statuses = Object.entries(usage.requests).filter(([status]) => !LEGACY_AI_STATUSES.has(status));
   const quota = (items: AiUsage["settledUnits"]) => (items.length ? items.map((item) => `${fmt(item.units)} ${quotaUnitLabel(item.quotaUnit)}`).join(" · ") : "0");
-  return <Panel title="Sử dụng AI" description="Hạn mức AI đã dùng và chốt trong kỳ; phần đang giữ chỗ và cần đối soát là số hiện tại, tính riêng." data-testid="card-ai-usage">
+  return <Panel title="Sử dụng AI" description="Hạn mức AI đã dùng và chốt trong kỳ; phần đang tạm trừ và cần đối soát là số hiện tại, tính riêng." data-testid="card-ai-usage">
     <div className={styles.miniRow}>
       <MiniStat label="Đã chốt (trong kỳ)" value={quota(settled)} hint={settled.length ? undefined : "Chưa dùng hạn mức nào trong kỳ"} />
       <MiniStat label="Đang đặt trước (hiện tại)" value={quota(usage.openReservations)} />
-      <MiniStat label="Cần đối soát (hiện tại)" value={fmt(usage.needsReconcile.requests)} hint={`${fmt(usage.needsReconcile.reservedUnits)} đơn vị đang giữ chỗ`} />
+      <MiniStat label="Cần đối soát (hiện tại)" value={fmt(usage.needsReconcile.requests)} hint={`${fmt(usage.needsReconcile.reservedUnits)} đơn vị đang tạm trừ`} />
     </div>
     {statuses.length > 0 && <ul className={styles.statusList} aria-label="Yêu cầu AI theo trạng thái (tạo trong kỳ)">
       {statuses.map(([status, count]) => <li key={status}><span>{aiStatusLabels[status] ?? status}</span><strong>{fmt(count)}</strong></li>)}

@@ -83,7 +83,7 @@ function AdminDetail({ accessToken, request, refresh, orgName }: { accessToken: 
 
     {request.status === "NeedsReconcile" && <section className={styles.section} aria-label="Đối soát">
       <h3>Đối soát</h3>
-      <p className={styles.muted}>Đối soát nhờ hệ thống hỏi lại nhà cung cấp AI về yêu cầu này. Thao tác không sửa số đã dùng và không tự hoàn hạn mức: nhà cung cấp có kết quả hợp lệ thì chốt theo kết quả, báo chưa nhận thì trả lại phần giữ chỗ, còn lại vẫn ở trạng thái Chờ đối soát.</p>
+      <p className={styles.muted}>Đối soát nhờ hệ thống hỏi lại nhà cung cấp AI về yêu cầu này. Thao tác không sửa số đã dùng và không tự hoàn hạn mức: nhà cung cấp có kết quả hợp lệ thì chốt theo kết quả, báo chưa nhận thì trả lại phần tạm trừ, còn lại vẫn ở trạng thái Chờ đối soát.</p>
       {reconcileAt && <Alert tone="info" title="Đã lên lịch tra cứu">Yêu cầu đối soát lúc {formatDateTime(reconcileAt)}. Trạng thái bên trên tự cập nhật; đã lên lịch chưa có nghĩa là đã có kết quả.</Alert>}
       {error !== undefined && <Alert tone="danger" title="Chưa lên lịch được đối soát" action={<Button size="sm" variant="secondary" className="mt-3" onClick={() => void run()} disabled={busy}>Thử lại</Button>}>{aiErrorText(error)}{error instanceof ApiError && error.code === "AI_RECONCILE_NOT_ALLOWED" ? "" : " Bấm thử lại sẽ không tạo lệnh trùng."}</Alert>}
       <div><Button type="button" onClick={() => setConfirm(true)} disabled={!canReconcile || busy} data-testid="ai-reconcile"><RefreshCw size={16} aria-hidden="true" />Đối soát yêu cầu này</Button></div>
@@ -92,7 +92,7 @@ function AdminDetail({ accessToken, request, refresh, orgName }: { accessToken: 
     <Modal open={confirm} onOpenChange={(open) => { if (!open && !busy) setConfirm(false); }} size="sm" title="Đối soát yêu cầu AI?"
       description="Chỉ lên lịch hỏi lại nhà cung cấp; không tự thay đổi hạn mức hay kết quả."
       footer={<><Button type="button" variant="quiet" onClick={() => setConfirm(false)} disabled={busy}>Hủy</Button><Button type="button" onClick={() => void run()} disabled={busy} data-testid="ai-reconcile-confirm">{busy ? "Đang gửi…" : "Xác nhận đối soát"}</Button></>}>
-      <p className={styles.muted}>Yêu cầu này đang giữ chỗ hạn mức của {orgName(request.organizationId)}. Gửi lệnh đối soát?</p>
+      <p className={styles.muted}>Yêu cầu này đang tạm trừ hạn mức của {orgName(request.organizationId)}. Gửi lệnh đối soát?</p>
       {error !== undefined && <Alert tone="danger" title="Chưa gửi được">{aiErrorText(error)}</Alert>}
     </Modal>
   </div>;
@@ -152,7 +152,7 @@ export function AdminRequestsTab({ accessToken, usage }: { accessToken: string; 
     { key: "request", header: "Yêu cầu", primary: true, render: (item) => <CellTitle title={operationLabel(item.operation)} sub={formatDateTime(item.createdAt)} /> },
     { key: "organization", header: "Tổ chức", width: 200, render: (item) => item.audience === "trainee" ? <CellTitle title="Học viên" sub="không tính vào hạn mức tổ chức" /> : orgName(item.organizationId) },
     { key: "status", header: "Trạng thái", width: 190, render: (item) => <CellTitle title={<StatusBadge tone={statusTone(item.status, item.resultType)}>{statusLabel(item.status, item.resultType)}</StatusBadge>} sub={item.reconcileRequestedAt ? "Đã yêu cầu đối soát" : undefined} /> },
-    { key: "usage", header: "Sử dụng", width: 150, hideBelow: 900, render: (item) => (item.consumedUnits !== undefined ? formatQuota(item.consumedUnits, item.quotaUnit) : item.reservedUnits !== undefined ? `Giữ chỗ ${formatQuota(item.reservedUnits, item.quotaUnit)}` : "—") },
+    { key: "usage", header: "Sử dụng", width: 150, hideBelow: 900, render: (item) => (item.consumedUnits !== undefined ? formatQuota(item.consumedUnits, item.quotaUnit) : item.reservedUnits !== undefined ? `Tạm trừ ${formatQuota(item.reservedUnits, item.quotaUnit)}` : "—") },
   ];
 
   return <div className={styles.stack}>

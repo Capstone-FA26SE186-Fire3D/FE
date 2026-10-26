@@ -41,7 +41,7 @@ export function SubmitStatus({ phase, operation, onRetry, onLook, onTrack, train
     const unit = limit.quotaUnit ?? undefined;
     return <div data-testid="ai-quota-blocked"><Alert tone="warning" title={limit.availableUnits <= 0 ? "Hạn mức AI đã hết" : "Hạn mức AI không đủ cho một yêu cầu"}
       action={<Button asChild size="sm" variant="secondary" className="mt-3"><Link href={BILLING_AI_HREF} data-testid="ai-topup-link"><Gauge size={14} aria-hidden="true" />Nạp thêm hạn mức AI</Link></Button>}>
-      {`Mỗi yêu cầu cần giữ chỗ ${limit.estimatedReserve != null ? formatQuota(limit.estimatedReserve, unit) : "một phần hạn mức"}, tổ chức còn ${formatQuota(limit.availableUnits, unit)}. Yêu cầu chưa được gửi, hệ thống không tính vượt mức. Hãy nạp thêm hạn mức (trả trước), thanh toán và chờ kích hoạt rồi gửi lại.`}
+      {`Mỗi yêu cầu tạm trừ ${limit.estimatedReserve != null ? formatQuota(limit.estimatedReserve, unit) : "một phần hạn mức"}, tổ chức còn ${formatQuota(limit.availableUnits, unit)}. Yêu cầu chưa được gửi, hệ thống không tính vượt mức. Hãy nạp thêm hạn mức (trả trước), thanh toán và chờ kích hoạt rồi gửi lại.`}
     </Alert></div>;
   }
 
@@ -59,7 +59,7 @@ export function SubmitStatus({ phase, operation, onRetry, onLook, onTrack, train
           <Button size="sm" variant="secondary" onClick={onLook} disabled={phase.looking}><Search size={14} aria-hidden="true" />{phase.looking ? "Đang tra cứu…" : "Tra yêu cầu gần nhất của tôi"}</Button>
           <Button size="sm" variant="quiet" onClick={onRetry} data-testid="ai-retry-same-key"><RefreshCw size={14} aria-hidden="true" />Gửi lại (không trừ hai lần)</Button>
         </div>}>
-        Mất phản hồi hoặc quá thời gian chờ. Đừng tạo yêu cầu mới: có thể máy chủ đã nhận và đã giữ chỗ {trainee ? "lượt hỏi" : "hạn mức"}. Hãy tra yêu cầu gần nhất, hoặc bấm gửi lại: hệ thống nhận ra yêu cầu cũ và không trừ lần hai.
+        Mất phản hồi hoặc quá thời gian chờ. Đừng tạo yêu cầu mới: có thể máy chủ đã nhận và đã tạm trừ {trainee ? "lượt hỏi" : "hạn mức"}. Hãy tra yêu cầu gần nhất, hoặc bấm gửi lại: hệ thống nhận ra yêu cầu cũ và không trừ lần hai.
       </Alert>
       {phase.lookError !== undefined && <Alert tone="danger" title="Không tra được danh sách yêu cầu">{aiErrorText(phase.lookError)}</Alert>}
       {phase.candidates && phase.candidates.length === 0 && <p className={styles.muted} data-testid="ai-no-candidates">Chưa thấy yêu cầu {operationLabel(operation).toLowerCase()} nào mới của bạn. Có thể yêu cầu chưa tới máy chủ: bấm gửi lại là an toàn.</p>}
