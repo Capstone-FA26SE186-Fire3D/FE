@@ -14,11 +14,11 @@ export const formatPostDate = (value: string | null | undefined) => {
   return Number.isNaN(time) ? "" : new Date(time).toLocaleDateString("vi-VN", { year: "numeric", month: "2-digit", day: "2-digit" });
 };
 
-/** Cover from the API (https only); without one (or when it fails to load) the art of the post kind, in a fixed 3:2 box. */
-function Cover({ url, slug, title, kind }: { url: string | null; slug: string; title: string; kind: LearnKind }) {
+/** Cover from the API (https only); without one (or when it fails to load) the art of the post kind. The box size comes from `className`. */
+export function PostCover({ url, slug, title, kind, className = "learn-cover" }: { url: string | null; slug: string; title: string; kind: LearnKind; className?: string }) {
   const [failed, setFailed] = useState(false);
   const safe = httpsUrl(url);
-  return <Link className="learn-cover" href={`/learn/${slug}`} aria-label={`Đọc ${title}`}>
+  return <Link className={className} href={`/learn/${slug}`} aria-label={`Đọc ${title}`}>
     {safe && !failed
       // eslint-disable-next-line @next/next/no-img-element
       ? <img src={safe} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
@@ -36,11 +36,11 @@ export function PostCard({ slug, title, summary, kind, coverImageUrl = null, pub
   readLink?: boolean;
 }) {
   const date = formatPostDate(publishedAt);
-  return <article className="learn-card">
-    <Cover url={coverImageUrl} slug={slug} title={title} kind={kind} />
+  return <article className="learn-card" data-learn-post>
+    <PostCover url={coverImageUrl} slug={slug} title={title} kind={kind} />
     <div className="learn-card-body">
       <div className="learn-card-meta"><span data-kind={kind}>{kindLabel[kind]}</span>{date && <small>{date}</small>}{action}</div>
-      <Link href={`/learn/${slug}`}><h2>{title}</h2></Link>
+      <Link href={`/learn/${slug}`}><h2 data-learn-title>{title}</h2></Link>
       <p className="learn-excerpt">{summary}</p>
       {note && <p className="learn-card-note">{note}</p>}
       {readLink && <Link className="learn-card-read" href={`/learn/${slug}`} aria-label={`Đọc bài: ${title}`}>Đọc bài<ChevronRight size={16} aria-hidden="true" /></Link>}

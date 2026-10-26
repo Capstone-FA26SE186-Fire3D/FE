@@ -14,7 +14,7 @@ async function setup(page: Page, who: Actor = "guest", seed: (backend: LearnBack
   return backend;
 }
 
-const cards = (page: Page) => page.locator(".learn-card");
+const cards = (page: Page) => page.locator("[data-learn-post]");
 
 test.describe("public list", () => {
   test("shows only Published posts, newest first, with a labelled search box", async ({ page }) => {
@@ -200,8 +200,8 @@ test.describe("reader", () => {
   test("related posts come from the API and exclude the current one", async ({ page }) => {
     await setup(page, "guest", (b) => { b.seedPost("a", { title: "Bài A", status: "Published" }); b.seedPost("b", { title: "Bài B", status: "Published" }); });
     await page.goto("/learn/a");
-    const related = page.getByRole("complementary");
-    await expect(related.getByRole("link", { name: /Bài B/ })).toBeVisible();
+    const related = page.getByRole("region", { name: "Bài liên quan" });
+    await expect(related.getByRole("link", { name: "Bài B", exact: true })).toBeVisible();
     await expect(related.getByRole("link", { name: /Bài A/ })).toHaveCount(0);
   });
 });

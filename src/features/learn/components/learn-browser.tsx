@@ -12,11 +12,14 @@ import { LearnBookmarksProvider } from "./bookmarks-context";
 import { LearnActiveFilters, LearnFilterPanel } from "./learn-filters";
 import { LearnPagination } from "./learn-pagination";
 import { LearnSearchBox } from "./learn-search-box";
+import { FeaturedPosts } from "./featured-posts";
 import { PostCard } from "./post-card";
 import { SavePostButton } from "./save-post-button";
 import "../learn.css";
 
 const PAGE_SIZE = 12;
+/** Posts in the "Mới đăng" list beside the featured one (first page, no filter). */
+const RECENT = 4;
 
 function CardSkeletons() {
   return <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 learn-grid" role="status" aria-live="polite" aria-label="Đang tải bài viết">
@@ -42,6 +45,9 @@ export function LearnBrowser() {
   const total = posts.data?.total ?? 0;
   const pageBeyondEnd = !!posts.data && !posts.loading && !broken && items.length === 0 && total > 0 && query.page > 1;
   const noMatch = !!posts.data && !posts.loading && !broken && items.length === 0 && !pageBeyondEnd;
+  // The unfiltered first page opens with the newest post large and the next ones in a side list; the grid gets the rest.
+  const hero = !filtered && query.page === 1 && items.length >= 2;
+  const gridItems = hero ? items.slice(1 + RECENT) : items;
 
   const commitSearch = useCallback((search: string, mode: "push" | "replace") => update({ search }, mode), [update]);
   const clearAll = () => update({ search: "", kinds: [], situations: [] });
@@ -73,8 +79,10 @@ export function LearnBrowser() {
 
     {posts.loading && !posts.data && !broken && <CardSkeletons />}
 
-    {items.length > 0 && <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 learn-grid" aria-busy={posts.loading}>
-      {items.map((post) => <PostCard key={post.id} slug={post.slug} title={post.title} summary={post.summary} kind={post.kind} coverImageUrl={post.coverImageUrl} publishedAt={post.publishedAt} action={<SavePostButton postId={post.id} slug={post.slug} compact />} />)}
+    {hero && <FeaturedPosts featured={items[0]} recent={items.slice(1, 1 + RECENT)} action={(post) => <SavePostButton postId={post.id} slug={post.slug} />} />}
+    {hero && gridItems.length > 0 && <h2 className="lv2-section-title">Tất cả bài học</h2>}
+    {gridItems.length > 0 && <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 learn-grid" aria-busy={posts.loading}>
+      {gridItems.map((post) => <PostCard key={post.id} slug={post.slug} title={post.title} summary={post.summary} kind={post.kind} coverImageUrl={post.coverImageUrl} publishedAt={post.publishedAt} action={<SavePostButton postId={post.id} slug={post.slug} compact />} />)}
     </div>}
 
     {noMatch && !filtered && <div className="learn-state" role="status">

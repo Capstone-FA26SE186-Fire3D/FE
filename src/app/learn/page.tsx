@@ -18,5 +18,5 @@ export async function generateMetadata({ searchParams }: { searchParams: Promise
 }
 
 export default function LearnPage() {
-  return <div className="site-shell"><SiteHeader /><main className="page-main learn-page"><header className="learn-heading"><p className="kicker"><span className="kicker-line" /> Bài học / thư viện mở</p><h1>Hiểu thêm. Chủ động hơn.</h1><p>Bài đọc ngắn để làm quen, đặt câu hỏi và nối kiến thức với trải nghiệm.</p></header><Suspense fallback={<p role="status">Đang mở thư viện bài học…</p>}><LearnBrowser /></Suspense></main><SiteFooter /></div>;
+  return <div className="site-shell"><SiteHeader /><main className="page-main learn-page"><header className="learn-heading"><p className="kicker"><span className="kicker-line" /> Khám phá bài học</p><h1>Bài viết, mẹo và video về an toàn cháy nổ</h1><p>Công khai cho mọi người. Đăng nhập tài khoản học viên để lưu bài và hỏi Trợ lý AI về nội dung bài.</p></header><Suspense fallback={<p role="status">Đang mở thư viện bài học…</p>}><LearnBrowser /></Suspense></main><SiteFooter /></div>;
 }
