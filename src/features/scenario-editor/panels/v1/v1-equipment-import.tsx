@@ -13,6 +13,7 @@ import { SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { capabilityName } from "@/configs/capability-labels";
 import { routes } from "@/configs/routes";
 import { buildingsApi } from "@/features/buildings/api";
 
@@ -91,7 +92,7 @@ export function V1EquipmentImport({ accessToken, buildingId, revisionId, draft, 
         {toAdd.length > 0 && <Table caption="Sẽ thêm vào bản nháp" data-testid="equipment-import-add">
           <thead><tr><th>Khả năng</th><th>Cấu kiện IFC</th><th>Tầng · vị trí (m)</th><th>Tham số bắt buộc</th></tr></thead>
           <tbody>{toAdd.map((row) => <tr key={row.candidate.id} data-testid="equipment-import-row">
-            <td>{row.catalogKey}{row.candidate.decision?.decision === "Retyped" && <> <StatusBadge tone="info">Đã đổi loại</StatusBadge></>}</td>
+            <td>{capabilityName(row.catalogKey)} <code className="ops-mono">{row.catalogKey}</code>{row.candidate.decision?.decision === "Retyped" && <> <StatusBadge tone="info">Đã đổi loại</StatusBadge></>}</td>
             <td><span className="ops-mono">{row.candidate.ifcGlobalId}</span>{row.candidate.ifcClass ? ` · ${row.candidate.ifcClass}` : ""}</td>
             <td>{where(row, geometry)}</td>
             <td>{row.requiredParameters.length > 0 ? <StatusBadge tone="warning">Cần điền: {row.requiredParameters.join(", ")}</StatusBadge> : "—"}</td>
@@ -101,7 +102,7 @@ export function V1EquipmentImport({ accessToken, buildingId, revisionId, draft, 
         {skipped.length > 0 && <Table caption="Không thêm" data-testid="equipment-import-skip">
           <thead><tr><th>Khả năng</th><th>Cấu kiện IFC</th><th>Lý do</th></tr></thead>
           <tbody>{skipped.map((row) => <tr key={row.candidate.id} data-testid="equipment-import-skip-row">
-            <td>{row.catalogKey ?? row.candidate.catalogKey}</td>
+            <td>{capabilityName(row.catalogKey ?? row.candidate.catalogKey ?? "")} <code className="ops-mono">{row.catalogKey ?? row.candidate.catalogKey}</code></td>
             <td className="ops-mono">{row.candidate.ifcGlobalId}</td>
             <td>{row.status === "skip" ? SKIP_LABEL[row.reason] : ""}</td>
           </tr>)}</tbody>
