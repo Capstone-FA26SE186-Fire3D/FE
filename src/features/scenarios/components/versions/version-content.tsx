@@ -1,6 +1,7 @@
 import { Panel } from "@/components/ui/panel";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table } from "@/components/ui/table";
+import { metricName } from "@/configs/metric-labels";
 
 import type { ScenarioVersionDetail } from "../../version-types";
 
@@ -56,7 +57,7 @@ export function VersionContent({ version }: { version: ScenarioVersionDetail }) 
           <thead><tr><th>Tiêu chí</th><th>Đo bằng</th><th>Điều kiện</th><th>Trọng số</th><th>Bắt buộc</th></tr></thead>
           <tbody>{criteria.map((criterion) => <tr key={criterion.id}>
             <td className="ops-cell-primary">{criterion.id}</td>
-            <td>{criterion.metric}</td>
+            <td>{metricName(criterion.metric)}</td>
             <td>{operatorLabel[criterion.operator] ?? criterion.operator} {criterion.threshold}</td>
             <td>{criterion.weight}</td>
             <td>{criterion.mandatory ? "Có" : "Không"}</td>

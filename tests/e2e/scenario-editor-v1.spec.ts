@@ -18,6 +18,8 @@ import { applyMatrix, glbToLocal, ifcToGlb, invertAffine, isUnitQuaternion, loca
 import { completenessIssues, initialStateV1, isV1State, readObjects, shapeIssues } from "../../src/features/scenario-editor/v1/state";
 import { kindAvailability, placementBlocked } from "../../src/features/scenario-editor/v1/availability";
 import { classifyDraft } from "../../src/features/scenario-editor/v1/mode";
+import { capabilityLabel, capabilityName } from "../../src/configs/capability-labels";
+import { metricName } from "../../src/configs/metric-labels";
 import { floorCeiling, parseFloors, parseLayers } from "../../src/features/scenario-editor/scene/preview-model";
 
 // Evidence level: pure logic against the BE contract fixtures (BE main @ 1eaf988, contracts/editor/v1). No browser, no network.
@@ -43,6 +45,16 @@ let counter = 0;
 const nextId = () => ++counter;
 
 // ───────── coordinates ─────────
+
+test("labels: batch-2 capabilities and metrics have plain names; unknown ids stay as received", () => {
+  expect(capabilityLabel("blanket.fire")).toBe("Chăn chữa cháy");
+  expect(capabilityLabel("npc.wheelchair")).toBe("Người ngồi xe lăn");
+  expect(capabilityLabel("no.such")).toBe("Loại khác");
+  expect(capabilityName("no.such")).toBe("no.such");
+  expect(metricName("fire_blanket_used")).toBe("Số lần dùng chăn chữa cháy");
+  expect(metricName("alarm_raised")).toBe("Số lần kích hoạt báo cháy");
+  expect(metricName("x_unknown")).toBe("x_unknown");
+});
 
 test("BE fixture: IFC (1000, 2000, 3000) maps to GLB (-9, 3, 3) through coordinateTransform", () => {
   const meta = geometryMeta();

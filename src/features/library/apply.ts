@@ -4,6 +4,7 @@ import { LIMITS, MODE_LABEL, TRAINING_MODES, type TrainingMode } from "@/feature
 import { TEMPLATE_FIELDS, ignoredTemplateParts, templateFieldLabel, type TemplateField } from "./payload";
 import type { LibraryVersion } from "./types";
 import { capabilityName } from "@/configs/capability-labels";
+import { metricName } from "@/configs/metric-labels";
 
 /*
  * Planning how a PUBLISHED library version would change the open draft. Pure: it reads the draft and the version and returns
@@ -88,7 +89,7 @@ function rubricWarnings(rubric: unknown, context: Pick<ApplyContext, "metrics" |
   if (context.schemaVersions && typeof rubric.schema_version === "string" && !context.schemaVersions.includes(rubric.schema_version)) out.push(`Phiên bản tiêu chí "${rubric.schema_version}" không còn được hỗ trợ; hệ thống có thể từ chối khi lưu hoặc kiểm tra.`);
   if (context.metrics && Array.isArray(rubric.criteria)) {
     const unknown = rubric.criteria.flatMap((item) => (isObject(item) && typeof item.metric === "string" && !context.metrics!.has(item.metric) ? [item.metric] : []));
-    if (unknown.length > 0) out.push(`Chỉ số không có trong danh mục của hệ thống: ${[...new Set(unknown)].join(", ")}.`);
+    if (unknown.length > 0) out.push(`Chỉ số không có trong danh mục của hệ thống: ${[...new Set(unknown)].map(metricName).join(", ")}.`);
   }
   return out;
 }
