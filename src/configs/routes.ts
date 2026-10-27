@@ -11,6 +11,7 @@ export const routes = {
   learningHubSupport: "/learning-hub?view=support",
   organizations: "/organizations",
   about: "/about",
+  privacy: "/privacy",
   download: "/download",
   adminOverview: "/admin/overview",
   adminAccounts: "/admin/accounts",
