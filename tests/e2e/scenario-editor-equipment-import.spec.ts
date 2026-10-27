@@ -74,6 +74,7 @@ test("previews decided equipment, adds it as ONE undoable step with anchor, capa
   await page.getByTestId("import-equipment").click();
   const dialog = page.getByTestId("equipment-import");
   await expect(dialog.getByTestId("equipment-import-row")).toHaveCount(2);
+  await expect(dialog.getByTestId("equipment-import-row").nth(0)).toContainText("Cửa thoát");
   await expect(dialog.getByTestId("equipment-import-row").nth(0)).toContainText("door.exit");
   await expect(dialog.getByTestId("equipment-import-row").nth(0)).toContainText("Đã đổi loại");
   await expect(dialog.getByTestId("equipment-import-row").nth(0)).toContainText("Tầng 1 · 12.5, 0, 1");

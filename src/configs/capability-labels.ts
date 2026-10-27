@@ -24,6 +24,23 @@ const CAPABILITY_LABELS: Record<string, string> = {
   "smoke.source": "Nguồn khói",
   "event.power_outage": "Mất điện",
   "event.alarm": "Chuông báo cháy",
+  // Batch 2 (runtime 2.1.0): named ahead so the editor reads right the day the runtime is registered.
+  "extinguisher.hose_reel": "Cuộn vòi chữa cháy",
+  "blanket.fire": "Chăn chữa cháy",
+  "item.blanket": "Chăn",
+  "power.breaker": "Tủ điện",
+  "gas.valve": "Van gas",
+  "door.fire_wedged": "Cửa chống cháy bị chèn",
+  "door.exit_locked": "Cửa thoát bị khóa",
+  "phone.emergency": "Điện thoại khẩn cấp",
+  "signal.window": "Cửa sổ ra hiệu",
+  "ppe.escape_hood": "Mặt nạ thoát hiểm",
+  "firstaid.kit": "Hộp sơ cứu",
+  "npc.injured": "Người bị thương",
+  "npc.wheelchair": "Người ngồi xe lăn",
+  "refuge.area": "Chỗ chờ cứu hộ",
+  "assembly.point": "Điểm tập kết",
+  "window.openable": "Cửa sổ mở được",
 };
 
 export function capabilityLabel(id: string | null | undefined): string {

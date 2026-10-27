@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, Select } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
+import { metricName } from "@/configs/metric-labels";
 
 import { isObject, type JsonObject } from "../../store/json";
 import type { Issue } from "../../store/validation";
@@ -133,8 +134,8 @@ export function RubricGroup({ draft, issues, actions, catalog, pathPrefix = "$" 
               <Field label="Chỉ số (metric)" required error={at(`${path}.metric`)} hint={known?.description}>
                 {(props) => <Select {...props} data-testid={`criterion-${index}-metric`} value={metric} onChange={(event) => actions.setField(["rubric", "criteria", index, "metric"], event.target.value || undefined, "Chọn chỉ số", false)}>
                   <option value="">Chọn…</option>
-                  {metric && !known && <option value={metric}>{metric} (không có trong danh mục)</option>}
-                  {view?.metrics.map((item) => <option key={item.id} value={item.id}>{item.id}</option>)}
+                  {metric && !known && <option value={metric}>{metricName(metric)} (không có trong danh mục)</option>}
+                  {view?.metrics.map((item) => <option key={item.id} value={item.id}>{metricName(item.id)}</option>)}
                 </Select>}
               </Field>
               <Field label="Toán tử" required error={at(`${path}.operator`)}>
