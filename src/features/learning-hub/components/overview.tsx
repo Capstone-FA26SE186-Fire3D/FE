@@ -1,10 +1,8 @@
 "use client";
 
-import { useOptionalAiBubble } from "@/features/org-ai/floating/ai-bubble-context";
-import { Bookmark, ChevronRight, History, RefreshCw, Sparkles } from "lucide-react";
+import { Bookmark, ChevronRight, History, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { ApiError } from "@/api/types/common";
 import { Alert } from "@/components/ui/alert";
@@ -14,7 +12,9 @@ import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { learnApi } from "@/features/learn/api";
 import { KIND_ART, KIND_ART_SIZE, KIND_TONE } from "@/features/learn/kind-art";
-import { kindLabel } from "@/features/learn/types";
+import { kindLabel, type BookmarkItem } from "@/features/learn/types";
+import { httpsUrl } from "@/features/learn/safe-url";
+import { usePostCover } from "@/features/learn/use-post-cover";
 import { trainingHistoryApi } from "@/features/training-history/api";
 import { formatWhen, modeLabel, resultCellView, sessionStatusView, trainingTitle } from "@/features/training-history/labels";
 import { useLocalPreference } from "@/utils/local-preference";
@@ -23,8 +23,6 @@ import { StateCard } from "./state-card";
 
 const INTRO_KEY = "fire3d-trainee-intro";
 const isIntroState = (value: string): value is "shown" | "dismissed" => value === "shown" || value === "dismissed";
-/** Longest question the shortcut hands to the Q&A view (the view still checks the server limit). */
-export const ASK_PREFILL_MAX = 2000;
 
 /** "Lưu 2 ngày trước" from the bookmark timestamp; falls back to the date after a month. */
 export function savedAgo(iso: string, now = Date.now()): string {
@@ -85,6 +83,20 @@ function Intro() {
   </section>;
 }
 
+/** The post's own cover (https only); the art of its kind when it has none or the image fails to load. */
+function SavedThumb({ item }: { item: Extract<BookmarkItem, { available: true }> }) {
+  const cover = httpsUrl(usePostCover(item.slug, item.coverImageUrl));
+  const [failed, setFailed] = useState<string | null>(null);
+  const photo = cover && failed !== cover ? cover : null;
+  return <Link className="ov-thumb" href={`/learn/${item.slug}`} tabIndex={-1} aria-hidden="true" data-photo={photo ? "" : undefined}>
+    {photo
+      // eslint-disable-next-line @next/next/no-img-element
+      ? <img src={photo} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(photo)} />
+      // eslint-disable-next-line @next/next/no-img-element
+      : <img src={KIND_ART[item.kind]} alt="" width={KIND_ART_SIZE.width} height={KIND_ART_SIZE.height} loading="lazy" decoding="async" />}
+  </Link>;
+}
+
 function SavedPreview({ accessToken, userId }: { accessToken: string; userId: string }) {
   const saved = useAsyncData("hub:overview:saved", (signal) => learnApi.bookmarks(accessToken, { page: 1, pageSize: 3 }, signal), true, { scope: userId });
   const items = saved.data?.items ?? [];
@@ -98,10 +110,7 @@ function SavedPreview({ accessToken, userId }: { accessToken: string; userId: st
   } else {
     body = <div className="ov-saved-grid">{items.map((item) => item.available
       ? <article key={item.postId} className="ov-card" data-testid="overview-saved">
-        <Link className="ov-thumb" href={`/learn/${item.slug}`} tabIndex={-1} aria-hidden="true">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={KIND_ART[item.kind]} alt="" width={KIND_ART_SIZE.width} height={KIND_ART_SIZE.height} loading="lazy" decoding="async" />
-        </Link>
+        <SavedThumb item={item} />
         <StatusBadge tone={KIND_TONE[item.kind]} className="self-start">{kindLabel[item.kind]}</StatusBadge>
         <h3><Link href={`/learn/${item.slug}`}>{item.title}</Link></h3>
         <p className="ov-card-meta">{savedAgo(item.bookmarkedAt)}</p>
@@ -118,27 +127,6 @@ function SavedPreview({ accessToken, userId }: { accessToken: string; userId: st
   return <section aria-labelledby="ov-saved-title">
     <div className="learning-section-head"><h2 id="ov-saved-title">Bài đã lưu</h2><Link className="learning-more" href="/learning-hub?view=saved">Xem tất cả<ChevronRight size={16} aria-hidden="true" /></Link></div>
     {body}
-  </section>;
-}
-
-/** Shortcut to the floating assistant. The text is only carried over as a draft; nothing is sent to the AI from here. */
-function AskShortcut() {
-  const router = useRouter();
-  const bubble = useOptionalAiBubble();
-  const [text, setText] = useState("");
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    const draft = text.trim().slice(0, ASK_PREFILL_MAX);
-    if (bubble?.enabled) bubble.openWith(null, draft || undefined);
-    else router.push(`/learning-hub?view=questions${draft ? `&q=${encodeURIComponent(draft)}` : ""}`);
-  };
-  return <section className="ov-card ov-ask" aria-labelledby="ov-ask-title">
-    <h3 id="ov-ask-title"><Sparkles size={20} aria-hidden="true" />Hỏi AI</h3>
-    <p>Câu trả lời kèm nguồn trích dẫn. Trong chế độ Đánh giá, AI bị tắt.</p>
-    <form onSubmit={submit}>
-      <input type="text" aria-label="Câu hỏi cho AI" placeholder="Hỏi về nội dung bài viết…" value={text} maxLength={ASK_PREFILL_MAX} onChange={(event) => setText(event.target.value)} />
-      <Button type="submit">Hỏi Trợ lý AI</Button>
-    </form>
   </section>;
 }
 
@@ -174,7 +162,7 @@ function RecentResults({ accessToken, userId }: { accessToken: string; userId: s
   </section>;
 }
 
-/** "Tổng quan" of a Trainee: where to start, the three latest bookmarks, the Q&A shortcut and the three latest sessions. */
+/** "Tổng quan" of a Trainee: where to start, the three latest bookmarks and the three latest sessions (the AI assistant is the floating button). */
 export function Overview() {
   const { accessToken, ready, user } = useAuthSession();
   if (!ready) return <p role="status">Đang kiểm tra phiên đăng nhập…</p>;
@@ -185,10 +173,7 @@ export function Overview() {
   return <div className="ov" data-testid="trainee-overview">
     <Hero />
     <Intro />
-    <div className="ov-split">
-      <SavedPreview accessToken={accessToken} userId={user.id} />
-      <AskShortcut />
-    </div>
+    <SavedPreview accessToken={accessToken} userId={user.id} />
     <RecentResults accessToken={accessToken} userId={user.id} />
   </div>;
 }

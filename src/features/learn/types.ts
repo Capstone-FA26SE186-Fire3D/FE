@@ -66,7 +66,7 @@ export type PublicSituation = { id: string; slug: string; name: string; descript
 
 /** Row of `GET /api/learn/bookmarks`. An unavailable bookmark has no content: only the post id and when it was saved. */
 export type BookmarkItem =
-  | { available: true; postId: string; bookmarkedAt: string; slug: string; title: string; summary: string; kind: LearnKind }
+  | { available: true; postId: string; bookmarkedAt: string; slug: string; title: string; summary: string; kind: LearnKind; /** Absent until the server sends it. */ coverImageUrl?: string | null }
   | { available: false; postId: string; bookmarkedAt: string };
 
 /** `counts` of `GET /api/learn/bookmarks`: every bookmark of the Trainee whatever the filters/page, available ones by kind. */
