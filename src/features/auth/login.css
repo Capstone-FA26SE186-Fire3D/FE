@@ -3,7 +3,7 @@
 .login-split { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(420px, 1fr); min-height: 100dvh; }
 .login-art { display: flex; flex-direction: column; justify-content: space-between; gap: 24px; min-width: 0; padding: clamp(32px, 4vw, 56px); overflow: hidden; background: linear-gradient(160deg, var(--surface), var(--bg-soft)); border-right: 1px solid var(--line); }
 .login-art h2 { max-width: 22ch; margin: 0; color: var(--text); font-size: clamp(28px, 2.9vw, 40px); font-weight: 600; line-height: 1.2; letter-spacing: -.03em; }
-.login-art img { display: block; width: 100%; max-width: 760px; height: auto; margin: 0 auto; aspect-ratio: 1100 / 614; }
+.login-pixel { display: block; width: 100%; max-width: 760px; height: auto; margin: 0 auto; aspect-ratio: 240 / 134; border: 1px solid var(--line); border-radius: 12px; image-rendering: pixelated; background: #0b1016; }
 .login-side { display: flex; flex-direction: column; min-width: 0; padding: 20px clamp(16px, 4vw, 56px) 32px; }
 .login-side-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .login-brand { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--text); font-weight: 650; letter-spacing: .02em; }
@@ -20,7 +20,7 @@
   .login-split { grid-template-columns: minmax(0, 1fr); }
   .login-art { flex-direction: row; align-items: center; padding: 16px 20px; border-right: 0; border-bottom: 1px solid var(--line); }
   .login-art h2 { max-width: none; font-size: 16px; line-height: 1.35; }
-  .login-art img { display: none; }
+  .login-pixel { display: none; }
   .login-side-body { justify-content: flex-start; }
 }
 @media (max-width: 640px) {
