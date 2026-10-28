@@ -19,9 +19,9 @@ import "../login.css";
 export function LoginShell({ children }: { children: ReactNode }) {
   return <ThemeScope className="login-theme">
     <div className="login-split">
+      <PixelEvacuation className="login-pixel" />
       <aside className="login-art" aria-label="Giới thiệu">
         <h2>Học bài, luyện tập, xem kết quả — theo nhịp của bạn</h2>
-        <PixelEvacuation className="login-pixel" />
       </aside>
       <main className="login-side" id="login-main">
         <div className="login-side-top">
