@@ -31,10 +31,17 @@ export const accountsApi = {
     return apiClient.request<PageResponse<ApiManagedAccount>>("/api/accounts", { headers: headers(accessToken), query: filters, signal })
       .then((page) => ({ ...page, items: page.items.map(normalizeAccount) }));
   },
-  /** 201 `AccountResponse`; 409 when the email is taken. */
+  /**
+   * 201 `AccountResponse`; 409 when the email is taken. The account already exists once this resolves, so an unreadable
+   * role in the body falls back to the requested role instead of turning a successful create into an error.
+   */
   create(accessToken: string, input: CreateAccountInput): Promise<CreatedAccount> {
     return apiClient.request<ApiCreatedAccount>("/api/accounts", { headers: headers(accessToken), json: { ...input, role: roleToApiName(input.role) } })
-      .then((account) => ({ ...account, role: normalizeRole(account.role) }));
+      .then((account) => {
+        let role = input.role;
+        try { role = normalizeRole(account?.role); } catch { /* keep the requested role */ }
+        return { ...account, role };
+      });
   },
   get(accessToken: string, id: string) {
     return apiClient.request<ApiManagedAccount>(`/api/accounts/${id}`, { headers: headers(accessToken) }).then(normalizeAccount);
