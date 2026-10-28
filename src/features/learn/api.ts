@@ -37,7 +37,7 @@ function parseVersion(raw: unknown): PublicVersion | null {
 function parseBookmark(raw: unknown): BookmarkItem | null {
   if (!isRecord(raw) || typeof raw.postId !== "string") return null;
   const bookmarkedAt = str(raw.bookmarkedAt);
-  if (bool(raw.available) && typeof raw.slug === "string") return { available: true, postId: raw.postId, bookmarkedAt, slug: raw.slug, title: str(raw.title, raw.slug), summary: str(raw.summary), kind: kindOf(raw.kind) };
+  if (bool(raw.available) && typeof raw.slug === "string") return { available: true, postId: raw.postId, bookmarkedAt, slug: raw.slug, title: str(raw.title, raw.slug), summary: str(raw.summary), kind: kindOf(raw.kind), ...("coverImageUrl" in raw ? { coverImageUrl: strOrNull(raw.coverImageUrl) } : {}) };
   return { available: false, postId: raw.postId, bookmarkedAt };
 }
 

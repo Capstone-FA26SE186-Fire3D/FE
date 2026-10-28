@@ -25,3 +25,23 @@ test("login keeps its form labels and does not change the stored theme by itself
   await expect(page.getByRole("tab", { name: /Tạo tài khoản|Đăng ký/ })).toBeVisible();
   expect(await page.evaluate(() => localStorage.getItem("fire3d-ops-theme"))).toBeNull();
 });
+
+test("the pixel evacuation scene loops beside the form and holds still with reduced motion", async ({ page, browser }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/login");
+  const scene = page.getByTestId("login-pixel-scene");
+  await expect(scene).toBeVisible();
+  await expect(scene).toHaveAttribute("aria-hidden", "true");
+  const snapshot = () => scene.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL());
+  const first = await snapshot();
+  await expect.poll(snapshot, { timeout: 3000 }).not.toBe(first);
+
+  const still = await browser.newPage({ reducedMotion: "reduce", viewport: { width: 1440, height: 900 } });
+  await still.goto("/login");
+  const stillScene = still.getByTestId("login-pixel-scene");
+  await expect(stillScene).toBeVisible();
+  const frame = await stillScene.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL());
+  await still.waitForTimeout(600);
+  expect(await stillScene.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL())).toBe(frame);
+  await still.close();
+});
