@@ -104,6 +104,9 @@
 .bill-kpis-6 { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .bill-kpi-text { font-size: 20px; line-height: 1.25; }
 .bill-kpis .ops-kpi-row { flex-wrap: wrap; align-items: center; }
+/* Tiles line up from the top (a tile with a hint no longer pushes the others' numbers down) and the number scales with the tile, so 9-digit balances never touch the edges. */
+.bill-kpis .ops-kpi { container-type: inline-size; align-content: start; }
+.bill-kpis .ops-kpi-value { font-size: clamp(14px, 12cqi, 30px); white-space: nowrap; }
 .bill-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; overflow-wrap: anywhere; }
 .bill-row-actions { justify-content: flex-end; flex-wrap: nowrap; }
 .bill-row-actions button { white-space: nowrap; }
@@ -111,6 +114,8 @@
 .bill-periods { padding: 0; border: 0; background: transparent; }
 .ops-drawer .bill-table { min-width: 560px; }
 @media (max-width: 900px) { .bill-kpis { grid-template-columns: minmax(0, 1fr); } .bill-kpis-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Two columns: a long label wraps to two lines, so every tile keeps room for two and the numbers still line up. */
+@media (max-width: 900px) { .bill-kpis-6 .ops-kpi-label { line-height: 1.35; min-height: 2.7em; } }
 
 /* Admin v2 (Figma 53:1540): searchable pickers in a DataTable toolbar keep a chip-like width; chart row above the lists. */
 .bill-toolbar-pick.bill-toolbar-pick { flex: 0 1 230px; width: auto; min-width: 180px; }
