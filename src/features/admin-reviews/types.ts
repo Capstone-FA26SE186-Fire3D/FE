@@ -6,7 +6,10 @@ export type ReviewAction = "approve" | "reject";
 
 export const reviewStatuses: ReviewStatus[] = ["Submitted", "Approved", "Rejected"];
 
-/** `ScenarioReviewSummary` (OpenAPI). `submittedBy`/`decidedBy` are account ids: the API gives no display names. */
+/**
+ * `ScenarioReviewSummary` (OpenAPI). `submittedBy`/`decidedBy` are account ids; `submittedByName`/`decidedByName` are the display
+ * names when the API resolves them (null/absent otherwise, e.g. older deployments).
+ */
 export type ReviewSummary = {
   reviewId: string;
   scenarioVersionId: string;
@@ -25,6 +28,8 @@ export type ReviewSummary = {
   scenarioId: string;
   scenarioName: string;
   versionNumber: number;
+  submittedByName?: string | null;
+  decidedByName?: string | null;
 };
 
 export type ReviewPage = PageResponse<ReviewSummary>;
@@ -49,6 +54,7 @@ export type ReviewDetail = {
   readiness: ReviewReadiness;
 };
 
+/** Query of `GET /api/admin/scenario-reviews`: page size defaults to 20, maximum 100. */
 export type ReviewListQuery = { status?: ReviewStatus; organizationId?: string; page: number; pageSize: number };
 
 /**

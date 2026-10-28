@@ -2,7 +2,7 @@ import { apiClient } from "@/api/client";
 import { ApiError } from "@/api/types/common";
 import { bool, isRecord, kindOf, list, num, parsePage, parseSituationRef, parseSourceRef, str, strOrNull } from "@/features/learn/parse";
 import { POST_STATUSES, type PostStatus } from "@/features/learn/types";
-import type { AdminPost, AdminSituation, AdminVersion, CreatePostInput, KnowledgeSource, LearnImage, LifecycleOperation, MediaDescriptor, Page, SourceStatus, VersionInput, VersionStatus, VersionSummary, WithEtag } from "./types";
+import type { AdminPost, AdminPostListInfo, AdminSituation, AdminVersion, CreatePostInput, CreateSituationInput, KnowledgeSource, LearnImage, LifecycleOperation, MediaDescriptor, Page, SourceStatus, VersionInput, VersionStatus, VersionSummary, WithEtag } from "./types";
 
 /*
  * Learn CMS over the real contract: /api/admin/learn/* and /api/admin/knowledge-sources (PlatformAdmin).
@@ -47,6 +47,21 @@ function parseVersionSummary(raw: unknown): VersionSummary | null {
   return { id: raw.id, versionNumber: num(raw.versionNumber, 1), status: versionStatus(raw.status), title: str(raw.title), revision: num(raw.revision, 1), updatedAt: str(raw.updatedAt) };
 }
 
+/** List-only fields; null when the row carries none of them (detail and command responses). */
+function parseListInfo(raw: Record<string, unknown>): AdminPostListInfo | null {
+  if (!("latestVersionId" in raw) && !("versionCount" in raw) && !("title" in raw)) return null;
+  return {
+    title: strOrNull(raw.title),
+    kind: typeof raw.kind === "string" ? kindOf(raw.kind) : null,
+    latestVersionId: strOrNull(raw.latestVersionId),
+    latestVersionNumber: typeof raw.latestVersionNumber === "number" ? raw.latestVersionNumber : null,
+    latestVersionStatus: raw.latestVersionStatus == null ? null : versionStatus(raw.latestVersionStatus),
+    draftVersionId: strOrNull(raw.draftVersionId),
+    draftVersionNumber: typeof raw.draftVersionNumber === "number" ? raw.draftVersionNumber : null,
+    versionCount: num(raw.versionCount, 0),
+  };
+}
+
 export function parsePost(raw: unknown): AdminPost | null {
   if (!isRecord(raw) || typeof raw.id !== "string") return null;
   return {
@@ -59,6 +74,7 @@ export function parsePost(raw: unknown): AdminPost | null {
     updatedAt: str(raw.updatedAt),
     publishedVersion: parseVersion(raw.publishedVersion),
     versions: Array.isArray(raw.versions) ? raw.versions.map(parseVersionSummary).filter((item) => item !== null) : null,
+    latest: parseListInfo(raw),
   };
 }
 
@@ -86,6 +102,7 @@ export function parseSource(raw: unknown): KnowledgeSource | null {
   return {
     id: raw.id,
     visibility: str(raw.visibility, "Common"),
+    organizationId: strOrNull(raw.organizationId),
     title: str(raw.title, "Nguồn không rõ tên"),
     sourceUri: strOrNull(raw.sourceUri),
     versionLabel: str(raw.versionLabel),
@@ -93,6 +110,9 @@ export function parseSource(raw: unknown): KnowledgeSource | null {
     effectiveFrom: strOrNull(raw.effectiveFrom),
     effectiveUntil: strOrNull(raw.effectiveUntil),
     approvalStatus: sourceStatus(raw.approvalStatus),
+    sourceHash: str(raw.sourceHash),
+    approvedAt: strOrNull(raw.approvedAt),
+    createdAt: str(raw.createdAt),
     revision: num(raw.revision, 1),
     canUseInDraft: bool(raw.canUseInDraft),
     canPublishReference: bool(raw.canPublishReference),
@@ -138,7 +158,7 @@ export const learnAdminApi = {
     const raw = await apiClient.request<unknown>("/api/admin/learn/situations", { headers: auth(accessToken), query: { search: query.search || undefined, isActive: query.isActive, page: query.page, pageSize: query.pageSize }, signal });
     return parsePage(raw, parseSituation);
   },
-  async createSituation(accessToken: string, input: { slug: string; name: string; description?: string }, idempotencyKey: string): Promise<AdminSituation> {
+  async createSituation(accessToken: string, input: CreateSituationInput, idempotencyKey: string): Promise<AdminSituation> {
     const raw = await apiClient.request<unknown>("/api/admin/learn/situations", { headers: auth(accessToken), method: "POST", json: { slug: input.slug, name: input.name, description: input.description || null }, idempotencyKey });
     const created = parseSituation(raw);
     if (!created) throw new ApiError("Máy chủ trả về tình huống không đọc được.", 502, undefined, undefined, "LEARN_SITUATION_MALFORMED");
@@ -167,7 +187,7 @@ export const learnAdminApi = {
     if (!put.ok) throw new ApiError("Không tải được ảnh lên kho lưu trữ.", put.status, undefined, undefined, "LEARN_UPLOAD_PUT_FAILED");
     const done = await apiClient.request<unknown>(`/api/admin/learn/media/images/${encodeURIComponent(intent.uploadId)}/complete`, { headers: auth(accessToken), method: "POST" });
     if (!isRecord(done) || typeof done.url !== "string") throw new ApiError("Máy chủ trả về ảnh không đọc được.", 502, undefined, undefined, "LEARN_IMAGE_MALFORMED");
-    return { imageId: str(done.imageId), url: done.url, width: num(done.width), height: num(done.height) };
+    return { imageId: str(done.imageId), url: done.url, width: num(done.width), height: num(done.height), contentType: str(done.contentType, file.type), sizeBytes: num(done.sizeBytes, file.size) };
   },
 
   /** Editor catalog: `visibility=Common` so tenant sources never enter a Learn draft. */

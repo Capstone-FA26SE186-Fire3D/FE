@@ -96,6 +96,8 @@ export type DraftSummary = {
   updatedAt: string;
   lastEditedById: string | null;
   lastEditedByName: string | null;
+  /** Uninitialized (state `{}`), Versioned (schemaVersion set) or Legacy (pre-editor typed shape). BE default "Legacy". */
+  stateKind?: "Uninitialized" | "Versioned" | "Legacy" | (string & {});
 };
 
 export type DraftPage = PageResponse<DraftSummary>;
@@ -283,7 +285,20 @@ export type VersionReview = {
     decidedAt: string | null;
     reason: string | null;
     versionNumber: number;
+    organizationId: string;
+    organizationName: string;
+    buildingId: string;
+    buildingName: string;
+    scenarioId: string;
+    scenarioName: string;
+    submittedByName?: string | null;
+    decidedByName?: string | null;
   };
+  /** Frozen content/rubric pinned by the submission (opaque JSON). */
+  content: unknown | null;
+  rubric: ScenarioRubric | null;
+  learningObjectives: string[] | null;
+  learnerInstructions: string | null;
   readiness: {
     validationRunId: string | null;
     outcome: string | null;

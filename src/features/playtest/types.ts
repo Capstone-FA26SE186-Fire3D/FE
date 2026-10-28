@@ -36,9 +36,25 @@ export type PlaytestPackageView = {
 export type PlaytestGrantView = { generation: number; issuedAt: string; expiresAt: string };
 
 /** What the calling session may do. BE decides; Web only mirrors it. */
-export type PlaytestRecoveryView = { canStart: boolean; canReissueGrant: boolean; canSync: boolean; canCancel: boolean };
+export type PlaytestRecoveryView = {
+  canStart: boolean;
+  canReissueGrant: boolean;
+  canSync: boolean;
+  canCancel: boolean;
+  /** A new Mobile handoff code may be created (status Created). Missing on BE builds older than the handoff flow. */
+  canIssueHandoff?: boolean;
+};
 
-/** `GET /api/playtests/{id}`. `completion` is an opaque JSON element (BE does not publish a schema). */
+/** BE `PlaytestCompletionView`: stored once at completion. `summary` is the object the runtime sent (opaque, never scored by BE). */
+export type PlaytestCompletionView = { lastEventSequence: number; summary: unknown; completedAt: string; completionHash: string };
+
+/** BE `PlaytestRejectedEvent`: a runtime event the backend stored but refused (EVENT_TYPE_UNSUPPORTED | EVENT_PAYLOAD_INVALID). */
+export type PlaytestRejectedEvent = { eventId: string; sequence: number; type: string; code: string; receivedAt: string };
+
+/** BE `PlaytestRejectedEvents`: totals per code plus the newest 20 refused events. */
+export type PlaytestRejectedEvents = { total: number; byCode: Record<string, number>; recent: PlaytestRejectedEvent[] };
+
+/** `GET /api/playtests/{id}` (BE `PlaytestStatusResponse`). `completion.summary` is opaque JSON (BE does not publish a schema). */
 export type PlaytestStatus = {
   id: string;
   buildingId: string;
@@ -58,7 +74,10 @@ export type PlaytestStatus = {
   launchSession: boolean;
   openHandoffExpiresAt: string | null;
   recovery: PlaytestRecoveryView;
-  completion: unknown;
+  completion: PlaytestCompletionView | null;
+  /** Id of the open (unredeemed) handoff code, if any. */
+  openHandoffId?: string | null;
+  rejectedEvents?: PlaytestRejectedEvents | null;
 };
 
 /** 201 of `POST /api/playtests/{id}/handoffs`. The QR encodes only `deepLink`; `code` is 43 base64url chars, 5 minutes, single use. */

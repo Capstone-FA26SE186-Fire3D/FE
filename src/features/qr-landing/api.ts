@@ -1,26 +1,7 @@
 import { apiClient } from "@/api/client";
+import type { ParticipationVerified, QrResolution, QrTraining } from "./types";
 
-/** `GET /api/qr/{qrToken}`: identifies a Building only. `hasAccess` is the caller's access right now, not a QR property. */
-export type QrResolution = { buildingId: string; buildingName: string; visibility: string; hasAccess: boolean };
-
-/** One Training of the QR Building (`GET /api/qr/{qrToken}/trainings`). Trainee sees only Active + Published, in schedule. */
-export type QrTraining = {
-  id: string;
-  releaseId: string;
-  name: string;
-  description: string | null;
-  status: string;
-  startDate: string | null;
-  endDate: string | null;
-  allowedModes: string[];
-  createdAt: string;
-  releaseStatus?: string | null;
-  scenarioVersionId?: string | null;
-  reviewStatus?: string;
-};
-
-/** `POST /api/buildings/{id}/participation/verify` (Trainee only). */
-export type ParticipationVerified = { buildingId: string; visibility: string; accessRevision: number; hasParticipationCode: boolean };
+export type { ParticipationVerified, QrResolution, QrServiceStatus, QrTraining } from "./types";
 
 function headers(accessToken: string): HeadersInit {
   return { Authorization: `Bearer ${accessToken}` };

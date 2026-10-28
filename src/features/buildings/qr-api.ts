@@ -18,7 +18,7 @@ export type BuildingQrCode = {
 export type BuildingQrPage = { items: BuildingQrCode[]; total: number; page: number; pageSize: number };
 
 /** Create and rotate return the token exactly once; it is not retrievable afterwards. */
-export type BuildingQrIssued = { code: BuildingQrCode; token: string };
+export type BuildingQrIssued = { code: BuildingQrCode; token: string; /** Full QR content (deep link) when the BE builds it. */ content?: string | null };
 
 function headers(accessToken: string): HeadersInit {
   return { Authorization: `Bearer ${accessToken}` };

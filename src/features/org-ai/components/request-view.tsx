@@ -96,7 +96,7 @@ export function Usage({ request, admin, trainee }: { request: AiRequest; admin?:
     <dl className={styles.meta}>
       <dt>Đơn vị</dt><dd>{unit ?? "—"} <span className={styles.dim}>(do hệ thống quy định)</span></dd>
       <dt>Đã tạm trừ</dt><dd>{request.reservedUnits !== undefined ? formatQuota(request.reservedUnits, unit) : "—"}</dd>
-      <dt>Đã tính</dt><dd>{request.consumedUnits !== undefined ? formatQuota(request.consumedUnits, unit) : isInFlight(request.status) || request.status === "NeedsReconcile" ? "Chưa có (chưa chốt)" : "—"}</dd>
+      <dt>Đã tính</dt><dd>{request.consumedUnits != null ? formatQuota(request.consumedUnits, unit) : isInFlight(request.status) || request.status === "NeedsReconcile" ? "Chưa có (chưa chốt)" : "—"}</dd>
       {admin && request.allocations && request.allocations.length > 0 && <><dt>Theo đợt cấp</dt><dd>{request.allocations.map((allocation, index) => `Đợt ${index + 1}: giữ ${formatNumber(allocation.reservedUnits)}, tính ${allocation.consumedUnits === null ? "—" : formatNumber(allocation.consumedUnits)} (${ALLOCATION_STATUS[allocation.status] ?? "khác"})`).join(" · ")}</dd></>}
     </dl>
     {!admin && !trainee && <p className={styles.dim}>Hạn mức được tạm trừ trước và chốt theo mức dùng thực tế; số dư và lịch sử nằm ở <Link href={BILLING_AI_HREF}>Hạn mức AI</Link>.</p>}

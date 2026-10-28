@@ -114,7 +114,8 @@ export type AiRequest = {
   resultType?: AiResultType | (string & {}) | null;
   quotaUnit?: string;
   reservedUnits?: number;
-  consumedUnits?: number;
+  /** `null` until the request is settled (BE `int?`, serialized as null). */
+  consumedUnits?: number | null;
   sources?: AiPinnedSource[];
   result?: AiResult | null;
   citations?: AiCitation[];
@@ -123,7 +124,7 @@ export type AiRequest = {
   /** Trainee only: the context (Training access, Learn post) is gone, so result and citations are withheld. */
   resultWithheld?: boolean | null;
   createdAt: string;
-  completedAt?: string;
+  completedAt?: string | null;
   revision?: number;
   // admin only
   modelVersion?: string | null;
@@ -131,8 +132,11 @@ export type AiRequest = {
   actorUserId?: string;
   policyId?: string;
   attempts?: number;
-  reconcileRequestedAt?: string;
+  reconcileRequestedAt?: string | null;
+  /** Raw provider payload (BE `JsonElement?`): arbitrary JSON, admin detail only. */
   providerResult?: unknown;
+  /** Provider token/usage report (BE `JsonElement?`), admin detail only. Never used for quota. */
+  technicalUsage?: unknown;
   updatedAt?: string;
   allocations?: AiAllocation[];
 };
@@ -193,7 +197,11 @@ export type AiPolicy = {
   effectiveFrom: string;
   effectiveUntil?: string | null;
   createdAt: string;
+  /** Only on the `/end` response: the policy had not started yet, so it was removed instead of ended. */
+  cancelled?: boolean | null;
 };
+/** Body of `POST /api/admin/ai/policies/{id}/end` (BE `EndAiPolicyRequest`); omitted `effectiveUntil` means now. */
+export type EndAiPolicyInput = { effectiveUntil?: string };
 export type AiPolicyPage = { items: AiPolicy[]; total: number; page: number; pageSize: number };
 export type AiPolicyFilters = { operation?: string; page?: number; pageSize?: number };
 export type CreateAiPolicyInput = {

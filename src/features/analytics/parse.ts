@@ -1,4 +1,4 @@
-import { GROUP_BY, OUTCOMES, type AiUsage, type GroupBy, type OperationsReport, type Outcome, type QuotaAmount, type RevenueReport, type TrainingReport } from "./types";
+import { GROUP_BY, OUTCOMES, type AiUsage, type GroupBy, type OperationsReport, type Outcome, type QuotaAmount, type RevenueReport, type TrainingDebriefRow, type TrainingReport } from "./types";
 
 type Raw = Record<string, unknown>;
 
@@ -32,9 +32,16 @@ const quota = (value: unknown): QuotaAmount[] => asList(value).map((item) => ({ 
 function aiUsage(value: unknown): AiUsage | null {
   if (!isRecord(value)) return null;
   const reconcile = isRecord(value.needsReconcile) ? value.needsReconcile : {};
-  const requests = isRecord(value.requests) ? Object.fromEntries(Object.entries(value.requests).map(([status, count]) => [status, asNumber(count)])) : {};
-  return { settledUnits: quota(value.settledUnits), openReservations: quota(value.openReservations), needsReconcile: { requests: asNumber(reconcile.requests), reservedUnits: asNumber(reconcile.reservedUnits) }, requests };
+  const byAudience = isRecord(value.byAudience) ? Object.fromEntries(Object.entries(value.byAudience).map(([audience, byStatus]) => [audience, counts(byStatus)])) : null;
+  return { settledUnits: quota(value.settledUnits), openReservations: quota(value.openReservations), needsReconcile: { requests: asNumber(reconcile.requests), reservedUnits: asNumber(reconcile.reservedUnits) }, requests: counts(value.requests), resultTypes: counts(value.resultTypes), byAudience };
 }
+
+/** `{key: number}` dictionaries (status counts); non-numbers read as 0. */
+function counts(value: unknown): Record<string, number> {
+  return isRecord(value) ? Object.fromEntries(Object.entries(value).map(([key, count]) => [key, asNumber(count)])) : {};
+}
+
+const debriefRow = (item: Raw): TrainingDebriefRow => ({ criterionId: asText(item.criterionId, "—"), metric: asText(item.metric, "—"), evaluated: asNumber(item.evaluated), passed: asNumber(item.passed), passRate: asNullable(item.passRate) });
 
 export function parseTraining(payload: unknown): TrainingReport {
   const raw = expectObject(payload, "Training analytics");
@@ -49,6 +56,8 @@ export function parseTraining(payload: unknown): TrainingReport {
     plays: raw.plays,
     uniqueTrainees: raw.uniqueTrainees,
     completed: asNumber(raw.completed),
+    abandoned: asNumber(raw.abandoned),
+    awaitingSync: asNumber(raw.awaitingSync),
     completionRate: asNullable(raw.completionRate),
     activeSessions: asNumber(raw.activeSessions),
     outcomes: Object.fromEntries(OUTCOMES.map((outcome) => [outcome, asNumber(outcomes[outcome])])) as Record<Outcome, number>,
@@ -60,7 +69,8 @@ export function parseTraining(payload: unknown): TrainingReport {
     byScenario: asList(raw.byScenario).map((item) => ({ scenarioId: asText(item.scenarioId, "—"), scenarioName: asText(item.scenarioName) || null, plays: asNumber(item.plays), uniqueTrainees: asNumber(item.uniqueTrainees), completed: asNumber(item.completed), passed: asNumber(item.passed) })),
     cohorts: Array.isArray(raw.cohorts) ? asList(raw.cohorts).map((item) => ({ key: asText(item.key, "—"), label: asText(item.label) || asText(item.key, "—"), plays: asNumber(item.plays), uniqueTrainees: asNumber(item.uniqueTrainees), completed: asNumber(item.completed), abandoned: asNumber(item.abandoned), awaitingSync: asNumber(item.awaitingSync), assessed: asNumber(item.assessed), passed: asNumber(item.passed), passRate: asNullable(item.passRate), averageDurationSeconds: asNullable(item.averageDurationSeconds) })) : null,
     groupBy: isRecord(raw.filters) && typeof raw.filters.groupBy === "string" && (GROUP_BY as readonly string[]).includes(raw.filters.groupBy) ? (raw.filters.groupBy as GroupBy) : null,
-    byOrganization: Array.isArray(raw.byOrganization) ? asList(raw.byOrganization).map((item) => ({ organizationId: asText(item.organizationId, "—"), plays: asNumber(item.plays), uniqueTrainees: asNumber(item.uniqueTrainees), completed: asNumber(item.completed) })) : null,
+    byOrganization: Array.isArray(raw.byOrganization) ? asList(raw.byOrganization).map((item) => ({ organizationId: asText(item.organizationId, "—"), organizationName: asText(item.organizationName) || null, plays: asNumber(item.plays), uniqueTrainees: asNumber(item.uniqueTrainees), completed: asNumber(item.completed) })) : null,
+    debrief: asList(raw.debrief).map(debriefRow),
     organization: identity(raw.organization),
     aiUsage: aiUsage(raw.aiUsage),
   };

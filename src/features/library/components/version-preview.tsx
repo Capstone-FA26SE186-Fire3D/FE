@@ -2,10 +2,10 @@ import { DetailList, formatDateTime } from "@/components/ops/detail-parts";
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table } from "@/components/ui/table";
-import { isObject } from "@/features/scenario-editor/store/json";
+import { isObject, type JsonObject } from "@/features/scenario-editor/store/json";
 import { summarizeField } from "../apply";
 import { TEMPLATE_FIELDS, ignoredTemplateParts, templateFieldLabel } from "../payload";
-import { kindLabel, type LibraryVersion } from "../types";
+import { kindLabel, type ColorSchemePayload, type LibraryVersion } from "../types";
 import { capabilityName } from "@/configs/capability-labels";
 import { SupportCode } from "@/components/ui/support-code";
 import { metricName, operatorSymbol } from "@/features/training-history/labels";
@@ -28,6 +28,35 @@ function RubricTable({ rubric }: { rubric: unknown }) {
       </tr>)}</tbody>
     </Table>}
   </div>;
+}
+
+const strings = (value: unknown) => (Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : []);
+
+/** `StylePresetPayload`: building types, keywords, materials per room category and surface, default colour scheme code. */
+function StylePresetView({ payload }: { payload: JsonObject }) {
+  const materials = isObject(payload.materials) ? Object.entries(payload.materials).filter((entry): entry is [string, JsonObject] => isObject(entry[1])) : [];
+  return <div className="ops-stack" data-testid="style-preset-view">
+    <DetailList columns={3} items={[
+      { label: "Loại công trình", value: strings(payload.buildingTypes).join(", ") || "—" },
+      { label: "Từ khóa phòng", value: strings(payload.keywords).join(", ") || "—" },
+      { label: "Bảng màu mặc định", value: typeof payload.defaultScheme === "string" ? payload.defaultScheme : "—" },
+    ]} />
+    {materials.length > 0 && <Table caption="Vật liệu theo loại phòng">
+      <thead><tr><th>Loại phòng</th><th>Sàn</th><th>Tường</th><th>Trần</th></tr></thead>
+      <tbody>{materials.map(([room, surfaces]) => <tr key={room}><td className="ops-cell-primary">{room === "default" ? "Mặc định (mọi phòng)" : room}</td><td>{String(surfaces.floor ?? "—")}</td><td>{String(surfaces.wall ?? "—")}</td><td>{String(surfaces.ceiling ?? "—")}</td></tr>)}</tbody>
+    </Table>}
+  </div>;
+}
+
+const COLOR_LABELS: Array<[keyof ColorSchemePayload["colors"], string]> = [["wall", "Tường"], ["accentWall", "Tường nhấn"], ["doorWood", "Cửa gỗ"], ["skirting", "Len chân tường"]];
+
+/** `ColorSchemePayload`: four `#RRGGBB` colours. */
+function ColorSchemeView({ payload }: { payload: JsonObject }) {
+  const colors = isObject(payload.colors) ? payload.colors : {};
+  return <div data-testid="color-scheme-view"><DetailList columns={2} items={COLOR_LABELS.map(([key, label]) => {
+    const value = typeof colors[key] === "string" ? colors[key] : null;
+    return { label, value: value ? <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}><span aria-hidden="true" style={{ width: 14, height: 14, borderRadius: 3, border: "1px solid var(--border)", background: /^#[0-9a-f]{6}$/i.test(value) ? value : "transparent" }} /><code>{value}</code></span> : "—" };
+  })} /></div>;
 }
 
 /**
@@ -62,6 +91,9 @@ export function VersionPreview({ version, compact = false }: { version: LibraryV
       {properties.length > 0 && <Table caption="Thuộc tính thiết bị"><thead><tr><th>Thuộc tính</th><th>Giá trị</th></tr></thead><tbody>{properties.map(([key, value]) => <tr key={key}><td className="ops-cell-primary">{key}</td><td>{String(value)}</td></tr>)}</tbody></Table>}
       <Alert tone="info" title="Không thêm tính năng cho ứng dụng">{NO_CAPABILITY_NOTICE}</Alert>
     </>}
+
+    {version.kind === "StylePreset" && <StylePresetView payload={payload} />}
+    {version.kind === "ColorScheme" && <ColorSchemeView payload={payload} />}
 
     <div>
       <p className="ops-field-label" style={{ margin: "0 0 4px" }}>Yêu cầu của mẫu này</p>

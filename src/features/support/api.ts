@@ -1,5 +1,6 @@
 import { apiClient } from "@/api/client";
 import type {
+  AdminFeedbackUpdate,
   AdminTicketUpdate,
   AuditDetail,
   AuditFilters,
@@ -12,6 +13,7 @@ import type {
   SupportFilters,
   SupportMessage,
   SupportPage,
+  SupportTicketPage,
   Ticket,
 } from "./types";
 
@@ -31,7 +33,7 @@ const ticketsBase = (scope: TicketScope) => (scope === "admin" ? "/api/admin/sup
 
 export const supportApi = {
   listTickets(scope: TicketScope, accessToken: string, filters: SupportFilters, signal?: AbortSignal) {
-    return apiClient.request<SupportPage<Ticket>>(ticketsBase(scope), { headers: auth(accessToken), query: filters, signal });
+    return apiClient.request<SupportTicketPage>(ticketsBase(scope), { headers: auth(accessToken), query: filters, signal });
   },
   async getTicket(scope: TicketScope, accessToken: string, id: string, paging: MessagePaging = {}, signal?: AbortSignal): Promise<TicketWithEtag> {
     const response = await apiClient.requestWithMeta<Ticket>(`${ticketsBase(scope)}/${id}`, { headers: auth(accessToken), query: { page: paging.page ?? 1, pageSize: paging.pageSize ?? 100 }, signal });
@@ -61,8 +63,10 @@ export const supportApi = {
     const response = await apiClient.requestWithMeta<Feedback>(`/api/admin/feedback/${id}`, { headers: auth(accessToken), signal });
     return { feedback: response.data, etag: etagOf(response.headers, response.data.revision) };
   },
-  async updateFeedbackStatus(accessToken: string, id: string, status: FeedbackStatus, etag: string): Promise<FeedbackWithEtag> {
-    const response = await apiClient.requestWithMeta<Feedback>(`/api/admin/feedback/${id}/status`, { headers: auth(accessToken), json: { status }, method: "PATCH", ifMatch: etag });
+  /** `reason` is optional and only stored in the audit trail. */
+  async updateFeedbackStatus(accessToken: string, id: string, status: FeedbackStatus, etag: string, reason?: string): Promise<FeedbackWithEtag> {
+    const body: AdminFeedbackUpdate = reason ? { status, reason } : { status };
+    const response = await apiClient.requestWithMeta<Feedback>(`/api/admin/feedback/${id}/status`, { headers: auth(accessToken), json: body, method: "PATCH", ifMatch: etag });
     return { feedback: response.data, etag: etagOf(response.headers, response.data.revision) };
   },
 
