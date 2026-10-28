@@ -29,11 +29,17 @@ export type PublicPostSummary = {
   publishedAt: string;
 };
 
-/** The published version inside `GET /api/learn/posts/{slug}`. `blocks` stay untyped until the renderer parses them. */
+/** The published version inside `GET /api/learn/posts/{slug}` (BE `LearnVersionView`). `blocks` stay untyped until the renderer parses them. */
 export type PublicVersion = {
   id: string;
   postId: string;
   versionNumber: number;
+  /** `fet3d.learn/1`. */
+  contentSchemaVersion: string;
+  contentHash: string;
+  /** Version status; always Published on a public read. */
+  status: string;
+  revision: number;
   kind: LearnKind;
   title: string;
   summary: string;
@@ -44,7 +50,17 @@ export type PublicVersion = {
   sources: SourceRef[];
 };
 
-export type PublicPost = { id: string; slug: string; version: PublicVersion };
+/** `GET /api/learn/posts/{slug}` (BE `LearnPostView`; public reads omit `versions`). `version` is the API's `publishedVersion`. */
+export type PublicPost = {
+  id: string;
+  slug: string;
+  publicationStatus: PostStatus | string;
+  publishedVersionId: string | null;
+  revision: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+  version: PublicVersion;
+};
 
 export type PublicSituation = { id: string; slug: string; name: string; description: string | null };
 
@@ -52,3 +68,12 @@ export type PublicSituation = { id: string; slug: string; name: string; descript
 export type BookmarkItem =
   | { available: true; postId: string; bookmarkedAt: string; slug: string; title: string; summary: string; kind: LearnKind }
   | { available: false; postId: string; bookmarkedAt: string };
+
+/** `counts` of `GET /api/learn/bookmarks`: every bookmark of the Trainee whatever the filters/page, available ones by kind. */
+export type BookmarkCounts = Record<LearnKind, number> & { unavailable: number };
+
+/** `GET /api/learn/bookmarks` (BE `LearnBookmarkPage`). `total` counts rows matching `kind`/`search`; `counts` ignores them (null when absent). */
+export type BookmarkPage = PageOf<BookmarkItem> & { counts: BookmarkCounts | null };
+
+/** Answer of `PUT`/`DELETE`/`GET /api/learn/bookmarks/{postId}` (BE `LearnBookmarkState`). */
+export type BookmarkState = { postId: string; bookmarked: boolean };

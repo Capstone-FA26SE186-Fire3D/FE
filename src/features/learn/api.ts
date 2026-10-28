@@ -2,7 +2,7 @@ import { apiClient } from "@/api/client";
 import { ApiError } from "@/api/types/common";
 import { bool, isRecord, kindOf, list, num, parsePage, parseSituationRef, parseSourceRef, str, strOrNull } from "./parse";
 import { LEARN_LIMITS, type LearnFilterField } from "./query";
-import type { BookmarkItem, PageOf, PublicPost, PublicPostSummary, PublicSituation, PublicVersion } from "./types";
+import type { BookmarkCounts, BookmarkItem, BookmarkPage, BookmarkState, PageOf, PublicPost, PublicPostSummary, PublicSituation, PublicVersion } from "./types";
 
 /** Public Learn (`/api/learn/*`, anonymous) and Trainee bookmarks (Bearer). Contract: BE docs/learn-library.md. */
 
@@ -19,6 +19,10 @@ function parseVersion(raw: unknown): PublicVersion | null {
     id: raw.id,
     postId: str(raw.postId),
     versionNumber: num(raw.versionNumber, 1),
+    contentSchemaVersion: str(raw.contentSchemaVersion),
+    contentHash: str(raw.contentHash),
+    status: str(raw.status, "Published"),
+    revision: num(raw.revision, 1),
     kind: kindOf(raw.kind),
     title: str(raw.title),
     summary: str(raw.summary),
@@ -37,7 +41,20 @@ function parseBookmark(raw: unknown): BookmarkItem | null {
   return { available: false, postId: raw.postId, bookmarkedAt };
 }
 
+function parseCounts(raw: unknown): BookmarkCounts | null {
+  if (!isRecord(raw)) return null;
+  return { Article: num(raw.Article), Tip: num(raw.Tip), Video: num(raw.Video), unavailable: num(raw.unavailable ?? raw.Unavailable) };
+}
+
+/** A 200 without a usable body still means the call succeeded: fall back to the state the caller asked for. */
+function parseBookmarkState(raw: unknown, postId: string, bookmarked: boolean): BookmarkState {
+  if (!isRecord(raw)) return { postId, bookmarked };
+  return { postId: str(raw.postId, postId), bookmarked: bool(raw.bookmarked, bookmarked) };
+}
+
 export type LearnPostsQuery = { search?: string; situations?: string[]; kinds?: string[]; page: number; pageSize: number };
+/** `GET /api/learn/bookmarks` also filters by `kind` (repeated) and `search` (2-100 chars), like the public list. */
+export type LearnBookmarksQuery = { search?: string; kinds?: string[]; page: number; pageSize: number };
 
 export const learnApi = {
   async situations(signal?: AbortSignal): Promise<PublicSituation[]> {
@@ -65,22 +82,39 @@ export const learnApi = {
     const body = isRecord(raw) ? raw : {};
     const version = parseVersion(body.publishedVersion);
     if (typeof body.id !== "string" || !version) throw new ApiError("Máy chủ trả về bài không đọc được.", 502, undefined, undefined, "LEARN_POST_MALFORMED");
-    return { id: body.id, slug: str(body.slug, slug), version };
+    return {
+      id: body.id,
+      slug: str(body.slug, slug),
+      publicationStatus: str(body.publicationStatus, "Published"),
+      publishedVersionId: strOrNull(body.publishedVersionId),
+      revision: num(body.revision, 1),
+      createdAt: strOrNull(body.createdAt),
+      updatedAt: strOrNull(body.updatedAt),
+      version,
+    };
   },
 
-  async bookmarks(accessToken: string, query: { page: number; pageSize: number }, signal?: AbortSignal): Promise<PageOf<BookmarkItem>> {
-    const raw = await apiClient.request<unknown>("/api/learn/bookmarks", { headers: auth(accessToken), query, signal });
-    return parsePage(raw, parseBookmark);
+  async bookmarks(accessToken: string, query: LearnBookmarksQuery, signal?: AbortSignal): Promise<BookmarkPage> {
+    const search = query.search?.trim();
+    const raw = await apiClient.request<unknown>("/api/learn/bookmarks", {
+      headers: auth(accessToken),
+      query: { search: search || undefined, kind: query.kinds?.length ? query.kinds : undefined, page: query.page, pageSize: query.pageSize },
+      signal,
+    });
+    const page: PageOf<BookmarkItem> = parsePage(raw, parseBookmark);
+    return { ...page, counts: parseCounts(isRecord(raw) ? raw.counts : undefined) };
   },
 
   /** Idempotent: saving an already-saved post is a no-op. 404 when the post is not Published. */
-  async bookmark(accessToken: string, postId: string): Promise<void> {
-    await apiClient.request<unknown>(`/api/learn/bookmarks/${encodeURIComponent(postId)}`, { headers: auth(accessToken), method: "PUT" });
+  async bookmark(accessToken: string, postId: string): Promise<BookmarkState> {
+    const raw = await apiClient.request<unknown>(`/api/learn/bookmarks/${encodeURIComponent(postId)}`, { headers: auth(accessToken), method: "PUT" });
+    return parseBookmarkState(raw, postId, true);
   },
 
   /** Idempotent: removing a bookmark that does not exist is a no-op. Works for unavailable posts too. */
-  async unbookmark(accessToken: string, postId: string): Promise<void> {
-    await apiClient.request<unknown>(`/api/learn/bookmarks/${encodeURIComponent(postId)}`, { headers: auth(accessToken), method: "DELETE" });
+  async unbookmark(accessToken: string, postId: string): Promise<BookmarkState> {
+    const raw = await apiClient.request<unknown>(`/api/learn/bookmarks/${encodeURIComponent(postId)}`, { headers: auth(accessToken), method: "DELETE" });
+    return parseBookmarkState(raw, postId, false);
   },
 };
 

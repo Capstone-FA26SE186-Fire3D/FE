@@ -6,7 +6,19 @@ import type { JsonObject } from "./store/json";
 
 const auth = (accessToken: string): HeadersInit => ({ Authorization: `Bearer ${accessToken}` });
 
-export type ScenarioDetail = { id: string; buildingId: string; organizationId: string; name: string; createdAt: string };
+/** BE `ScenarioDetailResponse`. The resume fields are optional because older deployments omit them. */
+export type ScenarioDetail = {
+  id: string;
+  buildingId: string;
+  organizationId: string;
+  name: string;
+  createdAt: string;
+  currentDraftId?: string | null;
+  currentDraftVersion?: number | null;
+  draftCount?: number;
+  latestVersionId?: string | null;
+  latestVersionNumber?: number | null;
+};
 
 /** `GET /api/scenario-drafts/{id}`: `state` is whatever JSON the BE stored (`{}` for a new draft). */
 export type DraftResponse = {
@@ -26,18 +38,60 @@ export type DraftResponse = {
 
 export type LoadedDraft = { draft: DraftResponse; etag: string };
 
-export type RuntimeCatalogEntry = { runtimeVersion: string; protocolVersion: string; manifestSchemaVersion: string; capabilities: unknown; capabilityContracts?: unknown };
+/** BE `RuntimeCatalogDto`. `capabilities` is free JSON; `capabilityContracts` maps capability id → contract (only those passing the editor schema). */
+export type RuntimeCatalogEntry = {
+  runtimeVersion: string;
+  protocolVersion: string;
+  manifestSchemaVersion: string;
+  capabilities: unknown;
+  capabilityContracts?: Record<string, unknown> | null;
+};
 
-export type ValidateResponse = { draftId: string; version: number; isValid: boolean; issues: unknown };
+/** BE `ScenarioDraftValidationIssue` (same shape as `ApiFieldError`). */
+export type DraftValidationIssue = { code: string; path: string; message: string };
+
+/** BE `ScenarioDraftValidationResponse`. */
+export type ValidateResponse = { draftId: string; version: number; isValid: boolean; issues: DraftValidationIssue[] };
 
 /** `POST /api/scenario-drafts/{id}/validate-state`: dry run of an unsaved body. `stateHash` is the SHA-256 of the exact request body bytes. */
-export type ValidateStateResponse = { draftId: string; storedVersion: number; stateHash: string; isValid: boolean; issues: unknown };
+export type ValidateStateResponse = { draftId: string; storedVersion: number; stateHash: string; isValid: boolean; issues: DraftValidationIssue[] };
 
 /** `GET /api/buildings/{id}/editor-preview` with the `fet3d.editor/1` fields (status Ready | NotReady | ReprocessRequired). */
 export type EditorPreviewV1 = EditorPreview & { schemaVersion?: string | null; units?: string | null; upAxis?: string | null; handedness?: string | null };
 
 /** `GET /api/revisions/{id}/floors`: pin + floors of the accepted Geometry artifact, without storage access. */
-export type RevisionFloorsResponse = { revisionId: string; buildingId: string; status: string; artifactId: string | null; sha256Hash: string | null; schemaVersion: string | null; floors: unknown | null };
+export type RevisionFloorsResponse = {
+  revisionId: string;
+  buildingId: string;
+  status: string;
+  artifactId: string | null;
+  sha256Hash: string | null;
+  schemaVersion: string | null;
+  floors: unknown | null;
+  /** anchorId/nodeId → ifcGlobalId, floorId, semanticType (fet3d.editor/1). */
+  semanticMapping?: unknown | null;
+};
+
+/** BE `RubricCatalog` (`GET /api/scenario-rubrics/catalog`). The UI still parses it defensively (`parseRubricCatalog`). */
+export type RubricCatalogMetric = { id: string; description: string };
+export type RubricCriterionShape = {
+  requiredFields: string[];
+  optionalFields: string[];
+  idPattern: string;
+  idMaxLength: number;
+  descriptionMaxLength: number;
+  weightMinimum: number;
+  labelMaxLength: number;
+};
+export type RubricCatalog = {
+  supportedSchemaVersions: string[];
+  defaultSchemaVersion: string;
+  metrics: RubricCatalogMetric[];
+  operators: string[];
+  criterion: RubricCriterionShape;
+  maxCriteria: number;
+  rubricFields: string[];
+};
 
 export const scenarioEditorApi = {
   getScenario(accessToken: string, scenarioId: string, signal?: AbortSignal) {
@@ -77,7 +131,7 @@ export const scenarioEditorApi = {
     return apiClient.request<RevisionFloorsResponse>(`/api/revisions/${revisionId}/floors`, { headers: auth(accessToken), signal });
   },
   rubricCatalog(accessToken: string, signal?: AbortSignal) {
-    return apiClient.request<unknown>("/api/scenario-rubrics/catalog", { headers: auth(accessToken), signal });
+    return apiClient.request<RubricCatalog>("/api/scenario-rubrics/catalog", { headers: auth(accessToken), signal });
   },
   /** Validates the body that would be PUT without storing it or changing the ETag. Shape problems come back as issues (200), not 422. */
   validateState(accessToken: string, draftId: string, body: JsonObject, signal?: AbortSignal) {

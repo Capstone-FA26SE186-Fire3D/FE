@@ -152,7 +152,7 @@ export function AdminRequestsTab({ accessToken, usage }: { accessToken: string; 
     { key: "request", header: "Yêu cầu", primary: true, render: (item) => <CellTitle title={operationLabel(item.operation)} sub={formatDateTime(item.createdAt)} /> },
     { key: "organization", header: "Tổ chức", width: 200, render: (item) => item.audience === "trainee" ? <CellTitle title="Học viên" sub="không tính vào hạn mức tổ chức" /> : orgName(item.organizationId) },
     { key: "status", header: "Trạng thái", width: 190, render: (item) => <CellTitle title={<StatusBadge tone={statusTone(item.status, item.resultType)}>{statusLabel(item.status, item.resultType)}</StatusBadge>} sub={item.reconcileRequestedAt ? "Đã yêu cầu đối soát" : undefined} /> },
-    { key: "usage", header: "Sử dụng", width: 150, hideBelow: 900, render: (item) => (item.consumedUnits !== undefined ? formatQuota(item.consumedUnits, item.quotaUnit) : item.reservedUnits !== undefined ? `Tạm trừ ${formatQuota(item.reservedUnits, item.quotaUnit)}` : "—") },
+    { key: "usage", header: "Sử dụng", width: 150, hideBelow: 900, render: (item) => (item.consumedUnits != null ? formatQuota(item.consumedUnits, item.quotaUnit) : item.reservedUnits !== undefined ? `Tạm trừ ${formatQuota(item.reservedUnits, item.quotaUnit)}` : "—") },
   ];
 
   return <div className={styles.stack}>

@@ -9,8 +9,16 @@ export type AiUsage = {
   settledUnits: QuotaAmount[];
   openReservations: QuotaAmount[];
   needsReconcile: { requests: number; reservedUnits: number };
+  /** Requests created in range by v7 status (Accepted, Processing, Succeeded, Failed, NeedsReconcile, Rejected). */
   requests: Record<string, number>;
+  /** `Succeeded` split by result type (KnowledgeAnswer, ScenarioDraft, InsufficientEvidence, RejectedBySafetyGate). */
+  resultTypes: Record<string, number>;
+  /** Platform report only: `organization` / `trainee`, each by status; `null` for an organization report. */
+  byAudience: Record<string, Record<string, number>> | null;
 };
+
+/** BE `AnalyticsDebriefRow`: stored assessment criterion results, aggregated (no individual answers). */
+export type TrainingDebriefRow = { criterionId: string; metric: string; evaluated: number; passed: number; passRate: number | null };
 
 export const GROUP_BY = ["day", "week", "month", "building", "scenario"] as const;
 export type GroupBy = (typeof GROUP_BY)[number];
@@ -41,7 +49,11 @@ export type TrainingReport = {
   definitions: Record<string, string>;
   plays: number;
   uniqueTrainees: number;
+  /** Excludes Abandoned sessions. */
   completed: number;
+  abandoned: number;
+  /** Completion requested but the result is not stored yet. */
+  awaitingSync: number;
   /** `null` means no sample (zero plays), which is not the same as 0 %. */
   completionRate: number | null;
   activeSessions: number;
@@ -57,7 +69,8 @@ export type TrainingReport = {
   cohorts: TrainingCohort[] | null;
   groupBy: GroupBy | null;
   /** Platform report only. */
-  byOrganization: Array<{ organizationId: string; plays: number; uniqueTrainees: number; completed: number }> | null;
+  byOrganization: Array<{ organizationId: string; organizationName: string | null; plays: number; uniqueTrainees: number; completed: number }> | null;
+  debrief: TrainingDebriefRow[];
   /** Admin per-organization report only. */
   organization: { id: string; name: string; isActive: boolean } | null;
   aiUsage: AiUsage | null;

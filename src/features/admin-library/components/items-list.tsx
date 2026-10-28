@@ -27,8 +27,8 @@ export const STATES = ["active", "inactive", "unpublished"] as const;
 type ItemState = (typeof STATES)[number];
 const stateLabel: Record<ItemState, string> = { active: "Đang dùng", inactive: "Ngừng dùng", unpublished: "Chưa có bản xuất bản" };
 const isState = (value: string): value is ItemState => (STATES as readonly string[]).includes(value);
-const tabLabel: Record<LibraryKind, string> = { ScenarioTemplate: "Kịch bản mẫu", RubricSample: "Tiêu chí chấm mẫu", Equipment: "Thiết bị" };
-const kindTone: Record<LibraryKind, Tone> = { ScenarioTemplate: "info", RubricSample: "ember", Equipment: "neutral" };
+const tabLabel: Record<LibraryKind, string> = { ScenarioTemplate: "Kịch bản mẫu", RubricSample: "Tiêu chí chấm mẫu", Equipment: "Thiết bị", StylePreset: "Bộ vật liệu", ColorScheme: "Bảng màu" };
+const kindTone: Record<LibraryKind, Tone> = { ScenarioTemplate: "info", RubricSample: "ember", Equipment: "neutral", StylePreset: "info", ColorScheme: "neutral" };
 
 const matches = (item: LibraryItem, state: ItemState | "") => state === "" || (state === "active" ? item.isActive : state === "inactive" ? !item.isActive : item.latestPublished === null);
 
@@ -72,6 +72,8 @@ export function ItemsList({ accessToken, reloadKey, onOpen, onNewVersion, onChan
     ScenarioTemplate: useKindTotal("ScenarioTemplate", accessToken, reloadKey),
     RubricSample: useKindTotal("RubricSample", accessToken, reloadKey),
     Equipment: useKindTotal("Equipment", accessToken, reloadKey),
+    StylePreset: useKindTotal("StylePreset", accessToken, reloadKey),
+    ColorScheme: useKindTotal("ColorScheme", accessToken, reloadKey),
   };
   const loaded = list.data?.items ?? [];
   const items = loaded.filter((item) => matches(item, state));

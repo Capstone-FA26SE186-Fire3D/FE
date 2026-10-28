@@ -1,9 +1,11 @@
 import { apiClient } from "@/api/client";
-import type { CreateAccountInput, ManagedAccount, Organization, PageResponse } from "./types";
+import type { CreateAccountInput, CreatedAccount, ManagedAccount, Organization, PageResponse } from "./types";
 import { normalizeRole, roleToApiName } from "@/features/auth/roles";
 import type { UserRole } from "@/features/auth/types";
 
 type ApiManagedAccount = Omit<ManagedAccount, "role"> & { role: unknown };
+
+type ApiCreatedAccount = Omit<CreatedAccount, "role"> & { role: unknown };
 
 function normalizeAccount(account: ApiManagedAccount): ManagedAccount {
   return { ...account, role: normalizeRole(account.role) };
@@ -13,6 +15,7 @@ function headers(accessToken: string): HeadersInit {
   return { Authorization: `Bearer ${accessToken}` };
 }
 
+/** BE `AccountFilter`. `sort`: createdAt | updatedAt | email | fullName | lastLoginAt, '-' prefix for descending (default -createdAt). */
 export type AccountFilters = {
   search?: string;
   isActive?: boolean;
@@ -20,6 +23,7 @@ export type AccountFilters = {
   organizationId?: string;
   page?: number;
   pageSize?: number;
+  sort?: string;
 };
 
 export const accountsApi = {
@@ -27,8 +31,10 @@ export const accountsApi = {
     return apiClient.request<PageResponse<ApiManagedAccount>>("/api/accounts", { headers: headers(accessToken), query: filters, signal })
       .then((page) => ({ ...page, items: page.items.map(normalizeAccount) }));
   },
-  create(accessToken: string, input: CreateAccountInput) {
-    return apiClient.request("/api/accounts", { headers: headers(accessToken), json: { ...input, role: roleToApiName(input.role) } });
+  /** 201 `AccountResponse`; 409 when the email is taken. */
+  create(accessToken: string, input: CreateAccountInput): Promise<CreatedAccount> {
+    return apiClient.request<ApiCreatedAccount>("/api/accounts", { headers: headers(accessToken), json: { ...input, role: roleToApiName(input.role) } })
+      .then((account) => ({ ...account, role: normalizeRole(account.role) }));
   },
   get(accessToken: string, id: string) {
     return apiClient.request<ApiManagedAccount>(`/api/accounts/${id}`, { headers: headers(accessToken) }).then(normalizeAccount);
