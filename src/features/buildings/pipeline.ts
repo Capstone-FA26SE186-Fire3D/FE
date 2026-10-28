@@ -1,4 +1,5 @@
 import type { Tone } from "@/components/ui/status-badge";
+import type { ValidationRunWithOutcome } from "./ifc-types";
 import type { BuildingRevision, IssueSeverity, JobQa, ProcessingJob, ProcessingJobDetail, ProcessingLog, RevisionIssue, ValidationRun } from "./types";
 
 /** Everything the UI knows about the newest processing job of one revision. */
@@ -82,7 +83,9 @@ export type QaVerdict = {
   tone: Tone;
 };
 
-function runOutcome(run: ValidationRun): string | undefined {
+function runOutcome(run: ValidationRunWithOutcome): string | undefined {
+  // `outcome` is the BE's own Passed/Failed of the run; `status` and `summary.outcome` are read for older responses.
+  if (run.outcome === "Passed" || run.outcome === "Failed") return run.outcome;
   const status = run.status;
   if (status === "Passed" || status === "Failed") return status;
   const summary = run.summary;

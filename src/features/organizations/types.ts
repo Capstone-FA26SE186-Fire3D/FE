@@ -20,14 +20,21 @@ export type OrganizationProfile = Organization & {
   profileRevision: number;
 };
 
-/** `GET /api/organizations/{id}` (PlatformAdmin): profile fields plus counts, all optional on older deployments. */
-export type OrganizationDetail = Organization & {
-  address?: string | null;
-  phoneNumber?: string | null;
-  profileRevision?: number;
-  buildingCount?: number;
-  accountCount?: number;
+/**
+ * BE `OrganizationResponse` (PlatformAdmin `GET/POST /api/organizations`, `GET/PATCH /api/organizations/{id}`, `PATCH .../status`).
+ * The API always serializes the profile fields and counts (defaults `profileRevision=1`, counts 0); `buildingCount` counts active
+ * Buildings. `profileRevision` is the ETag revision shared with `/api/organizations/me`.
+ */
+export type AdminOrganization = Organization & {
+  address: string | null;
+  phoneNumber: string | null;
+  profileRevision: number;
+  buildingCount: number;
+  accountCount: number;
 };
+
+/** Detail view of one organization (same shape as the list row). */
+export type OrganizationDetail = AdminOrganization;
 
 /** Admin PATCH: omitted fields keep their value; null or empty is rejected by the API, so only send what changed. */
 export type AdminUpdateOrganizationInput = { name?: string; address?: string; phoneNumber?: string };
@@ -43,9 +50,11 @@ export type CreateOrganizationInput = {
   slug: string;
 };
 
+/** BE `OrganizationFilter`. `sort`: createdAt | updatedAt | name, '-' prefix for descending (default -createdAt); other values are 400. */
 export type OrganizationFilters = {
   search?: string;
   isActive?: boolean;
   page?: number;
   pageSize?: number;
+  sort?: string;
 };

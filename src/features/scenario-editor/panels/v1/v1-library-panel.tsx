@@ -15,7 +15,7 @@ import { actionLabel, changesFor, chosenAction, planApply, summarizeChoices, typ
 import { VersionPreview } from "@/features/library/components/version-preview";
 import { libraryApi } from "@/features/library/api";
 import { describeLibraryError } from "@/features/library/errors";
-import { LIBRARY_KINDS, kindHint, kindLabel, type LibraryItem, type LibraryKind, type LibraryVersion } from "@/features/library/types";
+import { SCENARIO_LIBRARY_KINDS, kindHint, kindLabel, type LibraryItem, type LibraryKind, type LibraryVersion } from "@/features/library/types";
 
 import type { JsonObject } from "../../store/json";
 import { findRuntime, type RubricCatalogView, type RuntimeOption } from "../../v1/catalog";
@@ -156,7 +156,7 @@ export function V1LibraryPanel({ accessToken, ui, onUi, draft, selectedObject, r
 
     {!chosen && <>
       <div role="group" aria-label="Loại mẫu" className="ops-actions" style={{ flexWrap: "wrap" }}>
-        {LIBRARY_KINDS.map((value) => <Button key={value} type="button" size="sm" variant={value === kind ? "primary" : "secondary"} aria-pressed={value === kind} onClick={() => setKind(value)} data-testid={`library-kind-${value}`}>{kindLabel[value]}</Button>)}
+        {SCENARIO_LIBRARY_KINDS.map((value) => <Button key={value} type="button" size="sm" variant={value === kind ? "primary" : "secondary"} aria-pressed={value === kind} onClick={() => setKind(value)} data-testid={`library-kind-${value}`}>{kindLabel[value]}</Button>)}
       </div>
       <p className="ops-field-hint" style={{ margin: 0 }}>{kindHint[kind]}</p>
       {list.error !== undefined && (() => {

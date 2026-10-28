@@ -10,9 +10,9 @@ import { Field, Input, Select } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { libraryAdminApi } from "@/features/library/api";
 import { describeLibraryError, translateIssue, type LibraryErrorView } from "@/features/library/errors";
-import { LIBRARY_KINDS, LIBRARY_LIMITS, isKind, kindHint, kindLabel, type LibraryItem, type LibraryKind } from "@/features/library/types";
+import { LIBRARY_LIMITS, SCENARIO_LIBRARY_KINDS, isScenarioKind, kindHint, kindLabel, type LibraryItem, type LibraryKind } from "@/features/library/types";
 
-/** Creates an empty item (kind + code). Versions and their content come next. The Idempotency-Key is the same while the same kind+code is retried. */
+/** Creates an empty item (kind + code); only scenario kinds, since the version form has no StylePreset/ColorScheme payload yet. Versions and their content come next. The Idempotency-Key is the same while the same kind+code is retried. */
 export function NewItemModal({ accessToken, initialKind, onClose, onCreated }: { accessToken: string; initialKind: LibraryKind | ""; onClose: () => void; onCreated: (item: LibraryItem) => void }) {
   const toast = useToast();
   const [kind, setKind] = useState<LibraryKind | "">(initialKind);
@@ -50,9 +50,9 @@ export function NewItemModal({ accessToken, initialKind, onClose, onCreated }: {
     footer={<><Button variant="quiet" disabled={busy} onClick={onClose}>Hủy</Button><Button disabled={busy} onClick={() => void submit()} data-testid="create-item">{busy ? "Đang tạo…" : error?.kind === "retry" ? "Thử lại" : "Tạo mục"}</Button></>}>
     <form className="ops-stack" onSubmit={(event) => { event.preventDefault(); void submit(); }} noValidate>
       <Field label="Loại" required error={touched ? kindError : undefined} hint={kind ? kindHint[kind] : undefined}>
-        {(props) => <Select {...props} value={kind} onChange={(event) => setKind(isKind(event.target.value) ? event.target.value : "")} data-testid="new-item-kind">
+        {(props) => <Select {...props} value={kind} onChange={(event) => setKind(isScenarioKind(event.target.value) ? event.target.value : "")} data-testid="new-item-kind">
           <option value="">Chọn…</option>
-          {LIBRARY_KINDS.map((value) => <option key={value} value={value}>{kindLabel[value]}</option>)}
+          {SCENARIO_LIBRARY_KINDS.map((value) => <option key={value} value={value}>{kindLabel[value]}</option>)}
         </Select>}
       </Field>
       <Field label="Mã" required error={taken ? "Mã này đã được dùng." : touched ? codeError : undefined} hint={stored ? `Sẽ lưu là: ${stored}` : "Duy nhất, tự chuyển thành chữ hoa."}>

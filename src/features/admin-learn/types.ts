@@ -39,8 +39,24 @@ export type AdminVersion = {
 };
 
 /**
- * A post. In the LIST the `versions` array is absent and only the current published version is embedded, so a post that
- * was never published has no title there (a backend gap, reported). `GET /posts/{id}` adds `versions` (summaries).
+ * Admin list row extras (BE `LearnPostAdminRow`, BE#86/#154): the newest version of ANY status (Draft or Published), so every
+ * post, including Unpublished and Deleted ones, has a title in the list. `draftVersionId` is the newest open Draft or null.
+ * Only `GET /api/admin/learn/posts` returns these; detail and command responses do not.
+ */
+export type AdminPostListInfo = {
+  title: string | null;
+  kind: LearnKind | null;
+  latestVersionId: string | null;
+  latestVersionNumber: number | null;
+  latestVersionStatus: VersionStatus | null;
+  draftVersionId: string | null;
+  draftVersionNumber: number | null;
+  versionCount: number;
+};
+
+/**
+ * A post (BE `LearnPostView`). The public title is `publishedVersion.title`. `GET /posts/{id}` adds `versions` (summaries);
+ * the LIST adds `latest` (see `AdminPostListInfo`), null on other responses.
  */
 export type AdminPost = {
   id: string;
@@ -52,15 +68,18 @@ export type AdminPost = {
   updatedAt: string;
   publishedVersion: AdminVersion | null;
   versions: VersionSummary[] | null;
+  latest?: AdminPostListInfo | null;
 };
 
 export type AdminSituation = { id: string; slug: string; name: string; description: string | null; isActive: boolean; createdAt: string; updatedAt: string };
 
 export type SourceStatus = "Draft" | "Approved" | "Retired";
-/** Common (or tenant) knowledge source with the backend's own verdict on how a Learn version may cite it. */
+/** Common (or tenant) knowledge source (BE `KnowledgeSourceView`) with the backend's own verdict on how a Learn version may cite it. */
 export type KnowledgeSource = {
   id: string;
   visibility: string;
+  /** Null for Common sources. */
+  organizationId: string | null;
   title: string;
   sourceUri: string | null;
   versionLabel: string;
@@ -68,6 +87,9 @@ export type KnowledgeSource = {
   effectiveFrom: string | null;
   effectiveUntil: string | null;
   approvalStatus: SourceStatus;
+  sourceHash: string;
+  approvedAt: string | null;
+  createdAt: string;
   revision: number;
   /** A Learn draft may cite it (Common and Draft/Approved). */
   canUseInDraft: boolean;
@@ -76,9 +98,14 @@ export type KnowledgeSource = {
 };
 
 /** A completed Learn image upload (BE#171); `url` goes into `coverImageUrl` or an image block. */
-export type LearnImage = { imageId: string; url: string; width: number; height: number };
+/** Response of `POST /api/admin/learn/media/images/{uploadId}/complete` (BE#171). */
+export type LearnImage = { imageId: string; url: string; width: number; height: number; contentType: string; sizeBytes: number };
 
+/** Response of `POST /api/admin/learn/media/validate` (BE `MediaDescriptor`). */
 export type MediaDescriptor = { provider: string; videoId: string; canonicalUrl: string };
+
+/** Body of `POST /api/admin/learn/situations` (BE `CreateLearnSituationRequest`). */
+export type CreateSituationInput = { slug: string; name: string; description?: string };
 
 /** Wire form of a version for POST /posts (inside `version`), POST /posts/{id}/versions and PUT /versions/{id}. */
 export type VersionInput = {

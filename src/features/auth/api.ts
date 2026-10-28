@@ -1,6 +1,6 @@
 import { apiClient } from "@/api/client";
 import { ApiError } from "@/api/types/common";
-import type { GoogleLinkInput, GoogleLinkResult, GoogleLoginResult, GoogleOnboardingInput, GoogleOnboardingProof, SetLocalPasswordInput } from "./types";
+import type { ForgotPasswordAccepted, GoogleExchangeResponse, GoogleLinkInput, GoogleLinkResult, GoogleLoginResult, GoogleOnboardingInput, SetLocalPasswordInput } from "./types";
 import type { AuthUser, AvatarResponse, AvatarUploadIntent, RegisterInput, RegistrationOtpVerification, TokenResponse, UpdateProfileInput } from "./types";
 
 type ApiUserRole = AuthUser["role"] | "PlatformAdmin" | "OrganizationUser" | "Trainee";
@@ -8,11 +8,7 @@ type ApiUserGender = AuthUser["gender"] | "Male" | "Female" | "Other" | "PreferN
 type ApiAuthUser = Omit<AuthUser, "role" | "gender"> & { role: ApiUserRole; gender?: ApiUserGender };
 type ApiTokenResponse = Omit<TokenResponse, "user"> & { user: ApiAuthUser };
 
-type FirebaseLoginResponse = {
-  status: "Authenticated" | "OnboardingRequired" | "ACCOUNT_LINK_REQUIRED";
-  onboarding?: GoogleOnboardingProof;
-  authentication: ApiTokenResponse | null;
-};
+type FirebaseLoginResponse = GoogleExchangeResponse<ApiTokenResponse>;
 
 const roleByApiName = {
   OrganizationUser: 1,
@@ -165,7 +161,7 @@ export const authApi = {
     });
   },
   forgotPassword(email: string) {
-    return apiClient.request<void>("/api/auth/forgot-password", { method: "POST", json: { email } });
+    return apiClient.request<ForgotPasswordAccepted | undefined>("/api/auth/forgot-password", { method: "POST", json: { email } });
   },
   resetPassword(token: string, newPassword: string) {
     return apiClient.request<void>("/api/auth/reset-password", { method: "POST", json: { token, newPassword } });

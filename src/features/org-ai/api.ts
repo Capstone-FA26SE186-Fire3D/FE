@@ -13,6 +13,7 @@ import type {
   AnswerInput,
   CreateAiPolicyInput,
   CreateKnowledgeSourceInput,
+  EndAiPolicyInput,
   KnowledgeSource,
   KnowledgeSourceFilters,
   KnowledgeSourcePage,
@@ -93,7 +94,7 @@ export const adminAiApi = {
    * current end (422 AI_POLICY_END_INVALID); an ended policy is 409 AI_POLICY_ENDED. The next policy may start from that instant.
    */
   endPolicy(accessToken: string, policyId: string, effectiveUntil: string | null, idempotencyKey: string) {
-    return apiClient.request<AiPolicy>(`/api/admin/ai/policies/${encodeURIComponent(policyId)}/end`, { headers: auth(accessToken), json: effectiveUntil ? { effectiveUntil } : {}, idempotencyKey });
+    return apiClient.request<AiPolicy>(`/api/admin/ai/policies/${encodeURIComponent(policyId)}/end`, { headers: auth(accessToken), json: (effectiveUntil ? { effectiveUntil } : {}) satisfies EndAiPolicyInput, idempotencyKey });
   },
 
   listKnowledgeSources(accessToken: string, filters: KnowledgeSourceFilters, signal?: AbortSignal) {

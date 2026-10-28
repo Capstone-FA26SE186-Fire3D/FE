@@ -312,6 +312,10 @@ export type ScenarioVersionSummary = {
   timeLimitSeconds: number;
   scenarioHash: string;
   createdAt: string;
+  /** BE default "NotSubmitted"; missing on deployments older than BE#52. */
+  reviewStatus?: "NotSubmitted" | "Submitted" | "Approved" | "Rejected" | (string & {});
+  reviewId?: string | null;
+  rejectReason?: string | null;
 };
 
 export type BuildingPage = PageResponse<BuildingSummary>;

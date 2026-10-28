@@ -16,6 +16,13 @@ export type AuthUser = {
   googleLinked?: boolean;
   role: UserRole;
   organizationId: string | null;
+  /** Remaining `AccountResponse` fields (BE AuthContracts.cs). Not read by the web today; optional so older mocks still type-check. */
+  isActive?: boolean;
+  lastLoginAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  emailVerifiedAt?: string | null;
+  registrationExpiresAt?: string | null;
 };
 
 export type UpdateProfileInput = {
@@ -38,6 +45,10 @@ export type AvatarUploadIntent = {
   expiresAt: string;
 };
 
+/**
+ * BE `LoginResponse` / `TokenResponse` (login, refresh, Google). The BE sends only accessToken, refreshToken and user; the
+ * two `*ExpiresAt` fields are not part of the contract (the access token expiry is read from the JWT `exp`, see token-expiry.ts).
+ */
 export type TokenResponse = {
   accessToken: string;
   refreshToken: string;
@@ -46,9 +57,23 @@ export type TokenResponse = {
   user: AuthUser;
 };
 
+/** `POST /api/auth/forgot-password` answers 202 with this body (the same message whether or not the account exists). */
+export type ForgotPasswordAccepted = { message?: string };
+
 // Deployed Google contract: BE PR #44.
 // Proof is never a Fire3D session.
 export type GoogleOnboardingProof = { token: string; expiresAt: string; email: string; displayName: string | null };
+/**
+ * Raw body of `POST /api/auth/login-firebase` and `POST /api/auth/google/onboarding/complete` (BE `GoogleExchangeResponse`).
+ * `TAuth` is the token body before role/gender normalization. `onboardingToken`/`expiresAt` duplicate `onboarding` for older clients.
+ */
+export type GoogleExchangeResponse<TAuth = TokenResponse> = {
+  status: "Authenticated" | "OnboardingRequired" | "ACCOUNT_LINK_REQUIRED";
+  authentication: TAuth | null;
+  onboarding?: GoogleOnboardingProof | null;
+  onboardingToken?: string | null;
+  expiresAt?: string | null;
+};
 export type GoogleLoginResult =
   | { status: "Authenticated"; authentication: TokenResponse }
   | { status: "OnboardingRequired"; onboarding: GoogleOnboardingProof | null }

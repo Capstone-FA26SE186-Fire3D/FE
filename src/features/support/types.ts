@@ -5,6 +5,11 @@ export type FeedbackStatus = "Submitted" | "Reviewed" | "Closed";
 /** Support envelope is `{items,total,page,pageSize}` (not `totalCount`). */
 export type SupportPage<T> = { items: T[]; total: number; page: number; pageSize: number };
 
+/** Ticket count per status in the caller's scope (other filters applied, status filter ignored). Every key is present. */
+export type SupportTicketStatusCounts = Record<TicketStatus, number>;
+/** BE `SupportTicketPage`: `total` follows every filter including status; `counts` ignores status. */
+export type SupportTicketPage = SupportPage<Ticket> & { counts: SupportTicketStatusCounts };
+
 /**
  * Who sent a ticket/feedback/message. `displayName` is the current label (not a snapshot) and is null when the
  * user was deleted (`available:false`). `email` is only present in PlatformAdmin responses (`/api/admin/...`).
@@ -57,9 +62,12 @@ export type SupportFilters = {
   organizationId?: string;
 };
 
-export type CreateTicketInput = { subject: string; description: string };
-export type CreateFeedbackInput = { category: string; message: string; rating?: number };
-export type AdminTicketUpdate = { status: TicketStatus; priority: TicketPriority; assignedTo: string | null };
+/** `feedbackId` / `sessionId` optionally link the ticket to a feedback or a learner session (BE `CreateTicketRequest`). */
+export type CreateTicketInput = { subject: string; description: string; feedbackId?: string; sessionId?: string };
+export type CreateFeedbackInput = { category: string; message: string; rating?: number; sessionId?: string };
+/** `reason` (1-1000 chars, optional) is recorded only in the audit trail. */
+export type AdminTicketUpdate = { status: TicketStatus; priority: TicketPriority; assignedTo: string | null; reason?: string };
+export type AdminFeedbackUpdate = { status: FeedbackStatus; reason?: string };
 
 export type AuditLog = {
   id: string;
@@ -73,6 +81,8 @@ export type AuditLog = {
   /** Current labels; null when unknown or deleted. */
   actorDisplayName?: string | null;
   organizationName?: string | null;
+  /** BE `AuditMetadata.ActorType` (e.g. user vs system writer); null when unknown. */
+  actorType?: string | null;
 };
 
 /** Allowlisted field change: values are only status/priority names, GUIDs, dates, booleans or non-negative numbers. */
@@ -84,6 +94,7 @@ export type AuditFilters = {
   actorId?: string;
   organizationId?: string;
   action?: string;
+  targetEntity?: string;
   targetId?: string;
   correlationId?: string;
   from?: string;

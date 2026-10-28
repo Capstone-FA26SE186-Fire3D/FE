@@ -1,6 +1,6 @@
 import { apiClient } from "@/api/client";
 
-import type { AdminUpdateOrganizationInput, CreateOrganizationInput, Organization, OrganizationDetail, OrganizationFilters, OrganizationProfile, PageResponse, UpdateOrganizationProfileInput } from "./types";
+import type { AdminOrganization, AdminUpdateOrganizationInput, CreateOrganizationInput, OrganizationDetail, OrganizationFilters, OrganizationProfile, PageResponse, UpdateOrganizationProfileInput } from "./types";
 
 function headers(accessToken: string): HeadersInit {
   return { Authorization: `Bearer ${accessToken}` };
@@ -8,20 +8,20 @@ function headers(accessToken: string): HeadersInit {
 
 export const organizationsApi = {
   list(accessToken: string, filters: OrganizationFilters, signal?: AbortSignal) {
-    return apiClient.request<PageResponse<Organization>>("/api/organizations", {
+    return apiClient.request<PageResponse<AdminOrganization>>("/api/organizations", {
       headers: headers(accessToken),
       query: filters,
       signal,
     });
   },
   create(accessToken: string, input: CreateOrganizationInput) {
-    return apiClient.request<Organization>("/api/organizations", {
+    return apiClient.request<AdminOrganization>("/api/organizations", {
       headers: headers(accessToken),
       json: input,
     });
   },
   get(accessToken: string, id: string, signal?: AbortSignal) {
-    return apiClient.request<Organization>(`/api/organizations/${id}`, {
+    return apiClient.request<AdminOrganization>(`/api/organizations/${id}`, {
       headers: headers(accessToken),
       signal,
     });
@@ -35,7 +35,7 @@ export const organizationsApi = {
     return apiClient.requestWithMeta<OrganizationDetail>(`/api/organizations/${id}`, { headers: headers(accessToken), ifMatch: etag, json: input, method: "PATCH" });
   },
   setStatus(accessToken: string, id: string, isActive: boolean) {
-    return apiClient.request<Organization>(`/api/organizations/${id}/status`, {
+    return apiClient.request<AdminOrganization>(`/api/organizations/${id}/status`, {
       headers: headers(accessToken),
       json: { isActive },
       method: "PATCH",
