@@ -54,9 +54,9 @@ function Hero() {
       </div>
     </div>
     <figure className="learning-hero-art" aria-hidden="true">
-      {/* Decorative render (transparent WebP, fixed ratio): no layout shift. */}
+      {/* Decorative illustration (firefighter at a burning building; fixed ratio, so no layout shift). */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/assets/trainee/hero-v1.webp" alt="" width={1100} height={614} decoding="async" />
+      <img src="/assets/trainee/hero-firefighter-v1.webp" alt="" width={1040} height={762} decoding="async" />
     </figure>
   </section>;
 }
