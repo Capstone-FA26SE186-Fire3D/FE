@@ -16,10 +16,10 @@ export type SceneVariant = "evacuation" | "hose";
 
 /** Layout per variant; `wide` is the box being at least 960 CSS px across (the form or the copy beside the scene). */
 const LAYOUT: Record<SceneVariant, (wide: boolean) => SceneOptions> = {
-  // Sign-in page: the building left of centre, people run right to the assembly point, a fire engine in the corner, rain.
-  evacuation: (wide) => ({ cx: wide ? 0.27 : 0.5, pose: "point", direction: 1, truck: true, rain: true, headroom: 52 }),
-  // Overview banner: the building right of centre, the firefighter beside it hosing the fire, people run left.
-  hose: (wide) => ({ cx: wide ? 0.6 : 0.55, pose: "hose", direction: -1, truck: false, rain: false, headroom: 36 }),
+  // Sign-in page: the building left of centre, the slim firefighter with glasses points the way, people run right, a fire engine, rain.
+  evacuation: (wide) => ({ cx: wide ? 0.27 : 0.5, pose: "point", direction: 1, truck: true, rain: true, headroom: 52, fighter: "glasses", cast: 0 }),
+  // Overview banner: the building right of centre, the chubby firefighter hoses the fire, people run left (another crowd).
+  hose: (wide) => ({ cx: wide ? 0.6 : 0.55, pose: "hose", direction: -1, truck: false, rain: false, headroom: 36, fighter: "chubby", cast: 3 }),
 };
 
 export function PixelScene({ variant, className, testId }: { variant: SceneVariant; className?: string; testId?: string }) {

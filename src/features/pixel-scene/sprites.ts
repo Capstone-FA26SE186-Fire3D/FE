@@ -99,6 +99,46 @@ export const FIREFIGHTER = sprite([
 /** Shoulder of the firefighter (row, column from the sprite's left edge when facing left). */
 export const FIREFIGHTER_SHOULDER = { col: 3, row: 13 };
 
+
+/**
+ * Chubby firefighter (17 x 31) of the overview banner: round face, rosy cheeks, smile, no glasses, broad coat and belly.
+ * Same legend as FIREFIGHTER (the sign-in firefighter wears glasses; this one does not).
+ */
+export const FIREFIGHTER_CHUBBY = sprite([
+  "......RRRRRR.....",
+  "....RRRRYYYRRR...",
+  "...RRRRRRRRRRRr..",
+  "..rrrrrrrrrrrrrr.",
+  "...SSSSSSSSSSKK..",
+  "..SSSSSSSSSSSsK..",
+  "..SEKSSEKSSSsK...",
+  "..SbbSSSSSSbbsK..",
+  "..SSSSMMMSSSsK...",
+  "...sSSSSSSSSs....",
+  ".....ssssss......",
+  "...NNNNNNNNNNNAa.",
+  "..NNNNNNNNNNNNAa.",
+  ".NNNNNNNNNNNNNAa.",
+  ".LLLLLLLLLLLLLAa.",
+  ".WWWWWWWWWWWWWAa.",
+  ".LLLLLLLLLLLLLAa.",
+  "NNNNNNNNNNNNNNNAa",
+  "NNNNNNNNNNNNNNNAa",
+  "NNNNNNNNNNNNNNnA.",
+  "nNNNNNNNNNNNNnn..",
+  ".KKKKKKKKKKKKKK..",
+  ".NNNNNNNNNNNNNn..",
+  ".NNNNNN..NNNNNn..",
+  ".NNNNNN..NNNNNn..",
+  ".LLLLLL..LLLLLn..",
+  ".WWWWWW..WWWWWn..",
+  ".NNNNNN..NNNNNn..",
+  ".nnnnnn..nnnnnn..",
+  "KKKKKKK..KKKKKKK.",
+  "KKKKKKK..KKKKKKK.",
+]);
+export const FIREFIGHTER_CHUBBY_SHOULDER = { col: 2, row: 13 };
+
 export function blit(ctx: CanvasRenderingContext2D, sp: Sprite, legend: Record<string, string>, x: number, y: number, flip: boolean) {
   const bx = Math.round(x);
   const by = Math.round(y);

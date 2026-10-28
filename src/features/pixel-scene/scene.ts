@@ -1,4 +1,4 @@
-import { blit, CIVILIAN_BODY, FIREFIGHTER, FIREFIGHTER_SHOULDER, LEGS_RUN_A, LEGS_RUN_B, LEGS_STAND, shade } from "./sprites";
+import { blit, CIVILIAN_BODY, FIREFIGHTER, FIREFIGHTER_CHUBBY, FIREFIGHTER_CHUBBY_SHOULDER, FIREFIGHTER_SHOULDER, LEGS_RUN_A, LEGS_RUN_B, LEGS_STAND, shade } from "./sprites";
 
 /*
  * The evacuation scene: a burning glass building, people running out of its door, a firefighter either pointing the way
@@ -19,6 +19,10 @@ export type SceneOptions = {
   rain: boolean;
   /** Pixels kept free above the building (for a heading drawn over the sky). */
   headroom: number;
+  /** Which firefighter: the slim one with glasses, or the chubby bare-faced one. */
+  fighter: "glasses" | "chubby";
+  /** Where the crowd's look sequence starts, so two scenes do not show the same people in the same order. */
+  cast: number;
 };
 
 const PLAZA = 24;
@@ -87,7 +91,10 @@ export function createScene(ctx: CanvasRenderingContext2D, W: number, H: number,
   const fires: Fire[] = [{ a: x0 + 4, b: x1 - 4, bottom: topFloorTop + FLOOR - 3, base: 9, amp: 1 }];
   if (floors >= 4) fires.push({ a: x0 + Math.round(width * 0.55), b: x1 - 4, bottom: topFloorTop + FLOOR * 2 - 3, base: 6, amp: 0.7 });
   // The firefighter stands beside the door (pointing) or well right of the building (hosing); feet on the plaza.
-  const fighter = hose ? { x: Math.min(W - 24, x1 + 34), y: GROUND + 10 } : { x: doorX + 30, y: GROUND + 10 };
+  const chubby = o.fighter === "chubby";
+  const fighterSprite = chubby ? FIREFIGHTER_CHUBBY : FIREFIGHTER;
+  const fighterShoulder = chubby ? FIREFIGHTER_CHUBBY_SHOULDER : FIREFIGHTER_SHOULDER;
+  const fighter = hose ? { x: Math.min(W - fighterSprite.w - 8, x1 + 34), y: GROUND + 10 } : { x: doorX + 30, y: GROUND + 10 };
   const assemblyX = o.direction === 1 ? Math.min(W - 22, x1 + 20) : Math.max(6, x0 - 36);
   const truckX = W - 46;
   const showTruck = o.truck && truckX > assemblyX + 24;
@@ -121,7 +128,7 @@ export function createScene(ctx: CanvasRenderingContext2D, W: number, H: number,
   const patterns = new Map<string, CanvasPattern>();
   let tick = 0;
   let next = 0;
-  let lookIndex = 0;
+  let lookIndex = o.cast;
 
   const px = (x: number, y: number, w: number, h: number, color: string) => {
     ctx.fillStyle = color;
@@ -523,12 +530,12 @@ export function createScene(ctx: CanvasRenderingContext2D, W: number, H: number,
   function firefighter() {
     const { x, y } = fighter;
     const flip = !hose;
-    const top = y - FIREFIGHTER.h;
-    px(x - 2, y, 19, 1, "rgba(0,0,0,.22)");
-    px(x - 1, y + 1, 17, 1, "rgba(0,0,0,.1)");
-    blit(ctx, FIREFIGHTER, FIRE_LEGEND, x, top, flip);
-    const shoulderX = x + (flip ? FIREFIGHTER.w - 1 - FIREFIGHTER_SHOULDER.col : FIREFIGHTER_SHOULDER.col);
-    const shoulderY = top + FIREFIGHTER_SHOULDER.row;
+    const top = y - fighterSprite.h;
+    px(x - 2, y, fighterSprite.w + 4, 1, "rgba(0,0,0,.22)");
+    px(x - 1, y + 1, fighterSprite.w + 2, 1, "rgba(0,0,0,.1)");
+    blit(ctx, fighterSprite, FIRE_LEGEND, x, top, flip);
+    const shoulderX = x + (flip ? fighterSprite.w - 1 - fighterShoulder.col : fighterShoulder.col);
+    const shoulderY = top + fighterShoulder.row;
     if (!hose) {
       // Arm pointing to the assembly point, lifting a pixel every half second.
       const ay = shoulderY - (Math.floor(tick / 6) % 2);
@@ -549,7 +556,8 @@ export function createScene(ctx: CanvasRenderingContext2D, W: number, H: number,
       const ax = shoulderX + ux * i;
       const ay = shoulderY + uy * i;
       const band = i === 5 || i === 9;
-      px(ax, ay, 3, 3, i >= armLen - 2 ? INK : band ? FIRE_LEGEND.L : FIRE_LEGEND.N);
+      const arm = chubby ? 4 : 3;
+      px(ax, ay, arm, arm, i >= armLen - 2 ? INK : band ? FIRE_LEGEND.L : FIRE_LEGEND.N);
     }
     const nx = shoulderX + ux * (armLen + 2);
     const ny = shoulderY + uy * (armLen + 2);
