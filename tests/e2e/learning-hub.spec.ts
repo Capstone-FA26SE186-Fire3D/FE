@@ -509,16 +509,24 @@ test.describe("overview (Tổng quan)", () => {
   await expect(page.getByText(/XP|huy hiệu|cấp độ/i)).toHaveCount(0);
 });
 
-test("an empty account sees explained empty states, and the Ask AI shortcut only prefills the question", async ({ page }) => {
-    const ai = new TraineeAiBackend();
-    await restore(page, "trainee", () => undefined, ai);
+test("an empty account sees explained empty states and no second Ask AI box beside the floating assistant", async ({ page }) => {
+    await restore(page);
     await page.goto("/learning-hub");
     await expect(page.getByText("Bạn chưa lưu bài nào", { exact: true })).toBeVisible();
     await expect(page.getByText("Chưa có phiên luyện tập", { exact: true })).toBeVisible();
-    await page.getByLabel("Câu hỏi cho AI").fill("Thang máy khi có cháy?");
-    await page.getByRole("region", { name: "Hỏi AI" }).getByRole("button", { name: "Hỏi Trợ lý AI" }).click();
-    await expect(page.getByTestId("ai-chat-panel").getByLabel("Câu hỏi", { exact: true })).toHaveValue("Thang máy khi có cháy?");
-    expect(ai.posts()).toHaveLength(0);
+    await expect(page.getByRole("region", { name: "Hỏi AI" })).toHaveCount(0);
+  });
+
+  test("a saved post shows its own cover, and the art of its kind when it has none", async ({ page }) => {
+    const cover = "https://images.example.test/chung-cu.jpg";
+    await restore(page, "trainee", (b) => { b.seedPost("co-anh", { title: "Bài có ảnh", status: "Published", coverImageUrl: cover }); b.seedPost("khong-anh", { title: "Bài không ảnh", kind: "Tip", status: "Published" }); b.addBookmark("khong-anh"); b.addBookmark("co-anh"); });
+    await page.route(cover, (route) => route.fulfill({ status: 200, contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="4" height="3"/>' }));
+    for (const view of ["/learning-hub", "/learning-hub?view=saved"]) {
+      await page.goto(view);
+      const withCover = page.locator("article", { hasText: "Bài có ảnh" });
+      await expect(withCover.locator("img").first()).toHaveAttribute("src", cover);
+      await expect(page.locator("article", { hasText: "Bài không ảnh" }).locator("img").first()).toHaveAttribute("src", /thumb-extinguisher-v1\.webp$/);
+    }
   });
 
   test("an organization account is pointed to its own area", async ({ page }) => {

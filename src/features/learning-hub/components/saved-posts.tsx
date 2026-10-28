@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Bookmark, BookmarkMinus, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { ApiError } from "@/api/types/common";
@@ -11,6 +11,8 @@ import { useAuthSession } from "@/features/auth/auth-session";
 import { learnApi } from "@/features/learn/api";
 import { LearnPagination } from "@/features/learn/components/learn-pagination";
 import { PostCard, formatPostDate } from "@/features/learn/components/post-card";
+import type { BookmarkItem } from "@/features/learn/types";
+import { usePostCover } from "@/features/learn/use-post-cover";
 import "@/features/learn/learn.css";
 import { StateCard } from "./state-card";
 import { savedAgo } from "./overview";
@@ -28,6 +30,12 @@ function failureText(error: unknown): { title: string; message: string } {
  * "Bài đã lưu" from the real bookmark list (server truth, paged). A bookmark whose post is no longer public comes back as
  * `available: false` without title or summary: it stays listed so the user can remove it.
  */
+/** A saved post that is still public, with the post's own cover. */
+function SavedPostCard({ item, action }: { item: Extract<BookmarkItem, { available: true }>; action: ReactNode }) {
+  const cover = usePostCover(item.slug, item.coverImageUrl);
+  return <PostCard slug={item.slug} title={item.title} summary={item.summary} kind={item.kind} coverImageUrl={cover} note={savedAgo(item.bookmarkedAt)} readLink action={action} />;
+}
+
 export function SavedPosts() {
   const { accessToken } = useAuthSession();
   const { page, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
@@ -70,7 +78,7 @@ export function SavedPosts() {
     {removeError && <p role="alert" className="saved-posts-note">{removeError}</p>}
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 learn-grid" aria-busy={list.loading}>
       {items.map((item) => item.available
-        ? <PostCard key={item.postId} slug={item.slug} title={item.title} summary={item.summary} kind={item.kind} note={savedAgo(item.bookmarkedAt)} readLink action={
+        ? <SavedPostCard key={item.postId} item={item} action={
           <Button variant="secondary" size="md" className="ml-auto" disabled={removing.has(item.postId)} aria-label={`Bỏ lưu bài viết: ${item.title}`} onClick={() => void remove(item.postId)}><BookmarkMinus size={16} aria-hidden="true" /></Button>} />
         : <article key={item.postId} className="learn-card-unavailable" data-testid="saved-unavailable">
           <h2>Bài này không còn hiển thị</h2>
