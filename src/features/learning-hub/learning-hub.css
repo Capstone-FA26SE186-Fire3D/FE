@@ -60,51 +60,41 @@
 
 /* Overview */
 .ov { display: grid; gap: 24px; }
-.learning-hero { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; min-height: 240px; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(120deg, var(--surface) 55%, color-mix(in srgb, var(--ember) 8%, var(--surface))); }
-.learning-hero-copy { display: grid; gap: 12px; justify-items: start; padding: 32px 40px; }
+.learning-hero { position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; min-height: 320px; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: linear-gradient(120deg, var(--surface) 55%, color-mix(in srgb, var(--ember) 8%, var(--surface))); }
+/* The scene fills the banner; a fade on the left keeps the copy readable over it. */
+.learning-hero-scene { position: absolute; inset: 0; z-index: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; }
+.learning-hero::before { content: ""; position: absolute; inset: 0; z-index: 1; background: linear-gradient(90deg, var(--surface) 26%, transparent 58%); pointer-events: none; }
+.learning-hero-copy { position: relative; z-index: 2; display: grid; gap: 12px; justify-items: start; padding: 32px 40px; }
 .learning-hero h2 { margin: 0; max-width: 14em; font-size: clamp(26px, 2.6vw, 32px); font-weight: 650; line-height: 1.15; letter-spacing: -.02em; }
 .learning-hero p { margin: 0; max-width: 46ch; color: var(--muted); font-size: 14px; line-height: 1.6; }
 .learning-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
-.learning-hero-art { position: relative; align-self: stretch; min-width: 0; margin: 0; pointer-events: none; }
-/* The illustration fills the right half edge to edge and fades into the card on its left. */
-.learning-hero-art img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; object-position: right center; mask-image: linear-gradient(to right, transparent 0, #000 22%); -webkit-mask-image: linear-gradient(to right, transparent 0, #000 22%); }
-@media (prefers-reduced-motion: no-preference) {
-  .learning-hero-art img { animation: learning-rise .5s ease-out both; }
-}
-@keyframes learning-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
-.ov-intro { display: grid; grid-template-columns: minmax(200px, 250px) minmax(0, 1fr) auto; align-items: center; gap: 20px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+/* Copy and actions share the first row; the three steps take the full width below, and stack when the card is narrow. */
+.ov-intro { container-type: inline-size; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px 24px; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .ov-intro-head { display: grid; gap: 8px; justify-items: start; }
 .ov-intro-head h2 { margin: 0; font-size: 18px; font-weight: 650; }
 .ov-intro-head p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .ov-tag { display: inline-flex; align-items: center; gap: 6px; min-height: 24px; padding: 0 10px; border-radius: 999px; background: var(--ember-soft); color: var(--ember); font-size: 12px; font-weight: 600; }
 .ov-tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.ov-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+.ov-steps { grid-column: 1 / -1; grid-row: 2; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 0; list-style: none; }
+@container (max-width: 560px) { .ov-steps { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
 .ov-steps li { display: flex; gap: 12px; align-items: flex-start; min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-soft); }
 .ov-step-no { display: grid; place-items: center; flex: 0 0 auto; width: 28px; height: 28px; border-radius: 50%; background: var(--ember-soft); color: var(--ember); font-size: 13px; font-weight: 700; }
 .ov-steps strong { display: block; font-size: 14px; font-weight: 650; line-height: 1.35; }
 .ov-steps span:not(.ov-step-no) { display: block; margin-top: 4px; color: var(--muted); font-size: 12.5px; line-height: 1.5; }
-.ov-intro-actions { display: grid; gap: 8px; justify-items: stretch; }
+.ov-intro-actions { grid-column: 2; grid-row: 1; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 
-.ov-split { display: grid; grid-template-columns: minmax(0, 1fr) 340px; align-items: start; gap: 24px; }
 .ov-saved-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .ov-card { display: flex; flex-direction: column; gap: 10px; min-width: 0; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .ov-card h3 { margin: 0; font-size: 15px; font-weight: 650; line-height: 1.45; overflow-wrap: anywhere; }
 .ov-card h3 a:hover { text-decoration: underline; text-underline-offset: 3px; }
 .ov-thumb { display: block; position: relative; aspect-ratio: 3 / 2; overflow: hidden; border-radius: 8px; background: var(--art-bg); }
 .ov-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center bottom; }
+.ov-thumb[data-photo] img { object-fit: cover; object-position: center; }
 .ov-thumb[data-neutral] { background: var(--bg-soft); }
 .ov-card-meta { margin: 0; color: var(--dim); font-size: 12.5px; }
 .ov-card-link { display: inline-flex; align-items: center; gap: 2px; width: fit-content; min-height: 44px; margin-top: auto; color: var(--ember); font-size: 13px; font-weight: 600; }
 .ov-card-link:hover { text-decoration: underline; text-underline-offset: 3px; }
-.ov-ask { gap: 12px; padding: 20px; }
-.ov-ask h3 { display: flex; align-items: center; gap: 8px; font-size: 17px; }
-.ov-ask h3 svg { color: var(--ember); flex: 0 0 auto; }
-.ov-ask p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
-.ov-ask form { display: grid; gap: 12px; }
-.ov-ask input { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 16px; }
-.ov-ask input::placeholder { color: var(--dim); }
-.ov-ask input:focus-visible { outline: 2px solid var(--ember); outline-offset: 2px; }
 
 .ov-results { padding: 4px 20px; }
 .ov-results-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0 6px; }
@@ -164,13 +154,9 @@
   .learning-topnav a[aria-current="page"] { background: var(--ember-soft); color: var(--ember); }
   .learning-main { padding: 24px 24px 40px; }
   .learning-hero { grid-template-columns: minmax(0, 1fr); min-height: 0; }
-  .learning-hero-art { display: none; }
+  .learning-hero::before { background: linear-gradient(180deg, var(--surface) 40%, transparent 100%); }
+  .learning-hero-scene { opacity: .55; }
   .learning-hero-copy { padding: 24px; }
-  .ov-intro { grid-template-columns: minmax(0, 1fr) auto; }
-  .ov-intro-head { grid-column: 1; }
-  .ov-intro-actions { grid-column: 2; grid-row: 1; grid-auto-flow: column; align-items: center; }
-  .ov-steps { grid-column: 1 / -1; }
-  .ov-split { grid-template-columns: minmax(0, 1fr); }
   .ov-saved-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .ov-thumb { aspect-ratio: 16 / 7; }
 }
@@ -192,8 +178,8 @@
   .learning-tabbar a[aria-current="page"] { color: var(--ember); font-weight: 650; }
   .learning-hero-copy { padding: 20px 16px; }
   .ov-intro { grid-template-columns: minmax(0, 1fr); padding: 16px; }
-  .ov-intro-actions { grid-column: 1; grid-row: auto; grid-auto-flow: row; }
-  .ov-steps { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .ov-intro-actions { grid-column: 1; grid-row: 3; justify-content: stretch; }
+  .ov-intro-actions > * { flex: 1 1 140px; }
   .ov-saved-grid { grid-template-columns: minmax(0, 1fr); }
   .ov-results { padding: 4px 16px; }
   .ov-result { flex-direction: column; align-items: flex-start; gap: 8px; }
