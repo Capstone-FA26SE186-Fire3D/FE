@@ -17,6 +17,7 @@ import { httpsUrl } from "@/features/learn/safe-url";
 import { usePostCover } from "@/features/learn/use-post-cover";
 import { trainingHistoryApi } from "@/features/training-history/api";
 import { formatWhen, modeLabel, resultCellView, sessionStatusView, trainingTitle } from "@/features/training-history/labels";
+import { PixelScene } from "@/features/pixel-scene/pixel-scene";
 import { useLocalPreference } from "@/utils/local-preference";
 import { IntroTour } from "./intro-tour";
 import { StateCard } from "./state-card";
@@ -43,6 +44,8 @@ function failureLine(error: unknown): string {
 
 function Hero() {
   return <section className="learning-hero" aria-labelledby="ov-hero-title">
+    {/* Looping pixel scene behind the copy: a firefighter hosing the burning building (night or day with the theme). */}
+    <PixelScene variant="hose" className="learning-hero-scene" testId="hero-pixel-scene" />
     <div className="learning-hero-copy">
       <h2 id="ov-hero-title">Sẵn sàng cho buổi luyện tập tiếp theo</h2>
       <p>Mở ứng dụng Android để vào công trình và luyện tập. Bạn cũng có thể đọc bài Học trước, nhưng không bắt buộc.</p>
@@ -51,11 +54,6 @@ function Hero() {
         <Link className={buttonVariants({ variant: "ghost" })} href={routes.learn}>Đọc bài Học</Link>
       </div>
     </div>
-    <figure className="learning-hero-art" aria-hidden="true">
-      {/* Decorative illustration (firefighter at a burning building; fixed ratio, so no layout shift). */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/assets/trainee/hero-firefighter-v1.webp" alt="" width={1040} height={762} decoding="async" />
-    </figure>
   </section>;
 }
 

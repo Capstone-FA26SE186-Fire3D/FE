@@ -466,6 +466,7 @@ test.describe("overview (Tổng quan)", () => {
     const hero = page.getByRole("region", { name: "Sẵn sàng cho buổi luyện tập tiếp theo" });
     await expect(hero.getByRole("link", { name: "Luyện tập trên ứng dụng" })).toHaveAttribute("href", "/download");
     await expect(hero.getByRole("link", { name: "Đọc bài Học" })).toHaveAttribute("href", "/learn");
+    await expect(hero.getByTestId("hero-pixel-scene")).toHaveAttribute("data-variant", "hose");
     await expect(page.getByTestId("overview-saved")).toHaveCount(3);
     await expect(page.getByRole("link", { name: /^Đọc bài: / }).first()).toBeVisible();
     await expect(page.getByText("Tiếp tục đọc")).toHaveCount(0);
