@@ -7,6 +7,31 @@ const balance = (overrides: Record<string, unknown> = {}) => ({ quotaUnit: "toke
 const notification = (overrides: Record<string, unknown> = {}) => ({ id: "n-1", type: "BuildingServiceExpiring", title: "Dịch vụ sắp hết hạn", body: "Công trình 1 hết hạn sau 5 ngày. Hãy gia hạn để tránh gián đoạn.", buildingId: "b-1", buildingName: "Công trình 1", entitlementId: ids.entitlement, referenceEndsAt: iso(4), createdAt: iso(-0.5), readAt: null, stillRelevant: true, ...overrides });
 
 test.describe("organization AI quota (mock)", () => {
+  test("balance tiles line up from the top and a 100.000.000 balance stays inside its tile", async ({ page }, testInfo) => {
+    const mock = newMock();
+    mock.quota.units = [balance({ quotaUnit: "requests", granted: 100000000, reserved: 0, consumed: 0, expired: 0, available: 100000000, scheduled: 0 })];
+    await signIn(page, owner);
+    await mockBilling(page, mock);
+    for (const width of [1440, 1100, 390]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto("/workspace/billing?tab=ai");
+      const tiles = page.getByTestId("quota-unit").locator(".ops-kpi");
+      await expect(tiles).toHaveCount(6);
+      await expect(tiles.first().getByTestId("quota-available")).toHaveText("100.000.000");
+      const boxes = await tiles.evaluateAll((nodes) => nodes.map((node) => {
+        const tile = node.getBoundingClientRect();
+        const value = (node.querySelector(".ops-kpi-value") as HTMLElement).getBoundingClientRect();
+        return { top: tile.top, valueTop: value.top, right: tile.right, valueRight: value.right };
+      }));
+      // Same row: every number starts the same distance from the tile top (the tile with a hint does not push the others).
+      const rows = new Map<number, number[]>();
+      for (const b of boxes) rows.set(Math.round(b.top), [...(rows.get(Math.round(b.top)) ?? []), Math.round(b.valueTop - b.top)]);
+      for (const offsets of rows.values()) expect(Math.max(...offsets) - Math.min(...offsets)).toBeLessThanOrEqual(1);
+      for (const b of boxes) expect(b.valueRight).toBeLessThanOrEqual(b.right);
+      await page.screenshot({ path: testInfo.outputPath(`quota-${width}.png`) });
+    }
+  });
+
   test("balance per unit, grants by source with their own expiry, and usage allocations all come from the ai-quota endpoints", async ({ page }) => {
     const mock = newMock();
     mock.quota.units = [balance(), balance({ quotaUnit: "requests", granted: 20, reserved: 0, consumed: 5, expired: 0, available: 15, scheduled: 0 })];
