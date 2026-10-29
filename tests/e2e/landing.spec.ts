@@ -60,7 +60,8 @@ test('choices interrupt and return before routing explicitly', async ({ page }) 
   await page.getByRole('button', { name: 'Tôi muốn tập huấn', exact: true }).click();
   await settled(page, 'phone'); await next.click();
   await expect(page).toHaveURL(/\/login\?/);
-  await expect(page.locator('canvas')).toHaveCount(0);
+  // The landing's WebGL canvas is gone; the sign-in page's own pixel scene is a 2D canvas and stays.
+  await expect(page.locator('canvas:not([data-testid="login-pixel-scene"])')).toHaveCount(0);
   // The branch continues to the real sign-in page (not a demo login) and remembers where to return to.
   expect(new URL(page.url()).searchParams.get('next')).toBe('/learning-hub');
   await expect(page.getByLabel('Email')).toBeVisible();
@@ -141,3 +142,18 @@ test('mobile menu exposes every route and layout stays within viewport', async (
   expect(await button.evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
 });
+
+// The sticky stage fills the visible viewport at tablet sizes (landscape and portrait). It is sized in dvh, the
+// height that follows the browser toolbar; svh left a dark band under it on a tablet once the toolbar collapsed.
+// Desktop Chromium cannot shrink its toolbar, so this guards the layout, not the toolbar behaviour itself.
+for (const [width, height] of [[1180, 820], [1366, 1024], [820, 1180], [1024, 768]] as const) {
+  test(`stage fills a ${width}x${height} tablet viewport with no band below`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    await page.goto("/");
+    await ready(page);
+    await scrollTo(page, 0.2);
+    const box = await page.locator("main > section > div").first().evaluate((node) => { const r = node.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), vh: innerHeight }; });
+    expect(box.top).toBe(0);
+    expect(box.bottom).toBe(box.vh);
+  });
+}
