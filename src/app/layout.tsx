@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AuthSessionProvider } from "@/features/auth/auth-session";
+import { THEME_BOOT_SCRIPT } from "@/features/theme/theme-boot";
 import "@/assets/styles/globals.css";
 import "@fontsource/be-vietnam-pro/latin-400.css";
 import "@fontsource/be-vietnam-pro/vietnamese-400.css";
@@ -16,5 +17,7 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="vi"><body><AuthSessionProvider>{children}</AuthSessionProvider></body></html>;
+  // The inline script applies the saved light/dark choice before the first paint (see theme-boot.ts); it sets an
+  // attribute on <html>, hence suppressHydrationWarning.
+  return <html lang="vi" suppressHydrationWarning><head><script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} /></head><body><AuthSessionProvider>{children}</AuthSessionProvider></body></html>;
 }

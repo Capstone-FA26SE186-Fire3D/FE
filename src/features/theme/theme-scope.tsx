@@ -1,12 +1,12 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useLocalPreference } from "@/utils/local-preference";
+import { THEME_ROOT_ATTRIBUTE, THEME_STORAGE_KEY } from "./theme-boot";
 
 export type ThemeMode = "light" | "dark" | "system";
 export type ResolvedTheme = "light" | "dark";
 
-const STORAGE_KEY = "fire3d-ops-theme";
 const DARK_QUERY = "(prefers-color-scheme: dark)";
 
 const isThemeMode = (value: string): value is ThemeMode => value === "light" || value === "dark" || value === "system";
@@ -37,11 +37,18 @@ export function usePortalContainer() {
  * `resolved` is only for JS consumers such as the 3D viewport clear color.
  */
 export function ThemeScope({ children, className = "", forcedMode }: { children: ReactNode; className?: string; /** Pin the theme (e.g. dark for a page that lives in the public site). */ forcedMode?: ThemeMode }) {
-  const [storedMode, setMode] = useLocalPreference<ThemeMode>(STORAGE_KEY, "system", isThemeMode);
+  const [storedMode, setMode] = useLocalPreference<ThemeMode>(THEME_STORAGE_KEY, "system", isThemeMode);
   const mode = forcedMode ?? storedMode;
   const systemDark = useSyncExternalStore(subscribeSystem, () => window.matchMedia(DARK_QUERY).matches, () => true);
   const resolved: ResolvedTheme = mode === "system" ? (systemDark ? "dark" : "light") : mode;
   const [container, setContainer] = useState<HTMLElement | null>(null);
+  // Mirror the stored choice on <html> so the next full page load paints it before hydration (theme-boot.ts);
+  // "system" removes it so the OS setting applies again.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (storedMode === "system") root.removeAttribute(THEME_ROOT_ATTRIBUTE);
+    else root.setAttribute(THEME_ROOT_ATTRIBUTE, storedMode);
+  }, [storedMode]);
   const value = useMemo(() => ({ mode, resolved, setMode }), [mode, resolved, setMode]);
 
   return <ThemeContext.Provider value={value}><PortalContext.Provider value={container}><div ref={setContainer} className={`ops-theme ${className}`.trim()} data-theme={mode} data-resolved-theme={resolved}>{children}</div></PortalContext.Provider></ThemeContext.Provider>;
