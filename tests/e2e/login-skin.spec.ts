@@ -45,3 +45,28 @@ test("the pixel evacuation scene loops beside the form and holds still with redu
   expect(await stillScene.evaluate((canvas: HTMLCanvasElement) => canvas.toDataURL())).toBe(frame);
   await still.close();
 });
+
+// A saved light/dark choice is painted from the first frame (inline script in the root layout), not only after
+// hydration: with every Next.js script blocked the page never hydrates, yet it already shows the chosen theme.
+for (const [system, saved, bg] of [["dark", "light", "#eceff0"], ["light", "dark", "#141719"]] as const) {
+  test(`a saved ${saved} theme wins over a ${system} system before hydration`, async ({ browser }) => {
+    const context = await browser.newContext({ colorScheme: system });
+    const page = await context.newPage();
+    await page.addInitScript((value) => localStorage.setItem("fire3d-ops-theme", value), saved);
+    await page.route("**/_next/static/**", (route) => (route.request().resourceType() === "script" ? route.abort() : route.continue()));
+    await page.goto("/login");
+    expect(await page.evaluate(() => document.documentElement.getAttribute("data-ops-theme"))).toBe(saved);
+    expect(await page.locator(".ops-theme").first().evaluate((node) => getComputedStyle(node).getPropertyValue("--bg").trim())).toBe(bg);
+    await context.close();
+  });
+}
+
+test("choosing 'Theo hệ thống' again clears the saved choice from the page root", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto("/login");
+  await page.getByRole("button", { name: "Giao diện sáng" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-ops-theme", "light");
+  await page.getByRole("button", { name: "Theo hệ thống" }).click();
+  await expect(page.locator("html")).not.toHaveAttribute("data-ops-theme", /.+/);
+  await expect(page.locator(".ops-theme.login-theme")).toHaveAttribute("data-resolved-theme", "dark");
+});

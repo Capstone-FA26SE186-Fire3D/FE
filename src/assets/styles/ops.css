@@ -2,6 +2,8 @@
  * Operations area (Organization workspace + PlatformAdmin).
  * Tokens are scoped to `.ops-theme`; landing, Learn and auth keep the global dark tokens.
  * data-theme: "dark" | "light" | "system" ("system" follows prefers-color-scheme in CSS).
+ * Before hydration every scope is "system"; <html data-ops-theme> (set by the inline script in the root layout from
+ * the saved choice) wins over the OS setting, so a saved light/dark choice is painted from the first frame.
  */
 
 .ops-theme {
@@ -36,7 +38,8 @@
   min-height: 100dvh;
 }
 
-.ops-theme[data-theme="light"] {
+.ops-theme[data-theme="light"],
+:root[data-ops-theme="light"] .ops-theme[data-theme="system"] {
   color-scheme: light;
   --bg: #eceff0;
   --bg-soft: #f5f7f7;
@@ -64,7 +67,7 @@
 }
 
 @media (prefers-color-scheme: light) {
-  .ops-theme[data-theme="system"] {
+  :root:not([data-ops-theme="dark"]) .ops-theme[data-theme="system"] {
     color-scheme: light;
     --bg: #eceff0;
     --bg-soft: #f5f7f7;
