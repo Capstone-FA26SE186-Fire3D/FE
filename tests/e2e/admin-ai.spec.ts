@@ -315,6 +315,37 @@ test.describe("Admin AI: knowledge sources", () => {
     await expect(page.getByTestId("source-retire")).toHaveCount(0);
   });
 
+  test("verify link: read-only check shows match, changed content and a blocked download in plain words; no button without a link", async ({ page }) => {
+    const mock = newAiMock();
+    await open(page, mock, `/admin/ai?tab=sources&source=${ids.src1}`);
+    const result = page.getByTestId("source-verify-result");
+    await page.getByTestId("source-verify").click();
+    await expect(result).toContainText("Liên kết vẫn trả đúng tài liệu đã đăng ký");
+    const posts = calls(mock, "POST", `/api/admin/knowledge-sources/${ids.src1}/verify`);
+    expect(posts).toHaveLength(1);
+    expect(posts[0].headers["if-match"]).toBeUndefined();
+
+    mock.verify[ids.src1] = { outcome: "HashMismatch", actualHash: "f".repeat(64) };
+    await page.getByTestId("source-verify").click();
+    await expect(result).toContainText("Nội dung ở liên kết đã khác bản đã đăng ký");
+    await expect(result).toContainText("Nên ngừng dùng nguồn");
+
+    mock.verify[ids.src1] = { outcome: "Unavailable", actualHash: null, sizeBytes: null, httpStatus: 403, reason: "HTTP_STATUS_403" };
+    await page.getByTestId("source-verify").click();
+    await expect(result).toContainText("Không tải được tài liệu ở liên kết");
+    await expect(result).toContainText("Trang từ chối cho tải tự động");
+    await expect(result).not.toContainText("HTTP_STATUS");
+
+    mock.verify[ids.src1] = { status: 503, json: { code: "SERVICE_UNAVAILABLE", title: "Unavailable", status: 503 } };
+    await page.getByTestId("source-verify").click();
+    await expect(result).toContainText("Chưa kiểm tra được");
+    await expect(page.getByTestId("source-status")).toHaveText("Đã duyệt"); // nothing about the source changed
+
+    await page.goto(`/admin/ai?tab=sources&source=${ids.src2}`); // no link
+    await expect(page.getByTestId("source-detail")).toContainText("TCVN 3890:2023");
+    await expect(page.getByTestId("source-verify")).toHaveCount(0);
+  });
+
   test("412: a source changed elsewhere is not overwritten; the author reloads the new revision then decides again", async ({ page }) => {
     const mock = newAiMock();
     await open(page, mock, `/admin/ai?tab=sources&source=${ids.src2}`);

@@ -1,6 +1,6 @@
 "use client";
 
-import { Ban, BookMarked, CheckCircle2, Eye, RefreshCw, Search } from "lucide-react";
+import { Ban, BookMarked, CheckCircle2, Eye, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import { useId, useRef, useState, type FormEvent } from "react";
 
 import { ApiError } from "@/api/types/common";
@@ -24,9 +24,9 @@ import { accountsApi } from "@/features/accounts/api";
 import { formatDateTime } from "@/features/billing/format";
 
 import { adminAiApi, knowledgeEtag } from "../api";
-import { aiErrorText, fieldIssue } from "../labels";
+import { aiErrorText, fieldIssue, verifyReasonText } from "../labels";
 import { sha256Hex } from "../sha256";
-import type { CreateKnowledgeSourceInput, KnowledgeSource, WithEtag } from "../types";
+import type { CreateKnowledgeSourceInput, KnowledgeSource, KnowledgeSourceVerification, WithEtag } from "../types";
 import styles from "../org-ai.module.css";
 
 const PAGE_SIZE = 20;
@@ -176,6 +176,45 @@ function SourceModal({ open, accessToken, organizations, onCreated, onClose }: {
   </Modal>;
 }
 
+/**
+ * "Kiểm tra liên kết" (BE#188): the API downloads the link the way the AI service does and compares it with the registered hash.
+ * Read-only, so no confirmation. A source that does not match or cannot be downloaded makes AI answers that pin it fail.
+ */
+function VerifyLink({ accessToken, source }: { accessToken: string; source: KnowledgeSource }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<KnowledgeSourceVerification | null>(null);
+  const [error, setError] = useState<unknown>();
+
+  const check = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      setResult(await adminAiApi.verifyKnowledgeSource(accessToken, source.id));
+    } catch (cause) {
+      setResult(null);
+      setError(cause);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const when = result ? `Kiểm tra lúc ${formatDateTime(result.checkedAt)}.` : "";
+  const retired = source.approvalStatus === "Retired";
+  return <div className={styles.stack}>
+    <div className="ops-actions">
+      <Button type="button" variant="secondary" onClick={() => void check()} disabled={busy} data-testid="source-verify"><ShieldCheck size={16} aria-hidden="true" />{busy ? "Đang kiểm tra…" : "Kiểm tra liên kết"}</Button>
+    </div>
+    {!result && error === undefined && <p className={styles.hint}>Tải lại tài liệu ở liên kết như dịch vụ AI vẫn làm và so với mã đã đăng ký. Không thay đổi gì ở nguồn.</p>}
+    <div aria-live="polite" data-testid="source-verify-result">
+      {result?.outcome === "Match" && <Alert tone="success" title="Liên kết vẫn trả đúng tài liệu đã đăng ký">{when} Dịch vụ AI tải được nguồn này. Trang có thể đổi nội dung về sau; kiểm tra lại khi AI báo lỗi nguồn.</Alert>}
+      {result?.outcome === "HashMismatch" && <Alert tone="warning" title="Nội dung ở liên kết đã khác bản đã đăng ký">{when} AI không dùng được nguồn này.{retired ? "" : " Nên ngừng dùng nguồn và đăng ký lại bằng một tệp tài liệu cố định."}</Alert>}
+      {result && result.outcome !== "Match" && result.outcome !== "HashMismatch" && <Alert tone="danger" title="Không tải được tài liệu ở liên kết">{when} {verifyReasonText(result.reason)} Khi lỗi này còn, AI không dùng được nguồn.{retired ? "" : " Nếu lỗi không tự hết, hãy ngừng dùng nguồn và đăng ký lại bằng tệp tải lên."}</Alert>}
+      {error !== undefined && <Alert tone="danger" title="Chưa kiểm tra được">{aiErrorText(error)}</Alert>}
+    </div>
+  </div>;
+}
+
 /** Drawer body: the source as the server has it, with approve / retire behind a confirmation (If-Match = revision). */
 function SourceDetail({ accessToken, id, orgName, onChanged }: { accessToken: string; id: string; orgName: (id: string | null | undefined) => string; onChanged: () => void }) {
   const toast = useToast();
@@ -225,6 +264,8 @@ function SourceDetail({ accessToken, id, orgName, onChanged }: { accessToken: st
         <dt>Lần cập nhật</dt><dd data-testid="source-revision">{source.revision}</dd>
         {source.visibility === "Common" && <><dt>Dùng cho bài học</dt><dd>Bản nháp bài học: {source.canUseInDraft ? "được trích dẫn" : "chưa"} · bài đã xuất bản và AI: {source.canPublishReference ? "được dùng" : "chưa"}</dd></>}
       </dl>
+
+      {source.sourceUri && <VerifyLink accessToken={accessToken} source={source} />}
 
       {stale && <Alert tone="warning" title="Nguồn đã thay đổi ở nơi khác" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reloadFresh} data-testid="source-reload">Tải bản mới</Button>}>
         {aiErrorText(error)} Chưa có gì bị ghi đè: tải bản mới để xem trạng thái hiện tại rồi quyết định lại.
@@ -330,7 +371,7 @@ export function AdminSourcesTab({ accessToken }: { accessToken: string }) {
     />
     <p className={styles.hint}>Bấm hàng để xem chi tiết; menu “···” để duyệt hoặc ngừng dùng nguồn.</p>
 
-    <Drawer open={sourceId !== ""} onOpenChange={(open) => { if (!open) setParams({ source: null }); }} size="md" data-testid="ai-source-drawer" title="Chi tiết nguồn tri thức" description="Xem thông tin, duyệt hoặc ngừng dùng nguồn.">
+    <Drawer open={sourceId !== ""} onOpenChange={(open) => { if (!open) setParams({ source: null }); }} size="md" data-testid="ai-source-drawer" title="Chi tiết nguồn tri thức" description="Xem thông tin, kiểm tra liên kết, duyệt hoặc ngừng dùng nguồn.">
       {sourceId && <SourceDetail key={sourceId} accessToken={accessToken} id={sourceId} orgName={orgName} onChanged={list.reload} />}
     </Drawer>
 
