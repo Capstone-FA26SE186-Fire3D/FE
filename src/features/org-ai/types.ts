@@ -236,6 +236,22 @@ export type KnowledgeSource = {
   canUseInDraft?: boolean;
   canPublishReference?: boolean;
 };
+/**
+ * BE#188 `POST /api/admin/knowledge-sources/{id}/verify`: the API downloads `sourceUri` the way the AI service does and compares
+ * its SHA-256 with `sourceHash`. Read-only. `reason` (Unavailable): NO_SOURCE_URI, URI_INVALID, ADDRESS_NOT_PUBLIC, FETCH_FAILED,
+ * TIMEOUT, TOO_LARGE, TOO_MANY_REDIRECTS, REDIRECT_INVALID or HTTP_STATUS_nnn.
+ */
+export type KnowledgeSourceVerification = {
+  sourceId: string;
+  outcome: "Match" | "HashMismatch" | "Unavailable" | (string & {});
+  sourceHash: string;
+  actualHash?: string | null;
+  sizeBytes?: number | null;
+  httpStatus?: number | null;
+  contentType?: string | null;
+  reason?: string | null;
+  checkedAt: string;
+};
 export type KnowledgeSourcePage = { items: KnowledgeSource[]; total: number; page: number; pageSize: number };
 export type KnowledgeSourceFilters = { visibility?: string; status?: string; search?: string; page?: number; pageSize?: number };
 export type CreateKnowledgeSourceInput = {

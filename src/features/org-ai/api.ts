@@ -17,6 +17,7 @@ import type {
   KnowledgeSource,
   KnowledgeSourceFilters,
   KnowledgeSourcePage,
+  KnowledgeSourceVerification,
   ScenarioDraftInput,
   TraineeAiQuota,
   TraineeAnswerInput,
@@ -106,6 +107,10 @@ export const adminAiApi = {
   },
   createKnowledgeSource(accessToken: string, input: CreateKnowledgeSourceInput, idempotencyKey: string) {
     return apiClient.request<KnowledgeSource>("/api/admin/knowledge-sources", { headers: auth(accessToken), json: input, idempotencyKey });
+  },
+  /** BE#188: downloads the source's link and compares it with the registered hash; changes nothing. */
+  verifyKnowledgeSource(accessToken: string, id: string) {
+    return apiClient.request<KnowledgeSourceVerification>(`/api/admin/knowledge-sources/${encodeURIComponent(id)}/verify`, { headers: auth(accessToken), method: "POST" });
   },
   /** Draft -> Approved or Approved -> Retired. `etag` must be the one of the last read: 412 means it changed meanwhile. */
   async changeKnowledgeSource(accessToken: string, id: string, operation: "approve" | "retire", etag: string): Promise<WithEtag<KnowledgeSource>> {
