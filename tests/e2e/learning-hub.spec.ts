@@ -264,6 +264,25 @@ test("an article page offers saving and opens the floating Trợ lý AI with the
   await expect(panel).toContainText("Đọc không gian trước khi hành động");
 });
 
+test("the floating Trợ lý AI on an article is styled like in the hub (tokens and hidden labels load there too)", async ({ page }) => {
+  await restore(page, "trainee");
+  await page.goto(`/learn/${slug}`);
+  await page.getByRole("button", { name: "Hỏi Trợ lý AI về bài này" }).click();
+  const panel = page.getByRole("dialog", { name: /Trợ lý AI/ });
+  await panel.getByLabel("Câu hỏi", { exact: true }).fill("ok");
+  await panel.getByTestId("ai-send").click();
+  const asked = panel.getByTestId("ai-chat-user").first();
+  await expect(asked).toBeVisible();
+  const styles = await asked.evaluate((element) => {
+    const hidden = element.querySelector(".ops-sr-only")!.getBoundingClientRect();
+    return { background: getComputedStyle(element).backgroundColor, hiddenWidth: hidden.width, emberSoft: getComputedStyle(element).getPropertyValue("--ember-soft").trim() };
+  });
+  expect(styles.emberSoft).not.toBe("");
+  expect(styles.background).not.toBe("rgba(0, 0, 0, 0)");
+  expect(styles.hiddenWidth).toBeLessThanOrEqual(1); // "Bạn hỏi:" stays for screen readers only
+  await expect(asked).toHaveText(/ok$/);
+});
+
 test("logout returns home even on backend failure and the Q&A view respects reduced motion", async ({ page }) => {
   await restore(page);
   await page.emulateMedia({ reducedMotion: "reduce" });

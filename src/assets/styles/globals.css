@@ -345,3 +345,6 @@ button { cursor: pointer; }
 .support-code > summary:hover { color: var(--muted); }
 .support-code[open] { display: grid; gap: 4px; }
 .support-code code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap: anywhere; user-select: all; }
+
+/* Screen-reader-only text; global because shared components (the AI bubble, tables) use it on every page. */
+.ops-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
