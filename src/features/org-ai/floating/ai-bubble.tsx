@@ -14,6 +14,8 @@ import { AI_PROPOSAL_PARAM } from "../proposal-param";
 import type { AiRequest } from "../types";
 import { useAiBubble } from "./ai-bubble-context";
 import { usePageContext } from "./use-page-context";
+// The bubble also opens on pages outside the workspace shells (public Learn articles), which do not load the ops tokens.
+import "@/assets/styles/ops.css";
 import "./ai-bubble.css";
 
 // The conversation UI and the apply dialog load when the panel first opens; the page only ships the launcher.
