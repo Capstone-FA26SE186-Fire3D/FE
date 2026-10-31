@@ -205,9 +205,9 @@ function VerifyLink({ accessToken, source }: { accessToken: string; source: Know
     <div className="ops-actions">
       <Button type="button" variant="secondary" onClick={() => void check()} disabled={busy} data-testid="source-verify"><ShieldCheck size={16} aria-hidden="true" />{busy ? "Đang kiểm tra…" : "Kiểm tra liên kết"}</Button>
     </div>
-    {!result && error === undefined && <p className={styles.hint}>Tải lại tài liệu ở liên kết như dịch vụ AI vẫn làm và so với mã đã đăng ký. Không thay đổi gì ở nguồn.</p>}
+    {!result && error === undefined && <p className={styles.hint}>Máy chủ FET3D tải lại tài liệu ở liên kết (cùng quy tắc với dịch vụ AI) và so với mã đã đăng ký. Không thay đổi gì ở nguồn.</p>}
     <div aria-live="polite" data-testid="source-verify-result">
-      {result?.outcome === "Match" && <Alert tone="success" title="Liên kết vẫn trả đúng tài liệu đã đăng ký">{when} Dịch vụ AI tải được nguồn này. Trang có thể đổi nội dung về sau; kiểm tra lại khi AI báo lỗi nguồn.</Alert>}
+      {result?.outcome === "Match" && <Alert tone="success" title="Liên kết vẫn trả đúng tài liệu đã đăng ký">{when} Máy chủ FET3D tải được đúng tài liệu. Dịch vụ AI tải từ một máy khác, nên trang nào chặn tải tự động vẫn có thể từ chối AI; trang cũng có thể đổi nội dung về sau.</Alert>}
       {result?.outcome === "HashMismatch" && <Alert tone="warning" title="Nội dung ở liên kết đã khác bản đã đăng ký">{when} AI không dùng được nguồn này.{retired ? "" : " Nên ngừng dùng nguồn và đăng ký lại bằng một tệp tài liệu cố định."}</Alert>}
       {result && result.outcome !== "Match" && result.outcome !== "HashMismatch" && <Alert tone="danger" title="Không tải được tài liệu ở liên kết">{when} {verifyReasonText(result.reason)} Khi lỗi này còn, AI không dùng được nguồn.{retired ? "" : " Nếu lỗi không tự hết, hãy ngừng dùng nguồn và đăng ký lại bằng tệp tải lên."}</Alert>}
       {error !== undefined && <Alert tone="danger" title="Chưa kiểm tra được">{aiErrorText(error)}</Alert>}
