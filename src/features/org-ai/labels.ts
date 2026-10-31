@@ -151,3 +151,24 @@ export function isUnknownOutcome(error: unknown): boolean {
   if (error.status >= 500) return !error.code;
   return false;
 }
+
+const VERIFY_REASON: Record<string, string> = {
+  NO_SOURCE_URI: "Nguồn này không có liên kết để tải.",
+  URI_INVALID: "Liên kết không hợp lệ.",
+  ADDRESS_NOT_PUBLIC: "Liên kết trỏ tới địa chỉ nội bộ, không được phép tải.",
+  FETCH_FAILED: "Không kết nối được tới trang chứa tài liệu.",
+  TIMEOUT: "Trang phản hồi quá chậm (quá 30 giây).",
+  TOO_LARGE: "Tài liệu lớn hơn 20 MB.",
+  TOO_MANY_REDIRECTS: "Liên kết chuyển hướng quá nhiều lần.",
+  REDIRECT_INVALID: "Liên kết chuyển hướng tới một địa chỉ không hợp lệ.",
+};
+
+/** Why a source link could not be downloaded (BE#188 `reason`), in words an admin can act on. */
+export function verifyReasonText(reason: string | null | undefined): string {
+  if (reason && VERIFY_REASON[reason]) return VERIFY_REASON[reason];
+  const status = /^HTTP_STATUS_(\d{3})$/.exec(reason ?? "")?.[1];
+  if (status === "403" || status === "401") return "Trang từ chối cho tải tự động (chỉ mở được bằng trình duyệt).";
+  if (status === "404" || status === "410") return "Không còn tài liệu ở liên kết này.";
+  if (status) return "Trang báo lỗi khi tải tài liệu.";
+  return "Không tải được tài liệu.";
+}

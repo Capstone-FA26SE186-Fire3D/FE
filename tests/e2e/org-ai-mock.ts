@@ -52,6 +52,8 @@ export type AiMock = {
   draftState: Rec;
   policies: Rec[];
   knowledge: Rec[];
+  /** `POST /api/admin/knowledge-sources/{id}/verify` answers by source id (BE#188); a source not listed matches. */
+  verify: Record<string, Rec | { status: number; json: Rec }>;
   orgs: Rec[];
   /** Knowledge-source writes bump the revision; a test can pre-bump to force 412. */
   buildings: Rec[];
@@ -123,6 +125,7 @@ export function newAiMock(overrides: Partial<AiMock> = {}): AiMock {
       { id: ids.src1, visibility: "Common", organizationId: null, title: "QCVN 06:2022/BXD", sourceUri: "https://example.gov.vn/qcvn-06", versionLabel: "2022", sourceHash: "a".repeat(64), jurisdiction: "VN", effectiveFrom: null, effectiveUntil: null, approvalStatus: "Approved", approvedAt: iso(-1000), createdAt: iso(-2000), revision: 2, canUseInDraft: true, canPublishReference: true },
       { id: ids.src2, visibility: "Common", organizationId: null, title: "TCVN 3890:2023", sourceUri: null, versionLabel: "2023", sourceHash: "b".repeat(64), jurisdiction: null, effectiveFrom: null, effectiveUntil: null, approvalStatus: "Draft", approvedAt: null, createdAt: iso(-1500), revision: 1, canUseInDraft: true, canPublishReference: false },
     ],
+    verify: {},
     orgs: [{ id: "org-1", name: "Trường Mẫu", isActive: true }, { id: "org-2", name: "Công ty B", isActive: true }],
     buildings: [{ id: BUILDING_ID, name: "Tòa nhà A", buildingType: "Trường học", totalFloors: 2, isActive: true, createdAt: iso(-5000) }],
     revisions: [{ id: REVISION_ID, buildingId: BUILDING_ID, versionLabel: "IFC rev. 01", status: "ReadyForScenario", createdAt: iso(-4500), sourceDocument: null }],
@@ -373,6 +376,14 @@ export async function mockAi(page: Page, mock: AiMock) {
       mock.knowledge.unshift(created);
       mock.adminReceipts.set(`source:${key}`, { requestId: created.id as string });
       return route.fulfill({ status: 201, json: created });
+    }
+    const verify = /^\/api\/admin\/knowledge-sources\/([0-9a-f-]{36})\/verify$/.exec(path);
+    if (verify && method === "POST") {
+      const found = mock.knowledge.find((item) => item.id === verify[1]);
+      if (!found) return problem(route, 404, "NOT_FOUND", "The knowledge source was not found.");
+      const scripted = mock.verify[verify[1]];
+      if (scripted && typeof scripted.status === "number") return route.fulfill(scripted as { status: number; json: Rec });
+      return route.fulfill({ json: { sourceId: found.id, outcome: "Match", sourceHash: found.sourceHash, actualHash: found.sourceHash, sizeBytes: 1_250_000, httpStatus: 200, contentType: "application/pdf", reason: null, checkedAt: iso(0), ...(scripted ?? {}) } });
     }
     const source = /^\/api\/admin\/knowledge-sources\/([0-9a-f-]{36})(?:\/(approve|retire))?$/.exec(path);
     if (source) {
