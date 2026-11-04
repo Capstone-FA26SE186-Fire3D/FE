@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, BarChart3, Building2, LayoutGrid, List, PenLine, Pencil, Play, Plus, RefreshCw, Search, Upload } from "lucide-react";
+import { Archive, BarChart3, Building2, LayoutGrid, List, PenLine, Pencil, Play, Plus, QrCode, RefreshCw, Search, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent, type ReactNode } from "react";
@@ -50,7 +50,7 @@ function statusToFilter(status: StatusFilter) {
   return status === "all" ? undefined : status === "active";
 }
 
-const ACTION_ICONS = { upload: Upload, progress: Play, author: PenLine, open: Building2 } as const;
+const ACTION_ICONS = { upload: Upload, progress: Play, author: PenLine, open: Building2, qr: QrCode } as const;
 
 function detailHref(id: string, step?: BuildingStep["action"]) {
   if (!step) return `${routes.workspaceBuildings}/${id}`;

@@ -118,3 +118,15 @@ test("next permits workspace details, scenarios and profile while rejecting unre
   expect(postLoginRoute({ role: 0 }, "https://evil.test")).toBe("/admin/overview");
   expect(postLoginRoute({ role: 1 }, "/workspace/buildings/building-1/scenarios")).toBe("/workspace/buildings/building-1/scenarios");
 });
+
+test("a building with a published release shows Đã phát hành and opens its QR", async ({ page }) => {
+  await session(page);
+  await page.route("**/api/releases?*", (route) => {
+    const query = new URL(route.request().url()).searchParams;
+    const published = query.get("buildingId") === "building-1" && query.get("status") === "Published";
+    return route.fulfill({ json: { items: [], totalCount: published ? 1 : 0, page: 1, pageSize: 1 } });
+  });
+  await page.goto("/workspace/buildings");
+  await expect(page.getByTestId("building-step")).toHaveText("Đã phát hành");
+  await expect(page.getByRole("link", { name: "Mở mã QR" })).toHaveAttribute("href", /tab=access&sub=qr/);
+});

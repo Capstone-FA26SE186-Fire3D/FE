@@ -2,19 +2,22 @@
 
 import { useAsyncData } from "@/api/use-async-data";
 import type { Tone } from "@/components/ui/status-badge";
+import { scenarioVersionsApi } from "@/features/scenarios/versions-api";
 import { buildingsApi } from "./api";
 import { revisionLabel } from "./pipeline";
 import type { BuildingTab } from "./components/building-detail-workspace";
 
-/** The list's "Bước hiện tại" chip + "Việc tiếp theo" button, from two light reads per visible row. */
+/** The list's "Bước hiện tại" chip + "Việc tiếp theo" button, from three light reads per visible row. */
 export type BuildingStep = {
   label: string;
   tone: Tone;
   /** Next action for the row button. */
-  action: { label: string; icon: "upload" | "progress" | "author" | "open"; tab: BuildingTab; sub?: string; upload?: boolean };
+  action: { label: string; icon: "upload" | "progress" | "author" | "open" | "qr"; tab: BuildingTab; sub?: string; upload?: boolean };
 };
 
-function deriveStep(revisionStatus: string | null, scenarioCount: number): BuildingStep {
+function deriveStep(revisionStatus: string | null, scenarioCount: number, publishedCount = 0): BuildingStep {
+  // A published release stays playable whatever the newest IFC revision is doing; learners scan the QR to get it.
+  if (publishedCount > 0) return { label: "Đã phát hành", tone: "success", action: { label: "Mở mã QR", icon: "qr", tab: "access", sub: "qr" } };
   if (!revisionStatus) return { label: "Chưa có IFC", tone: "neutral", action: { label: "Tải IFC", icon: "upload", tab: "ifc", upload: true } };
   switch (revisionStatus) {
     case "Uploaded":
@@ -36,17 +39,18 @@ function deriveStep(revisionStatus: string | null, scenarioCount: number): Build
 }
 
 /**
- * Newest revision status + scenario count of one building. Both reads are tolerant: a failure leaves the chip at
+ * Newest revision status, scenario count and published releases of one building. Every read is tolerant: a failure leaves the chip at
  * "—" (the row still opens), so a list of 20 buildings never breaks because one revision read fails.
  */
 export function useBuildingStep(accessToken: string, buildingId: string, enabled: boolean) {
   const state = useAsyncData<BuildingStep>(`building-step:${buildingId}`, async (signal) => {
-    const [revisions, scenarios] = await Promise.all([
+    const [revisions, scenarios, published] = await Promise.all([
       buildingsApi.listRevisions(accessToken, buildingId, 1, 1, signal).catch(() => null),
       buildingsApi.listScenarios(accessToken, buildingId, 1, 1, signal).catch(() => null),
+      scenarioVersionsApi.listReleases(accessToken, { buildingId, status: "Published" }, 1, 1, signal).catch(() => null),
     ]);
     const newest = revisions ? [...revisions.items].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] : undefined;
-    return deriveStep(newest?.status ?? null, scenarios?.totalCount ?? 0);
+    return deriveStep(newest?.status ?? null, scenarios?.totalCount ?? 0, published?.totalCount ?? 0);
   }, enabled, { keepPrevious: true });
   return state;
 }
