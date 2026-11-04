@@ -89,8 +89,16 @@ export function findRuntime(runtimes: RuntimeOption[], version: string | undefin
 }
 
 /** Capabilities of a runtime that accept `kind` objects. */
+/**
+ * Capabilities that belong to the building, not to a scenario: the game places them from the IFC (an elevator the drawing
+ * has), so a scenario never adds one. A scenario only decides through its rubric whether using it is scored.
+ */
+export const BUILDING_ONLY_CAPABILITIES: readonly string[] = ["transport.elevator"];
+
+export const isBuildingOnly = (id: string | undefined | null): boolean => !!id && BUILDING_ONLY_CAPABILITIES.includes(id);
+
 export function capabilitiesForKind(runtime: RuntimeOption | undefined, kind: ObjectKind): CapabilityOption[] {
-  return runtime ? runtime.capabilities.filter((capability) => capability.objectKinds.includes(kind)) : [];
+  return runtime ? runtime.capabilities.filter((capability) => capability.objectKinds.includes(kind) && !isBuildingOnly(capability.id)) : [];
 }
 
 export function findCapability(runtime: RuntimeOption | undefined, id: string | undefined): CapabilityOption | undefined {

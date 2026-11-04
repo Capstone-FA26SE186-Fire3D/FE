@@ -41,6 +41,8 @@ const CANDIDATES = [
   candidate("ifc:wrongfloor", SPACE_L2, "equipment.extinguisher", decided("Confirmed")),
   candidate("ifc:suggested", gid("9suggest"), "equipment.extinguisher", null, { suggestedDecision: { decision: "Confirmed", catalogKey: null, fromRevisionId: "rev-0" } }),
   candidate("ifc:rejected", gid("6reject"), "equipment.extinguisher", decided("Rejected")),
+  // A lift belongs to the building: the game places it from the IFC, a scenario never adds one.
+  candidate("ifc:lift", gid("5lift"), "transport.elevator", decided("Confirmed"), { ifcClass: "IfcTransportElement" }),
 ];
 
 const fixtureState = () => JSON.parse(readFileSync(join(process.cwd(), "tests", "fixtures", "scenario-editor", "v1", "scenario-state.valid.json"), "utf8")) as Record<string, unknown>;
@@ -81,7 +83,8 @@ test("previews decided equipment, adds it as ONE undoable step with anchor, capa
   await expect(dialog.getByTestId("equipment-import-row").nth(1)).toContainText("Cần điền: state");
   await expect(dialog).toContainText("Cần điền tham số bắt buộc");
   const skipped = dialog.getByTestId("equipment-import-skip-row");
-  await expect(skipped).toHaveCount(3);
+  await expect(skipped).toHaveCount(4);
+  await expect(skipped.filter({ hasText: gid("5lift") })).toContainText("Có sẵn trong game từ bản vẽ IFC");
   await expect(skipped.filter({ hasText: "extinguisher.portable" })).toContainText("Phiên bản ứng dụng của bản nháp không có khả năng này");
   await expect(skipped.filter({ hasText: gid("8ghost") })).toContainText("Mô hình 3D không có cấu kiện này");
   await expect(skipped.filter({ hasText: SPACE_L2 })).toContainText("Tầng của thiết bị khác tầng");
