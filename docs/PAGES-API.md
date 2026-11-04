@@ -1263,7 +1263,7 @@ So sánh type FE với DTO của BE (`Fire3D.Application`). Các endpoint IFC th
 **Quyền truy cập:** Shell `[0, 1]`; danh sách chỉ fetch khi `role 0 | 1`. 403 → "Không có quyền xem thư viện" (`describeLibraryError`).
 
 **Logic xử lý:**
-- Organization chỉ thấy item **đang active và có phiên bản Published**, chỉ phiên bản Published. Lọc theo loại (`?kind=` ∈ `ScenarioTemplate | RubricSample | Equipment | StylePreset | ColorScheme`, SubTabs có đếm). Hai loại style (Bộ vật liệu, Bảng màu) chỉ để xem; chúng được chọn theo bản IFC (`PUT /api/revisions/{id}/style`), nên không có nút "Dùng làm mẫu" và trình soạn kịch bản chỉ đưa ra 3 loại nội dung kịch bản (`SCENARIO_LIBRARY_KINDS`), tìm theo mã/tên (`?q=`) và lọc theo năng lực runtime (`?cap=`, "Không có yêu cầu") – hai bộ lọc sau chạy **phía client trên trang đã tải** (có thông báo "Máy chủ chưa lọc…"). Phân trang 20.
+- Organization chỉ thấy item **đang active và có phiên bản Published**, chỉ phiên bản Published. Lọc theo loại (`?kind=` ∈ `ScenarioTemplate | RubricSample | Equipment`, SubTabs có đếm). FE không hiển thị `StylePreset`/`ColorScheme` (BE còn lưu nhưng chưa có gì đưa chúng vào gói trò chơi; quyết định 04/11/2026), tìm theo mã/tên (`?q=`) và lọc theo năng lực runtime (`?cap=`, "Không có yêu cầu") – hai bộ lọc sau chạy **phía client trên trang đã tải** (có thông báo "Máy chủ chưa lọc…"). Phân trang 20.
 - `?item=<uuid>` (kiểm UUID) mở hộp thoại: `getItem` → `VersionPreview` của `latestPublished` (template: các trường phi không gian + rubric; rubric mẫu: bảng tiêu chí; thiết bị: thuộc tính + cảnh báo "không thêm năng lực runtime"; bộ vật liệu: loại công trình, từ khóa, bảng vật liệu sàn/tường/trần theo loại phòng, bảng màu mặc định; bảng màu: 4 màu `#RRGGBB` có ô màu; `requiredCapabilities`, `payloadHash`). "Dùng làm mẫu" mở `UseSampleDialog` chọn công trình + kịch bản rồi mở editor với `?useSample=<kind>:<itemId>`. 404 → "Mẫu không còn khả dụng".
 - **Luồng áp dụng (apply flow)**: trang này chỉ xem. Áp dụng thực hiện trong trình soạn kịch bản: `planApply(version, draft, context)` (thuần, không ghi) tạo các nhóm trường với trạng thái `new | same | different` và hành động `fill | replace | merge | keep` (mặc định `keep` nếu trường đã có nội dung, không ghi đè ngầm); template chỉ điền trường phi không gian của `fet3d.editor/1`, rubric sample điền `rubric` (hợp nhất tiêu chí, cảnh báo metric/schema_version không có trong catalog), equipment chỉ gán `label` và năng lực nếu runtime catalog của bản nháp công bố. `changesFor()` → một lệnh undo được (`setFieldsCommand`). Bản sao: cập nhật mẫu sau này không đổi kịch bản đã soạn.
 - Response đọc `unknown` → `parseItem`/`parseVersion` phòng thủ; sai cấu trúc → `ApiError` 502 `LIBRARY_ITEM_MALFORMED` / `LIBRARY_VERSION_MALFORMED`.
@@ -1380,7 +1380,7 @@ So sánh type FE với DTO của BE (`Fire3D.Application`). Các endpoint IFC th
 | `GET .../analytics/operations` | `OperationsReport` | Đủ | Hợp nhất `PlatformOperations` / `OrganizationOperations` / `AdminOrganizationOperations`; parse runtime. |
 | `GET /api/admin/analytics/revenue` | `RevenueReport` | Đủ | BE trả JSON từ SQL (không có record C#); khớp tài liệu learner-analytics.md. |
 | `/api/library/items`, `/items/{id}`, `/versions/{id}` | `LibraryItem`, `LibraryVersion`, `LibraryVersionRef`, `Page<T>` | Đủ | BE trả raw JSON; FE parse phòng thủ (`parseItem`/`parseVersion`). `payload` là `JsonObject`. |
-| `/api/library/*`, `/api/admin/library/*` – trường `kind` | `LibraryKind` = `SCENARIO_LIBRARY_KINDS` + `STYLE_LIBRARY_KINDS`; `StylePresetPayload`, `ColorSchemePayload` | Đã bổ sung | BE cho phép 5 loại (CHECK trong `RevisionStyle.sql`, docs/revision-style.md); FE trước chỉ khai 3 nên `parseItem`/`parseVersion` (qua `isKind`) loại bỏ im lặng `StylePreset`/`ColorScheme`. Nay giữ lại, có nhãn/gợi ý, xem trước riêng; payload type re-export từ `features/buildings/ifc-types.ts` (không nhân bản). |
+| `/api/library/*`, `/api/admin/library/*` – trường `kind` | `LibraryKind` = `SCENARIO_LIBRARY_KINDS` | Cố ý chỉ 3 loại | BE cho phép thêm `StylePreset`/`ColorScheme` (STYLE-01) nhưng worker chưa dùng nên FE bỏ hẳn hai loại này (04/11/2026): `parseItem`/`parseVersion` loại chúng, không có tab, form hay xem trước. Thêm lại khi worker áp được vật liệu/màu vào gói. |
 | `GET/POST /api/support/tickets`, `/api/admin/support/tickets` | `SupportTicketPage`, `SupportTicketStatusCounts`, `Ticket`, `CreateTicketInput` | Đã bổ sung | Thêm `counts` (BE `SupportTicketPage`) và `listTickets` trả `SupportTicketPage`; `CreateTicketInput` thêm `feedbackId?`, `sessionId?`. |
 | `GET /api/support/tickets/{id}`, `POST .../messages` | `Ticket`, `SupportMessage`, `SupportPerson`, `SupportOrganization` | Đủ | |
 | `GET/POST /api/feedback` | `Feedback`, `CreateFeedbackInput` | Đã bổ sung | `CreateFeedbackInput` thêm `sessionId?`. |
@@ -1589,7 +1589,7 @@ Polling: job/QA của revision (tới khi job kết thúc + revision ổn địn
 - **BIM facts**: mỗi `IfcSpace` có 3 dòng `Name`, `LongName` (Revit thường đặt tên phòng ở đây), `Category`; phòng không tên & không long name có `qualityFlags:["SPACE_UNNAMED"]` (FE: “Phòng chưa có tên”). Sắp theo `ifcGlobalId` rồi `propertyPath`; lọc `entityType`, `ifcGlobalId`, `qualityFlag`. Endpoint `/bim-facts/elements` gộp theo phòng (FE chưa dùng).
 - **Artifacts**: `preview_glb` (GLB + metadata editor), `building_metadata`, (`unity_package` cho job đóng gói); có `sha256Hash`, `isRuntimeReady`, `isCurrentAttempt`.
 - **Editor preview**: Ready khi metadata đúng `fet3d.editor/1` và object S3 tồn tại đúng kích thước (HEAD) → URL ký 5 phút + `coordinateTransform`, `floors`, `semanticMapping`; S3 lỗi → `503 PREVIEW_STORAGE_UNAVAILABLE`. `/api/revisions/{id}/floors` trả tầng + mapping không ký URL (dùng trong scenario-editor).
-- **Revision style (STYLE-01)**: GET/PUT `/api/revisions/{id}/style` chọn StylePreset + ColorScheme + override vật liệu theo phòng; **FE chưa có màn hình/API cho mục này**; worker chưa đọc lựa chọn.
+- **Revision style (STYLE-01)**: GET/PUT `/api/revisions/{id}/style` chọn StylePreset + ColorScheme + override vật liệu theo phòng; worker chưa đọc lựa chọn nên **FE không dùng** (bỏ khỏi giao diện 04/11/2026).
 
 ---
 
@@ -1758,8 +1758,8 @@ Organization Library do PlatformAdmin quản lý (`/admin/library`, `src/feature
 | `ScenarioTemplate` | Kịch bản mẫu | `{state, description?}` — `state` là bản nháp `fet3d.editor/1` (cho phép một phần) | Chỉ điền trường phi không gian: `name`, `learningObjectives`, `learnerInstructions`, `timeLimitSeconds`, `modePolicy`, `rubric`. Không áp dụng `geometry`, `objects`, `runtimeVersion`, `randomSeed`, `replanIntervalSeconds` | Có |
 | `RubricSample` | Tiêu chí chấm mẫu | `{rubric, description?}` — `rubric.schema_version` (chuỗi `"1"`), `pass_threshold`, `criteria[]{id, metric,...}` | Điền/Thay/Hợp nhất `rubric` (hợp nhất thêm tiêu chí chưa có theo `id`) | Có |
 | `Equipment` | Thiết bị | `{description?, properties?}` — ≤ 50 thuộc tính string/number/boolean | Đặt `label` của đối tượng Equipment đang chọn = tên version; gợi ý `capability` nếu runtime của bản nháp công bố capability đó cho Equipment. Mô tả/thuộc tính chỉ tham khảo. Không tạo năng lực mới cho runtime | Có (FE bắt buộc mô tả, BE thì tuỳ chọn) |
-| `StylePreset` | — | `{buildingTypes[1–10], keywords?, materials{default{floor,wall,ceiling}, <roomCategory>{surface?}…≤50}, defaultScheme?, description?}` | Chọn per-revision qua `PUT /api/revisions/{id}/style`; worker áp vật liệu PBR | **Chưa** (FE `LIBRARY_KINDS` chỉ 3 kind, `parseItem` loại bỏ kind lạ) |
-| `ColorScheme` | — | `{colors{wall, accentWall, doorWood, skirting} (#RRGGBB), description?}` | Chọn cùng preset (không chọn → `defaultScheme` của preset) | **Chưa** |
+| `StylePreset` | — | `{buildingTypes[1–10], keywords?, materials{default{floor,wall,ceiling}, <roomCategory>{surface?}…≤50}, defaultScheme?, description?}` | Chọn per-revision qua `PUT /api/revisions/{id}/style`; worker chưa áp | **Không dùng** (FE bỏ khỏi giao diện) |
+| `ColorScheme` | — | `{colors{wall, accentWall, doorWood, skirting} (#RRGGBB), description?}` | Chọn cùng preset (không chọn → `defaultScheme` của preset) | **Không dùng** |
 
 Ghi chú `EditorContract.LibraryKinds` (BE) cho `libraryRefs` chỉ chấp nhận `ScenarioTemplate`, `RubricSample`, `Equipment`.
 
@@ -1828,10 +1828,10 @@ Mã lỗi nội dung (FE mirror trong `library/payload.ts#checkForm`): `STRING_I
 | PATCH `/api/revisions/{id}/equipment-decisions` | `EquipmentDecisionInput[]` | Đã bổ sung | Thêm `EquipmentDecisionsRequest` |
 | POST `/api/revisions/{id}/confirm-for-training` | `ConfirmTrainingInput` → `{reviewId}` | Đã bổ sung | Thêm `ConfirmTrainingResult` |
 | POST `/api/revisions/{id}/reviews` | `RejectScenarioVersionInput` → `TechnicalRejectionResult` | Đã bổ sung | Chưa có hàm API FE |
-| GET/PUT `/api/revisions/{id}/style` | `RevisionStyleView`, `RevisionStyleRequest`, `StyleOverride`, `StyleLibraryRef`… | Đã bổ sung | Chưa có hàm API/UI FE |
+| GET/PUT `/api/revisions/{id}/style` | — | Không dùng | Type đã xóa khỏi `ifc-types.ts` (04/11/2026) vì worker chưa áp lựa chọn |
 | Worker output `building_metadata` | `BuildingMetadataV1`, `BuildingInteractable`, `BuildingSpace` | Đã bổ sung | Theo `contracts/ifc/v1/building-metadata.schema.json` |
 | Lỗi upload | `IfcUploadErrorCode` | Đã bổ sung | |
-| `/api/library/*`, `/api/admin/library/*` | `LibraryItem`, `LibraryVersion`, `VersionInput` | Thiếu | `LibraryKind` thiếu `StylePreset`, `ColorScheme` (BE có); payload type đã thêm ở `ifc-types.ts` (`StylePresetPayload`, `ColorSchemePayload`) nhưng `library/types.ts` thuộc agent khác |
+| `/api/library/*`, `/api/admin/library/*` | `LibraryItem`, `LibraryVersion`, `VersionInput` | Thiếu | `LibraryKind` cố ý không có `StylePreset`, `ColorScheme` (BE có, worker chưa dùng) |
 | `/internal/processing/*` | — | Không áp dụng | Chỉ worker gọi (X-Worker-Key) |
 
 ---
@@ -1857,11 +1857,11 @@ Mã lỗi nội dung (FE mirror trong `library/payload.ts#checkForm`): `STRING_I
 | support | `types.ts`, `api.ts` | `SupportTicketPage` (+ `counts`), `feedbackId`/`sessionId`, `reason`, `actorType`, `targetEntity` |
 | org-ai | `types.ts`, `api.ts` + 3 component | `consumedUnits: number \| null`, `EndAiPolicyInput`, `technicalUsage`. **Sửa lỗi hiển thị** khi `consumedUnits` là `null` |
 | rag | `api.ts` | `ChatRequest`, `DocumentIngestResponse`, `Source.source_id/version` |
-| library | `types.ts` + `items-list.tsx`, `v1-library-panel.tsx`, `new-item-modal.tsx` | Thêm loại `StylePreset` và `ColorScheme`, trước đây bị bỏ qua khi parse. Form tạo mục chỉ cho chọn 3 loại kịch bản |
+| library | `types.ts` + `items-list.tsx`, `v1-library-panel.tsx`, `new-item-modal.tsx` | (04/11/2026) Bỏ lại `StylePreset` và `ColorScheme` khỏi giao diện vì chưa có tác dụng trong game |
 | billing, training-history | — | Đã đủ, không cần sửa |
 
 ### Còn tồn đọng (chưa làm)
-- **Thư viện đồ, loại Style:** chưa có form tạo phiên bản cho `StylePreset`/`ColorScheme` (`admin-library/payload.ts`). Hiện chỉ xem được, không tạo được.
+- **Thư viện đồ, loại Style:** `StylePreset`/`ColorScheme` không hiển thị trên FE (04/11/2026) cho tới khi worker áp được chúng vào gói.
 - **Endpoint BE có nhưng FE chưa gọi:**
   - `GET/PUT /api/revisions/{id}/style`
   - `GET /api/revisions/{id}/bim-facts/elements`

@@ -12,7 +12,7 @@ import { libraryAdminApi } from "@/features/library/api";
 import { describeLibraryError, translateIssue, type LibraryErrorView } from "@/features/library/errors";
 import { LIBRARY_LIMITS, SCENARIO_LIBRARY_KINDS, isScenarioKind, kindHint, kindLabel, type LibraryItem, type LibraryKind } from "@/features/library/types";
 
-/** Creates an empty item (kind + code); only scenario kinds, since the version form has no StylePreset/ColorScheme payload yet. Versions and their content come next. The Idempotency-Key is the same while the same kind+code is retried. */
+/** Creates an empty item (kind + code). Versions and their content come next. The Idempotency-Key is the same while the same kind+code is retried. */
 export function NewItemModal({ accessToken, initialKind, onClose, onCreated }: { accessToken: string; initialKind: LibraryKind | ""; onClose: () => void; onCreated: (item: LibraryItem) => void }) {
   const toast = useToast();
   const [kind, setKind] = useState<LibraryKind | "">(initialKind);
