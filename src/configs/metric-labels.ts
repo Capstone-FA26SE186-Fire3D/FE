@@ -36,6 +36,9 @@ const METRIC_LABELS: Record<string, string> = {
   wheelchair_to_refuge: "Số người xe lăn tới chỗ chờ",
   assembly_point_reached: "Đã tới điểm tập kết",
   window_opened: "Số lần mở cửa sổ",
+  jumped: "Số lần nhảy",
+  obstacle_climbed: "Số lần leo qua vật cản",
+  fell_from_height: "Số lần ngã từ trên cao",
 };
 
 export const metricName = (metric: string) => METRIC_LABELS[metric] ?? metric;
