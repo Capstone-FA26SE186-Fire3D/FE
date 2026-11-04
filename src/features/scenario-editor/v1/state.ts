@@ -1,6 +1,6 @@
 import { isObject, type Json, type JsonObject } from "../store/json";
 import type { Issue } from "../store/validation";
-import { findCapability, findRuntime, validateParameters, type RuntimeOption } from "./catalog";
+import { findCapability, findRuntime, isBuildingOnly, validateParameters, type RuntimeOption } from "./catalog";
 import {
   CAPABILITY_REQUIRED_KINDS, ID_PATTERN, IFC_GLOBAL_ID_PATTERN, LIMITS, OBJECT_KINDS, RUBRIC_OPERATORS, SCHEMA_VERSION, SEMVER_PATTERN, SHA256_PATTERN,
   KIND_META, MODE_LABEL, TRAINING_MODES, UUID_PATTERN, type GeometryPin, type ObjectKind,
@@ -293,6 +293,10 @@ export function completenessIssues(draft: JsonObject, context: ReferenceContext)
         if (!entry) out.push(issue("ANCHOR_NOT_FOUND", `${base}.anchorId`, "Cấu kiện neo không có trong mô hình 3D."));
         else if (entry.floorId !== object.floorId) out.push(issue("ANCHOR_FLOOR_MISMATCH", `${base}.anchorId`, "Cấu kiện neo nằm ở tầng khác."));
       }
+    }
+    if (object.capability && isBuildingOnly(object.capability.id)) {
+      out.push(issue("CAPABILITY_BUILDING_ONLY", `${base}.capability.id`, "Thang máy lấy từ bản vẽ IFC của tòa nhà và có sẵn trong game, không đặt trong kịch bản. Hãy xóa đối tượng này."));
+      continue;
     }
     if (object.capability && runtime) {
       const capability = findCapability(runtime, object.capability.id);

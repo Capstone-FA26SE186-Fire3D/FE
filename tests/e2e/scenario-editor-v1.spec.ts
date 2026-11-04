@@ -292,6 +292,13 @@ test("runtime catalog: capabilities are offered per object kind; contracts that 
   expect(broken[0].capabilities).toEqual([]);
 });
 
+test("a lift belongs to the building: the editor never offers transport.elevator for a hand-placed object", () => {
+  const sample = catalogSample() as { capabilities: string[]; capabilityContracts: Record<string, unknown> };
+  const [withLift] = parseRuntimeCatalog([{ ...sample, capabilities: [...sample.capabilities, "transport.elevator"], capabilityContracts: { ...sample.capabilityContracts, "transport.elevator": { version: "1.0.0", objectKinds: ["Equipment"] } } }]);
+  expect(findCapability(withLift, "transport.elevator")).toBeDefined(); // the runtime has it (the game places it from the IFC)
+  expect(capabilitiesForKind(withLift, "Equipment").map((capability) => capability.id)).not.toContain("transport.elevator");
+});
+
 test("parameter form schema and validation: number/integer/string/boolean/enum, min/max, required, closed set", () => {
   const [runtime] = runtimes();
   const fire = findCapability(runtime, "fire.source")!;
