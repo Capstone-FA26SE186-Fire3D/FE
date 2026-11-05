@@ -1,0 +1,21 @@
+/* Phiên bản runtime (/admin/runtime): detail popup and register popup. Colours come from the ops theme variables, so light/dark follow. */
+.rt-heading { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
+.rt-caps { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.rt-cap { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-soft); min-width: 0; }
+.rt-cap-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.rt-cap-head strong { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.rt-cap-kinds { color: var(--dim); font-size: 12px; }
+.rt-cap-empty { margin: 0; color: var(--dim); font-size: 12.5px; }
+.rt-cap-group { display: grid; grid-template-columns: 76px minmax(0, 1fr); gap: 4px 10px; align-items: start; }
+.rt-cap-label { color: var(--muted); font-size: 12px; font-weight: 600; padding-top: 2px; }
+.rt-cap-group ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.rt-cap-group li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; color: var(--text); min-width: 0; }
+.rt-metric { color: var(--muted); font-size: 12px; }
+.rt-metric--none { color: var(--dim); }
+.rt-summary { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-soft); }
+.rt-problems { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+.rt-switch { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg-soft); color: var(--text); font-size: 14px; cursor: pointer; }
+.rt-switch input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--ember); }
+.rt-switch small { display: block; margin-top: 2px; color: var(--dim); font-size: 12px; line-height: 1.5; }
+.rt-switch:has(input:disabled) { opacity: .55; cursor: not-allowed; }
+@media (max-width: 480px) { .rt-cap-group { grid-template-columns: 1fr; } }
