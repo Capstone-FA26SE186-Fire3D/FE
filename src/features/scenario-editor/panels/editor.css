@@ -6,7 +6,8 @@
 
 .se-header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; min-width: 0; }
 .se-header h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.02em; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
-.se-crumbs { display: flex; align-items: center; gap: 4px; color: var(--dim); font-size: 12px; white-space: nowrap; overflow-x: auto; }
+.se-crumbs { display: flex; align-items: center; gap: 4px; color: var(--dim); font-size: 12px; white-space: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.se-crumbs::-webkit-scrollbar { display: none; }
 .se-crumbs a { color: var(--muted); }
 .se-crumbs a:hover { color: var(--ember); text-decoration: underline; }
 .se-crumbs [aria-current="page"] { color: var(--text); }
@@ -177,7 +178,7 @@
 .se-tree .se-add { min-height: 36px; }
 
 /* fet3d.editor/1 */
-.se-right .ops-tabs-list { overflow-x: auto; flex-wrap: nowrap; scrollbar-width: thin; }
+.se-right .ops-tabs-list { overflow-x: auto; flex-wrap: nowrap; }
 .se-right .ops-tab { flex: 0 0 auto; white-space: nowrap; }
 .se-facts { display: grid; gap: 8px; margin: 0; }
 .se-facts > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 8px; font-size: 13px; }

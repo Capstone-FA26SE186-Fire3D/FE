@@ -257,7 +257,10 @@ select.ops-input { appearance: none; padding-right: 34px; background-image: line
 .ops-pagination > div { display: flex; align-items: center; gap: 8px; }
 
 /* ───────── Tabs ───────── */
-.ops-tabs-list { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.ops-tabs-list { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--line); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+/* The active tab's underline sits 1px below the list: with overflow-x auto that showed a tiny vertical scrollbar with
+   arrow buttons beside every tab list. Tabs still scroll sideways by swipe/wheel when they do not fit. */
+.ops-tabs-list::-webkit-scrollbar { display: none; }
 .ops-tab { position: relative; flex: 0 0 auto; min-height: 44px; padding: 0 14px; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 14px; cursor: pointer; white-space: nowrap; }
 .ops-tab:hover { color: var(--text); }
 .ops-tab[data-state="active"] { color: var(--ember); font-weight: 600; }
