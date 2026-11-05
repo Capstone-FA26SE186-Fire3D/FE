@@ -1,4 +1,4 @@
-import { BarChart3, BookOpen, Home, BrainCircuit, Building2, ClipboardCheck, CreditCard, Landmark, LayoutDashboard, LifeBuoy, Library, Receipt, ScanLine, Sparkles, UserRound, Users, type LucideIcon } from "lucide-react";
+import { BarChart3, BookOpen, Home, BrainCircuit, Building2, ClipboardCheck, Cpu, CreditCard, Landmark, LayoutDashboard, LifeBuoy, Library, Receipt, ScanLine, Sparkles, UserRound, Users, type LucideIcon } from "lucide-react";
 import type { UserRole } from "@/features/auth/types";
 import { routes } from "@/configs/routes";
 
@@ -61,6 +61,7 @@ export const adminArea: OperationsArea = {
     { href: routes.adminSupport, label: "Hỗ trợ & nhật ký", icon: LifeBuoy, group: "Xử lý công việc" },
     { href: routes.adminAccounts, label: "Tài khoản", icon: Users, group: "Quản lý hệ thống" },
     { href: routes.adminOrganizations, label: "Tổ chức", icon: Landmark, group: "Quản lý hệ thống" },
+    { href: routes.adminRuntime, label: "Phiên bản runtime", icon: Cpu, group: "Quản lý hệ thống" },
     { href: routes.adminLearn, label: "Bài học", icon: BookOpen, group: "Quản lý nội dung" },
     { href: routes.adminLibrary, label: "Thư viện mẫu", icon: Library, group: "Quản lý nội dung" },
     { href: routes.adminAi, label: "AI & nguồn tri thức", icon: BrainCircuit, group: "Quản lý nội dung" },
