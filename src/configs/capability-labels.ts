@@ -43,6 +43,8 @@ const CAPABILITY_LABELS: Record<string, string> = {
   "refuge.area": "Chỗ chờ cứu hộ",
   "assembly.point": "Điểm tập kết",
   "window.openable": "Cửa sổ mở được",
+  // Runtime 2.3.0: beds the IFC carries give their blanket and sheet (like sinks give water).
+  "furniture.bed": "Giường",
   // Runtime 2.2.0: the player's own jumps, climbs and falls (declared on the spawn, not an object to place).
   "player.movement": "Di chuyển của người chơi",
 };
