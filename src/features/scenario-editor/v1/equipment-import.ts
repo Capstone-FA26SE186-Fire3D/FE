@@ -2,7 +2,7 @@ import type { EquipmentCandidate } from "@/features/buildings/types";
 
 import { makeSetPatch, type Patch } from "../store/commands";
 import type { Json, JsonObject } from "../store/json";
-import { findCapability, type RuntimeOption } from "./catalog";
+import { findCapability, isBuildingOnly, type RuntimeOption } from "./catalog";
 import { KIND_META, LIMITS } from "./contract";
 import type { V1Command, V1Selection } from "./commands";
 import type { GeometryInfo } from "./geometry";
@@ -19,7 +19,7 @@ import { readObjects } from "./state";
  */
 
 export type ImportSkip =
-  | "not-decided" | "rejected" | "present" | "duplicate" | "capability-missing" | "anchor-missing" | "floor-missing" | "floor-mismatch" | "position-invalid" | "limit";
+  | "not-decided" | "rejected" | "present" | "duplicate" | "building" | "capability-missing" | "anchor-missing" | "floor-missing" | "floor-mismatch" | "position-invalid" | "limit";
 
 export type ImportRow =
   | { status: "add"; candidate: EquipmentCandidate; object: JsonObject; catalogKey: string; floorId: string; requiredParameters: string[] }
@@ -36,6 +36,7 @@ export const SKIP_LABEL: Record<ImportSkip, string> = {
   rejected: "Đã loại bỏ",
   present: "Đã có trong bản nháp (cùng cấu kiện neo)",
   duplicate: "Trùng cấu kiện với thiết bị khác trong danh sách",
+  building: "Có sẵn trong game từ bản vẽ IFC của tòa nhà, không cần thêm vào kịch bản",
   "capability-missing": "Phiên bản ứng dụng của bản nháp không có khả năng này cho Thiết bị",
   "anchor-missing": "Mô hình 3D không có cấu kiện này",
   "floor-missing": "Không xác định được tầng",
@@ -74,6 +75,7 @@ export function planEquipmentImport({ draft, candidates, runtime, geometry }: { 
     const skip = (reason: ImportSkip): ImportRow => ({ status: "skip", candidate, reason, catalogKey: key });
     if (candidate.decision?.decision === "Rejected") return skip("rejected");
     if (!key) return skip("not-decided");
+    if (isBuildingOnly(key)) return skip("building");
     if (anchored.has(candidate.ifcGlobalId)) return skip("present");
     if (seen.has(candidate.ifcGlobalId)) return skip("duplicate");
     const capability = findCapability(runtime, key);
