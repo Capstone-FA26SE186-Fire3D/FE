@@ -178,7 +178,7 @@ export function BillingWorkspace() {
     { key: "number", header: "Mã đơn", primary: true, render: (item) => <CellTitle title={<span className="bill-mono">{item.quotationNumber}</span>} sub={quotationKind(item)} /> },
     { key: "content", header: "Nội dung", width: 220, render: (item) => <span className="bill-wrap">{summarizeQuotation(item)}</span> },
     { key: "amount", header: "Số tiền", width: 150, align: "right", render: (item) => <span className="bill-money">{formatVnd(item.totalAmount)}{item.taxAmount === null && <span className="ops-dt-title-sub" style={{ display: "block" }}>ước tính, chưa thuế</span>}</span> },
-    { key: "status", header: "Trạng thái", width: 200, render: (item) => <QuotationStatusBadge status={item.status} /> },
+    { key: "status", header: "Trạng thái", width: 200, render: (item) => <QuotationStatusBadge status={item.status} validUntil={item.validUntil} /> },
     { key: "valid", header: "Hiệu lực đến", width: 170, hideBelow: 1100, render: (item) => formatDateTime(item.validUntil) },
   ];
   const quotationsError = quotations.error !== undefined && <Alert tone="danger" className="mb-4" title={noAccess(quotations.error) ? "Không có quyền xem báo giá" : "Không tải được báo giá"} action={<Button size="sm" variant="secondary" className="mt-3" onClick={quotations.reload}>Thử lại</Button>}>{billingErrorText(quotations.error)}</Alert>;
@@ -253,7 +253,7 @@ export function BillingWorkspace() {
       </div>
     </SubTabs>
 
-    <Drawer open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) { setOverride(null); setParams({ quotation: null, payment: null }); } }} size="xl" title="Chi tiết báo giá" description="Số tiền, kỳ và điều khoản giữ đúng như lúc phát hành." eyebrow={current ? <><span className="bill-mono">{current.data.quotationNumber}</span><QuotationStatusBadge status={current.data.status} /></> : undefined} data-testid="quotation-drawer">
+    <Drawer open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) { setOverride(null); setParams({ quotation: null, payment: null }); } }} size="xl" title="Chi tiết báo giá" description="Số tiền, kỳ và điều khoản giữ đúng như lúc phát hành." eyebrow={current ? <><span className="bill-mono">{current.data.quotationNumber}</span><QuotationStatusBadge status={current.data.status} validUntil={current.data.validUntil} /></> : undefined} data-testid="quotation-drawer">
       {selectedId && selected.loading && !current && <SkeletonDetail rows={6} label="Đang tải báo giá…" />}
       {selectedId && selected.error !== undefined && !current && <Alert tone="danger" title={noAccess(selected.error) ? "Không có quyền xem báo giá này" : "Không tải được báo giá"} action={<Button size="sm" variant="secondary" className="mt-3" onClick={selected.reload}>Thử lại</Button>}>{billingErrorText(selected.error)}</Alert>}
       {current && <div className="ops-stack">

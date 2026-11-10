@@ -215,7 +215,7 @@ export function QuotationsSection({ accessToken }: { accessToken: string }) {
   const columns: DataColumn<Quotation>[] = [
     { key: "number", header: "Báo giá", primary: true, render: (item) => <CellTitle title={item.quotationNumber} sub={summarize(item)} /> },
     { key: "organization", header: "Tổ chức", width: 200, render: (item) => orgName[item.organizationId] ?? "Tổ chức không còn tồn tại" },
-    { key: "status", header: "Trạng thái", width: 170, render: (item) => <QuotationStatusBadge status={item.status} /> },
+    { key: "status", header: "Trạng thái", width: 170, render: (item) => <QuotationStatusBadge status={item.status} validUntil={item.validUntil} /> },
     { key: "validUntil", header: "Hiệu lực đến", width: 180, hideBelow: 1000, render: (item) => formatDateTime(item.validUntil) },
     { key: "total", header: "Tổng thanh toán", width: 170, align: "right", render: (item) => <CellTitle title={formatVnd(item.totalAmount)} sub={item.taxAmount === null ? "ước tính" : undefined} /> },
   ];
@@ -247,7 +247,7 @@ export function QuotationsSection({ accessToken }: { accessToken: string }) {
     <p className="bill-hint">Bấm hàng để mở báo giá; bản nháp phát hành ngay trong ngăn chi tiết.</p>
 
     <Drawer open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) { setOverride(null); setParams({ quotation: null }); } }} size="lg" data-testid="quotation-drawer" title="Chi tiết báo giá" description="Số liệu giữ đúng như lúc phát hành."
-      eyebrow={current ? <><QuotationStatusBadge status={current.data.status} /><StatusBadge tone="neutral">{current.data.quotationNumber}</StatusBadge></> : undefined}>
+      eyebrow={current ? <><QuotationStatusBadge status={current.data.status} validUntil={current.data.validUntil} /><StatusBadge tone="neutral">{current.data.quotationNumber}</StatusBadge></> : undefined}>
       {selectedId && detail.loading && !current && <SkeletonDetail rows={6} label="Đang tải báo giá…" />}
       {selectedId && detail.error !== undefined && !current && <Alert tone="danger" title="Không tải được báo giá" action={<Button size="sm" variant="secondary" className="mt-3" onClick={detail.reload}>Thử lại</Button>}>{billingErrorText(detail.error)}</Alert>}
       {current && <div className="ops-stack">

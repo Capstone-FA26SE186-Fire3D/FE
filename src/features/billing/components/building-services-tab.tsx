@@ -117,7 +117,7 @@ export function BuildingServicesTab({ buildingId }: { buildingId: string }) {
     { key: "number", header: "Mã đơn", primary: true, render: (item) => <CellTitle title={<span className="bill-mono">{item.quotationNumber}</span>} sub={`${item.items.some((line) => line.purchaseAction === "Upgrade") ? "Nâng cấp · " : ""}${item.items.length} công trình`} /> },
     { key: "content", header: "Nội dung", width: 160, hideBelow: 900, render: (item) => item.purpose === "AIQuotaTopUp" ? "Nạp thêm hạn mức AI" : "Công trình" },
     { key: "amount", header: "Số tiền", width: 150, align: "right", render: (item) => <span className="bill-money">{formatVnd(item.totalAmount)}</span> },
-    { key: "status", header: "Trạng thái", width: 210, render: (item) => <QuotationStatusBadge status={item.status} /> },
+    { key: "status", header: "Trạng thái", width: 210, render: (item) => <QuotationStatusBadge status={item.status} validUntil={item.validUntil} /> },
     { key: "valid", header: "Hiệu lực đến", width: 170, hideBelow: 1100, render: (item) => formatDateTime(item.validUntil) },
   ];
 
@@ -170,7 +170,7 @@ export function BuildingServicesTab({ buildingId }: { buildingId: string }) {
       <p className="bill-dim" style={{ margin: "-6px 0 0" }}>Bấm một hàng để xem báo giá và thanh toán trong ngăn bên phải.</p>
     </div>
 
-    <Drawer open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) closeQuotation(); }} size="xl" title="Chi tiết báo giá" description="Số tiền, kỳ và điều khoản giữ đúng như lúc phát hành." eyebrow={current ? <><span className="bill-mono">{current.data.quotationNumber}</span><QuotationStatusBadge status={current.data.status} /></> : undefined} data-testid="quotation-drawer">
+    <Drawer open={Boolean(selectedId)} onOpenChange={(open) => { if (!open) closeQuotation(); }} size="xl" title="Chi tiết báo giá" description="Số tiền, kỳ và điều khoản giữ đúng như lúc phát hành." eyebrow={current ? <><span className="bill-mono">{current.data.quotationNumber}</span><QuotationStatusBadge status={current.data.status} validUntil={current.data.validUntil} /></> : undefined} data-testid="quotation-drawer">
       {selectedId && selected.loading && !current && <SkeletonDetail rows={6} />}
       {selectedId && selected.error !== undefined && !current && <Alert tone="danger" title="Không tải được báo giá" action={<Button size="sm" variant="secondary" className="mt-3" onClick={selected.reload}>Thử lại</Button>}>{billingErrorText(selected.error)}</Alert>}
       {current && <div className="ops-stack" data-testid="selected-quotation">

@@ -97,7 +97,7 @@ export function AiQuotaView({ accessToken, organizationId, onTopUp, onOpenQuotat
   const topUpColumns: DataColumn<Quotation>[] = [
     { key: "number", header: "Mã đơn", primary: true, render: (item) => <CellTitle title={<span className="bill-mono">{item.quotationNumber}</span>} sub={`Yêu cầu ${item.topUp?.requestedQuotaUnits != null ? formatNumber(item.topUp.requestedQuotaUnits) : "không nêu"}`} /> },
     { key: "granted", header: "Được cấp", width: 160, hideBelow: 900, render: (item) => item.topUp?.quotaUnits != null ? formatQuota(item.topUp.quotaUnits, item.topUp.quotaUnit) : "Chờ phát hành" },
-    { key: "status", header: "Trạng thái", width: 210, render: (item) => <QuotationStatusBadge status={item.status} /> },
+    { key: "status", header: "Trạng thái", width: 210, render: (item) => <QuotationStatusBadge status={item.status} validUntil={item.validUntil} /> },
   ];
 
   return <div className="ops-stack" data-testid="ai-quota">
