@@ -15,7 +15,13 @@ export const quotationStatus: Record<string, { label: string; tone: Tone }> = {
   Cancelled: { label: "Đã hủy", tone: "neutral" },
 };
 
-export function QuotationStatusBadge({ status }: { status: QuotationStatus }) {
+/** BE keeps an expired quotation `Issued` (acceptance is refused past `validUntil`), so show it as overdue instead of "chờ chấp nhận". */
+export function isOverdueQuotation(status: QuotationStatus, validUntil: string | null | undefined) {
+  return status === "Issued" && isPast(validUntil);
+}
+
+export function QuotationStatusBadge({ status, validUntil }: { status: QuotationStatus; validUntil?: string | null }) {
+  if (isOverdueQuotation(status, validUntil)) return <StatusBadge tone="danger">Đã quá hạn</StatusBadge>;
   const item = quotationStatus[status] ?? { label: "Không rõ", tone: "neutral" as Tone };
   return <StatusBadge tone={item.tone}>{item.label}</StatusBadge>;
 }
@@ -43,7 +49,7 @@ function Capacity({ line }: { line: QuotationLine }) {
  * the UI never recomputes subtotal, discount, tax, total, periods, learner limits or quota.
  */
 export function QuotationSnapshot({ quotation, organizationName }: { quotation: Quotation; organizationName?: string }) {
-  const expired = quotation.status === "Issued" && isPast(quotation.validUntil);
+  const expired = isOverdueQuotation(quotation.status, quotation.validUntil);
   const isTopUp = quotation.purpose === "AIQuotaTopUp";
   const topUp = quotation.topUp ?? null;
   const upgrade = quotation.items.some((line) => line.purchaseAction === "Upgrade");
@@ -58,7 +64,7 @@ export function QuotationSnapshot({ quotation, organizationName }: { quotation: 
       </div>
       <div className="ops-actions">
         <StatusBadge tone={isTopUp ? "ember" : "neutral"}>{isTopUp ? "Nạp thêm hạn mức AI" : upgrade ? "Nâng cấp gói" : "Dịch vụ công trình"}</StatusBadge>
-        <QuotationStatusBadge status={quotation.status} />{expired && <StatusBadge tone="danger">Đã quá hạn</StatusBadge>}
+        <QuotationStatusBadge status={quotation.status} validUntil={quotation.validUntil} />
       </div>
     </div>
 
