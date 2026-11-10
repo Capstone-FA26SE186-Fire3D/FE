@@ -144,9 +144,7 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
           <div><dt>Tạo lúc</dt><dd>{formatDateTime(release.createdAt)}</dd></div>
           <div><dt>Phát hành lúc</dt><dd>{release.publishedAt ? formatDateTime(release.publishedAt) : "Chưa phát hành"}</dd></div>
           <div><dt>Nền tảng</dt><dd>{release.package.buildTarget}</dd></div>
-          
           <div><dt>Ứng dụng tối thiểu</dt><dd>{release.package.minRuntimeVersion}</dd></div>
-          <div><dt>Dung lượng gói</dt><dd>{(release.package.packageSizeBytes / 1048576).toLocaleString("vi-VN", { maximumFractionDigits: 1 })} MB</dd></div>
           {release.revokedAt && <div><dt>Thu hồi lúc</dt><dd>{formatDateTime(release.revokedAt)} · {release.revokedReason}</dd></div>}
         </dl>
         {release.entitlement !== undefined && <div className="ver-service">
