@@ -28,6 +28,8 @@ const METRIC_LABELS: Record<string, string> = {
   wedge_removed: "Số lần gỡ vật chèn cửa",
   door_gap_sealed: "Số lần chèn khe cửa",
   locked_exit_tried: "Số lần thử cửa bị khóa",
+  door_forced: "Số lần phá cửa bị khóa",
+  glass_broken: "Số lần đập kính",
   emergency_called: "Số lần gọi khẩn cấp",
   signaled_for_help: "Số lần ra hiệu cứu hộ",
   escape_hood_worn: "Số lần đeo mặt nạ",
