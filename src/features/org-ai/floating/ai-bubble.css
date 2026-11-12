@@ -111,3 +111,9 @@
   .ai-launcher-button, .ai-send, .ai-composer-box { transition: none; }
   .ai-launcher-button:hover { transform: none; }
 }
+
+/* Trainee: ready-made questions for a Training or a Result (trainee-suggestions.ts). */
+.ai-suggestions { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 16px 0; }
+.ai-suggestion { padding: 6px 10px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface-raised); color: var(--text); font: inherit; font-size: 12px; line-height: 1.3; text-align: left; cursor: pointer; }
+.ai-suggestion:hover:not(:disabled) { border-color: var(--ember); color: var(--ember); }
+.ai-suggestion:disabled { opacity: 0.5; cursor: default; }
