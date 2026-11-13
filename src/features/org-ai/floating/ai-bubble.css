@@ -60,14 +60,17 @@
 .ai-msg-row--user { justify-content: flex-end; }
 .ai-msg { max-width: 85%; min-width: 0; }
 .ai-msg--user { margin: 0; padding: 10px 14px; border-radius: 12px 12px 4px 12px; background: var(--ember-soft); color: var(--text); font-size: 13px; line-height: 20px; white-space: pre-wrap; overflow-wrap: anywhere; }
-.ai-msg--assistant { display: grid; gap: 10px; max-width: 92%; padding: 12px 14px; border-radius: 12px 12px 12px 4px; background: var(--surface-raised); color: var(--text); font-size: 13px; line-height: 20px; }
+.ai-msg--assistant { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; max-width: 92%; padding: 12px 14px; border-radius: 12px 12px 12px 4px; background: var(--surface-raised); color: var(--text); font-size: 13px; line-height: 20px; }
 .ai-msg--pending { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); }
 .ai-msg-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .ai-msg-text .ops-badge { vertical-align: middle; margin-right: 4px; }
-.ai-msg-list { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
-.ai-msg-draft { display: grid; gap: 8px; }
-.ai-msg-note { margin: 0; color: var(--dim); font-size: 12px; line-height: 1.5; }
-.ai-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.ai-msg-list { margin: 0; padding-left: 18px; display: grid; gap: 2px; overflow-wrap: anywhere; }
+.ai-msg-draft { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; min-width: 0; }
+.ai-msg-note { margin: 0; color: var(--dim); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.ai-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+/* Long source titles ("[1] TPL-LOP-HOC-TIEU-HOC Sơ tán lớp học …") wrap inside the bubble instead of widening it. */
+.ai-chips li { min-width: 0; max-width: 100%; }
+.ai-chips .ops-badge { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; }
 .ai-chips a.ops-badge { text-decoration: none; }
 .ai-chips a.ops-badge:hover { text-decoration: underline; }
 .ai-msg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
