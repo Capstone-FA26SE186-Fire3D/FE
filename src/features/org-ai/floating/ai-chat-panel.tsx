@@ -26,6 +26,7 @@ import { useAiBubble } from "./ai-bubble-context";
 import { AssistantMessage, UserMessage } from "./chat-message";
 import { MessageScroller } from "./message-scroller";
 import type { PageContext } from "./use-page-context";
+import { detectOrgIntent } from "./org-intent";
 
 export const HISTORY_HREF = `${routes.workspaceAi}?tab=history`;
 
@@ -72,6 +73,8 @@ export function AiChatPanel({ context, variant, onClose, onToggleExpand, onApply
   const { accessToken, mode, setMode, messages, phase, working, ask, draft, retry, lookRecent, track, dismissPhase, settledCount, noteSettled } = bubble;
   const [text, setText] = useState("");
   const [buildingId, setBuildingId] = useState("");
+  // Set when a message was sent with the other operation than the selected mode (detectOrgIntent); cleared on typing.
+  const [routed, setRouted] = useState<string | null>(null);
   const input = useRef<HTMLTextAreaElement>(null);
 
   const quota = useAsyncData(`ai-bubble:quota:${settledCount}`, (signal) => billingApi.getAiQuota(accessToken, undefined, signal));
@@ -103,10 +106,17 @@ export function AiChatPanel({ context, variant, onClose, onToggleExpand, onApply
   const trimmed = text.trim();
   const maxChars = limit?.maxInputChars ?? null;
   const tooLong = maxChars !== null && trimmed.length > maxChars;
-  const canSend = trimmed.length > 0 && !working && !tooLong && (mode === "Answer" || Boolean(targetBuilding));
+  // Each message goes to the operation its wording asks for: a knowledge question in draft mode is answered, a "soạn
+  // kịch bản…" request in answer mode becomes a draft when a Building is known. Unclear text follows the selected mode.
+  const intent = detectOrgIntent(trimmed);
+  const operation: AiOperation = intent === "ScenarioDraft" && !targetBuilding ? mode : intent ?? mode;
+  const canSend = trimmed.length > 0 && !working && !tooLong && (operation === "Answer" || Boolean(targetBuilding));
   const send = () => {
     if (!canSend) return;
-    if (mode === "Answer") ask(trimmed); else draft(trimmed, targetBuilding);
+    if (operation === "Answer") ask(trimmed); else draft(trimmed, targetBuilding);
+    setRouted(operation === mode ? null : operation === "Answer"
+      ? "Câu này là câu hỏi kiến thức nên được gửi dạng Hỏi đáp."
+      : "Câu này là yêu cầu soạn kịch bản nên được gửi dạng Đề xuất kịch bản.");
     setText("");
   };
   const onSubmit = (event: FormEvent) => { event.preventDefault(); send(); };
@@ -151,13 +161,14 @@ export function AiChatPanel({ context, variant, onClose, onToggleExpand, onApply
       </div>
     </MessageScroller>
 
+    {routed && <p className="ai-panel-context" role="status" data-testid="ai-routed">{routed}</p>}
     {blocked !== undefined ? <QuotaOut limit={blocked} operation={mode} /> : <form className="ai-composer" onSubmit={onSubmit} aria-label={mode === "Answer" ? "Hỏi đáp AI" : "Đề xuất kịch bản AI"}>
       {needsBuilding && <Select aria-label="Công trình" className="ai-composer-building" value={targetBuilding} onChange={(event) => setBuildingId(event.target.value)} disabled={working || buildingItems.length === 0} data-testid="ai-chat-building">
         {buildingItems.length === 0 && <option value="">{buildings.loading ? "Đang tải công trình…" : "Chưa có công trình đang hoạt động"}</option>}
         {buildingItems.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
       </Select>}
       <div className={cn("ai-composer-box", fieldError && "is-invalid")}>
-        <textarea ref={input} className="ai-composer-input" rows={1} value={text} onChange={(event) => setText(event.target.value)} onKeyDown={onKey} disabled={working}
+        <textarea ref={input} className="ai-composer-input" rows={1} value={text} onChange={(event) => { setText(event.target.value); setRouted(null); }} onKeyDown={onKey} disabled={working}
           placeholder={mode === "Answer" ? "Hỏi về công trình, kịch bản, PCCC…" : "Ví dụ: Sơ tán khi báo cháy ở tầng 2 cho học sinh lớp 10"}
           aria-label={mode === "Answer" ? "Câu hỏi" : "Yêu cầu đề xuất"} aria-invalid={fieldError ? true : undefined} aria-describedby="ai-composer-note" data-testid="ai-chat-input" />
         <button type="submit" className="ai-send-target" disabled={!canSend} aria-label={working ? "Đang gửi" : "Gửi"} data-testid="ai-send"><span className={cn("ai-send", !canSend && "is-disabled")}><Send size={14} aria-hidden="true" /></span></button>
