@@ -83,7 +83,8 @@ export function OrganizationProfile() {
 
   useEffect(() => {
     if (!allowed) return;
-    const task = window.setTimeout(() => { void load(); }, 0);
+    // load changes with every token renewal; after the first load, keep what the user typed (same path as a 412).
+    const task = window.setTimeout(() => { void load(saved.current !== null); }, 0);
     return () => window.clearTimeout(task);
   }, [allowed, load]);
 

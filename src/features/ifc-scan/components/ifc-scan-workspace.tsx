@@ -112,6 +112,10 @@ export function IfcScanWorkspace({
   const kindCursor = useRef<Partial<Record<IfcElementKind, number>>>({});
 
   useEffect(() => () => { model?.dispose(); }, [model]);
+  // Each openFile call takes a number; a load that is no longer the latest (another file was chosen, or the page closed)
+  // disposes its own model instead of replacing the newer one or leaking web-ifc and GPU memory.
+  const loadSeq = useRef(0);
+  useEffect(() => () => { loadSeq.current += 1; }, []);
 
   useEffect(() => {
     const onChange = () => setFullscreen(document.fullscreenElement === stageRef.current);
@@ -145,10 +149,15 @@ export function IfcScanWorkspace({
       return;
     }
 
+    const seq = ++loadSeq.current;
     try {
       setProgress({ completed: 0, total: 1, phase: "parse" });
       const { loadIfcFile } = await import("../ifc-loader");
-      const loaded = await loadIfcFile(file, setProgress);
+      const loaded = await loadIfcFile(file, (value) => { if (seq === loadSeq.current) setProgress(value); });
+      if (seq !== loadSeq.current) {
+        loaded.dispose();
+        return;
+      }
       setStoreyID(null);
       setSectionHeight(null);
       setHiddenCategories(new Set(defaultHidden));
@@ -158,6 +167,7 @@ export function IfcScanWorkspace({
       setFileSize(file.size);
       setProgress(null);
     } catch (loadError) {
+      if (seq !== loadSeq.current) return;
       setProgress(null);
       setError(safeErrorMessage(loadError));
     }

@@ -14,6 +14,7 @@ import { Rows } from "@/features/admin-overview/components/admin-kit";
 import { routes } from "@/configs/routes";
 import { organizationsApi } from "../api";
 import type { AdminUpdateOrganizationInput, Organization, OrganizationDetail as OrganizationDetailData } from "../types";
+import { useTokenRef } from "@/api/use-token-ref";
 
 const formatDate = (value: string) => new Date(value).toLocaleString("vi-VN");
 const buildingsHref = (id: string) => `${routes.adminOrganizations}/${id}/buildings`;
@@ -50,18 +51,23 @@ export function OrganizationDetail({ id, accessToken, onLoaded, onSaved }: { id:
   const onLoadedRef = useRef(onLoaded);
   useEffect(() => { onLoadedRef.current = onLoaded; }, [onLoaded]);
 
+  const { tokenRef, hasToken } = useTokenRef(accessToken);
+  // Not on every token renewal: read the current token when the load runs.
   useEffect(() => {
+    if (!hasToken) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
+      const current = tokenRef.current;
+      if (!current) return;
       setLoading(true);
       setLoadError(undefined);
-      organizationsApi.getDetail(accessToken, id, controller.signal)
+      organizationsApi.getDetail(current, id, controller.signal)
         .then((response) => { if (!controller.signal.aborted) { setLoaded({ organization: response.data, etag: etagOf(response.headers, response.data) }); onLoadedRef.current?.(response.data); } })
         .catch((cause: unknown) => { if (!controller.signal.aborted) setLoadError(cause); })
         .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     }, 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [accessToken, id, token]);
+  }, [hasToken, tokenRef, id, token]);
   const reload = useCallback(() => setToken((value) => value + 1), []);
 
   if (!loaded) {

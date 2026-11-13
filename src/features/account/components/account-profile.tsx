@@ -131,7 +131,8 @@ export function AccountProfile() {
   }, [accessToken, updateUser]);
 
   useEffect(() => {
-    const task = window.setTimeout(() => { void loadProfile(); }, 0);
+    // loadProfile changes with every token renewal; after the first load, keep what the user typed (same path as a 412).
+    const task = window.setTimeout(() => { void loadProfile(saved.current.profile !== null); }, 0);
     return () => window.clearTimeout(task);
   }, [loadProfile]);
 
