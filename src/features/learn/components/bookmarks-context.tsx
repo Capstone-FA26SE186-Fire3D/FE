@@ -28,16 +28,20 @@ const BookmarksContext = createContext<BookmarksValue | null>(null);
 export function LearnBookmarksProvider({ children }: { children: ReactNode }) {
   const { accessToken, ready, user } = useAuthSession();
   const supported = ready && user?.role === 2 && !!accessToken;
-  const [loaded, setLoaded] = useState<{ token: string; ids: Set<string>; failed: boolean } | null>(null);
+  // Keyed by user, not by token: a silent token renewal must not show every post as unsaved and reload the list.
+  const [loaded, setLoaded] = useState<{ owner: string; ids: Set<string>; failed: boolean } | null>(null);
   const [busy, setBusy] = useState<ReadonlySet<string>>(new Set());
   const [reloadToken, setReloadToken] = useState(0);
   const token = supported ? accessToken : null;
+  const owner = supported && user ? user.id : null;
   const tokenRef = useRef(token);
+  const ownerRef = useRef(owner);
 
-  useEffect(() => { tokenRef.current = token; }, [token]);
+  useEffect(() => { tokenRef.current = token; ownerRef.current = owner; }, [token, owner]);
 
   useEffect(() => {
-    if (!token) return;
+    const token = tokenRef.current;
+    if (!owner || !token) return;
     const controller = new AbortController();
     void (async () => {
       const ids = new Set<string>();
@@ -47,26 +51,27 @@ export function LearnBookmarksProvider({ children }: { children: ReactNode }) {
           for (const item of result.items) ids.add(item.postId);
           if (result.items.length === 0 || page * PAGE_SIZE >= result.total) break;
         }
-        if (!controller.signal.aborted) setLoaded({ token, ids, failed: false });
+        if (!controller.signal.aborted) setLoaded({ owner, ids, failed: false });
       } catch {
-        if (!controller.signal.aborted) setLoaded({ token, ids, failed: true });
+        if (!controller.signal.aborted) setLoaded({ owner, ids, failed: true });
       }
     })();
     return () => controller.abort();
-  }, [token, reloadToken]);
+  }, [owner, reloadToken]);
 
-  const current = token && loaded?.token === token ? loaded : null;
-  const status: Status = !token ? "off" : !current ? "loading" : current.failed ? "error" : "ready";
+  const current = owner && loaded?.owner === owner ? loaded : null;
+  const status: Status = !owner ? "off" : !current ? "loading" : current.failed ? "error" : "ready";
 
   const mutate = useCallback(async (postId: string, saved: boolean) => {
     const activeToken = tokenRef.current;
-    if (!activeToken) return;
+    const activeOwner = ownerRef.current;
+    if (!activeToken || !activeOwner) return;
     setBusy((previous) => new Set(previous).add(postId));
     try {
       if (saved) await learnApi.bookmark(activeToken, postId);
       else await learnApi.unbookmark(activeToken, postId);
       setLoaded((previous) => {
-        if (!previous || previous.token !== activeToken) return previous;
+        if (!previous || previous.owner !== activeOwner) return previous;
         const ids = new Set(previous.ids);
         if (saved) ids.add(postId); else ids.delete(postId);
         return { ...previous, ids };

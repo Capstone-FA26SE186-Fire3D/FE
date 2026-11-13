@@ -273,6 +273,9 @@ export const IfcViewer = forwardRef<IfcViewerHandle, IfcViewerProps>(function If
       (grid.material as THREE.Material).dispose();
       controls.dispose();
       renderer.dispose();
+      // Release the WebGL context now (as the other viewers do), not at garbage collection: going back and forth between
+      // IFC pages otherwise piles up contexts until the browser drops the oldest one.
+      renderer.forceContextLoss();
       renderer.domElement.remove();
       runtimeRef.current = null;
     };

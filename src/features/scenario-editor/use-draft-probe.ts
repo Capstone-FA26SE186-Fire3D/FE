@@ -7,6 +7,7 @@ import { ApiError } from "@/api/types/common";
 import { scenarioEditorApi, type LoadedDraft } from "./api";
 import { classifyDraft, type DraftMode } from "./v1/mode";
 import { describeApiError } from "@/api/describe-error";
+import { useTokenRef } from "@/api/use-token-ref";
 
 export type ProbeState =
   | { phase: "loading" }
@@ -20,11 +21,14 @@ export function useDraftProbe(accessToken: string | null, draftId: string | null
   const [result, setResult] = useState<Result | null>(null);
   const [token, setToken] = useState(0);
   const key = `${draftId ?? ""}:${token}`;
+  const { tokenRef, hasToken } = useTokenRef(accessToken);
 
+  // A silent token renewal must not read the draft again: a new ETag would remount the editor and drop unsaved edits.
   useEffect(() => {
-    if (!accessToken || !draftId) return;
+    const current = tokenRef.current;
+    if (!hasToken || !current || !draftId) return;
     const controller = new AbortController();
-    scenarioEditorApi.getDraft(accessToken, draftId, controller.signal)
+    scenarioEditorApi.getDraft(current, draftId, controller.signal)
       .then((loaded) => {
         if (controller.signal.aborted) return;
         const { mode, schemaVersion } = classifyDraft(loaded.draft.state);
@@ -35,7 +39,7 @@ export function useDraftProbe(accessToken: string | null, draftId: string | null
         setResult({ key, state: { phase: "error", status: cause instanceof ApiError ? cause.status : undefined, message: describeApiError(cause, "Không thể tải bản nháp.") } });
       });
     return () => controller.abort();
-  }, [accessToken, draftId, key]);
+  }, [hasToken, tokenRef, draftId, key]);
 
   const reload = useCallback(() => setToken((value) => value + 1), []);
   const state: ProbeState = result && result.key === key ? result.state : { phase: "loading" };

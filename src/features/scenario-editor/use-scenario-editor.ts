@@ -13,6 +13,7 @@ import { mergeIssues, normalizeServerIssues, validateDraftState, type Issue } fr
 import { deepEqual, isObject, type JsonObject } from "./store/json";
 import { normalizeEtag } from "./store/etag";
 import { describeApiError } from "@/api/describe-error";
+import { useTokenRef } from "@/api/use-token-ref";
 
 export type LoadState = { phase: "loading" } | { phase: "ready" } | { phase: "error"; status?: number; message: string };
 
@@ -68,13 +69,16 @@ export function useScenarioEditor(accessToken: string | null, draftId: string | 
   const requestScope = useRef<AbortController | null>(null);
   const clock = useRef(() => Date.now());
   const initialRef = useRef(initial);
+  const { tokenRef, hasToken } = useTokenRef(accessToken);
 
   useEffect(() => {
     stateRef.current = state;
   });
 
+  // Depends on whether a token exists, not on its value: a silent renewal must not reload the draft and drop edits.
   useEffect(() => {
-    if (!accessToken || !draftId) return;
+    const token = tokenRef.current;
+    if (!hasToken || !token || !draftId) return;
     const controller = new AbortController();
     requestScope.current = controller;
     savingRef.current = false;
@@ -97,7 +101,7 @@ export function useScenarioEditor(accessToken: string | null, draftId: string | 
         return;
       }
       setLoad({ phase: "loading" });
-      scenarioEditorApi.getDraft(accessToken, draftId, controller.signal)
+      scenarioEditorApi.getDraft(tokenRef.current ?? token, draftId, controller.signal)
         .then((loaded) => {
           if (controller.signal.aborted) return;
           apply(loaded);
@@ -111,7 +115,7 @@ export function useScenarioEditor(accessToken: string | null, draftId: string | 
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [accessToken, draftId, reloadToken]);
+  }, [hasToken, tokenRef, draftId, reloadToken]);
 
   const reload = useCallback(() => setReloadToken((token) => token + 1), []);
 

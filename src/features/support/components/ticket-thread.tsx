@@ -11,6 +11,7 @@ import { formatDateTime } from "@/utils/date-range";
 import { supportApi, type TicketScope } from "../api";
 import type { SupportMessage, Ticket } from "../types";
 import styles from "./support.module.css";
+import { useTokenRef } from "@/api/use-token-ref";
 
 const MESSAGE_PAGE_SIZE = 100;
 const MAX_MESSAGE_PAGES = 10;
@@ -38,20 +39,24 @@ export function useTicketDetail(scope: TicketScope, accessToken: string | null, 
   const [error, setError] = useState<unknown>();
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(0);
+  const { tokenRef, hasToken } = useTokenRef(accessToken);
 
+  // Not on every token renewal (that re-read every message page and flashed the loading state).
   useEffect(() => {
-    if (!accessToken) return;
+    if (!hasToken) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
+      const current = tokenRef.current;
+      if (!current) return;
       setLoading(true);
       setError(undefined);
-      loadDetail(scope, accessToken, id, controller.signal)
+      loadDetail(scope, current, id, controller.signal)
         .then((value) => { if (!controller.signal.aborted) setState(value); })
         .catch((cause: unknown) => { if (!controller.signal.aborted) setError(cause); })
         .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     }, 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [scope, accessToken, id, token]);
+  }, [scope, hasToken, tokenRef, id, token]);
 
   const reload = useCallback(() => setToken((value) => value + 1), []);
   /** Applies a fresh ticket body (e.g. the PATCH response) without refetching; keeps the loaded messages. */

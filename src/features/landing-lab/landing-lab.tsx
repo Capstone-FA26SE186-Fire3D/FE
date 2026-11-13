@@ -40,6 +40,7 @@ export function LandingLab() {
       try {
         const mobile = window.matchMedia("(max-width: 767px)").matches;
         const { createLandingRuntime } = await import("@/features/landing/scene/runtime");
+        if (disposed) return; // cleanup already ran: do not append an orphan canvas or allocate a WebGL context
         host.appendChild(canvas);
         const runtime = await createLandingRuntime(canvas, mobile, { tier: live.current.tier, features: live.current.features });
         if (disposed) { runtime.dispose(); return; }

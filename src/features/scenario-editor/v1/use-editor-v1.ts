@@ -78,14 +78,15 @@ export function useEditorV1({ accessToken, draftId, initial, context }: { access
     stateRef.current = state;
   });
 
-  // The scope owns every request of this draft: leaving or switching drafts aborts them and drops their results.
+  // The scope owns every request of this draft: leaving or switching drafts aborts them and drops their results. A token
+  // renewal does not (save/validate take the token from their own closures); aborting there dropped an in-flight save.
   useEffect(() => {
     const controller = new AbortController();
     scope.current = controller;
     savingRef.current = false;
     validatingRef.current = false;
     return () => controller.abort();
-  }, [draftId, accessToken]);
+  }, [draftId]);
 
   const edit = useCallback((build: (draft: JsonObject, id: number, selection: V1Selection, now: number) => V1Command | null) => {
     dispatch({ type: "edit", build: (draft, id, selection) => build(draft, id, selection, clock.current()) });

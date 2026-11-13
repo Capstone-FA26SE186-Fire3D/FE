@@ -24,6 +24,7 @@ import type { Feedback, FeedbackStatus } from "../types";
 import { PendingBox } from "./pending-box";
 import { errorText } from "./ticket-thread";
 import styles from "./support.module.css";
+import { useTokenRef } from "@/api/use-token-ref";
 
 const PAGE_SIZE = 20;
 const nextStatuses: Record<FeedbackStatus, FeedbackStatus[]> = {
@@ -49,18 +50,23 @@ function FeedbackDetail({ id, accessToken, onChanged }: { id: string; accessToke
   const [saveError, setSaveError] = useState("");
   const [staleEtag, setStaleEtag] = useState<string | null>(null);
 
+  const { tokenRef, hasToken } = useTokenRef(accessToken);
+  // Not on every token renewal: read the current token when the load runs.
   useEffect(() => {
+    if (!hasToken) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
+      const current = tokenRef.current;
+      if (!current) return;
       setLoading(true);
       setLoadError(undefined);
-      supportApi.getFeedback(accessToken, id, controller.signal)
+      supportApi.getFeedback(current, id, controller.signal)
         .then((value) => { if (!controller.signal.aborted) setState(value); })
         .catch((cause: unknown) => { if (!controller.signal.aborted) setLoadError(cause); })
         .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     }, 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [accessToken, id, token]);
+  }, [hasToken, tokenRef, id, token]);
   const reload = useCallback(() => setToken((value) => value + 1), []);
 
   if (!state) {

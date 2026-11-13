@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@/api/types/common";
 import { scenarioEditorApi, type EditorPreviewV1 } from "./api";
 import { describeApiError } from "@/api/describe-error";
+import { useTokenRef } from "@/api/use-token-ref";
 
 export type PreviewPhase = "idle" | "loading" | "ready" | "not-ready" | "reprocess" | "error";
 
@@ -37,9 +38,11 @@ function message(error: unknown) {
 export function useEditorPreview(accessToken: string | null, buildingId: string | undefined, revisionId: string | undefined) {
   const [state, setState] = useState<PreviewState>({ phase: "idle", preview: null, error: null, nonce: 0, attempts: 0 });
   const [kick, setKick] = useState(0);
+  const { tokenRef, hasToken } = useTokenRef(accessToken);
 
+  // Depends on whether a token exists, not on its value: a renewal must not drop and re-download the model.
   useEffect(() => {
-    if (!accessToken || !buildingId || !revisionId) return;
+    if (!hasToken || !buildingId || !revisionId) return;
     const controller = new AbortController();
     let timer: number | undefined;
     let polls = 0;
@@ -52,7 +55,9 @@ export function useEditorPreview(accessToken: string | null, buildingId: string 
         return;
       }
       try {
-        const preview = await scenarioEditorApi.editorPreview(accessToken, buildingId, revisionId, controller.signal);
+        const token = tokenRef.current;
+        if (!token) return;
+        const preview = await scenarioEditorApi.editorPreview(token, buildingId, revisionId, controller.signal);
         if (stopped) return;
         // ReprocessRequired is final until IFC is processed again: no URL and no coordinates are ever returned, so do not poll.
         if (preview.status === "ReprocessRequired") {
@@ -91,7 +96,7 @@ export function useEditorPreview(accessToken: string | null, buildingId: string 
       window.clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [accessToken, buildingId, revisionId, kick]);
+  }, [hasToken, tokenRef, buildingId, revisionId, kick]);
 
   const refresh = useCallback(() => {
     setKick((value) => value + 1);

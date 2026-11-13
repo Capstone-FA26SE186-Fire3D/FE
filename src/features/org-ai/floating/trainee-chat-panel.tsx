@@ -23,6 +23,7 @@ import { urlId, type TraineeAiContext } from "../types";
 import { useAiBubble } from "./ai-bubble-context";
 import { AssistantMessage, UserMessage } from "./chat-message";
 import { MessageScroller } from "./message-scroller";
+import { traineeSuggestions } from "./trainee-suggestions";
 
 /**
  * The Trainee's conversation in the floating bubble (`POST /api/ai/trainee/answer`, BE#77). Same surface as the
@@ -109,6 +110,8 @@ export function TraineeChatPanel({ variant, onClose, onToggleExpand, focusToken,
     askTrainee(trimmed, context);
     setText("");
   };
+  const suggestions = useMemo(() => traineeSuggestions(context), [context]);
+  const canSuggest = !working && !articlePending && !articleUnresolved && !block;
   const onSubmit = (event: FormEvent) => { event.preventDefault(); send(); };
   const onKey = (event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(); } };
   const fieldError = tooLong ? `Dài hơn giới hạn ${maxChars} ký tự.` : phase.kind === "failed" ? fieldIssue(phase.error, "$.question") : undefined;
@@ -170,6 +173,10 @@ export function TraineeChatPanel({ variant, onClose, onToggleExpand, focusToken,
     </MessageScroller>
 
     {quota.error !== undefined && <div className="ai-system" role="alert"><p>{aiErrorText(quota.error)}</p><button type="button" className="ai-action" onClick={quota.reload}>Thử lại</button></div>}
+    {!block && suggestions.length > 0 && messages.length === 0 && <div className="ai-suggestions" data-testid="trainee-ai-suggestions">
+      {suggestions.map((question) => <button key={question} type="button" className="ai-suggestion" disabled={!canSuggest}
+        onClick={() => askTrainee(question, context)}>{question}</button>)}
+    </div>}
     {block ? <div className="ai-quota-out" data-testid="trainee-ai-blocked">
       <div className="ai-quota-out-card" role="status">
         {quota.data?.blockedByAssessment ? <Lock size={18} aria-hidden="true" /> : <Hourglass size={18} aria-hidden="true" />}
