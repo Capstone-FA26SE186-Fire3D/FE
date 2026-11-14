@@ -20,7 +20,7 @@ export type Budget = {
 };
 
 export const BUDGETS: Record<Tier, Budget> = {
-  high: { characters: 14, rescue: 21, smokePuffs: 360, flames: 70, dprCap: 1.5, phoneHz: 60, phoneWidth: 1024 },
+  high: { characters: 15, rescue: 21, smokePuffs: 360, flames: 70, dprCap: 1.5, phoneHz: 60, phoneWidth: 1024 },
   medium: { characters: 10, rescue: 14, smokePuffs: 220, flames: 45, dprCap: 1.25, phoneHz: 30, phoneWidth: 768 },
   low: { characters: 8, rescue: 9, smokePuffs: 120, flames: 24, dprCap: 1, phoneHz: 20, phoneWidth: 512 },
 };
