@@ -1,6 +1,6 @@
 import * as THREE from "three";
-import { spawnBody, type Body, type CharacterAssets } from "./characters";
-import { ASSEMBLY, ENGINE, ESCAPE_PATHS, JET_TARGET, MODEL_HEIGHT, PLAN, RESCUE_CAST, STAIR, arcPoint, facadeFires, rescuePose, type RescueActor } from "./layout";
+import { heldPose, spawnBody, type Body, type CharacterAssets } from "./characters";
+import { ASSEMBLY, ENGINE, ESCAPE_PATHS, GARDEN, GARDEN_RADIUS, JET_TARGET, MODEL_HEIGHT, PLAN, RESCUE_CAST, STAIR, arcPoint, facadeFires, rescuePose, type RescueActor } from "./layout";
 import { animationInterval, type Tier } from "./budget";
 import { createSmoke, type Emitter } from "./smoke";
 
@@ -64,6 +64,47 @@ function stairs() {
   }
   mesh.name = "stairs";
   return { mesh, dispose() { geometry.dispose(); material.dispose(); } };
+}
+
+/**
+ * The courtyard garden: a lawn, trunks and leafy crowns, three instanced draws. `burn(seconds)` takes the clock of the
+ * Organization fire: a plant glows as it catches, then stands charred and thinner; the lawn scorches with them.
+ */
+function garden() {
+  const group = new THREE.Group(); group.name = "garden";
+  const lawnMaterial = new THREE.MeshStandardMaterial({ color: 0x2f6b34, roughness: 0.95 });
+  const lawn = new THREE.Mesh(new THREE.CircleGeometry(GARDEN_RADIUS, 48), lawnMaterial); lawn.rotation.x = -Math.PI / 2; lawn.position.y = 0.02; group.add(lawn);
+  const trunkGeometry = new THREE.CylinderGeometry(0.12, 0.2, 1, 7), crownGeometry = new THREE.IcosahedronGeometry(1, 1);
+  const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x5a4130, roughness: 0.9 });
+  const crownMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, flatShading: true });
+  const trunks = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, GARDEN.length);
+  // Two overlapping blobs per plant read as foliage rather than a ball on a stick.
+  const crowns = new THREE.InstancedMesh(crownGeometry, crownMaterial, GARDEN.length * 2);
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(), colour = new THREE.Color(), tinted = new THREE.Color();
+  const leaf = new THREE.Color(0x3f8f45), ember = new THREE.Color(0xff7a1e), char = new THREE.Color(0x15110e), lawnGreen = new THREE.Color(0x2f6b34), scorched = new THREE.Color(0x14120f);
+  GARDEN.forEach((plant, i) => { m.compose(p.set(plant.x, plant.height * 0.35, plant.z), q, s.set(1, plant.height * 0.7, 1)); trunks.setMatrixAt(i, m); });
+  let last = -1;
+  function burn(seconds: number) {
+    if (Math.abs(seconds - last) < 0.05) return;
+    last = seconds;
+    let total = 0;
+    GARDEN.forEach((plant, i) => {
+      const b = THREE.MathUtils.clamp((seconds - plant.ignite) / 10, 0, 1); total += b;
+      // green -> glowing -> charred; the crown shrinks as the leaves go
+      if (b < 0.35) colour.copy(leaf).lerp(ember, b / 0.35); else colour.copy(ember).lerp(char, (b - 0.35) / 0.65);
+      const size = plant.crown * (1 - 0.45 * b);
+      for (let k = 0; k < 2; k++) {
+        const tint = k === 0 ? 1 : 0.86;
+        m.compose(p.set(plant.x + (k ? plant.crown * 0.35 : 0), plant.height * (k ? 0.72 : 0.9), plant.z + (k ? -plant.crown * 0.25 : 0)), q, s.set(size * (k ? 0.8 : 1), size * (k ? 0.7 : 0.95), size * (k ? 0.8 : 1)));
+        crowns.setMatrixAt(i * 2 + k, m); crowns.setColorAt(i * 2 + k, tinted.copy(colour).multiplyScalar(tint));
+      }
+    });
+    crowns.instanceMatrix.needsUpdate = true; if (crowns.instanceColor) crowns.instanceColor.needsUpdate = true;
+    lawnMaterial.color.copy(lawnGreen).lerp(scorched, total / GARDEN.length);
+  }
+  burn(0);
+  group.add(trunks, crowns);
+  return { group, burn, dispose() { lawn.geometry.dispose(); lawnMaterial.dispose(); trunkGeometry.dispose(); crownGeometry.dispose(); trunkMaterial.dispose(); crownMaterial.dispose(); } };
 }
 
 /** A canvas-drawn muster sign, the same green board as in the training app. */
@@ -149,6 +190,9 @@ function waterJet(count: number) {
   return { mesh, uniforms, dispose() { geometry.dispose(); quad.dispose(); material.dispose(); } };
 }
 
+/** While carrying, the hips and waist keep their rest rotation (the legs still walk), so the load stays in the arms. */
+const STEADY: Record<string, number[]> = { CC_Base_Hip: [0, 0, 0, 1], CC_Base_Waist: [0, 0, 0, 1] };
+
 type Actor = Body & { actor: RescueActor; accumulated: number; frame: number; child?: Body };
 
 export function createRescue(parent: THREE.Object3D, puffs: number, flames: number) {
@@ -159,6 +203,7 @@ export function createRescue(parent: THREE.Object3D, puffs: number, flames: numb
   const sign = assemblySign(); sign.group.position.set(ASSEMBLY[0], 0, ASSEMBLY[1]); sign.group.rotation.y = Math.atan2(-ASSEMBLY[0] * 0.2, 1); group.add(sign.group);
   const marks = routeMarks(); group.add(marks.mesh);
   const steps = stairs(); parent.add(steps.mesh);
+  const plants = garden(); parent.add(plants.group);
   const jet = waterJet(260); group.add(jet.mesh);
   jet.uniforms.uTo.value.set(...JET_TARGET);
 
@@ -189,16 +234,17 @@ export function createRescue(parent: THREE.Object3D, puffs: number, flames: numb
     /** Bodies arrive later than the building (they are a few megabytes); until then the stage plays without people. */
     attach(assets: CharacterAssets) {
       actors = RESCUE_CAST.map(actor => {
-        const body = spawnBody(assets, actor.id, actor.model, actor.clip, actor.path !== undefined ? actor.speed ?? 0 : 0);
+        // The carrier walks on his legs while his arms and trunk hold the pose authored in Blender.
+        const carry = actor.carries && assets.carry && assets.carry.carrier === actor.model && assets.carry.child === actor.carries ? assets.carry : null;
+        const speed = actor.path !== undefined ? actor.speed ?? 0 : 0;
+        const body = spawnBody(assets, actor.id, actor.model, actor.clip, speed, undefined, carry ? heldPose(assets, actor.model, "Carry", { ...carry.carrierBones, ...STEADY }, actor.clip) : undefined);
         cast.add(body.holder);
         const entry: Actor = { ...body, actor, accumulated: 0, frame: 0 };
-        if (actor.carries) {
-          // A small child carried out of the building.
-          const child = spawnBody(assets, actor.id + "-child", actor.carries, "Sit", 0, MODEL_HEIGHT[actor.carries] * 0.72);
-          // Across both forearms, lying back: the cradle turns about the child's hips (the body's origin is its feet).
-          const cradle = new THREE.Group(); cradle.position.set(0.02, 1.1, 0.36); cradle.rotation.set(-0.95, -Math.PI / 2, 0, "YXZ");
-          child.holder.position.set(0, -0.3, 0);
-          cradle.add(child.holder); body.holder.add(cradle); entry.child = child;
+        if (carry) {
+          // The child lies in his arms exactly where it was placed in Blender (the carrier's model space).
+          const child = spawnBody(assets, actor.id + "-child", carry.child, "Idle", 0, MODEL_HEIGHT[carry.child] * carry.childScale, heldPose(assets, carry.child, "Carried", carry.childBones));
+          child.holder.position.fromArray(carry.childPosition); child.holder.quaternion.fromArray(carry.childRotation);
+          body.holder.add(child.holder); entry.child = child;
         }
         return entry;
       });
@@ -206,13 +252,30 @@ export function createRescue(parent: THREE.Object3D, puffs: number, flames: numb
       actors[0]?.root.traverse(o => { if (o.name === "CC_Base_R_Hand") hand = o; });
       this.setBudget(active || actors.length, tier);
     },
+    /** Diagnostic: where the named joints of an actor (or of the child it carries) are, in the actor's own space (metres). */
+    probe(id: string, joints: string[], child = false) {
+      const actor = actors.find(a => a.actor.id === id), body = child ? actor?.child : actor;
+      if (!actor || !body) return null;
+      actor.holder.updateWorldMatrix(true, true);
+      const out: Record<string, number[]> = {}, p = new THREE.Vector3();
+      body.root.traverse(o => { if (joints.includes(o.name)) { o.getWorldPosition(p); actor.holder.worldToLocal(p); out[o.name] = [+p.x.toFixed(3), +p.y.toFixed(3), +p.z.toFixed(3)]; } });
+      return out;
+    },
     setBudget(count: number, next: Tier) { active = Math.min(actors.length, count); tier = next; actors.forEach((a, i) => { if (i >= active) a.holder.visible = false; }); },
     setFire(puffCount: number, flameCount: number) { fire.setCounts(puffCount, flameCount); },
-    /** `amount` is 1 outside, 0 once the camera is in the building. Returns how many bodies were animated this frame. */
-    update(delta: number, time: number, camera: THREE.Camera, amount: number) {
+    /**
+     * `amount` is 1 when the stage shows, 0 once the camera is in the building. `ownFire` is false where another fire
+     * system burns the building (Organization); `evacuating` is false once the building comes down: nobody is left on
+     * the stairs or in the doorway then; `collapse` (0..1) is how much of it is down and `burning` the clock of that fire (the garden burns with it). Returns how many bodies were animated.
+     */
+    update(delta: number, time: number, camera: THREE.Camera, amount: number, ownFire = true, evacuating = true, collapse = 0, burning = 0) {
+      plants.burn(burning);
+      // The stairs come down with the building: they sink into the rubble and are gone by the time half of it is down.
+      const fallen = THREE.MathUtils.smoothstep(collapse, 0.02, 0.45);
+      steps.mesh.visible = fallen < 0.999; steps.mesh.position.y = -fallen * (PLAN.tiers * PLAN.tierHeight + 1); steps.mesh.rotation.x = fallen * 0.12;
       group.visible = amount > 0.01;
       if (!group.visible) return 0;
-      fire.update(time);
+      fire.update(time); fire.smoke.visible = fire.flames.visible = ownFire;
       const flicker = 0.8 + 0.2 * Math.sin(time * 9.1) * Math.sin(time * 5.3 + 1.7);
       glowA.intensity = 900 * flicker * amount; glowB.intensity = 700 * (1.6 - flicker) * amount;
       const phase = Math.floor(time * 3.2) % 2;
@@ -222,7 +285,8 @@ export function createRescue(parent: THREE.Object3D, puffs: number, flames: numb
       for (let i = 0; i < active; i++) {
         const a = actors[i], pose = rescuePose(a.actor, time);
         a.holder.position.set(pose.position[0], pose.position[1], pose.position[2]); a.holder.rotation.y = pose.yaw;
-        a.setOpacity(pose.visibility); a.child?.setOpacity(pose.visibility);
+        const present = evacuating || (a.actor.path === undefined && a.actor.id !== "trapped") ? pose.visibility : 0;
+        a.setOpacity(present); a.child?.setOpacity(present);
         a.holder.getWorldPosition(world);
         const interval = animationInterval(world.distanceTo(camera.position) * 0.5, tier);
         a.accumulated += delta;
@@ -240,7 +304,7 @@ export function createRescue(parent: THREE.Object3D, puffs: number, flames: numb
     },
     dispose() {
       for (const a of actors) { a.dispose(); a.child?.dispose(); }
-      fire.dispose(); sign.dispose(); marks.dispose(); jet.dispose(); steps.dispose(); parent.remove(steps.mesh);
+      fire.dispose(); sign.dispose(); marks.dispose(); jet.dispose(); steps.dispose(); parent.remove(steps.mesh); plants.dispose(); parent.remove(plants.group);
       truck.group.traverse(o => (o as THREE.Mesh).geometry?.dispose()); truck.materials.forEach(m => m.dispose());
       hose.geometry.dispose(); hoseMaterial.dispose(); nozzle.geometry.dispose(); nozzleMaterial.dispose(); glowA.dispose(); glowB.dispose();
       parent.remove(group);

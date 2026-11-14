@@ -4,7 +4,7 @@ import type { LandingBranch } from "../types";
 import { BUDGETS, TIER_DWELL_MS, initialTier, tierBelow, type Tier } from "./budget";
 import { createCircularBuilding } from "./building";
 import { createCharacters, loadCharacterAssets } from "./characters";
-import { BAYS, FRAME_SHIFT, ORG_FRAME, OCCUPANTS, isWideFrame, PLAN, STAGE, bayCentre, bayFallStart, firePosition, followPose, journeyPose, occupantPose, orgOverview, outsideAmount, roomFire, routeFire, ROUTE_FIRES, smokeDrift, smoothstep, type Orbit, type Pose } from "./layout";
+import { BAYS, FRAME_SHIFT, GARDEN, ORG_FRAME, OCCUPANTS, isWideFrame, PLAN, STAGE, bayCentre, bayFallStart, firePosition, followPose, journeyPose, occupantPose, orgOverview, outsideAmount, roomFire, routeFire, ROUTE_FIRES, smokeDrift, smoothstep, type Orbit, type Pose } from "./layout";
 import { createJunction } from "./junction";
 import { createLandscapePhone } from "./phone";
 import { phoneTargetSize } from "./phone-fit";
@@ -44,6 +44,8 @@ function organizationEmitters(): Emitter[] {
     list.push({ position: [Math.cos(a) * 29.6, base + 1.2, Math.sin(a) * 29.6], start: fire.facade, scale: 1 + fire.strength * 0.8 });
   }
   for (let bay = 0; bay < BAYS; bay++) { const a = bayCentre(bay); list.push({ position: [Math.cos(a) * 20, PLAN.tiers * PLAN.tierHeight, Math.sin(a) * 20], start: roomFire(PLAN.tiers - 1, bay).roof, scale: 1.6 }); }
+  // The courtyard garden burns with the building: flames in each crown from the moment it catches.
+  for (const plant of GARDEN) list.push({ position: [plant.x, plant.height * 0.7, plant.z], start: plant.ignite, scale: 0.6 + plant.crown * 0.4 });
   for (let tier = 0; tier < PLAN.tiers; tier++) for (let bay = 0; bay < BAYS; bay++) { const a = bayCentre(bay); list.push({ position: [Math.cos(a) * 25, 1, Math.sin(a) * 25], start: bayFallStart(tier, bay) + 2.4, scale: 1.4, kind: 1 }); }
   return list;
 }
@@ -220,12 +222,13 @@ export async function createLandingRuntime(canvas: HTMLCanvasElement, mobile: bo
       fireLight.intensity = 55 * fireFlicker(time, 1) * (organization < 0.5 ? 1 : 0.3);
       fog.density = organization > 0.1 ? FOG * 0.4 : FOG;
       if (characters) {
-        characters.group.visible = organization < 0.05 && collapse < 0.01;
+        characters.group.visible = collapse < 0.01;
         animated = characters.group.visible ? characters.update(dt, time, camera) : 0;
       }
-      // The rescue stage is what the opening shows; it is gone once the camera is inside or in a branch.
-      const outside = lineup ? 0 : outsideAmount(progress) * (organization < 0.05 ? 1 : 0) * (phoneAmount < 0.5 ? 1 : 0);
-      animated += rescue.update(dt, time, camera, outside);
+      // The rescue stage is what the opening shows; it is gone once the camera is inside, and back for the Organization
+      // overview, where the building's own fire takes over and people keep leaving until it starts to come down.
+      const outside = lineup ? 0 : Math.max(outsideAmount(progress) * (phoneAmount < 0.5 ? 1 : 0), organization > 0.5 ? 1 : 0);
+      animated += rescue.update(dt, time, camera, outside, organization < 0.05, collapse < 0.01, collapse, damageTime);
       draw(dt);
 
       report.organization = organization; report.phone = phoneAmount;
@@ -258,6 +261,7 @@ export async function createLandingRuntime(canvas: HTMLCanvasElement, mobile: bo
     setLineup(on: boolean) { lineup = on; characters?.setLineup(on); initialized = false; },
     debugPlay(clip: string) { characters?.debugPlay(clip); },
     /** Diagnostic: hold the camera at a fixed pose (null returns it to the journey). */
+    probe(id: string, joints: string[], child = false) { return rescue.probe(id, joints, child); },
     setDebugView(pose: (Pose & { follow?: string }) | null) { debugView = pose; initialized = false; },
     /** Diagnostic: jump the Organization demonstration clock (it only advances while the overview is settled). */
     seekDamage(seconds: number) { damageTime = Math.max(0, seconds); },

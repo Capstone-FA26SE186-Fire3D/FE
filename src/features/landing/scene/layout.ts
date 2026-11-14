@@ -238,6 +238,27 @@ export function orgOverview(fovDegrees: number, aspect: number, mobile: boolean,
   return { position: [x * c + z * s + target[0], y + target[1], -x * s + z * c + target[2]], target };
 }
 
+/**
+ * The courtyard garden in the middle of the ring: trees and shrubs on a lawn. In the Organization demonstration each
+ * one catches fire at `ignite` seconds (the fire reaches the courtyard from the origin side) and is charred ten
+ * seconds later. Positions come from a fixed pseudo-random sequence, so the garden is the same on every visit.
+ */
+export type GardenPlant = { x: number; z: number; height: number; crown: number; ignite: number };
+export const GARDEN_RADIUS = PLAN.atriumRadius - 1.6;
+export const GARDEN: readonly GardenPlant[] = (() => {
+  const plants: GardenPlant[] = [];
+  const noise = (k: number) => { const x = Math.sin(k * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+  const origin = bayCentre(FIRE_ORIGIN.bay);
+  for (let i = 0; i < 16; i++) {
+    const tree = i < 9, angle = noise(i) * Math.PI * 2 + i * 0.9, radius = (tree ? 2.5 : 1.2) + noise(i + 40) * (GARDEN_RADIUS - (tree ? 4 : 2.2));
+    const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
+    // Distance from the side of the ring where the fire starts decides when a plant catches.
+    const reach = Math.hypot(x - Math.cos(origin) * PLAN.atriumRadius, z - Math.sin(origin) * PLAN.atriumRadius);
+    plants.push({ x, z, height: tree ? 4.2 + noise(i + 80) * 3.2 : 1 + noise(i + 80) * 0.7, crown: tree ? 1.5 + noise(i + 120) * 0.9 : 0.8 + noise(i + 120) * 0.5, ignite: 34 + reach * 1.7 + noise(i + 160) * 8 });
+  }
+  return plants;
+})();
+
 /* ---------------------------------------------------------------------------------------------------------------
  * Rescue stage: what happens outside the main door while the camera is still outside (aerial view and approach).
  * The whole building burns; one firefighter hoses the facade, one waves people out at the door, one carries a child
@@ -295,7 +316,7 @@ export type RescueActor = {
 export const RESCUE_CAST: readonly RescueActor[] = [
   { id: "hose", model: "FirefighterKiet", clip: "HoseHold", at: [-11.5, 0, 44.5], faces: [JET_TARGET[0], JET_TARGET[2]] },
   { id: "door", model: "FirefighterLoc", clip: "Wave", at: [2.9, 0, 31.9], faces: [-1.5, 36] },
-  { id: "carrier", model: "FirefighterNam", clip: "CarryWalk", path: 0, lateral: -0.5, speed: 1.6, phase: 0.3, carries: "NpcBoy" },
+  { id: "carrier", model: "FirefighterNam", clip: "Walk", path: 0, lateral: -0.5, speed: 1.5, phase: 0.3, carries: "NpcBoy" },
   { id: "casual-panic", model: "CasualBlackShirt", clip: "Run", path: 1, lateral: 0.4, speed: 3.4, phase: 0.1 },
   { id: "casual-run", model: "CasualBlueTee", clip: "Run", path: 0, lateral: 0.7, speed: 3.2, phase: 0.62 },
   { id: "casual-phone", model: "CasualWhitePolo", clip: "Phone", at: [ASSEMBLY[0] + 1.6, 0, ASSEMBLY[1] + 0.8], faces: [0, 30] },

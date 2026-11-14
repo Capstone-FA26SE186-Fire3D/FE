@@ -63,9 +63,18 @@ lengths, measures height on the posed skin and fades bodies with a dithered opac
 `scene/rescue.ts` + the `RESCUE_CAST` / `ESCAPE_PATHS` data in `layout.ts`: a limited fire on the upper floors left of
 the door (the whole-building fire and the collapse stay in the Organization branch, where rooms now catch one after
 another from an origin room), a fire engine, a hose jet, the assembly point, two stairs beside the door with people
-coming down from the upper floors, and the firefighters: one on the hose, one at the door, one carrying a child out. The
+coming down from the upper floors, and the firefighters: one on the hose, one at the door, one carrying a child out (the
+carry pose is authored in Blender on the two real bodies, `scripts/build_landing_carry.py` -> `carry-pose.json`; his legs
+keep walking). The
 fourth firefighter works half way along the walked route and a colleague waits at its end (both in `OCCUPANTS`). The
-stage is hidden once the camera is through the door. Budgets: `BUDGETS[tier].rescue` people, first N of the cast.
+stage is hidden once the camera is through the door and shown again in the Organization overview, where people keep
+leaving until the building starts to come down. Budgets: `BUDGETS[tier].rescue` people, first N of the cast.
+
+The courtyard has a small garden (`GARDEN` in `layout.ts`); in the Organization fire each plant catches, glows and
+stands charred, and the stairs come down with the building.
+
+**Asset cache:** `/models` is cached for a day and the files keep their names, so `ASSET_VERSION` in
+`scene/characters.ts` must be bumped *after* a body, `animations.glb` or `carry-pose.json` is rebuilt.
 
 ## Not done / not verified
 

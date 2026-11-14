@@ -99,22 +99,13 @@ def game(name, texture=1024, triangles=14000):
     return _export(name, arm, mesh, texture, triangles)
 
 
-def landing(name, texture=1024, triangles=14000):
-    """A landing-only body from AccuRig: repair hands, T-pose as rest, palms down, new atlas -> GLB."""
-    folder, source = LANDING[name]
-    arm, mesh = H.load(os.path.join(ART, folder, source + ".fbx").replace("\\", "/"))
-    rep = {"hands": H.fix_hands(arm, mesh)}
+def _apply_pose_as_rest(arm, mesh):
     win = _window()
-    mesh.matrix_parent_inverse = Matrix.Identity(4)
-    mesh.matrix_basis = Matrix.Identity(4)
-    if mesh.data.shape_keys:
-        mesh.shape_key_clear()
     with bpy.context.temp_override(window=win, scene=win.scene, view_layer=win.view_layer):
         bpy.ops.object.select_all(action="DESELECT")
         mesh.select_set(True)
         bpy.context.view_layer.objects.active = mesh
         bpy.ops.object.modifier_apply(modifier=mesh.modifiers[0].name)
-        bpy.ops.mesh.customdata_custom_splitnormals_clear()
         mesh.select_set(False)
         arm.select_set(True)
         bpy.context.view_layer.objects.active = arm
@@ -124,8 +115,64 @@ def landing(name, texture=1024, triangles=14000):
     mod = mesh.modifiers.new("Armature", "ARMATURE")
     mod.object = arm
     bpy.context.view_layer.update()
+
+
+def shots(arm, mesh, out, tag, views=("side", "front")):
+    """Orthographic full-body renders for checking by eye; returns the file paths."""
+    from mathutils import Vector
+    scene = _window().scene
+    zs = [(mesh.matrix_world @ v.co).z for v in mesh.data.vertices]
+    centre = Vector((0, 0, (max(zs) + min(zs)) / 2))
+    data = bpy.data.cameras.new("TMP_cam")
+    data.type = "ORTHO"
+    data.ortho_scale = (max(zs) - min(zs)) * 1.15
+    cam = bpy.data.objects.new("TMP_cam", data)
+    scene.collection.objects.link(cam)
+    prev = (scene.render.engine, scene.camera, scene.render.resolution_x, scene.render.resolution_y, scene.render.filepath)
+    scene.camera = cam
+    scene.render.engine = "BLENDER_WORKBENCH"
+    scene.display.shading.light = "STUDIO"
+    scene.display.shading.color_type = "TEXTURE"
+    scene.render.resolution_x, scene.render.resolution_y = 420, 640
+    files = []
+    offsets = {"side": Vector((1, 0, 0)), "front": Vector((0, -1, 0)), "back": Vector((0, 1, 0)), "quarter": Vector((0.7, -0.7, 0.15)), "top": Vector((0, -0.2, 1))}
+    for view in views:
+        cam.location = centre + offsets[view] * 4
+        cam.rotation_euler = (centre - cam.location).normalized().to_track_quat("-Z", "Y").to_euler()
+        scene.render.filepath = os.path.join(out, f"{tag}_{view}.png")
+        bpy.ops.render.render(write_still=True)
+        files.append(scene.render.filepath)
+    scene.render.engine, scene.camera, scene.render.resolution_x, scene.render.resolution_y, scene.render.filepath = prev
+    bpy.data.objects.remove(cam)
+    bpy.data.cameras.remove(data)
+    return files
+
+
+def prepare(name):
+    """A landing-only body from AccuRig: repair hands, T-pose as rest, palms down. No export."""
+    folder, source = LANDING[name]
+    arm, mesh = H.load(os.path.join(ART, folder, source + ".fbx").replace("\\", "/"))
+    rep = {"hands": H.fix_hands(arm, mesh)}
+    mesh.matrix_parent_inverse = Matrix.Identity(4)
+    mesh.matrix_basis = Matrix.Identity(4)
+    if mesh.data.shape_keys:
+        mesh.shape_key_clear()
+    _apply_pose_as_rest(arm, mesh)
+    win = _window()
+    with bpy.context.temp_override(window=win, scene=win.scene, view_layer=win.view_layer):
+        bpy.ops.object.select_all(action="DESELECT")
+        mesh.select_set(True)
+        bpy.context.view_layer.objects.active = mesh
+        bpy.ops.mesh.customdata_custom_splitnormals_clear()
     rep["resize"] = B.resize_hands(arm, mesh)
     rep["palm"] = B.turn_palms(arm, mesh)
+    return arm, mesh, rep
+
+
+def landing(name, texture=1024, triangles=14000):
+    """A landing-only body from AccuRig, repaired (see prepare), with a new atlas -> GLB."""
+    folder, _ = LANDING[name]
+    arm, mesh, rep = prepare(name)
     atlas = os.path.join(ART, folder, "textures", name + "_atlas.jpg")
     rep["atlas"] = atlas_fix.rebake(mesh, atlas, size=2048)
     rep.update(_export(name, arm, mesh, texture, triangles))
