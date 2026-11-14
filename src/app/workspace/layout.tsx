@@ -8,5 +8,5 @@ import { ThemeScope } from "@/features/theme/theme-scope";
 
 // The AI conversation state sits above the shell (which re-mounts its children per pathname), so it survives navigation.
 export default function WorkspaceLayout({ children }: { children: ReactNode }) {
-  return <Suspense fallback={<ThemeScope><main className="ops-access"><LoadingBlock label="Đang mở không gian tổ chức…" /></main></ThemeScope>}><AiBubbleProvider><OperationsShell areaId="organization">{children}<AiBubble /></OperationsShell></AiBubbleProvider></Suspense>;
+  return <Suspense fallback={<ThemeScope><main className="ops-access"><LoadingBlock label="Đang mở không gian tổ chức…" reloadHint /></main></ThemeScope>}><AiBubbleProvider><OperationsShell areaId="organization">{children}<AiBubble /></OperationsShell></AiBubbleProvider></Suspense>;
 }

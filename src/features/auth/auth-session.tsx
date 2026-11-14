@@ -18,6 +18,12 @@ type AuthSessionContextValue = {
   isAuthenticated: boolean;
   pending: boolean;
   ready: boolean;
+  /**
+   * Set when the saved session could not be checked (network down, API timeout, 5xx/429): the session is kept, not
+   * signed out, and screens offer [retrySession] instead of a sign-in prompt or an endless spinner (FE#100, FE#103).
+   */
+  sessionError: string | null;
+  retrySession: () => void;
   user: AuthUser | null;
   login: (email: string, password: string) => Promise<AuthUser>;
   loginWithGoogle: () => Promise<GoogleLoginResult>;
@@ -47,6 +53,16 @@ function forgetAccountBoundData() {
 const REFRESH_LEAD_MS = 60_000;
 /** A transient refresh failure (network, 5xx, 429) is retried after this delay instead of signing the user out. */
 const REFRESH_RETRY_MS = 30_000;
+/** Checking the saved session gives up after this long, so a hung request never leaves the app on a spinner. */
+const RESTORE_TIMEOUT_MS = 15_000;
+
+/** Network failure, timeout, 408/429 or 5xx: the session may be fine, the API just did not answer. */
+export function isTransientAuthError(error: unknown) {
+  if (error instanceof ApiError) return error.status === 408 || error.status === 429 || error.status >= 500;
+  return true;
+}
+
+const RESTORE_UNREACHABLE = "Chưa kết nối được máy chủ FET3D để kiểm tra phiên đăng nhập. Kiểm tra mạng rồi thử lại; bạn chưa bị đăng xuất.";
 
 function toMessage(error: unknown) {
   return messageOf(error, "Không thể hoàn tất xác thực. Vui lòng thử lại.");
@@ -58,6 +74,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [pending, setPending] = useState(false);
   const [ready, setReady] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
   // The account this tab last held: a different account signing in (even without a logout in between) starts clean.
   const lastUserId = useRef<string | null>(null);
   const channel = useRef<ReturnType<typeof openSessionChannel> | null>(null);
@@ -65,6 +83,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   const saveSession = useCallback((response: TokenResponse, explicitLogin = false) => {
     if (explicitLogin && lastUserId.current && lastUserId.current !== response.user.id) forgetAccountBoundData();
     lastUserId.current = response.user.id;
+    setSessionError(null);
     setAccessToken(response.accessToken);
     setUser(response.user);
     const tokens = { accessToken: response.accessToken, refreshToken: response.refreshToken };
@@ -73,6 +92,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearSession = useCallback(() => {
+    setSessionError(null);
     setAccessToken(null);
     setUser(null);
     persistTokens(null);
@@ -115,15 +135,23 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
         if (active) setReady(true);
         return;
       }
+      const timeout = new AbortController();
+      const timer = window.setTimeout(() => timeout.abort(), RESTORE_TIMEOUT_MS);
       try {
-        const currentUser = await authApi.me(tokens.accessToken);
+        const currentUser = await authApi.me(tokens.accessToken, timeout.signal);
         if (!active) return;
         lastUserId.current = currentUser.id;
         setAccessToken(tokens.accessToken);
         setUser(currentUser);
       } catch (error) {
+        if (!active) return;
+        if (isTransientAuthError(error)) {
+          // Keep the saved tokens: signing out because the network blinked would lose the session for nothing.
+          setSessionError(RESTORE_UNREACHABLE);
+          return;
+        }
         if (!(error instanceof ApiError) || error.status !== 401) {
-          if (active) clearSession();
+          clearSession();
           return;
         }
         try {
@@ -136,17 +164,34 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
             return authApi.refresh(tokens.refreshToken);
           });
           if (active) saveSession(refreshed);
-        } catch {
+        } catch (refreshError) {
+          if (!active) return;
+          if (isTransientAuthError(refreshError)) setSessionError(RESTORE_UNREACHABLE);
           // The session is really gone (expired/revoked): whoever signs in next may be another account.
-          if (active) { clearSession(); forgetAccountBoundData(); }
+          else { clearSession(); forgetAccountBoundData(); }
         }
       } finally {
+        window.clearTimeout(timer);
         if (active) setReady(true);
       }
     };
     void restore();
     return () => { active = false; };
-  }, [clearSession, saveSession]);
+  }, [clearSession, saveSession, restoreAttempt]);
+
+  const retrySession = useCallback(() => {
+    setSessionError(null);
+    setReady(false);
+    setRestoreAttempt((attempt) => attempt + 1);
+  }, []);
+
+  // Back online after a failed check: try again without waiting for a click.
+  useEffect(() => {
+    if (!sessionError) return;
+    const onOnline = () => retrySession();
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [retrySession, sessionError]);
 
   // Keep the session alive while the tab is open: renew the access token shortly before it expires (single flight).
   // A rejected refresh means the session family is gone (revoked/expired) and the user must sign in again; a transient
@@ -283,6 +328,8 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!user,
     pending,
     ready,
+    sessionError,
+    retrySession,
     user,
     login,
     loginWithGoogle,
@@ -293,7 +340,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     requestPasswordReset,
     resetPassword,
     updateUser,
-  }), [accessToken, completeGoogleOnboarding, endSession, login, loginWithGoogle, logout, pending, ready, register, requestPasswordReset, resetPassword, updateUser, user]);
+  }), [accessToken, completeGoogleOnboarding, endSession, login, loginWithGoogle, logout, pending, ready, register, requestPasswordReset, resetPassword, retrySession, sessionError, updateUser, user]);
 
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;
 }

@@ -23,8 +23,19 @@ export function Spinner({ size = 20, className, label }: { size?: number; classN
 }
 
 /** Centered spinner with a caption for a whole panel or page section. */
-export function LoadingBlock({ label = "Đang tải…", className, size = 44 }: { label?: string; className?: string; size?: number }) {
-  return <div className={cn("ops-loading-block", className)} role="status" aria-live="polite"><Spinner size={size} /><p>{label}</p></div>;
+export function LoadingBlock({ label = "Đang tải…", className, size = 44, reloadHint }: {
+  label?: string;
+  className?: string;
+  size?: number;
+  /**
+   * For a page-level fallback that is server-rendered and only replaced once the client bundle runs (FE#100): after a
+   * while a plain reload link appears. CSS reveals it, so it works even when the page's JavaScript failed to load or run.
+   */
+  reloadHint?: boolean;
+}) {
+  return <div className={cn("ops-loading-block", className)} role="status" aria-live="polite"><Spinner size={size} /><p>{label}</p>
+    {reloadHint && <p className="ops-loading-stuck">Trang mở lâu hơn bình thường. <a href="">Tải lại trang</a></p>}
+  </div>;
 }
 
 /**

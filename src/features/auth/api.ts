@@ -122,8 +122,8 @@ export const authApi = {
   logout(accessToken: string) {
     return apiClient.request<void>("/api/auth/logout", { headers: bearer(accessToken), method: "POST" });
   },
-  async me(accessToken: string) {
-    return normalizeUser(await apiClient.request<ApiAuthUser>("/api/auth/me", { headers: bearer(accessToken) }));
+  async me(accessToken: string, signal?: AbortSignal) {
+    return normalizeUser(await apiClient.request<ApiAuthUser>("/api/auth/me", { headers: bearer(accessToken), signal }));
   },
   async meWithMeta(accessToken: string) {
     const response = await apiClient.requestWithMeta<ApiAuthUser>("/api/auth/me", { headers: bearer(accessToken) });

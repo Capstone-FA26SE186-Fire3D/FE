@@ -374,3 +374,26 @@ test("platform admin loads and manages accounts through Fire3D endpoints", async
   await expect(page.getByText("Đã tạo tài khoản", { exact: true })).toBeVisible();
   expect(createPayload).toMatchObject({ email: "member@fire3d.test", password: "long-enough-password", fullName: "New Member", role: "Trainee", organizationId: null });
 });
+
+test("an unreachable API while restoring keeps the session and offers a retry instead of an endless spinner (FE#100)", async ({ page }) => {
+  const user = { id: "org-user", email: "owner@fire3d.test", fullName: "Chủ tổ chức", role: 1, organizationId: "org-1" };
+  await page.addInitScript((tokens) => {
+    if (!sessionStorage.getItem("fire3d-auth-tokens")) sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify(tokens));
+  }, { accessToken: "test-access-token", refreshToken: "test-refresh-token" });
+  let apiDown = true;
+  let refreshCalls = 0;
+  await page.route("**/api/auth/me", (route) => apiDown
+    ? route.fulfill({ status: 503, json: { title: "Service Unavailable" } })
+    : route.fulfill({ json: user }));
+  await page.route("**/api/auth/refresh", (route) => { refreshCalls++; return route.fulfill({ status: 503 }); });
+
+  await page.goto("/workspace/buildings");
+  await expect(page.getByText(/Chưa kết nối được máy chủ FET3D/)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Đăng nhập", exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => sessionStorage.getItem("fire3d-auth-tokens"))).toContain("test-refresh-token");
+  expect(refreshCalls).toBe(0);
+
+  apiDown = false;
+  await page.getByRole("button", { name: "Thử lại" }).click();
+  await expect(page.getByRole("link", { name: /Chủ tổ chức/ })).toBeVisible();
+});

@@ -92,7 +92,7 @@ function AccessScreen({ title, message, action, busy }: { title: string; message
 function Shell({ area, children }: { area: OperationsArea; children: ReactNode }) {
   const pathname = usePathname();
   const params = useSearchParams();
-  const { ready, user, logout, accessToken } = useAuthSession();
+  const { ready, user, logout, accessToken, sessionError, retrySession } = useAuthSession();
   const navCounts = useAdminNavCounts(accessToken ?? null, area.id === "admin" && ready && user?.role === 0);
   const [sidebar, setSidebar] = useLocalPreference<"expanded" | "collapsed">("fire3d-ops-sidebar", "expanded", isSidebarState);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -100,6 +100,9 @@ function Shell({ area, children }: { area: OperationsArea; children: ReactNode }
   const collapsed = sidebar === "collapsed";
 
   if (!ready) return <AccessScreen title={area.label} message="Đang kiểm tra phiên đăng nhập…" action={null} busy />;
+  if (!user && sessionError) {
+    return <AccessScreen title={area.label} message={sessionError} action={<div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}><Button onClick={retrySession}>Thử lại</Button><Button asChild variant="secondary"><Link href="/login">Đăng nhập lại</Link></Button></div>} />;
+  }
   if (!user) {
     const next = pathname + (params.size ? "?" + params.toString() : "");
     return <AccessScreen title={area.label} message={area.signInPrompt} action={<Button asChild><Link href={`/login?next=${encodeURIComponent(next)}`}>Đăng nhập</Link></Button>} />;

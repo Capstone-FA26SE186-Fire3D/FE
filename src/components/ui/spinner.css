@@ -7,6 +7,10 @@
 @keyframes ops-spark { 0%, 100% { opacity: .15; transform: scale(.6); } 50% { opacity: 1; transform: scale(1); } }
 .ops-loading-block { display: grid; justify-items: center; gap: 12px; padding: 40px 16px; color: var(--muted); font-size: 13px; text-align: center; }
 .ops-loading-block p { margin: 0; }
+/* Shown 12 s into a page-level fallback; delay survives the global reduced-motion rule (it only shortens durations). */
+.ops-loading-stuck { visibility: hidden; opacity: 0; animation: ops-reveal .2s ease-out 12s forwards; }
+.ops-loading-stuck a { color: var(--ember); font-weight: 600; text-decoration: underline; }
+@keyframes ops-reveal { to { visibility: visible; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .ops-spinner-ring { animation: none; stroke-dasharray: 100 26; }
 }
