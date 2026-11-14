@@ -22,6 +22,7 @@ import { SubmitStatus } from "../components/submit-status";
 import { fieldIssue, operationLabel } from "../labels";
 import type { AiOperation, AiOperationLimit, AiRequest } from "../types";
 import { canSubmitWith, limitOf } from "../use-ai-submit";
+import { splitUnits } from "../quota-units";
 import { useAiBubble } from "./ai-bubble-context";
 import { AssistantMessage, UserMessage } from "./chat-message";
 import { MessageScroller } from "./message-scroller";
@@ -97,10 +98,14 @@ export function AiChatPanel({ context, variant, onClose, onToggleExpand, onApply
   // The limits say no (balance under the reserve, or no policy) → the composer is replaced by the quota-out card (Figma 43:304).
   const blocked: AiOperationLimit | null | undefined = phase.kind === "blocked" && !phase.message ? phase.limit : limit !== undefined && !canSubmitWith(limit) ? limit : undefined;
   const units = quota.data?.units ?? [];
+  // The header names only the balance the selected operation spends (one line, never cut): units no policy uses are left out.
+  const spentUnit = limit?.policyActive && limit.quotaUnit ? limit.quotaUnit.trim().toLowerCase() : null;
+  const spent = spentUnit ? units.find((unit) => unit.quotaUnit.trim().toLowerCase() === spentUnit) : undefined;
+  const { inUse } = splitUnits(units, limits.data?.items);
   const quotaLine = blocked !== undefined && blocked?.policyActive
     ? { text: blocked.availableUnits <= 0 ? "Hạn mức đã hết" : "Hạn mức không đủ cho một yêu cầu", tone: "danger" as const }
     : quota.data
-      ? { text: units.length ? units.map((unit) => `Còn ${formatQuota(unit.available, unit.quotaUnit)}`).join(" · ") : "Chưa có hạn mức AI", tone: "dim" as const }
+      ? { text: spent ? `Còn ${formatQuota(spent.available, spent.quotaUnit)}` : inUse.length ? inUse.map(({ balance }) => `Còn ${formatQuota(balance.available, balance.quotaUnit)}`).join(" · ") : "Chưa có hạn mức AI", tone: "dim" as const }
       : quota.error !== undefined ? { text: "Chưa đọc được hạn mức", tone: "dim" as const } : { text: "Đang đọc hạn mức…", tone: "dim" as const };
 
   const trimmed = text.trim();

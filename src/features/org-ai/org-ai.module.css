@@ -45,6 +45,10 @@
 
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
 .kpis .ops-kpi-value { font-size: 26px; }
+.kpiUnits { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.kpiUnits li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.kpiUnitValue { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.kpiUnitOps { font-size: 13px; opacity: 0.72; }
 .wideDrawer.wideDrawer { width: min(680px, 100vw); }
 .wideModal.wideModal { width: min(760px, calc(100vw - 24px)); }
 .charCount { color: var(--dim); font-size: 12px; text-align: right; }
