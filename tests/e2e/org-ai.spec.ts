@@ -74,6 +74,47 @@ test.describe("Organization AI page: history", () => {
     await expect(page.getByRole("link", { name: "Hạn mức AI & nạp thêm" })).toHaveAttribute("href", "/workspace/billing?tab=ai"); // one link, in the page header
   });
 
+  test("the balance shows only units an active policy spends; an unused unit is listed apart in the quota tab", async ({ page }) => {
+    const mock = newAiMock();
+    // Production 13/11: an old grant in "credit" (no AI policy meters it) next to the "requests" pool the policies spend.
+    mock.quota.units = [
+      { quotaUnit: "credit", granted: 100000000, reserved: 0, consumed: 0, expired: 0, available: 100000000, scheduled: 0 },
+      { quotaUnit: "requests", granted: 300000000, reserved: 3, consumed: 9, expired: 0, available: 299999988, scheduled: 0 },
+    ];
+    mock.limits = ["Answer", "ScenarioDraft"].map((operation) => ({ operation, policyActive: true, quotaUnit: "requests", estimatedReserve: 1, maxInputChars: 4000, maxSources: 20, availableUnits: 299999988, canSubmit: true }));
+    await open(page, mock, "/workspace/ai");
+    await expect(page.getByTestId("ai-kpi-quota")).toHaveText("299.999.988 lượt hỏi");
+    await page.getByTestId("ai-bubble-button").click();
+    await expect(page.getByTestId("ai-chat-quota")).toHaveText("Còn 299.999.988 lượt hỏi");
+    await page.keyboard.press("Escape");
+    await page.getByRole("tab", { name: "Hạn mức & giới hạn" }).click();
+    await expect(page.getByTestId("ai-rail-quota")).toHaveCount(1);
+    await expect(page.getByTestId("ai-rail-quota")).toContainText("299.999.988");
+    await expect(page.getByTestId("ai-rail-quota-unused")).toContainText("Không dùng được");
+    await expect(page.getByTestId("ai-rail-quota-unused")).toContainText("credit");
+  });
+
+  test("two units in use are stacked, each named by the operations that spend it", async ({ page }) => {
+    const mock = newAiMock();
+    mock.quota.units = [
+      { quotaUnit: "requests", granted: 500, reserved: 0, consumed: 20, expired: 0, available: 480, scheduled: 0 },
+      { quotaUnit: "tokens", granted: 2000000, reserved: 0, consumed: 800000, expired: 0, available: 1200000, scheduled: 0 },
+    ];
+    mock.limits = [
+      { operation: "Answer", policyActive: true, quotaUnit: "requests", estimatedReserve: 1, maxInputChars: 4000, maxSources: 20, availableUnits: 480, canSubmit: true },
+      { operation: "ScenarioDraft", policyActive: true, quotaUnit: "tokens", estimatedReserve: 5000, maxInputChars: 8000, maxSources: 20, availableUnits: 1200000, canSubmit: true },
+    ];
+    await open(page, mock, "/workspace/ai");
+    const lines = page.getByTestId("ai-kpi-quota").locator("li");
+    await expect(lines).toHaveCount(2);
+    await expect(lines.nth(0)).toContainText("480 lượt hỏi");
+    await expect(lines.nth(0)).toContainText("Hỏi đáp");
+    await expect(lines.nth(1)).toContainText("1.200.000 tokens");
+    await expect(lines.nth(1)).toContainText("Đề xuất kịch bản");
+    await page.getByTestId("ai-bubble-button").click();
+    await expect(page.getByTestId("ai-chat-quota")).toHaveText("Còn 480 lượt hỏi");
+  });
+
   test("history empty, filtered-empty and error states", async ({ page }) => {
     const mock = newAiMock();
     await open(page, mock, "/workspace/ai?tab=history");
