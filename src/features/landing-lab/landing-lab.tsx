@@ -7,7 +7,7 @@ import type { Features, LabStats, LandingRuntime } from "@/features/landing/scen
 import styles from "./landing-lab.module.css";
 
 type Mode = "journey" | "trainee" | "organization";
-declare global { interface Window { __landingLab?: { stats: LabStats | null; error: string | null; ready: boolean; setProgress(p: number): void; setMode(m: Mode): void; setLineup(on: boolean): void; debugPlay(clip: string): void; setTier(t: Tier | "auto"): void; remount(): void; snapshot(): string; orbit(yaw: number, pitch: number): void; seekDamage(seconds: number): void } } }
+declare global { interface Window { __landingLab?: { stats: LabStats | null; error: string | null; ready: boolean; setProgress(p: number): void; setMode(m: Mode): void; setLineup(on: boolean): void; debugPlay(clip: string): void; probe(id: string, joints: string[], child?: boolean): Record<string, number[]> | null; view(pose: { position: [number, number, number]; target: [number, number, number]; follow?: string } | null): void; setTier(t: Tier | "auto"): void; remount(): void; snapshot(): string; orbit(yaw: number, pitch: number): void; seekDamage(seconds: number): void } } }
 
 const TARGET_FRAME_MS = 1000 / 60;
 const BEAT_LABEL = { aerial: "Toàn cảnh", door: "Cửa chính", fire: "1 · Nhận biết cháy", evac: "2 · Gặp người sơ tán", junction: "3 · Sảnh phân nhánh" } as const;
@@ -87,7 +87,7 @@ export function LandingLab() {
     window.__landingLab = {
       stats: null, error: null, ready: false,
       setProgress: p => { live.current.progress = p; setProgress(p); }, setMode: m => { live.current.mode = m; setMode(m); },
-      setLineup: on => runtimeRef.current?.setLineup(on), debugPlay: c => runtimeRef.current?.debugPlay(c), setTier, remount,
+      setLineup: on => runtimeRef.current?.setLineup(on), debugPlay: c => runtimeRef.current?.debugPlay(c), probe: (id, joints, child) => runtimeRef.current?.probe(id, joints, child) ?? null, view: pose => runtimeRef.current?.setDebugView(pose), setTier, remount,
       snapshot: () => runtimeRef.current?.snapshot() ?? "", orbit: (yaw, pitch) => { live.current.orbit = { yaw, pitch }; }, seekDamage: s => runtimeRef.current?.seekDamage(s),
     };
     return () => { delete window.__landingLab; };

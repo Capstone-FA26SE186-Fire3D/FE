@@ -23,7 +23,8 @@ Scroll journey: aerial view of the three-storey circular glass building -> main 
 | `scene/layout.ts` | Shared floor plan: ring radii, door, route arc, camera path `journeyPose`, occupants, fire/smoke anchors, bays, collapse/fire timeline, branch doors, `orgOverview`. Pure, unit-tested. |
 | `scene/building.ts` | Glass, slabs, frames, walls in 8 bays x 3 tiers. "Whole" merged meshes for the walk/overview; pivoted per-bay groups + instanced debris once the collapse starts. |
 | `scene/smoke.ts` | Instanced smoke/flames/dust, animated in the vertex shader; emitters have start times. |
-| `scene/characters.ts` | One-time GLB load (cached), skinned clones, animation LOD, foot-sync playback speed. |
+| `scene/characters.ts` | One-time GLB load (cached), skinned clones, clip transfer per body, animation LOD, foot-sync playback speed. |
+| `scene/rescue.ts` | Opening rescue stage: facade fire, fire engine, hose jet, stairs, assembly point, the people outside. |
 | `scene/phone.ts`, `phone-fit.ts` | Landscape device overlay scene and sizing. |
 | `scene/runtime.ts` | `createLandingRuntime`: one WebGLRenderer, quality controller + tier budgets (`budget.ts`), branches, diagnostics (`canvas.dataset.*`). |
 | `components/*` | Scroll state, copy, choices, orbit surface, fallback. |
@@ -50,10 +51,30 @@ resource growth when switching branches), `landing.spec.ts` (journey, branches, 
 
 ## Characters
 
-Player/NPC GLBs are produced by `scripts/export-landing-characters.py` and `scripts/export-landing-npcs.py` (Blender CLI) from
-`artifacts/characters`. Seven NPCs are skinned to the NpcWorker skeleton with automatic weights (Security/Cleaner/Boy use a nearest-
-surface weight transfer because heat weighting failed). **Known issue:** arm/hand poses in the walk and jog clips look wrong on the
-non-PlayerMale rigs; rigs and clips are being fixed separately. Rig/animation fidelity after GLB export is not verified.
+Eighteen bodies share one rig family (AccuRig): the ten game bodies, four firefighters and four people in everyday
+clothes (landing only). `scripts/export_landing_cast.py` writes the GLBs (live Blender session); landing-only bodies get
+the same hand, palm and atlas repair as the game bodies. Clips are the game's own character states, recorded in the Unity
+project (`LandingClipBakeTests`) and turned into `animations.glb` by `scripts/build_landing_animations.py`.
+`scene/characters.ts` transfers a clip to a body in model space (bone axes differ per body), keeps the body's own bone
+lengths, measures height on the posed skin and fades bodies with a dithered opacity (never by scaling them).
+
+## Rescue stage (opening view)
+
+`scene/rescue.ts` + the `RESCUE_CAST` / `ESCAPE_PATHS` data in `layout.ts`: a limited fire on the upper floors left of
+the door (the whole-building fire and the collapse stay in the Organization branch, where rooms now catch one after
+another from an origin room), a fire engine, a hose jet, the assembly point, two stairs beside the door with people
+coming down from the upper floors, and the firefighters: one on the hose, one at the door, one carrying a child out (the
+carry pose is authored in Blender on the two real bodies, `scripts/build_landing_carry.py` -> `carry-pose.json`; his legs
+keep walking). The
+fourth firefighter works half way along the walked route and a colleague waits at its end (both in `OCCUPANTS`). The
+stage is hidden once the camera is through the door and shown again in the Organization overview, where people keep
+leaving until the building starts to come down. Budgets: `BUDGETS[tier].rescue` people, first N of the cast.
+
+The courtyard has a small garden (`GARDEN` in `layout.ts`); in the Organization fire each plant catches, glows and
+stands charred, and the stairs come down with the building.
+
+**Asset cache:** `/models` is cached for a day and the files keep their names, so `ASSET_VERSION` in
+`scene/characters.ts` must be bumped *after* a body, `animations.glb` or `carry-pose.json` is rebuilt.
 
 ## Not done / not verified
 
