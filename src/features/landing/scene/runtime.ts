@@ -4,11 +4,12 @@ import type { LandingBranch } from "../types";
 import { BUDGETS, TIER_DWELL_MS, initialTier, tierBelow, type Tier } from "./budget";
 import { createCircularBuilding } from "./building";
 import { createCharacters, loadCharacterAssets } from "./characters";
-import { BAYS, FRAME_SHIFT, ORG_FRAME, OCCUPANTS, isWideFrame, PLAN, STAGE, bayCentre, bayFallStart, firePosition, followPose, journeyPose, occupantPose, orgOverview, roomFire, smokeDrift, smoothstep, type Orbit, type Pose } from "./layout";
+import { BAYS, FRAME_SHIFT, ORG_FRAME, OCCUPANTS, isWideFrame, PLAN, STAGE, bayCentre, bayFallStart, firePosition, followPose, journeyPose, occupantPose, orgOverview, outsideAmount, roomFire, routeFire, ROUTE_FIRES, smokeDrift, smoothstep, type Orbit, type Pose } from "./layout";
 import { createJunction } from "./junction";
 import { createLandscapePhone } from "./phone";
 import { phoneTargetSize } from "./phone-fit";
 import { createQualityController } from "./quality";
+import { createRescue } from "./rescue";
 import { fireFlicker } from "./fire-flicker";
 import { createSmoke, type Emitter } from "./smoke";
 
@@ -27,13 +28,16 @@ const damp = (rate: number, dt: number) => 1 - Math.exp(-rate * dt);
 const FOG = 0.006;
 const TIER_H = PLAN.tierHeight - PLAN.slab;
 
-function corridorEmitters(): Emitter[] { return [{ position: [...firePosition()] as [number, number, number], start: 0, ceiling: TIER_H, drift: [...smokeDrift()] as [number, number] }]; }
+function corridorEmitters(): Emitter[] {
+  const first: Emitter = { position: [...firePosition()] as [number, number, number], start: 0, ceiling: TIER_H, drift: [...smokeDrift()] as [number, number] };
+  return [first, ...ROUTE_FIRES.map(f => { const fire = routeFire(f); return { position: [...fire.position] as [number, number, number], start: 0, ceiling: TIER_H, drift: [...fire.drift] as [number, number], scale: 0.85 }; })];
+}
 
 /** Building-wide fire for the Organization demonstration: authored timing, not a propagation model. */
 function organizationEmitters(): Emitter[] {
   const list: Emitter[] = [];
   for (let tier = 0; tier < PLAN.tiers; tier++) for (let bay = 0; bay < BAYS; bay++) {
-    const fire = roomFire(tier, bay), a = bayCentre(bay), base = tier * PLAN.tierHeight;
+    const fire = roomFire(tier, bay), a = bayCentre(bay) + fire.offset, base = tier * PLAN.tierHeight;
     // Room fire seen through the glass, smoke spreading along the corridor ceiling.
     list.push({ position: [Math.cos(a) * 25.5, base + 0.05, Math.sin(a) * 25.5], start: fire.wall, ceiling: base + TIER_H, drift: [-Math.sin(a), Math.cos(a)], scale: 0.8 + fire.strength * 0.5 });
     // Flames and smoke breaking through the facade.
@@ -79,6 +83,9 @@ export async function createLandingRuntime(canvas: HTMLCanvasElement, mobile: bo
   const orgSmoke = createSmoke(900, 420, organizationEmitters());
   orgSmoke.smoke.visible = orgSmoke.flames.visible = false;
   scene.add(corridorSmoke.smoke, corridorSmoke.flames, orgSmoke.smoke, orgSmoke.flames);
+  // Outside the door: a fire on the upper floors, the fire engine and the people (bodies join when loaded).
+  const RESCUE_PUFFS = 240, RESCUE_FLAMES = 150;
+  const rescue = createRescue(scene, RESCUE_PUFFS, RESCUE_FLAMES);
   // Characters are decoration (about 6 MB of models): the building renders first and they join when loaded; if the models cannot load, the landing works without them.
   let characters: ReturnType<typeof createCharacters> | null = null;
 
@@ -106,6 +113,8 @@ export async function createLandingRuntime(canvas: HTMLCanvasElement, mobile: bo
     const ratio = b.smokePuffs / BUDGETS.high.smokePuffs;
     orgSmoke.setCounts(features.smoke ? Math.round(900 * ratio) : 0, features.smoke ? Math.round(420 * ratio) : 0);
     characters?.setBudget(features.characters ? b.characters : 0, tier);
+    rescue.setFire(features.smoke ? Math.round(RESCUE_PUFFS * ratio) : 0, features.smoke ? Math.round(RESCUE_FLAMES * ratio) : 0);
+    rescue.setBudget(features.characters ? b.rescue : 0, tier);
     const size = phoneTargetSize(b.phoneWidth); phoneTarget.setSize(size.width, size.height);
     const dpr = Math.min(window.devicePixelRatio, b.dprCap);
     if (renderer.getPixelRatio() > dpr) renderer.setPixelRatio(dpr);
@@ -123,6 +132,7 @@ export async function createLandingRuntime(canvas: HTMLCanvasElement, mobile: bo
     if (disposed) return;
     characters = createCharacters(assets, scene, tier);
     characters.setBudget(features.characters ? BUDGETS[tier].characters : 0, tier);
+    rescue.attach(assets); rescue.setBudget(features.characters ? BUDGETS[tier].rescue : 0, tier);
     if (lineup) characters.setLineup(true);
   }).catch(error => console.warn("[Fire3D:characters]", error));
 
@@ -155,6 +165,7 @@ export async function createLandingRuntime(canvas: HTMLCanvasElement, mobile: bo
   }
 
   const noOrbit: Orbit = { yaw: 0, pitch: 0 };
+  let debugView: (Pose & { follow?: string }) | null = null;
   applySize();
   return {
     renderer,
@@ -185,6 +196,12 @@ export async function createLandingRuntime(canvas: HTMLCanvasElement, mobile: bo
       orgPosition.set(...over.position); orgTarget.set(...over.target);
       desired.lerp(orgPosition, organization); desiredTarget.lerp(orgTarget, organization);
       if (lineup) { desired.set(0, 1.25, 47.5); desiredTarget.set(0, 1, 40); }
+      if (debugView) {
+        desired.set(...debugView.position); desiredTarget.set(...debugView.target);
+        // With `follow`, position and target are offsets from that rescue actor.
+        const followed = debugView.follow ? rescue.actors.find(a => a.actor.id === debugView!.follow) : null;
+        if (followed) { desired.add(followed.holder.position); desiredTarget.add(followed.holder.position); camPos.copy(desired); camTarget.copy(desiredTarget); }
+      }
       const settle = initialized ? damp(10, dt) : 1;
       camPos.lerp(desired, settle); camTarget.lerp(desiredTarget, settle);
       if (!initialized) { camPos.copy(desired); camTarget.copy(desiredTarget); initialized = true; }
@@ -206,6 +223,9 @@ export async function createLandingRuntime(canvas: HTMLCanvasElement, mobile: bo
         characters.group.visible = organization < 0.05 && collapse < 0.01;
         animated = characters.group.visible ? characters.update(dt, time, camera) : 0;
       }
+      // The rescue stage is what the opening shows; it is gone once the camera is inside or in a branch.
+      const outside = lineup ? 0 : outsideAmount(progress) * (organization < 0.05 ? 1 : 0) * (phoneAmount < 0.5 ? 1 : 0);
+      animated += rescue.update(dt, time, camera, outside);
       draw(dt);
 
       report.organization = organization; report.phone = phoneAmount;
@@ -220,7 +240,7 @@ export async function createLandingRuntime(canvas: HTMLCanvasElement, mobile: bo
         const collapseText = collapse.toFixed(3), damageText = damageTime.toFixed(2);
         if (diagnostics.collapse !== collapseText) { diagnostics.collapse = collapseText; data.collapse = collapseText; }
         if (diagnostics.damageTime !== damageText) { diagnostics.damageTime = damageText; data.damageTime = damageText; }
-        data.npcs = String(characters ? characters.actors.length : 0);
+        data.npcs = String(characters ? characters.actors.length : 0); data.rescue = String(rescue.actors.length); data.outside = outside.toFixed(2);
         data.camera = camera.position.x.toFixed(3) + "," + camera.position.y.toFixed(3) + "," + camera.position.z.toFixed(3);
         data.phone = phoneAmount.toFixed(3); data.cutaway = organization.toFixed(3);
         data.drawCalls = String(passes.main.calls + passes.screen.calls + passes.overlay.calls);
@@ -237,6 +257,8 @@ export async function createLandingRuntime(canvas: HTMLCanvasElement, mobile: bo
     setTier(next: Tier | "auto") { if (next === "auto") return; applyTier(next); },
     setLineup(on: boolean) { lineup = on; characters?.setLineup(on); initialized = false; },
     debugPlay(clip: string) { characters?.debugPlay(clip); },
+    /** Diagnostic: hold the camera at a fixed pose (null returns it to the journey). */
+    setDebugView(pose: (Pose & { follow?: string }) | null) { debugView = pose; initialized = false; },
     /** Diagnostic: jump the Organization demonstration clock (it only advances while the overview is settled). */
     seekDamage(seconds: number) { damageTime = Math.max(0, seconds); },
     stats(): LabStats {
@@ -251,7 +273,7 @@ export async function createLandingRuntime(canvas: HTMLCanvasElement, mobile: bo
     },
     dispose() {
       if (disposed) return; disposed = true; liveRenderers--;
-      characters?.dispose(); corridorSmoke.dispose(); orgSmoke.dispose(); building.dispose(); junction.dispose(); phone.dispose(); phoneTarget.dispose(); environment.dispose();
+      characters?.dispose(); rescue.dispose(); corridorSmoke.dispose(); orgSmoke.dispose(); building.dispose(); junction.dispose(); phone.dispose(); phoneTarget.dispose(); environment.dispose();
       backdrop.geometry.dispose(); backdrop.material.dispose(); fireLight.dispose();
       scene.clear(); renderer.dispose(); renderer.forceContextLoss();
     },

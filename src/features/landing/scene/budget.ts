@@ -6,6 +6,8 @@ export const TIER_ORDER: readonly Tier[] = ["high", "medium", "low"];
 export type Budget = {
   /** Skinned characters drawn at once (first N of OCCUPANTS). */
   characters: number;
+  /** People on the rescue stage outside the door (first N of RESCUE_CAST; the four firefighters come first). */
+  rescue: number;
   /** Smoke billboards in the single instanced draw. */
   smokePuffs: number;
   flames: number;
@@ -18,9 +20,9 @@ export type Budget = {
 };
 
 export const BUDGETS: Record<Tier, Budget> = {
-  high: { characters: 12, smokePuffs: 360, flames: 70, dprCap: 1.5, phoneHz: 60, phoneWidth: 1024 },
-  medium: { characters: 8, smokePuffs: 220, flames: 45, dprCap: 1.25, phoneHz: 30, phoneWidth: 768 },
-  low: { characters: 6, smokePuffs: 120, flames: 24, dprCap: 1, phoneHz: 20, phoneWidth: 512 },
+  high: { characters: 14, rescue: 20, smokePuffs: 360, flames: 70, dprCap: 1.5, phoneHz: 60, phoneWidth: 1024 },
+  medium: { characters: 10, rescue: 14, smokePuffs: 220, flames: 45, dprCap: 1.25, phoneHz: 30, phoneWidth: 768 },
+  low: { characters: 8, rescue: 9, smokePuffs: 120, flames: 24, dprCap: 1, phoneHz: 20, phoneWidth: 512 },
 };
 
 export function initialTier(mobile: boolean, cores: number | undefined): Tier {
