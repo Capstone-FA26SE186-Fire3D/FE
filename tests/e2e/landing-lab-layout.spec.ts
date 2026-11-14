@@ -82,7 +82,8 @@ test("landscape phone keeps the screen aspect and fits every target viewport", (
 });
 
 test("budgets follow the agreed caps and step down monotonically", () => {
-  expect([BUDGETS.high.characters, BUDGETS.medium.characters, BUDGETS.low.characters]).toEqual([12, 8, 6]);
+  expect([BUDGETS.high.characters, BUDGETS.medium.characters, BUDGETS.low.characters]).toEqual([15, 10, 8]);
+  expect([BUDGETS.high.rescue, BUDGETS.medium.rescue, BUDGETS.low.rescue]).toEqual([21, 14, 9]);
   expect(BUDGETS.high.smokePuffs).toBeGreaterThan(BUDGETS.medium.smokePuffs);
   expect(BUDGETS.medium.smokePuffs).toBeGreaterThan(BUDGETS.low.smokePuffs);
   expect(tierBelow("high")).toBe("medium");
