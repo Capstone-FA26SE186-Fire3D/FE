@@ -9,6 +9,7 @@ import { billingApi } from "@/features/billing/api";
 import { formatDateTime, formatNumber, formatQuota, quotaUnitLabel } from "@/features/billing/format";
 
 import { orgAiApi } from "../api";
+import { splitUnits } from "../quota-units";
 import { aiErrorText, operationLabel } from "../labels";
 import styles from "../org-ai.module.css";
 
@@ -20,8 +21,10 @@ import styles from "../org-ai.module.css";
 export function AiQuotaCard({ accessToken }: { accessToken: string }) {
   const quota = useAsyncData("org-ai:quota", (signal) => billingApi.getAiQuota(accessToken, undefined, signal));
   const limits = useAsyncData("org-ai:limits", (signal) => orgAiApi.limits(accessToken, signal));
-  const units = quota.data?.units ?? [];
   const items = limits.data?.items ?? [];
+  // Units an active policy spends first; any other unit is listed after them, marked as not usable by any AI request.
+  const { inUse, unused } = splitUnits(quota.data?.units ?? [], limits.data?.items);
+  const units = [...inUse.map((entry) => ({ ...entry.balance, usable: true })), ...unused.map((balance) => ({ ...balance, usable: false }))];
 
   return <div className={styles.grid2} data-testid="ai-quota-card">
     <section className="org-card" aria-labelledby="org-ai-quota-title">
@@ -31,8 +34,8 @@ export function AiQuotaCard({ accessToken }: { accessToken: string }) {
       {quota.error !== undefined && !quota.data && <Alert tone="danger" title="Chưa đọc được hạn mức" action={<Button size="sm" variant="secondary" className="mt-3" onClick={quota.reload}>Thử lại</Button>}>{aiErrorText(quota.error)}</Alert>}
       {quota.data && units.length === 0 && <p className="org-card-sub">Tổ chức chưa có hạn mức AI.</p>}
       <div className="org-stack-sm">
-        {units.map((unit) => <div key={unit.quotaUnit} className="org-sub-card" data-testid="ai-rail-quota">
-          <span className="org-meta">Còn lại</span>
+        {units.map((unit) => <div key={unit.quotaUnit} className="org-sub-card" data-testid={unit.usable ? "ai-rail-quota" : "ai-rail-quota-unused"}>
+          <span className="org-meta">{unit.usable ? "Còn lại" : "Không dùng được"}</span>
           <p className="org-big">{formatQuota(unit.available, null)}</p>
           <p style={{ margin: 0 }}>{quotaUnitLabel(unit.quotaUnit)}</p>
           <dl className={styles.meta} style={{ marginTop: 10 }}>
@@ -42,6 +45,7 @@ export function AiQuotaCard({ accessToken }: { accessToken: string }) {
             {unit.expired > 0 && <><dt>Đã hết hạn</dt><dd>{formatNumber(unit.expired)}</dd></>}
             {unit.scheduled > 0 && <><dt>Sắp hiệu lực</dt><dd>{formatNumber(unit.scheduled)}</dd></>}
           </dl>
+          {!unit.usable && <p className={styles.dim} style={{ margin: "8px 0 0" }}>Không chính sách AI nào trừ theo đơn vị này, nên số này không dùng được cho câu hỏi hay đề xuất kịch bản.</p>}
         </div>)}
       </div>
       {quota.data && <p className={styles.dim} style={{ marginTop: 10 }}>Số liệu lúc {formatDateTime(quota.data.asOf)}.</p>}

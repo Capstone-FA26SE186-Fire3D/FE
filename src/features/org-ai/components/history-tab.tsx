@@ -16,6 +16,8 @@ import { billingApi } from "@/features/billing/api";
 import { formatDateTime, formatNumber, formatQuota } from "@/features/billing/format";
 
 import { orgAiApi } from "../api";
+import { useOptionalAiBubble } from "../floating/ai-bubble-context";
+import { splitUnits } from "../quota-units";
 import { aiErrorText, isSuccessfulDraft, operationLabel, resultTypeLabel, statusLabel, statusTone } from "../labels";
 import { AI_OPERATIONS, AI_RESULT_TYPES, AI_STATUSES, urlFilter, urlId, type AiRequest } from "../types";
 import styles from "../org-ai.module.css";
@@ -24,15 +26,27 @@ import { BILLING_AI_HREF } from "./request-view";
 
 const PAGE_SIZE = 20;
 
-/** Figma 48:1988 KPI tiles. Only numbers the API gives: the pooled balance and the count of requests waiting for an admin. */
+/**
+ * Figma 48:1988 KPI tiles. Only numbers the API gives: the balance in the unit(s) the active policies spend and the count
+ * of requests waiting for an admin. Both reload whenever a request from the bubble settles, so the balance follows use.
+ */
 function Kpis({ accessToken }: { accessToken: string }) {
-  const quota = useAsyncData("org-ai:kpi:quota", (signal) => billingApi.getAiQuota(accessToken, undefined, signal));
-  const reconcile = useAsyncData("org-ai:kpi:reconcile", (signal) => orgAiApi.listRequests(accessToken, { status: "NeedsReconcile", page: 1, pageSize: 1 }, signal));
-  const units = quota.data?.units ?? [];
+  const settled = useOptionalAiBubble()?.settledCount ?? 0;
+  const quota = useAsyncData(`org-ai:kpi:quota:${settled}`, (signal) => billingApi.getAiQuota(accessToken, undefined, signal));
+  const limits = useAsyncData(`org-ai:kpi:limits:${settled}`, (signal) => orgAiApi.limits(accessToken, signal));
+  const reconcile = useAsyncData(`org-ai:kpi:reconcile:${settled}`, (signal) => orgAiApi.listRequests(accessToken, { status: "NeedsReconcile", page: 1, pageSize: 1 }, signal));
+  const { inUse } = splitUnits(quota.data?.units ?? [], limits.data?.items);
+  // One unit (the usual case) is the big number; several are stacked smaller, each named by the operations spending it.
+  const many = inUse.length > 1;
   return <div className={styles.kpis} data-testid="ai-kpis">
     <div className="ops-kpi">
       <span className="ops-kpi-label">Hạn mức còn lại</span>
-      <div className="ops-kpi-row"><span className="ops-kpi-value" data-testid="ai-kpi-quota">{quota.data ? (units.length ? units.map((unit) => formatQuota(unit.available, unit.quotaUnit)).join(" · ") : "0") : quota.error !== undefined ? "—" : "…"}</span></div>
+      {quota.data && many
+        ? <ul className={styles.kpiUnits} data-testid="ai-kpi-quota">{inUse.map(({ balance, operations }) => <li key={balance.quotaUnit}>
+            <span className={styles.kpiUnitValue}>{formatQuota(balance.available, balance.quotaUnit)}</span>
+            <span className={styles.kpiUnitOps}>{operations.map(operationLabel).join(", ")}</span>
+          </li>)}</ul>
+        : <div className="ops-kpi-row"><span className="ops-kpi-value" data-testid="ai-kpi-quota">{quota.data ? (inUse.length ? formatQuota(inUse[0].balance.available, inUse[0].balance.quotaUnit) : "0") : quota.error !== undefined ? "—" : "…"}</span></div>}
       <span className="ops-kpi-hint">Gộp từ gói công trình và các lần nạp thêm đã thanh toán · <Link href={BILLING_AI_HREF}>Nạp thêm</Link></span>
     </div>
     <div className="ops-kpi">
