@@ -290,7 +290,7 @@ export function createRescue(parent: THREE.Object3D, puffs: number, flames: numb
         a.holder.getWorldPosition(world);
         const interval = animationInterval(world.distanceTo(camera.position) * 0.5, tier);
         a.accumulated += delta;
-        if (++a.frame % interval === 0) { a.mixer.update(a.accumulated); a.child?.mixer.update(a.accumulated); a.accumulated = 0; animated++; }
+        if (++a.frame % interval === 0) { a.mixer.update(a.accumulated); a.child?.mixer.update(a.accumulated); a.ground(); a.accumulated = 0; animated++; }
       }
       // The nozzle sits in the hose firefighter's hands and points at the window the jet lands on.
       const holder = actors[0];

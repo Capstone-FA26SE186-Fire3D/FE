@@ -170,6 +170,11 @@ export type Body = {
   holder: THREE.Group; root: THREE.Object3D; mixer: THREE.AnimationMixer; action: THREE.AnimationAction; height: number;
   /** Fades the body in or out (0..1) without changing its size: a dithered fade, so it stays in the opaque pass. */
   setOpacity(value: number): void; dispose(): void;
+  /**
+   * Call after the mixer moved the bones: lifts the body by however far its lower ankle is under its standing height.
+   * Clips are recorded on one body; on other leg lengths the hips end up a little low and the feet sink into the floor.
+   */
+  ground(): void;
 };
 
 /** One skinned body standing on the ground at its real height, playing `clip`; `speed` (m/s) keeps the feet from sliding. */
@@ -201,8 +206,23 @@ export function spawnBody(assets: CharacterAssets, id: string, model: ModelId, c
   action.time = (id.length * 0.37 + id.charCodeAt(0) * 0.11) % action.getClip().duration;
   const recorded = CLIP_SPEED[clip];
   action.timeScale = speed > 0 && recorded ? speed / (recorded * (height / HEIGHT.PlayerMale)) : 1;
+  // Ankles at their standing height, in the holder's space (the body stands at its origin in the bind pose).
+  const ankles: THREE.Object3D[] = [];
+  root.traverse(o => { if (o.name === "CC_Base_L_Foot" || o.name === "CC_Base_R_Foot") ankles.push(o); });
+  const at = new THREE.Vector3();
+  const lowest = () => { let y = Infinity; for (const a of ankles) y = Math.min(y, holder.worldToLocal(a.getWorldPosition(at)).y); return y; };
+  holder.updateWorldMatrix(true, true);
+  const standing = ankles.length ? lowest() : 0;
   return {
     holder, root, mixer, action, height,
+    ground() {
+      if (!ankles.length) return;
+      lean.position.y = 0;
+      holder.updateWorldMatrix(true, true);
+      const sunk = standing - lowest();
+      // Only ever up, and by what a leg-length mismatch can explain: a body that kneels or crawls stays down.
+      if (sunk > 0.004 && sunk < 0.2) lean.position.y = sunk / Math.max(1e-3, holder.scale.y);
+    },
     setOpacity(value: number) {
       const next = Math.min(1, Math.max(0, value));
       if (Math.abs(next - opacity) < 0.004) return;
@@ -242,7 +262,7 @@ export function createCharacters(assets: CharacterAssets, parent: THREE.Object3D
         a.holder.getWorldPosition(world);
         const interval = animationInterval(world.distanceTo(camera.position), tier);
         a.accumulated += delta;
-        if (++a.frame % interval === 0) { a.mixer.update(a.accumulated); a.accumulated = 0; animated++; }
+        if (++a.frame % interval === 0) { a.mixer.update(a.accumulated); a.ground(); a.accumulated = 0; animated++; }
       }
       return animated;
     },
