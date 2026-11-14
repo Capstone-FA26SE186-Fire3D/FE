@@ -1,6 +1,6 @@
 # Landing character GLBs
 
-Eighteen skinned bodies (one JPEG atlas each, T-pose, no animation) and `animations.glb` (PlayerMale skeleton with 13 clips).
+Eighteen skinned bodies (one JPEG atlas each, T-pose, no animation) and `animations.glb` (PlayerMale skeleton with 10 clips).
 
 - Bodies: `scripts/export_landing_cast.py`, run in a live Blender session. Game bodies come from the Unity project
   (`Unity/Assets/_Fire3D/Art/Characters`), landing-only bodies (four firefighters, four casual) from

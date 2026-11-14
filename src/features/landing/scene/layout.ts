@@ -93,9 +93,9 @@ export const MODEL_HEIGHT: Record<ModelId, number> = {
 };
 export const MODEL_IDS = Object.keys(MODEL_HEIGHT) as ModelId[];
 /** Clips in animations.glb, recorded from the game's own character states (scripts/build_landing_animations.py). */
-export type ClipId = "Idle" | "Walk" | "Run" | "PanicRun" | "Wave" | "HoseHold" | "CarryWalk" | "InjuredWalk" | "CrouchWalk" | "Phone" | "Sit" | "Direct" | "Cough";
+export type ClipId = "Idle" | "Walk" | "Run" | "Wave" | "HoseHold" | "InjuredWalk" | "CrouchWalk" | "Phone" | "Direct" | "Cough";
 /** Ground speed (m/s) each moving clip was recorded at; playback follows the actor's speed so feet do not slide. */
-export const CLIP_SPEED: Partial<Record<ClipId, number>> = { Walk: 1.4, Run: 3.3, PanicRun: 3.2, CarryWalk: 1.3, InjuredWalk: 0.9, CrouchWalk: 0.85 };
+export const CLIP_SPEED: Partial<Record<ClipId, number>> = { Walk: 1.4, Run: 3.3, InjuredWalk: 0.9, CrouchWalk: 0.85 };
 export type Occupant = {
   id: string; model: ModelId; clip: ClipId;
   /** Route fraction range the occupant stays in. A moving occupant loops inside [from, to]. */

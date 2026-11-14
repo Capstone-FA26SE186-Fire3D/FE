@@ -9,7 +9,7 @@ const HEIGHT = MODEL_HEIGHT;
  * /models is cached for a day (next.config.ts) and these files keep their names when they are rebuilt: bump this
  * whenever a body, the clips or the carry pose changes, or browsers pair the new code with the old files.
  */
-const ASSET_VERSION = "2026-11-14.4";
+const ASSET_VERSION = "2026-11-14.5";
 const MODEL_URL = (id: ModelId) => `/models/landing/${id}.glb?v=${ASSET_VERSION}`;
 const ANIMATIONS_URL = `/models/landing/animations.glb?v=${ASSET_VERSION}`;
 const CARRY_URL = `/models/landing/carry-pose.json?v=${ASSET_VERSION}`;
