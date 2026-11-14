@@ -119,7 +119,7 @@ export const OCCUPANTS: readonly Occupant[] = [
   { id: "casual-out-1", model: "CasualBlackShirt", clip: "Run", from: 0.04, to: 0.4, dir: -1, lateral: 0.7, speed: 3.3 },
   { id: "casual-out-2", model: "CasualBlueTee", clip: "Run", from: 0.34, to: 0.7, dir: -1, lateral: -1.0, speed: 3.2 },
   { id: "casual-out-3", model: "CasualNavyPolo", clip: "Run", from: 0.6, to: 0.95, dir: -1, lateral: 1.0, speed: 3.4 },
-  { id: "casual-cough", model: "CasualWhitePolo", clip: "Cough", from: 0.58, to: 0.58, dir: 0, lateral: 1.9, speed: 0 },
+  { id: "casual-out-4", model: "CasualWhitePolo", clip: "Run", from: 0.2, to: 0.58, dir: -1, lateral: 1.6, speed: 3.1 },
   { id: "worker-terrified", model: "NpcOfficeFemale", clip: "Cough", from: 0.2, to: 0.2, dir: 0, lateral: 1.4, speed: 0 },
   { id: "female-walk", model: "NpcOfficeMale", clip: "Walk", from: 0.4, to: 0.72, dir: 1, lateral: 1.1, speed: 1.35 },
   { id: "worker-jog", model: "NpcSecurity", clip: "Run", from: 0.12, to: 0.44, dir: -1, lateral: -1.2, speed: 3.0 },
@@ -319,7 +319,7 @@ export const RESCUE_CAST: readonly RescueActor[] = [
   { id: "carrier", model: "FirefighterNam", clip: "Walk", path: 0, lateral: -0.5, speed: 1.5, phase: 0.3, carries: "NpcBoy" },
   { id: "casual-panic", model: "CasualBlackShirt", clip: "Run", path: 1, lateral: 0.4, speed: 3.4, phase: 0.1 },
   { id: "casual-run", model: "CasualBlueTee", clip: "Run", path: 0, lateral: 0.7, speed: 3.2, phase: 0.62 },
-  { id: "casual-phone", model: "CasualWhitePolo", clip: "Phone", at: [ASSEMBLY[0] + 1.6, 0, ASSEMBLY[1] + 0.8], faces: [0, 30] },
+  { id: "casual-run-2", model: "CasualWhitePolo", clip: "Run", path: 1, lateral: -0.8, speed: 3.3, phase: 0.6 },
   { id: "casual-panic-2", model: "CasualNavyPolo", clip: "Run", path: 2, lateral: -0.6, speed: 3.5, phase: 0.45 },
   { id: "girl", model: "NpcGirl", clip: "Run", path: 0, lateral: 0.1, speed: 3.0, phase: 0.05 },
   { id: "office-f", model: "NpcOfficeFemale", clip: "Run", path: 2, lateral: 0.8, speed: 3.2, phase: 0.85 },
@@ -334,6 +334,7 @@ export const RESCUE_CAST: readonly RescueActor[] = [
   { id: "down-4", model: "PlayerFemale", clip: "Run", path: 6, lateral: -0.4, speed: 2.9, phase: 0.25 },
   { id: "down-5", model: "NpcWorker", clip: "Run", path: 3, lateral: -0.6, speed: 3.0, phase: 0.55 },
   { id: "down-6", model: "NpcSecurity", clip: "Run", path: 5, lateral: -0.3, speed: 2.8, phase: 0.15 },
+  { id: "phone", model: "NpcTechnician", clip: "Phone", at: [ASSEMBLY[0] + 1.6, 0, ASSEMBLY[1] + 0.8], faces: [0, 30] },
   { id: "waiting", model: "NpcWorker", clip: "Idle", at: [ASSEMBLY[0] + 0.3, 0, ASSEMBLY[1] + 2.6], faces: [0, 30] },
 ];
 
