@@ -5,5 +5,5 @@ import { LoadingBlock } from "@/components/ui/spinner";
 import { ThemeScope } from "@/features/theme/theme-scope";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
-  return <Suspense fallback={<ThemeScope><main className="ops-access"><LoadingBlock label="Đang mở khu quản trị…" /></main></ThemeScope>}><OperationsShell areaId="admin"><div className="adm">{children}</div></OperationsShell></Suspense>;
+  return <Suspense fallback={<ThemeScope><main className="ops-access"><LoadingBlock label="Đang mở khu quản trị…" reloadHint /></main></ThemeScope>}><OperationsShell areaId="admin"><div className="adm">{children}</div></OperationsShell></Suspense>;
 }
