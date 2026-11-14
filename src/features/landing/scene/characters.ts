@@ -73,8 +73,8 @@ function retarget(assets: CharacterAssets, model: ModelId, clipName: ClipId): TH
     if (!track.name.endsWith(".quaternion")) return copy;
     post.copy(a.world).invert().multiply(b.world);
     // The game's run tips the hips forward and bends the lower back the other way to keep the chest up, which reads
-    // as a hollow back. Keep most of the spine straight so the trunk follows the hips into the run.
-    const straighten = clipName === "Run" && SPINE.test(node) ? 0.3 : 1;
+    // as a hollow back. Keep the spine straight so the trunk follows the hips into the run.
+    const straighten = clipName === "Run" && SPINE.test(node) ? 0 : 1;
     home.copy(b.parent).invert().multiply(b.world);
     for (let i = 0; i < copy.values.length; i += 4) {
       q.fromArray(copy.values, i); q.premultiply(pre).multiply(post).normalize();
