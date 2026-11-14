@@ -45,12 +45,18 @@ function restPositionOf(root: THREE.Object3D) {
  * `q_target = P_target^-1 * P_source * q_source * W_source^-1 * W_target`. Hip travel is scaled to the body's size.
  */
 const SPINE = /CC_Base_(Waist|Spine01|Spine02)$/;
+/**
+ * Bodies sculpted with a hollow back and the chest pushed out: each spine bone bends forward by this much (radians) in
+ * every clip, which rounds the back to a normal posture.
+ */
+const POSTURE: Partial<Record<ModelId, number>> = { CasualBlackShirt: 0.13 };
+const FORWARD = new THREE.Vector3(1, 0, 0);
 
 function retarget(assets: CharacterAssets, model: ModelId, clipName: ClipId): THREE.AnimationClip {
   const key = `${model}:${clipName}`, found = assets.retargeted.get(key);
   if (found) return found;
   const source = assets.clips[clipName], src = assets.rest.src, dst = assets.rest[model];
-  const pre = new THREE.Quaternion(), post = new THREE.Quaternion(), q = new THREE.Quaternion(), v = new THREE.Vector3(), home = new THREE.Quaternion(), spine = new THREE.Quaternion();
+  const pre = new THREE.Quaternion(), post = new THREE.Quaternion(), q = new THREE.Quaternion(), v = new THREE.Vector3(), home = new THREE.Quaternion(), spine = new THREE.Quaternion(), posture = new THREE.Quaternion();
   // Only rotations, and the travel of the hips: bone lengths and bone scales stay the body's own (the clip file
   // also carries the source body's, which stretched the children to adult size).
   const hips = /Hip$/;
@@ -76,9 +82,13 @@ function retarget(assets: CharacterAssets, model: ModelId, clipName: ClipId): TH
     // as a hollow back. Keep the spine straight so the trunk follows the hips into the run.
     const straighten = clipName === "Run" && SPINE.test(node) ? 0 : 1;
     home.copy(b.parent).invert().multiply(b.world);
+    // A bend about the model's side axis, expressed in the parent's axes: `parent^-1 * bend * parent`.
+    const bend = SPINE.test(node) ? POSTURE[model] ?? 0 : 0;
+    if (bend) posture.copy(b.parent).invert().multiply(spine.setFromAxisAngle(FORWARD, bend)).multiply(b.parent);
     for (let i = 0; i < copy.values.length; i += 4) {
       q.fromArray(copy.values, i); q.premultiply(pre).multiply(post).normalize();
       if (straighten < 1) q.copy(spine.copy(home).slerp(q, straighten));
+      if (bend) q.premultiply(posture);
       q.toArray(copy.values, i);
     }
     return copy;
