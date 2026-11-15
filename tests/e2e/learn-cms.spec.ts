@@ -142,6 +142,90 @@ test.describe("situations", () => {
     await page.getByLabel("Tìm tình huống").fill("thoat");
     await expect(page).toHaveURL(/q=thoat/);
   });
+
+  test("edit (popup) sends only the changed fields with PATCH; stop and resume go through a confirmation; the slug never changes", async ({ page }) => {
+    const backend = await setup(page, (b) => { b.seedSituation("chay-nha", "Cháy trong nhà", { description: "Mô tả cũ" }); });
+    const id = backend.situations[0].id;
+    const patches = () => backend.callsTo("PATCH", /^\/api\/admin\/learn\/situations\/[^/]+$/);
+    await page.goto("/admin/learn?section=situations");
+    const table = page.getByRole("table", { name: "Danh mục tình huống bài học" });
+    const row = table.getByRole("row").filter({ hasText: "Cháy trong nhà" });
+    await expect(row).toBeVisible();
+
+    // edit: the row opens the popup; the slug is shown but locked; nothing changed = no request
+    await row.getByText("Cháy trong nhà").click();
+    let dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: "Sửa tình huống" })).toBeVisible();
+    await expect(dialog.getByLabel("Đường dẫn rút gọn")).toHaveValue("chay-nha");
+    await expect(dialog.getByLabel("Đường dẫn rút gọn")).toBeDisabled();
+    await dialog.getByRole("button", { name: "Lưu thay đổi" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(patches()).toHaveLength(0);
+
+    // a blank name is stopped in the form; a new name alone is sent alone
+    await row.getByRole("button", { name: "Thao tác" }).click();
+    await page.getByRole("menuitem", { name: "Sửa" }).click();
+    dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Tên tình huống").fill("  ");
+    await dialog.getByRole("button", { name: "Lưu thay đổi" }).click();
+    await expect(dialog.getByText("Nhập tên tình huống.")).toBeVisible();
+    expect(patches()).toHaveLength(0);
+    await dialog.getByLabel("Tên tình huống").fill("Cháy trong nhà ở");
+    await dialog.getByRole("button", { name: "Lưu thay đổi" }).click();
+    await expect(page.getByText("Đã lưu tình huống")).toBeVisible();
+    await expect(table.getByText("Cháy trong nhà ở")).toBeVisible();
+    expect(patches()).toHaveLength(1);
+    expect(patches()[0].path).toBe(`/api/admin/learn/situations/${id}`);
+    expect(patches()[0].body).toEqual({ name: "Cháy trong nhà ở" });
+
+    // an emptied description is sent as "" (the API clears it)
+    await table.getByText("Cháy trong nhà ở").click();
+    dialog = page.getByRole("dialog");
+    await dialog.getByLabel(/^Mô tả/).fill("");
+    await dialog.getByRole("button", { name: "Lưu thay đổi" }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    expect(patches()[1].body).toEqual({ description: "" });
+    expect(backend.situations[0]).toMatchObject({ slug: "chay-nha", name: "Cháy trong nhà ở", description: null, isActive: true });
+
+    // stop: confirmation first, then PATCH { isActive: false }; resume the same way
+    const current = table.getByRole("row").filter({ hasText: "Cháy trong nhà ở" });
+    await current.getByRole("button", { name: "Thao tác" }).click();
+    await page.getByRole("menuitem", { name: "Ngừng dùng" }).click();
+    const stop = confirmDialog(page, "Ngừng dùng tình huống này?");
+    await expect(stop).toContainText("Tình huống không bị xóa");
+    expect(patches()).toHaveLength(2);
+    await stop.getByRole("button", { name: "Ngừng dùng" }).click();
+    await expect(page.getByText("Đã ngừng dùng tình huống")).toBeVisible();
+    expect(patches()[2].body).toEqual({ isActive: false });
+    await expect(current).toContainText("Ngừng dùng");
+    expect(backend.situations[0].isActive).toBe(false);
+
+    await current.getByRole("button", { name: "Thao tác" }).click();
+    await page.getByRole("menuitem", { name: "Dùng lại" }).click();
+    await confirmDialog(page, "Dùng lại tình huống này?").getByRole("button", { name: "Dùng lại" }).click();
+    await expect(page.getByText("Đã dùng lại tình huống")).toBeVisible();
+    expect(patches()[3].body).toEqual({ isActive: true });
+    expect(backend.situations[0]).toMatchObject({ slug: "chay-nha", isActive: true });
+    for (const call of patches()) { expect(call.headers["if-match"]).toBeUndefined(); expect(call.headers["idempotency-key"]).toBeUndefined(); }
+  });
+
+  test("a failed save keeps the popup and what was typed; a situation that is gone is explained", async ({ page }) => {
+    const backend = await setup(page, (b) => { b.seedSituation("khoi", "Khói dày"); });
+    await page.goto("/admin/learn?section=situations");
+    const table = page.getByRole("table", { name: "Danh mục tình huống bài học" });
+    await table.getByText("Khói dày").click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Tên tình huống").fill("Khói dày đặc");
+    backend.failNext("PATCH", /\/api\/admin\/learn\/situations\//, { status: 503, json: { status: 503, title: "Unavailable", code: "SERVICE_UNAVAILABLE" } });
+    await dialog.getByRole("button", { name: "Lưu thay đổi" }).click();
+    await expect(dialog.getByRole("alert")).toContainText("Máy chủ đang bận");
+    await expect(dialog.getByLabel("Tên tình huống")).toHaveValue("Khói dày đặc");
+    expect(backend.situations[0].name).toBe("Khói dày");
+
+    backend.situations.length = 0; // removed elsewhere (the API itself never deletes; this is the 404 path)
+    await dialog.getByRole("button", { name: "Thử lại" }).click();
+    await expect(dialog.getByRole("alert")).toContainText("Tình huống này không còn tồn tại");
+  });
 });
 
 test.describe("post lifecycle", () => {

@@ -23,14 +23,13 @@ import { describeLibraryError, type LibraryErrorView } from "@/features/library/
 import { LIBRARY_KINDS, isKind, kindLabel, type LibraryItem, type LibraryKind } from "@/features/library/types";
 
 const PAGE_SIZE = 20;
-export const STATES = ["active", "inactive", "unpublished"] as const;
+/** The two states the server filters by (`isActive`). It has no "no published version" filter, so the chip does not offer one. */
+export const STATES = ["active", "inactive"] as const;
 type ItemState = (typeof STATES)[number];
-const stateLabel: Record<ItemState, string> = { active: "Đang dùng", inactive: "Ngừng dùng", unpublished: "Chưa có bản xuất bản" };
+const stateLabel: Record<ItemState, string> = { active: "Đang dùng", inactive: "Ngừng dùng" };
 const isState = (value: string): value is ItemState => (STATES as readonly string[]).includes(value);
 const tabLabel: Record<LibraryKind, string> = { ScenarioTemplate: "Kịch bản mẫu", RubricSample: "Tiêu chí chấm mẫu", Equipment: "Thiết bị" };
 const kindTone: Record<LibraryKind, Tone> = { ScenarioTemplate: "info", RubricSample: "ember", Equipment: "neutral" };
-
-const matches = (item: LibraryItem, state: ItemState | "") => state === "" || (state === "active" ? item.isActive : state === "inactive" ? !item.isActive : item.latestPublished === null);
 
 /** The version a row describes: the one organizations see, otherwise the newest version (a Draft). */
 function shownVersion(item: LibraryItem): { number: number; status: "Published" | "Draft" } | null {
@@ -54,9 +53,8 @@ function useKindTotal(kind: LibraryKind, token: string, reloadKey: number) {
 
 /**
  * Items of every kind and state (Figma 53:1111): kind sub-tabs with totals, a DataTable whose row opens the item popup
- * (`?item=`), and a "···" menu (Mở · Tạo phiên bản · Ngừng dùng/Dùng lại, the only item write the API has). Kind and the
- * code search are applied by the server and live in the URL together with the page; the state filter only narrows the
- * page that is loaded and says so.
+ * (`?item=`), and a "···" menu (Mở · Tạo phiên bản · Ngừng dùng/Dùng lại, the only item write the API has). Kind, state
+ * (`isActive`) and the code search are applied by the server before paging and live in the URL together with the page.
  */
 export function ItemsList({ accessToken, reloadKey, onOpen, onNewVersion, onChanged }: { accessToken: string; reloadKey: number; onOpen: (itemId: string) => void; onNewVersion: (itemId: string) => void; onChanged: () => void }) {
   const toast = useToast();
@@ -67,14 +65,13 @@ export function ItemsList({ accessToken, reloadKey, onOpen, onNewVersion, onChan
   const state = isState(rawState) ? rawState : "";
   const urlSearch = get("q");
   const [searchText, setSearchText] = useUrlSearch(urlSearch, setParams);
-  const list = useAsyncData(`library-items:${kind}:${urlSearch}:${page}:${reloadKey}`, (signal) => libraryAdminApi.listItems(accessToken, { kind, search: urlSearch, page, pageSize: PAGE_SIZE }, signal));
+  const list = useAsyncData(`library-items:${kind}:${state}:${urlSearch}:${page}:${reloadKey}`, (signal) => libraryAdminApi.listItems(accessToken, { kind, isActive: state === "" ? undefined : state === "active", search: urlSearch, page, pageSize: PAGE_SIZE }, signal));
   const totals: Record<LibraryKind, number | undefined> = {
     ScenarioTemplate: useKindTotal("ScenarioTemplate", accessToken, reloadKey),
     RubricSample: useKindTotal("RubricSample", accessToken, reloadKey),
     Equipment: useKindTotal("Equipment", accessToken, reloadKey),
   };
-  const loaded = list.data?.items ?? [];
-  const items = loaded.filter((item) => matches(item, state));
+  const items = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
   const filtered = kind !== "" || state !== "" || urlSearch !== "";
   const [toggling, setToggling] = useState<LibraryItem | null>(null);
@@ -139,8 +136,7 @@ export function ItemsList({ accessToken, reloadKey, onOpen, onNewVersion, onChan
       toolbar={<>
         <TableSearch value={searchText} onChange={setSearchText} label="Tìm theo mã" placeholder="Tìm theo mã mục" />
         <FilterChips label="Bộ lọc mục">
-          {/* The server has no state filter: this chip narrows the loaded page only (and the note below says so). */}
-          <FilterChip label="Trạng thái" value={state} onChange={(value) => setParams({ state: value, page })} options={STATES.map((value) => ({ value, label: stateLabel[value] }))} />
+          <FilterChip label="Trạng thái" value={state} onChange={(value) => setParams({ state: value })} options={STATES.map((value) => ({ value, label: stateLabel[value] }))} />
         </FilterChips>
       </>}
       empty={<EmptyState icon={filtered ? Search : Library} title={filtered ? "Không có mục khớp bộ lọc." : "Thư viện chưa có mục nào"}
@@ -149,7 +145,6 @@ export function ItemsList({ accessToken, reloadKey, onOpen, onNewVersion, onChan
     />
     <p className="ops-field-hint" style={{ margin: "10px 0 0" }}>
       Bấm hàng để mở mục với danh sách phiên bản và trình sửa theo loại; menu “···” tạo phiên bản hoặc ngừng dùng mục.
-      {state && ` Bộ lọc trạng thái chỉ áp dụng cho ${loaded.length} mục của trang đang mở.`}
     </p>
     <div style={{ marginTop: 18 }}>
       <Alert tone="info" title="Thêm thông tin thiết bị không tự thêm chức năng trong ứng dụng huấn luyện">

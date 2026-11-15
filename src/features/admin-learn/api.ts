@@ -2,7 +2,7 @@ import { apiClient } from "@/api/client";
 import { ApiError } from "@/api/types/common";
 import { bool, isRecord, kindOf, list, num, parsePage, parseSituationRef, parseSourceRef, str, strOrNull } from "@/features/learn/parse";
 import { POST_STATUSES, type PostStatus } from "@/features/learn/types";
-import type { AdminPost, AdminPostListInfo, AdminSituation, AdminVersion, CreatePostInput, CreateSituationInput, KnowledgeSource, LearnImage, LifecycleOperation, MediaDescriptor, Page, SourceStatus, VersionInput, VersionStatus, VersionSummary, WithEtag } from "./types";
+import type { AdminPost, AdminPostListInfo, AdminSituation, AdminVersion, CreatePostInput, CreateSituationInput, KnowledgeSource, LearnImage, LifecycleOperation, MediaDescriptor, Page, SourceStatus, UpdateSituationInput, VersionInput, VersionStatus, VersionSummary, WithEtag } from "./types";
 
 /*
  * Learn CMS over the real contract: /api/admin/learn/* and /api/admin/knowledge-sources (PlatformAdmin).
@@ -163,6 +163,17 @@ export const learnAdminApi = {
     const created = parseSituation(raw);
     if (!created) throw new ApiError("Máy chủ trả về tình huống không đọc được.", 502, undefined, undefined, "LEARN_SITUATION_MALFORMED");
     return created;
+  },
+  /**
+   * Renames, describes, stops or resumes a situation. The route takes no If-Match and no Idempotency-Key: sending the same
+   * fields twice gives the same result. 400 `VALIDATION_ERROR` (nothing sent, name blank or over 255, description over 2000),
+   * 404 `NOT_FOUND`. The response has no `createdAt`, so callers re-read the list instead of patching a row with it.
+   */
+  async updateSituation(accessToken: string, id: string, input: UpdateSituationInput): Promise<AdminSituation> {
+    const raw = await apiClient.request<unknown>(`/api/admin/learn/situations/${encodeURIComponent(id)}`, { headers: auth(accessToken), method: "PATCH", json: input });
+    const updated = parseSituation(raw);
+    if (!updated) throw new ApiError("Máy chủ trả về tình huống không đọc được.", 502, undefined, undefined, "LEARN_SITUATION_MALFORMED");
+    return updated;
   },
 
   /** The URL is never fetched by the backend; it only returns the canonical descriptor. 422 `LEARN_MEDIA_INVALID` when not allowlisted. */

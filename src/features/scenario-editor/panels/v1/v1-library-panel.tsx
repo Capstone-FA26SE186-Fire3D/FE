@@ -11,7 +11,7 @@ import { Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton, SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { actionLabel, changesFor, chosenAction, planApply, summarizeChoices, type ApplyAction, type ApplyGroup, type Change, type Choices } from "@/features/library/apply";
+import { actionLabel, changesFor, chosenAction, planApply, readLibraryRefs, summarizeChoices, type ApplyAction, type ApplyGroup, type Change, type Choices } from "@/features/library/apply";
 import { VersionPreview } from "@/features/library/components/version-preview";
 import { libraryApi } from "@/features/library/api";
 import { describeLibraryError } from "@/features/library/errors";
@@ -21,7 +21,10 @@ import type { JsonObject } from "../../store/json";
 import { findRuntime, type RubricCatalogView, type RuntimeOption } from "../../v1/catalog";
 import type { ObjectView } from "../../v1/state";
 
-/** One sample copied into the draft during this editing session. The draft itself cannot carry provenance (closed schema), so this is a session record. */
+/**
+ * One sample copied into the draft during this editing session (version number and name for the undo button and the list).
+ * The lasting record is the draft's own `libraryRefs[]` (see `libraryRefChange`), which holds only version id, kind and code.
+ */
 export type AppliedSample = { kind: LibraryKind; code: string; versionNumber: number; versionId: string; payloadHash: string; name: string; at: number };
 
 /** Where the author is in the Library tab. Held by the workspace so switching to another tab and back keeps the chosen sample and the choices. */
@@ -150,6 +153,7 @@ export function V1LibraryPanel({ accessToken, ui, onUi, draft, selectedObject, r
   const fresh = item.data && item.data.nonce === nonce ? item.data.item : null;
   const current = chosen && fresh && fresh.id === chosen ? fresh : null;
   const itemError = chosen && item.error !== undefined && !current ? describeLibraryError(item.error) : null;
+  const refs = readLibraryRefs(draft);
 
   return <div className="se-form" data-testid="library-panel">
     <div className="se-form-head"><div><h3>Thư viện mẫu</h3><p>Chọn mẫu đã xuất bản, xem trước thay đổi rồi mới áp dụng. Bạn vẫn có thể soạn hoàn toàn bằng tay.</p></div></div>
@@ -190,10 +194,13 @@ export function V1LibraryPanel({ accessToken, ui, onUi, draft, selectedObject, r
     </details>}
 
     <section aria-label="Mẫu đã áp dụng" className="ops-stack" style={{ gap: 6 }} data-testid="applied-samples">
-      <h4 style={{ margin: 0, fontSize: 13 }}>Đã áp dụng trong phiên soạn này</h4>
-      {applied.length === 0 ? <p className="ops-field-hint" style={{ margin: 0 }}>Chưa áp dụng mẫu nào. Bản nháp không lưu nguồn mẫu; danh sách này chỉ có trong phiên soạn hiện tại.</p>
-        : <ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc", fontSize: 13 }}>{applied.map((entry) => <li key={`${entry.versionId}-${entry.at}`}>{kindLabel[entry.kind]} <strong>{entry.code}</strong> v{entry.versionNumber} ({entry.payloadHash.slice(0, 8) || "—"}) · {new Date(entry.at).toLocaleTimeString("vi-VN")}</li>)}</ul>}
-      <p className="ops-field-hint" style={{ margin: 0 }}>Nội dung đã sao chép thuộc về bản nháp của bạn; cập nhật mẫu sau này không tự sửa kịch bản hay bài đã phát hành.</p>
+      <h4 style={{ margin: 0, fontSize: 13 }}>Mẫu đã dùng cho bản nháp này</h4>
+      {refs.length === 0 ? <p className="ops-field-hint" style={{ margin: 0 }}>Chưa áp dụng mẫu nào. Khi bạn áp dụng một mẫu, bản nháp ghi lại mẫu đó để về sau biết nội dung lấy từ đâu.</p>
+        : <ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc", fontSize: 13 }}>{refs.map((entry) => {
+          const session = applied.find((item) => item.versionId === entry.versionId);
+          return <li key={entry.versionId} data-testid="applied-sample">{kindLabel[entry.kind]} <strong>{entry.code ?? "(không ghi mã)"}</strong>{session ? ` · phiên bản v${session.versionNumber}` : ""}</li>;
+        })}</ul>}
+      <p className="ops-field-hint" style={{ margin: 0 }}>Danh sách này được lưu cùng bản nháp và chỉ để tham khảo. Nội dung đã sao chép thuộc về bản nháp của bạn; cập nhật mẫu sau này không tự sửa kịch bản hay bài đã phát hành.</p>
     </section>
   </div>;
 }
