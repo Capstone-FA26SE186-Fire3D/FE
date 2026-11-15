@@ -7,7 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAsyncData } from "@/api/use-async-data";
-import type { Change } from "@/features/library/apply";
+import { libraryRefChange, type Change } from "@/features/library/apply";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Breadcrumbs } from "@/components/ui/page-header";
@@ -160,11 +160,17 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const gizmoEnabled = !isMobile;
   const selectedIndex = state.selection?.index ?? null;
   const selectedObject = selectedIndex === null ? undefined : objects[selectedIndex];
-  /** A library sample becomes ONE undoable command; the sample is recorded for this session only (the draft schema has no provenance field). */
+  /**
+   * A library sample becomes ONE undoable command: the copied fields plus the `libraryRefs[]` entry that records the source
+   * version in the draft (kept when another sample is applied, never duplicated). Undo removes both.
+   */
   const onApplySample = useCallback((changes: Change[], sample: Omit<AppliedSample, "at">) => {
     if (changes.length === 0) return;
     const label = `Áp dụng ${sample.code} v${sample.versionNumber}`;
-    edit((draft, id, selection, now) => setFieldsCommand(draft, id, changes, { label, at: now, selection }));
+    edit((draft, id, selection, now) => {
+      const ref = libraryRefChange(draft, { id: sample.versionId, kind: sample.kind, code: sample.code });
+      return setFieldsCommand(draft, id, ref ? [...changes, ref] : changes, { label, at: now, selection });
+    });
     setApplied((current) => [...current, { ...sample, at: Date.now() }]);
     toast.notify({ tone: "success", title: "Đã áp dụng mẫu vào bản nháp", description: "Chưa lưu. Hoàn tác bằng nút Hoàn tác hoặc Ctrl+Z." });
   }, [edit, toast]);

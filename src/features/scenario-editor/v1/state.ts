@@ -111,7 +111,9 @@ function unique(list: unknown, path: string, max: number, check: (item: unknown)
   });
 }
 
-const ROOT_KEYS = new Set(["schemaVersion", "name", "geometry", "runtimeVersion", "objects", "timeLimitSeconds", "rubric", "learningObjectives", "learnerInstructions", "modePolicy", "randomSeed", "replanIntervalSeconds"]);
+const ROOT_KEYS = new Set(["schemaVersion", "name", "geometry", "runtimeVersion", "objects", "timeLimitSeconds", "rubric", "learningObjectives", "learnerInstructions", "modePolicy", "randomSeed", "replanIntervalSeconds", "libraryRefs"]);
+const LIBRARY_REF_KEYS = new Set(["versionId", "kind", "code"]);
+const LIBRARY_REF_KINDS = ["ScenarioTemplate", "RubricSample", "Equipment"];
 const OBJECT_KEYS = new Set(["id", "kind", "placement", "anchorId", "capability", "parameters", "label"]);
 const CRITERION_KEYS = new Set(["id", "metric", "mandatory", "weight", "threshold", "operator", "description"]);
 
@@ -163,9 +165,24 @@ export function shapeIssues(draft: JsonObject): Issue[] {
   }
   if (draft.learningObjectives !== undefined) unique(draft.learningObjectives, "$.learningObjectives", LIMITS.objectivesMax, (item) => printable(item, LIMITS.objectiveMax), out, `Mỗi mục dùng 1–${LIMITS.objectiveMax} ký tự, không để trống.`);
   if (draft.learnerInstructions !== undefined && !printable(draft.learnerInstructions, LIMITS.instructionsMax)) out.push(issue("STRING_INVALID", "$.learnerInstructions", `Dùng 1–${LIMITS.instructionsMax} ký tự.`));
+  if (draft.libraryRefs !== undefined) libraryRefsShape(draft.libraryRefs, out);
   if (draft.rubric !== undefined) rubricShape(draft.rubric, out);
   if (draft.objects !== undefined) objectsShape(draft.objects, out);
   return out;
+}
+
+/** Provenance only (which Library versions were copied): at most 50 `{ versionId, kind, code? }`, shape checked like the BE. */
+function libraryRefsShape(refs: Json, out: Issue[]) {
+  if (!Array.isArray(refs)) { out.push(issue("TYPE_INVALID", "$.libraryRefs", "Phải là một danh sách.")); return; }
+  if (refs.length > 50) { out.push(issue("ARRAY_TOO_LARGE", "$.libraryRefs", "Tối đa 50 mẫu đã dùng.")); return; }
+  refs.forEach((ref, index) => {
+    const path = `$.libraryRefs[${index}]`;
+    if (!isObject(ref)) { out.push(issue("TYPE_INVALID", path, "Phải là một đối tượng.")); return; }
+    unknownKeys(ref, LIBRARY_REF_KEYS, path, out);
+    if (typeof ref.versionId !== "string" || !UUID_PATTERN.test(ref.versionId)) out.push(issue(ref.versionId === undefined ? "FIELD_REQUIRED" : "STRING_FORMAT_INVALID", `${path}.versionId`, "Cần mã phiên bản của mẫu trong thư viện."));
+    if (typeof ref.kind !== "string" || !LIBRARY_REF_KINDS.includes(ref.kind)) out.push(issue(ref.kind === undefined ? "FIELD_REQUIRED" : "VALUE_UNSUPPORTED", `${path}.kind`, "Loại mẫu là kịch bản mẫu, tiêu chí chấm mẫu hoặc thiết bị."));
+    if (ref.code !== undefined && !printable(ref.code, 80)) out.push(issue("STRING_INVALID", `${path}.code`, "Mã mẫu dùng 1–80 ký tự."));
+  });
 }
 
 function rubricShape(rubric: Json, out: Issue[]) {

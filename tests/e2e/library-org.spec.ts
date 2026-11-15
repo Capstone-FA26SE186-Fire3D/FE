@@ -62,7 +62,9 @@ async function openEditor(page: Page, options: { state?: Record<string, unknown>
 const status = (page: Page) => page.getByTestId("save-status");
 const tab = (page: Page, name: string) => page.getByRole("tab", { name, exact: true });
 const lastPut = (mock: MockState) => mock.puts[mock.puts.length - 1].body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
-const noOverflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth).then((value) => expect(value).toBeLessThanOrEqual(0));
+/** Id of the newest version of an item: what `libraryRefs[].versionId` must hold (the version, not the item). */
+const versionId = (backend: LibraryBackend, code: string) => backend.versionsOf(backend.item(code).id).at(-1)!.id;
+const noOverflow =(page: Page) => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth).then((value) => expect(value).toBeLessThanOrEqual(0));
 
 async function choose(page: Page, kind: "ScenarioTemplate" | "RubricSample" | "Equipment", code: string) {
   await tab(page, "Thư viện").click();
@@ -252,6 +254,8 @@ test.describe("apply to the draft in the v1 editor", () => {
     expect(body).toEqual({
       schemaVersion: "fet3d.editor/1", geometry: pin, name: "Sơ tán văn phòng", learningObjectives: ["Mục tiêu của tôi", "Rời khỏi tòa nhà an toàn"],
       learnerInstructions: "Đi theo lối thoát gần nhất.", timeLimitSeconds: 600, modePolicy: { allowedModes: ["Learn", "Guided"] }, rubric: RUBRIC,
+      // provenance: the Library VERSION that was copied, its kind and the item code, nothing else
+      libraryRefs: [{ versionId: versionId(backend, "TEMPLATE-SO-TAN"), kind: "ScenarioTemplate", code: "TEMPLATE-SO-TAN" }],
     });
     expect(body.objects).toBeUndefined(); // no position or object comes from a template
     expect(body.runtimeVersion).toBeUndefined();
@@ -382,7 +386,8 @@ test.describe("apply to the draft in the v1 editor", () => {
     await tab(page, "Kịch bản").click();
     await expect(page.getByTestId("field-time-limit")).toHaveValue("600"); // v1's value is still what the draft has
     await tab(page, "Thư viện").click();
-    await expect(page.getByTestId("applied-samples")).toContainText("Chưa áp dụng mẫu nào"); // session record only; the draft stores no provenance
+    await expect(page.getByTestId("applied-samples")).toContainText("TEMPLATE-SO-TAN"); // read back from the saved draft (libraryRefs), not from this session
+    expect((mock.state as Record<string, unknown>).libraryRefs).toEqual([{ versionId: backend.versionsOf(backend.item("TEMPLATE-SO-TAN").id)[0].id, kind: "ScenarioTemplate", code: "TEMPLATE-SO-TAN" }]); // still v1: publishing v2 does not move the ref
     await page.getByTestId("library-item-TEMPLATE-SO-TAN").click();
     await expect(page.getByTestId("library-preview")).toContainText("phiên bản v2");
     await expect(page.getByTestId("apply-group-template:timeLimitSeconds")).toHaveAttribute("data-status", "different");
@@ -395,6 +400,68 @@ test.describe("apply to the draft in the v1 editor", () => {
     backend.externalDeactivate("TEMPLATE-SO-TAN");
     await page.getByTestId("library-item-TEMPLATE-SO-TAN").click();
     await expect(page.getByText("Mẫu không còn khả dụng")).toBeVisible();
+    await expect(status(page)).toHaveText("Đã lưu");
+  });
+
+  test("provenance: each applied sample is recorded once in libraryRefs, refs already in the draft are kept, undo removes the entry and a reload reads it back", async ({ page }) => {
+    const foreign = { versionId: "0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b", kind: "Equipment", code: "TU-TRUOC" }; // recorded earlier, the item may be gone now
+    const { backend, mock } = await openEditor(page, { state: { ...partial(), libraryRefs: [foreign] } });
+    const templateRef = { versionId: versionId(backend, "TEMPLATE-SO-TAN"), kind: "ScenarioTemplate", code: "TEMPLATE-SO-TAN" };
+    const rubricRef = { versionId: versionId(backend, "RUBRIC-CO-BAN"), kind: "RubricSample", code: "RUBRIC-CO-BAN" };
+    const applied = page.getByTestId("applied-sample");
+    await tab(page, "Thư viện").click();
+    await expect(applied).toHaveText(["Thiết bị TU-TRUOC"]); // what the draft already recorded is shown, nothing is invented
+
+    // a preview alone records nothing
+    await choose(page, "ScenarioTemplate", "TEMPLATE-SO-TAN");
+    await expect(applied).toHaveCount(1);
+    await expect(status(page)).toHaveText("Đã lưu");
+
+    // first sample: the entry is part of the same undoable command as the copied fields
+    await page.getByTestId("apply-open").click();
+    await page.getByTestId("apply-confirm").click();
+    await expect(applied).toHaveCount(2);
+    await expect(applied.nth(1)).toContainText("Kịch bản mẫu TEMPLATE-SO-TAN");
+    await page.getByTestId("undo").click();
+    await expect(applied).toHaveCount(1);
+    await expect(status(page)).toHaveText("Đã lưu");
+    await page.getByTestId("redo").click();
+    await expect(applied).toHaveCount(2);
+    await page.getByTestId("save").click();
+    await expect(status(page)).toHaveText("Đã lưu");
+    expect(lastPut(mock).libraryRefs).toEqual([foreign, templateRef]);
+
+    // second sample of another kind: earlier entries stay, in order
+    await page.getByRole("button", { name: "Chọn mẫu khác" }).click();
+    await choose(page, "RubricSample", "RUBRIC-CO-BAN");
+    await page.getByTestId("apply-rubric-replace").check();
+    await page.getByTestId("apply-open").click();
+    await page.getByTestId("apply-confirm").click();
+    await page.getByTestId("save").click();
+    await expect(status(page)).toHaveText("Đã lưu");
+    expect(lastPut(mock).libraryRefs).toEqual([foreign, templateRef, rubricRef]);
+
+    // the same template version again (after the author changed a field it fills): still one entry for it
+    await tab(page, "Kịch bản").click();
+    await page.getByTestId("learner-instructions").fill("Câu của tôi.");
+    await tab(page, "Thư viện").click();
+    await page.getByRole("button", { name: "Chọn mẫu khác" }).click();
+    await choose(page, "ScenarioTemplate", "TEMPLATE-SO-TAN");
+    await page.getByTestId("apply-template:learnerInstructions-replace").check();
+    await page.getByTestId("apply-open").click();
+    await page.getByTestId("apply-confirm").click();
+    await expect(applied).toHaveCount(3);
+    await expect(status(page)).toHaveText("Đã lưu"); // the field is back to the sample's value and no second entry was added: equal to the saved draft
+    await tab(page, "Kịch bản").click();
+    await expect(page.getByTestId("learner-instructions")).toHaveValue("Đi theo lối thoát gần nhất.");
+    for (const entry of lastPut(mock).libraryRefs) expect(Object.keys(entry).sort()).toEqual(["code", "kind", "versionId"]); // only the fields the draft contract allows
+    expect(mock.rejected).toEqual([]); // the mock checks the body with the same shape rules and refused nothing
+
+    // save → reload: the provenance comes back from the server copy of the draft
+    await page.reload();
+    await expect(page.getByTestId("scenario-editor")).toHaveAttribute("data-draft-mode", "v1");
+    await tab(page, "Thư viện").click();
+    await expect(applied).toHaveText(["Thiết bị TU-TRUOC", "Kịch bản mẫu TEMPLATE-SO-TAN", "Tiêu chí chấm mẫu RUBRIC-CO-BAN"]);
     await expect(status(page)).toHaveText("Đã lưu");
   });
 

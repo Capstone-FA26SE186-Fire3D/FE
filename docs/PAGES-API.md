@@ -631,7 +631,7 @@ Khung chung cho mọi trang `/admin/*`:
 - Trạng thái trên URL: `?section=posts|situations`, `?post=<uuid>|new`, `&version=<uuid>`, `&tab=`, `?quick=<id>` (Drawer sửa nhanh) và bộ lọc. Đổi section thì xóa tham số của section cũ. `post` không phải UUID → báo lỗi đường dẫn.
 - Bài viết: `DataTable` lọc trạng thái (`?status=` theo `POST_STATUSES`) phía server; tìm kiếm và lọc loại chỉ áp dụng trên trang đã tải (API không hỗ trợ). Bấm dòng → Drawer sửa nhanh (`loadPostWithVersion`: lấy bài, chọn version theo URL → Draft mới nhất → version mới nhất). Menu dòng có xuất bản và các thao tác vòng đời.
 - Soạn bài: form so với "dấu vân tay" (`fingerprint`) để biết đã sửa chưa; kiểm tra nội dung phía client (`checkContent`), video kiểm tra allowlist qua `validateMedia`, nguồn trích dẫn kiểm tra cờ `canUseInDraft`/`canPublishReference` (`useSourceFlags`); lỗi 422 `CONTENT_INVALID` hiện `issues[]` theo đường dẫn JSON. Lưu Draft bằng `PUT` + `If-Match` (version ETag) + `Idempotency-Key` (`commandKey(intent)` để thử lại an toàn); 412 → tải bản mới, nếu form chưa sửa thì áp luôn, nếu đã sửa thì hiện so sánh khác biệt và cho chọn "lấy bản server" hoặc "giữ của tôi". Xuất bản (version ETag) → nhận lại bài; hide/show/delete/restore dùng ETag của bài. Có xác nhận khi rời trang lúc chưa lưu. Ảnh bìa/ảnh khối tải qua upload-intent → PUT presigned URL → complete.
-- Tình huống: danh sách tìm `?q=`, lọc `?active=`, tạo mới (slug, tên, mô tả) có `Idempotency-Key`.
+- Tình huống: danh sách tìm `?q=`, lọc `?active=`, tạo mới (slug, tên, mô tả) có `Idempotency-Key`. Bấm dòng hoặc menu dòng "Sửa" mở popup sửa tên và mô tả (slug chỉ hiển thị, không đổi được); chỉ gửi trường đã đổi, mô tả để trống gửi `""` để xóa. Menu dòng "Ngừng dùng"/"Dùng lại" có hộp xác nhận rồi gửi `isActive`. PATCH không có `If-Match` hay `Idempotency-Key`; tình huống không bao giờ bị xóa.
 
 **API gọi**:
 
@@ -647,6 +647,7 @@ Khung chung cho mọi trang `/admin/*`:
 | POST | `/api/admin/learn/posts/{id}/{hide\|show\|delete\|restore}` | `learnAdminApi.lifecycle` | `If-Match` (post); `Idempotency-Key` | `WithEtag<AdminPost>` | `ContentController.Lifecycle` |
 | GET | `/api/admin/learn/situations` | `learnAdminApi.listSituations` | `search?`, `isActive?`, `page`, `pageSize` | `Page<AdminSituation>` | `ContentController.AdminSituations` |
 | POST | `/api/admin/learn/situations` | `learnAdminApi.createSituation` | `CreateSituationInput` {slug, name, description?}; `Idempotency-Key` | `AdminSituation` | `ContentController.CreateSituation` |
+| PATCH | `/api/admin/learn/situations/{id}` | `learnAdminApi.updateSituation` | `UpdateSituationInput` {name?, description?, isActive?} (ít nhất một trường) | `AdminSituation` (response không có `createdAt`) | `ContentController.UpdateSituation` |
 | POST | `/api/admin/learn/media/validate` | `learnAdminApi.validateMedia` | `{ url }` | `MediaDescriptor` | `ContentController.ValidateMedia` |
 | POST | `/api/admin/learn/media/images/upload-intent` | `learnAdminApi.uploadImage` (bước 1) | {fileName, contentType, sizeBytes, sha256}; `Idempotency-Key` | `{uploadId, uploadUrl, headers, expiresAt}` (parse nội bộ) | `LearnMediaController.CreateUploadIntent` |
 | POST | `/api/admin/learn/media/images/{uploadId}/complete` | `learnAdminApi.uploadImage` (bước 3) | — | `LearnImage` | `LearnMediaController.Complete` |
@@ -662,7 +663,7 @@ Khung chung cho mọi trang `/admin/*`:
 **Quyền truy cập**: PlatformAdmin.
 
 **Logic xử lý**:
-- URL: `?kind=`, `?page=`, `?state=`, `?item=<uuid>`, `&version=<uuid|new>`. Danh sách lọc loại phía server; bộ lọc trạng thái (đang dùng / ngừng dùng / chưa xuất bản) chỉ lọc trang đang tải và có ghi chú rõ.
+- URL: `?kind=`, `?page=`, `?state=`, `?item=<uuid>`, `&version=<uuid|new>`. Danh sách lọc loại, mã (`?q=` → `search`) và trạng thái (`?state=active|inactive` → `isActive`) phía server, trước khi phân trang; đổi bộ lọc thì về trang 1. BE không có bộ lọc "chưa có bản xuất bản" nên chip trạng thái không có lựa chọn đó (cột Trạng thái vẫn hiện "Bản nháp"/"Chưa có phiên bản").
 - Thêm mục (Modal): kind + code, `Idempotency-Key`; 409 `LIBRARY_CODE_EXISTS`. Thành công → mở luôn mục mới.
 - Chi tiết mục: bật/tắt `isActive` bằng `PATCH` + `If-Match`. Trình soạn phiên bản: form theo từng kind (template kịch bản, rubric mẫu cần catalog rubric, thiết bị, preset…), kiểm tra `checkForm` phía client, 422 `CONTENT_INVALID` → `issues[]` gắn vào trường; lưu Draft bằng `PUT` + `If-Match`, 412 → so sánh với bản server (`describeDifferences`); xuất bản bằng `If-Match` rồi đọc lại mục (revision của mục cũng tăng).
 
@@ -670,7 +671,7 @@ Khung chung cho mọi trang `/admin/*`:
 
 | Method | Endpoint | Hàm FE | Request | Response type | BE controller |
 |---|---|---|---|---|---|
-| GET | `/api/admin/library/items` | `features/library/api.ts:libraryAdminApi.listItems` | `kind?`, `search?`, `page`, `pageSize` | `Page<LibraryItem>` (parse) | `ContentController.AdminItems` |
+| GET | `/api/admin/library/items` | `features/library/api.ts:libraryAdminApi.listItems` | `kind?`, `isActive?`, `search?`, `page`, `pageSize` | `Page<LibraryItem>` (parse) | `ContentController.AdminItems` |
 | GET | `/api/admin/library/items/{id}` | `libraryAdminApi.getItem` | — | `WithEtag<LibraryItem>` | `ContentController.AdminItem` |
 | POST | `/api/admin/library/items` | `libraryAdminApi.createItem` | {kind, code}; `Idempotency-Key` | `WithEtag<LibraryItem>` | `ContentController.CreateItem` |
 | PATCH | `/api/admin/library/items/{id}` | `libraryAdminApi.updateItem` | {isActive}; `If-Match`; `Idempotency-Key` | `WithEtag<LibraryItem>` | `ContentController.UpdateItem` |
@@ -754,12 +755,12 @@ Phạm vi sửa: chỉ các feature `accounts`, `organizations`, `admin-reviews`
 | GET `/api/admin/learn/posts` | `Page<AdminPost>` | Đã bổ sung | Thêm `AdminPostListInfo` (`latest`: title, kind, latestVersionId/Number/Status, draftVersionId/Number, versionCount theo BE `LearnPostAdminRow`) và parse trong `parsePost`. Lưu ý: UI `posts-tab.tsx` (upstream) chưa dùng `latest` — vẫn hiện "Chưa có bản xuất bản", và e2e `tests/e2e/learn-cms.spec.ts` đang khẳng định điều đó (BE#154 thực tế đã có title). |
 | GET/POST `/api/admin/learn/posts/{id}`, `/publish`, lifecycle | `WithEtag<AdminPost>` | Đủ | Parse an toàn qua `parsePost`; `latest` = null ở các response này. |
 | GET/POST/PUT `/api/admin/learn/versions…` | `AdminVersion`, `VersionInput` | Đủ | Khớp `LearnVersionView` / `LearnVersionInput`. |
-| GET/POST `/api/admin/learn/situations` | `Page<AdminSituation>`, `CreateSituationInput` | Đã bổ sung | Tách type request `CreateSituationInput` (trước là kiểu inline). `PATCH /api/admin/learn/situations/{id}` (BE có) chưa có hàm FE. |
+| GET/POST `/api/admin/learn/situations` | `Page<AdminSituation>`, `CreateSituationInput` | Đã bổ sung | Tách type request `CreateSituationInput` (trước là kiểu inline). `PATCH /api/admin/learn/situations/{id}` gọi qua `learnAdminApi.updateSituation` với `UpdateSituationInput`. |
 | POST `/api/admin/learn/media/validate` | `MediaDescriptor` | Đủ | |
 | POST `/api/admin/learn/media/images/{uploadId}/complete` | `LearnImage` | Đã bổ sung | Thêm `contentType`, `sizeBytes` (BE trả {imageId, url, width, height, contentType, sizeBytes}). Response upload-intent vẫn parse nội bộ, không có type riêng. |
 | GET `/api/admin/knowledge-sources` (Learn editor) | `Page<KnowledgeSource>` (admin-learn) | Đã bổ sung | Thêm `organizationId`, `sourceHash`, `approvedAt`, `createdAt` theo `KnowledgeSourceView`. |
 | GET `/api/admin/analytics/*`, `/api/admin/organizations/{id}/analytics/*` | `OperationsReport`, `TrainingReport`, `RevenueReport` (analytics) | Đủ | Đọc `unknown` rồi parse (`features/analytics/parse.ts`); không thuộc phạm vi sửa. |
-| `/api/admin/library/*` | `LibraryItem`, `LibraryVersion`, `VersionInput` (library) | Thiếu | Parse đủ trường response; nhưng `listItems` không gửi được `isActive` mà BE `AdminItems` hỗ trợ (nên bộ lọc trạng thái phải lọc phía client). Feature `library` do agent khác phụ trách. |
+| `/api/admin/library/*` | `LibraryItem`, `LibraryVersion`, `VersionInput` (library) | Đủ | Parse đủ trường response; `libraryAdminApi.listItems` gửi `kind`, `isActive`, `search`. |
 | `/api/admin/support/*`, `/api/admin/feedback/*`, `/api/admin/audit-logs*` | type trong `features/support` | Đủ | Không thuộc phạm vi sửa; không kiểm tra chi tiết. |
 | `/api/admin/ai/*`, `/api/admin/knowledge-sources*` (trang AI) | type trong `features/org-ai` | Đủ | Không thuộc phạm vi sửa; không kiểm tra chi tiết. |
 | `/api/admin/payments/payos/checkouts` | `PageResponse<PayosLedgerItem>` (billing) | Đủ | Agent billing phụ trách. |
@@ -1268,7 +1269,7 @@ So sánh type FE với DTO của BE (`Fire3D.Application`). Các endpoint IFC th
 **Quyền truy cập:** Shell `[0, 1]`; danh sách chỉ fetch khi `role 0 | 1`. 403 → "Không có quyền xem thư viện" (`describeLibraryError`).
 
 **Logic xử lý:**
-- Organization chỉ thấy item **đang active và có phiên bản Published**, chỉ phiên bản Published. Lọc theo loại (`?kind=` ∈ `ScenarioTemplate | RubricSample | Equipment`, SubTabs có đếm). FE không hiển thị `StylePreset`/`ColorScheme` (BE còn lưu nhưng chưa có gì đưa chúng vào gói trò chơi; quyết định 04/11/2026), tìm theo mã/tên (`?q=`) và lọc theo năng lực runtime (`?cap=`, "Không có yêu cầu") – hai bộ lọc sau chạy **phía client trên trang đã tải** (có thông báo "Máy chủ chưa lọc…"). Phân trang 20.
+- Organization chỉ thấy item **đang active và có phiên bản Published**, chỉ phiên bản Published. Lọc theo loại (`?kind=` ∈ `ScenarioTemplate | RubricSample | Equipment`, SubTabs có đếm). FE không hiển thị `StylePreset`/`ColorScheme` (BE còn lưu nhưng chưa có gì đưa chúng vào gói trò chơi; quyết định 04/11/2026), tìm theo mã/tên (`?q=`) và lọc theo năng lực runtime (`?cap=`, "Không có yêu cầu") – hai bộ lọc sau chạy **phía client trên trang đã tải** (có thông báo "Máy chủ chưa lọc…") vì `GET /api/library/items` của BE chỉ nhận `kind`, `page`, `pageSize` (controller `LibraryController.Items` không đọc `search`, `isActive` hay năng lực). Phân trang 20.
 - `?item=<uuid>` (kiểm UUID) mở hộp thoại: `getItem` → `VersionPreview` của `latestPublished` (template: các trường phi không gian + rubric; rubric mẫu: bảng tiêu chí; thiết bị: thuộc tính + cảnh báo "không thêm năng lực runtime"; bộ vật liệu: loại công trình, từ khóa, bảng vật liệu sàn/tường/trần theo loại phòng, bảng màu mặc định; bảng màu: 4 màu `#RRGGBB` có ô màu; `requiredCapabilities`, `payloadHash`). "Dùng làm mẫu" mở `UseSampleDialog` chọn công trình + kịch bản rồi mở editor với `?useSample=<kind>:<itemId>`. 404 → "Mẫu không còn khả dụng".
 - **Luồng áp dụng (apply flow)**: trang này chỉ xem. Áp dụng thực hiện trong trình soạn kịch bản: `planApply(version, draft, context)` (thuần, không ghi) tạo các nhóm trường với trạng thái `new | same | different` và hành động `fill | replace | merge | keep` (mặc định `keep` nếu trường đã có nội dung, không ghi đè ngầm); template chỉ điền trường phi không gian của `fet3d.editor/1`, rubric sample điền `rubric` (hợp nhất tiêu chí, cảnh báo metric/schema_version không có trong catalog), equipment chỉ gán `label` và năng lực nếu runtime catalog của bản nháp công bố. `changesFor()` → một lệnh undo được (`setFieldsCommand`). Bản sao: cập nhật mẫu sau này không đổi kịch bản đã soạn.
 - Response đọc `unknown` → `parseItem`/`parseVersion` phòng thủ; sai cấu trúc → `ApiError` 502 `LIBRARY_ITEM_MALFORMED` / `LIBRARY_VERSION_MALFORMED`.
@@ -1788,10 +1789,10 @@ Khoá vật liệu thư viện: `floor.tile`, `floor.wood`, `floor.carpet`, `flo
 
 | Method | Endpoint | Hàm FE | Request | Response | Quyền |
 |---|---|---|---|---|---|
-| GET | `/api/library/items?kind&search&page&pageSize` | `libraryApi.listItems` | query | `Page<LibraryItem>` | Org, Admin (chỉ active + có Published) |
+| GET | `/api/library/items?kind&page&pageSize` | `libraryApi.listItems` | query | `Page<LibraryItem>` | Org, Admin (chỉ active + có Published) |
 | GET | `/api/library/items/{id}` | `libraryApi.getItem` | — | `LibraryItem` (có `latestPublished`) | Org, Admin |
 | GET | `/api/library/versions/{id}` | `libraryApi.getVersion` | — | `LibraryVersion` | Org (chỉ Published), Admin |
-| GET | `/api/admin/library/items?kind&search&page&pageSize` | `libraryAdminApi.listItems` | query | `Page<LibraryItem>` | Admin |
+| GET | `/api/admin/library/items?kind&isActive&search&page&pageSize` | `libraryAdminApi.listItems` | query | `Page<LibraryItem>` | Admin |
 | POST | `/api/admin/library/items` | `libraryAdminApi.createItem` | `{kind, code}` + Idempotency-Key | `WithEtag<LibraryItem>` (201; 409 `LIBRARY_CODE_EXISTS`) | Admin |
 | GET/PATCH | `/api/admin/library/items/{id}` | `getItem` / `updateItem` | PATCH `{isActive}` + If-Match + Idempotency-Key tuỳ chọn | `WithEtag<LibraryItem>` | Admin |
 | POST | `/api/admin/library/items/{id}/versions` | `createVersion` | `VersionInput {name, payload, requiredCapabilities}` + Idempotency-Key | `WithEtag<LibraryVersion>` (422 `CONTENT_INVALID` + `issues`) | Admin |
@@ -1872,11 +1873,11 @@ Mã lỗi nội dung (FE mirror trong `library/payload.ts#checkForm`): `STRING_I
   - `GET /api/revisions/{id}/bim-facts/elements`
   - `GET /api/validation-runs/{id}`
   - `POST /api/revisions/{id}/reviews`
-  - `PATCH /api/admin/learn/situations/{id}`
   - `GET /api/learn/bookmarks/{postId}`
   - `GET /api/admin/billing/quota-policies/{id}`
 - **`EditorPreview`** (`buildings/types.ts`) thiếu `schemaVersion`, `units`, `upAxis`, `handedness`. Có thể dùng `EditorPreviewDetails` trong `ifc-types.ts`.
-- **`library/api.ts` → `listItems`** chưa gửi `isActive`, nên lọc trạng thái chỉ chạy trên trang đang tải.
+- **Thư viện phía tổ chức (`/workspace/library`)**: tìm theo tên/mã và lọc theo yêu cầu vẫn chạy trên trang đã tải, vì `GET /api/library/items` của BE chưa nhận các tham số đó.
+- **Bản nháp `fet3d.editor/1`**: `shapeIssues` (FE) chưa biết hai trường gốc `wind` và `routingConfig` mà BE đã nhận; `libraryRefs` đã được thêm.
 - **`scripts/copy-ifc-wasm.mjs`** (`pnpm ifc:wasm`) chưa gắn vào `dev`/`build`. Phải chạy tay mỗi khi nâng `web-ifc`.
 - **Quét IFC trên trình duyệt** mới đọc GlobalId, Name, ObjectType/PredefinedType, chưa đọc property sets.
 - **`/privacy`** chưa nằm trong danh sách `next` được phép ở `features/auth/redirect.ts`.
