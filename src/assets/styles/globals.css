@@ -130,6 +130,10 @@ button { cursor: pointer; }
 .download-panel { display: grid; grid-template-columns: 1fr .7fr; gap: 50px; align-items: center; padding: 36px; }
 .download-state { display: flex; gap: 12px; align-items: flex-start; padding: 17px; border: 1px dashed var(--line-strong); border-radius: 9px; color: var(--muted); font-size: 13px; line-height: 1.65; }
 .download-state svg { flex: 0 0 auto; color: var(--ember); }
+.download-steps { display: grid; gap: 16px; margin: 0; padding: 0; list-style: none; counter-reset: download-step; }
+.download-steps li { display: flex; gap: 12px; align-items: flex-start; color: var(--muted); font-size: 14px; line-height: 1.65; counter-increment: download-step; }
+.download-steps li::before { content: counter(download-step); display: inline-grid; flex: 0 0 auto; place-items: center; width: 28px; height: 28px; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--ember); font-size: 12px; font-weight: 650; }
+.download-link { color: var(--ember); text-decoration: underline; text-underline-offset: 3px; }
 .rag-shell { max-width: 820px; }
 .rag-panel { display: grid; gap: 15px; padding: 25px; }
 .rag-panel textarea { min-height: 130px; padding: 13px; resize: vertical; border: 1px solid var(--line); border-radius: 8px; background: var(--bg-soft); color: var(--text); outline: 0; }

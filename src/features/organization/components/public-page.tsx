@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Building2, CheckCircle2, Download, Eye, Flame, ShieldCheck } from "lucide-react";
+import { ArrowUpRight, Building2, CheckCircle2, Eye, Flame, QrCode, ShieldCheck, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { routes } from "@/configs/routes";
@@ -22,8 +22,8 @@ const content = {
   },
   download: {
     kicker: "Ứng dụng FET3D",
-    title: <>Một cánh cửa khác<br /><em>sẽ sớm mở.</em></>,
-    description: "Ứng dụng Android và các gói nội dung đang được chuẩn bị. Khi có bản phát hành thật, QR và trạng thái tải sẽ xuất hiện tại đây.",
+    title: <>Tập thoát nạn<br /><em>trên điện thoại.</em></>,
+    description: "Ứng dụng FET3D cho Android mở các bài tập huấn thoát nạn 3D của công trình mà tổ chức của bạn đã chuẩn bị. Ứng dụng đang được thử nghiệm trên Google Play, nên chưa có trên cửa hàng cho mọi người.",
   },
 } as const;
 
@@ -34,7 +34,7 @@ export function PublicPage({ kind }: PublicPageProps) {
 }
 
 function DownloadPage({ copy }: { copy: PageCopy }) {
-  return <div className="site-shell"><SiteHeader /><main className="page-main"><section className="page-hero"><p className="kicker"><span className="kicker-line" /> {copy.kicker}</p><h1>{copy.title}</h1><p>{copy.description}</p></section><Card className="download-panel"><div><h2 className="mb-3 text-2xl font-semibold tracking-[-.04em]">Trạng thái phát hành</h2><p className="mb-6 max-w-[570px] leading-7 text-[var(--muted)]">Hiện chưa có bản ứng dụng Android để tải. Bạn có thể tiếp tục đọc bài học trên web; khi ứng dụng sẵn sàng, chúng tôi sẽ cập nhật đường dẫn tải chính thức.</p><div className="download-state"><Download size={18} /><span><strong className="text-[var(--text)]">Chưa khả dụng</strong><br />Đường tải chỉ xuất hiện khi có bản ứng dụng chính thức.</span></div></div><div className="flex min-h-[220px] items-center justify-center rounded-lg border border-dashed border-[var(--line-strong)] bg-[var(--bg-soft)]"><div className="text-center text-[var(--dim)]"><Flame className="mx-auto mb-3 text-[var(--ember)]" /><span className="block text-xs uppercase tracking-[.15em]">Ứng dụng Android</span><span className="mt-2 block text-xs">sắp có</span></div></div></Card></main><SiteFooter /></div>;
+  return <div className="site-shell"><SiteHeader /><main className="page-main"><section className="page-hero"><p className="kicker"><span className="kicker-line" /> {copy.kicker}</p><h1>{copy.title}</h1><p>{copy.description}</p></section><Card className="download-panel"><div><h2 className="mb-3 text-2xl font-semibold tracking-[-.04em]">Cách nhận ứng dụng</h2><p className="mb-6 max-w-[570px] leading-7 text-[var(--muted)]">Ứng dụng đã có và đang trong giai đoạn thử nghiệm trên Google Play. Trong giai đoạn này, ứng dụng chưa hiện khi tìm trên cửa hàng và trang này chưa có tệp cài đặt để tải. Người học cài ứng dụng qua lời mời do tổ chức của mình hoặc nhóm FET3D gửi.</p><div className="download-state" data-testid="download-state"><Smartphone size={18} aria-hidden="true" /><span><strong className="text-[var(--text)]">Đang thử nghiệm trên Google Play</strong><br />Chưa nhận được lời mời? Hãy hỏi người phụ trách tập huấn ở tổ chức của bạn. Trong lúc chờ, bạn có thể <Link className="download-link" href={routes.learn}>đọc bài học trên web</Link>.</span></div></div><div><h2 className="mb-4 text-lg font-semibold tracking-[-.03em]">Khi đã có lời mời</h2><ol className="download-steps"><li><span>Mở lời mời trên điện thoại Android và cài ứng dụng FET3D từ Google Play. Chỉ cần cài một lần.</span></li><li><span>Mở ứng dụng và đăng nhập bằng tài khoản FET3D của bạn.</span></li><li><span>Quét mã QR của công trình bằng chức năng quét trong ứng dụng, rồi chọn bài để bắt đầu.</span></li></ol></div></Card><div className="section-grid mt-[14px]"><InfoCard icon={<Flame />} title="Ứng dụng làm gì" body="Ứng dụng tải bài tập huấn về máy và cho bạn tập thoát nạn trong mô hình 3D của chính công trình đó: học, luyện có hướng dẫn hoặc làm bài đánh giá." /><InfoCard icon={<Smartphone />} title="Điện thoại cần có" body="Điện thoại Android 10 trở lên. Cần có mạng khi tải bài và khi bắt đầu bài." /><InfoCard icon={<QrCode />} title="Mã QR công trình" body="Mỗi công trình có một mã QR do tổ chức in hoặc gửi. Khi đã cài ứng dụng, quét mã này trong ứng dụng là mở được danh sách bài của công trình. Bạn vẫn cần đăng nhập; công trình Riêng tư cần thêm mã tham gia do tổ chức cung cấp." /></div></main><SiteFooter /></div>;
 }
 
 function InfoCard({ icon, title, body }: { icon: React.ReactNode; title: string; body: string }) {
