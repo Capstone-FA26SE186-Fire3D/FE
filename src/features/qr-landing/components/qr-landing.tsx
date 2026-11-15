@@ -10,8 +10,9 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Panel } from "@/components/ui/panel";
 import { Skeleton } from "@/components/ui/skeleton";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { StatusBadge, type Tone } from "@/components/ui/status-badge";
 import { useAuthSession } from "@/features/auth/auth-session";
+import { formatDate } from "@/features/buildings/format";
 import { qrLandingApi } from "../api";
 import { isQrToken, qrLandingPath } from "../token";
 import { MobileGuide } from "./mobile-guide";
@@ -19,6 +20,13 @@ import { ParticipationForm } from "./participation-form";
 import { TrainingList } from "./training-list";
 
 const TRAINEE = 2;
+
+/** BE `ServiceStatus` of the Building: a paid period is running, one ran before and none does now, or none was ever paid. */
+const serviceInfo: Record<string, { label: string; tone: Tone }> = {
+  Active: { label: "Dịch vụ đang hiệu lực", tone: "success" },
+  Expired: { label: "Dịch vụ đã hết hạn", tone: "danger" },
+  NotPurchased: { label: "Chưa có dịch vụ", tone: "warning" },
+};
 
 function loginHref(token: string) {
   return `/login?next=${encodeURIComponent(qrLandingPath(token))}`;
@@ -76,9 +84,17 @@ export function QrLanding({ token }: { token: string }) {
   }
 
   if (resolution.error !== undefined && !resolution.data) {
-    if (resolveStatus === 404 || resolveStatus === 410) {
+    // BE tells a revoked or replaced code (410) from an unknown one (404). Neither is a service problem: an expired
+    // service still resolves and is explained on the Building card below.
+    if (resolveStatus === 410) {
       return <>
-        <StateCard title="Không tìm thấy công trình">Mã QR này không còn dùng được: có thể mã sai, đã bị thu hồi hoặc đã được thay bằng mã mới, hoặc công trình không còn hoạt động. Hãy xin tổ chức quản lý công trình mã QR mới nhất.</StateCard>
+        <StateCard title="Mã QR này đã bị thu hồi">Tổ chức quản lý công trình đã thu hồi mã này hoặc thay bằng mã mới, nên mã không còn mở được công trình. Việc này không liên quan tới hạn dịch vụ của công trình. Hãy xin tổ chức mã QR mới nhất.</StateCard>
+        <MobileGuide />
+      </>;
+    }
+    if (resolveStatus === 404) {
+      return <>
+        <StateCard title="Không tìm thấy công trình">Mã QR này không mở được công trình nào: có thể mã sai hoặc công trình không còn hoạt động. Hãy xin tổ chức quản lý công trình mã QR mới nhất.</StateCard>
         <MobileGuide />
       </>;
     }
@@ -93,6 +109,10 @@ export function QrLanding({ token }: { token: string }) {
   if (!building) return null;
   const isPrivate = building.visibility !== "Public";
   const staff = user.role !== TRAINEE;
+  // An older server sends no service fields: unknown is never shown as Active and never blocks the guide.
+  const service = serviceInfo[building.serviceStatus ?? ""] ?? null;
+  const serviceDate = building.serviceEndsAt ? formatDate(building.serviceEndsAt) : null;
+  const serviceBlocked = service !== null && building.serviceStatus !== "Active";
 
   return <>
     <Panel bodyClassName="ops-stack">
@@ -104,22 +124,25 @@ export function QrLanding({ token }: { token: string }) {
           <div className="qrl-badges">
             <StatusBadge tone={isPrivate ? "neutral" : "info"}>{isPrivate ? "Riêng tư" : "Công khai"}</StatusBadge>
             <StatusBadge tone={building.hasAccess ? "success" : "warning"}>{building.hasAccess ? "Bạn đã có quyền tham gia" : "Cần mã tham gia"}</StatusBadge>
+            {service && <StatusBadge tone={service.tone} data-testid="qr-service-status">{service.label}</StatusBadge>}
           </div>
         </div>
       </div>
-      <p className="ops-muted"><ShieldCheck size={14} aria-hidden="true" style={{ display: "inline", verticalAlign: "-2px", marginRight: 6 }} />Mã QR chỉ xác định công trình, không cấp quyền. Khi bạn bắt đầu một bài trong ứng dụng, hệ thống kiểm tra lại quyền tham gia, hạn dịch vụ của công trình và số suất người học. Hết hạn dịch vụ vẫn xem được trang này nhưng không bắt đầu được phiên mới.</p>
+      {building.serviceStatus === "Expired" && <Alert tone="warning" title="Dịch vụ của công trình đã hết hạn">Dịch vụ tập huấn của công trình này đã hết hạn{serviceDate ? ` từ ngày ${serviceDate}` : ""}. Mã QR vẫn đúng và bạn vẫn xem được danh sách bài, nhưng chưa bắt đầu được bài nào. {staff ? "Hãy gia hạn dịch vụ cho công trình trong mục Dịch vụ & thanh toán để học viên tập tiếp." : "Hãy báo tổ chức quản lý công trình gia hạn dịch vụ, rồi quét lại mã QR này."}</Alert>}
+      {building.serviceStatus === "NotPurchased" && <Alert tone="warning" title="Công trình chưa có dịch vụ tập huấn">Tổ chức chưa đăng ký dịch vụ tập huấn cho công trình này, nên chưa bắt đầu được bài nào. Mã QR vẫn đúng. {staff ? "Hãy mua dịch vụ cho công trình trong mục Dịch vụ & thanh toán." : "Hãy báo tổ chức quản lý công trình, rồi quét lại mã QR này khi dịch vụ đã có."}</Alert>}
+      <p className="ops-muted"><ShieldCheck size={14} aria-hidden="true" style={{ display: "inline", verticalAlign: "-2px", marginRight: 6 }} />Mã QR chỉ xác định công trình, không cấp quyền. Khi bạn bắt đầu một bài trong ứng dụng, hệ thống kiểm tra lại quyền tham gia, hạn dịch vụ của công trình và số suất người học.{service === null ? " Hết hạn dịch vụ vẫn xem được trang này nhưng không bắt đầu được phiên mới." : building.serviceStatus === "Active" && serviceDate ? ` Dịch vụ của công trình có hiệu lực đến ngày ${serviceDate}.` : ""}</p>
       {resolution.error !== undefined && <Alert tone="warning" title="Trạng thái có thể đã cũ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={reload}>Tải lại</Button>}>Không làm mới được thông tin công trình. Đang hiển thị lần tải gần nhất.</Alert>}
     </Panel>
 
     {building.hasAccess
       ? <>
         {justVerified && <Alert tone="success" title="Đã xác minh mã tham gia">Quyền tham gia của bạn đã được ghi nhận cho công trình này.</Alert>}
-        <TrainingList accessToken={accessToken ?? ""} token={token} staff={staff} onSessionLost={onSessionLost} onRecheckAccess={reload} />
+        <TrainingList accessToken={accessToken ?? ""} token={token} staff={staff} canStart={!serviceBlocked && building.canStartNewSessions !== false} onSessionLost={onSessionLost} onRecheckAccess={reload} />
       </>
       : user.role === TRAINEE
         ? <ParticipationForm accessToken={accessToken ?? ""} buildingId={building.buildingId} onVerified={onVerified} onSessionLost={onSessionLost} />
         : <EmptyState icon={CircleSlash} title="Tài khoản này không nhập được mã tham gia" description="Chỉ tài khoản học viên mới xác minh được mã tham gia để vào công trình Riêng tư." />}
 
-    <MobileGuide />
+    <MobileGuide canStart={!serviceBlocked} />
   </>;
 }
