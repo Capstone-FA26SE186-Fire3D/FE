@@ -1036,7 +1036,10 @@ Quy ước chung cho cả nhóm:
   - `prepare` dùng Idempotency-Key = `keyFor({scenarioId, revisionId, scenarioVersionId})`. Kết quả trả id, ghi vào `?playtest=`.
   - Lỗi `PLAYTEST_PACKAGE_REQUIRED`, `RUNTIME_INCOMPATIBLE`, `DRAFT_SNAPSHOT_REQUIRED` khiến FE tải lại trạng thái gói. Nếu có `Retry-After`, nút bị khóa tới hết thời gian chờ.
   - `usePlaytestStatus` poll `GET /api/playtests/{id}` cho tới Completed/Cancelled; 401/403/404 dừng poll hẳn.
-  - `HandoffCard`: `createHandoff` với Idempotency-Key, sinh QR deep link sống 5 phút. `PLAYTEST_HANDOFF_NOT_RECOVERABLE` xóa handoff đang hiện.
+  - `HandoffCard`: `createHandoff` với Idempotency-Key, sinh QR deep link sống 5 phút. `PLAYTEST_HANDOFF_NOT_RECOVERABLE` xóa handoff đang hiện. Nút cấp mã theo `recovery.canIssueHandoff` của máy chủ (BE: còn `Created`, kể cả khi điện thoại đã nhận mã); mã đang hiện chỉ còn dùng được khi `openHandoffId` trùng `handoffId` của nó (tab khác cấp mã mới hoặc điện thoại đã nhận thì ẩn QR).
+  - Khi chưa mở lượt nào: `playtestApi.availability` (kèm `scenarioVersionId`) hiện dịch vụ của công trình (trả phí / dùng thử còn N lượt / chưa có) và các điều kiện chặn bằng lời thường; `canCreate=false` khóa nút "Bắt đầu chạy thử". Không đọc được thì chỉ cảnh báo, không khóa (máy chủ vẫn kiểm tra lại).
+  - `PlaytestHistory`: `playtestApi.list` (10 lượt mới nhất của chính người dùng, mọi phiên bản của kịch bản) để mở lại lượt đã tạo trên máy khác; bấm "Mở lại" ghi id vào `?playtest=`.
+  - `RejectedEventsView`: `rejectedEvents` (tổng, số theo lý do; tên sự kiện và mã nằm trong phần gập cho hỗ trợ) hiện trong kết quả khi `total > 0`.
   - Hủy playtest: `cancel` với Idempotency-Key. 409 `PLAYTEST_TERMINAL` nghĩa là playtest đã kết thúc; FE đọc lại trạng thái.
   - Web **không** gọi redeem, start, launch-grants, launched, heartbeat, events, complete; các bước này thuộc Mobile.
 
@@ -1069,6 +1072,8 @@ Quy ước chung cho cả nhóm:
 | POST | `/api/releases/{id}/revoke` | `scenarioVersionsApi.revokeRelease` | `{reason}` | `void` (204) | `ReleasesController.RevokeRelease` |
 | GET | `/api/buildings/{id}/trainings` | `scenarioVersionsApi.listTrainings` | – | `TrainingItem[]` | `BuildingsController.GetTrainings` |
 | POST | `/api/scenarios/{id}/playtests?buildingId=` | `playtest/api.ts:playtestApi.prepare` | `PreparePlaytestInput {revisionId, scenarioVersionId}` + Idempotency-Key | `PlaytestPreparation` (201) | `ScenariosController.PreparePlaytestSession` |
+| GET | `/api/scenarios/{id}/playtests?page=&pageSize=` | `playtestApi.list` | – | `PlaytestPage` | `PlaytestsController.List` |
+| GET | `/api/scenarios/{id}/playtest-availability?scenarioVersionId=` | `playtestApi.availability` | – | `PlaytestAvailability` | `PlaytestsController.Availability` |
 | GET | `/api/playtests/{id}` | `playtestApi.get` | – | `PlaytestStatus` | `PlaytestsController.Get` |
 | POST | `/api/playtests/{id}/handoffs` | `playtestApi.createHandoff` | Idempotency-Key | `PlaytestHandoff` (201) | `PlaytestsController.CreateHandoff` |
 | POST | `/api/playtests/{id}/cancel` | `playtestApi.cancel` | Idempotency-Key | `PlaytestStatus` | `PlaytestsController.Cancel` |
@@ -1111,9 +1116,9 @@ So sánh type FE với DTO của BE (`Fire3D.Application`). Các endpoint IFC th
 | GET/POST `/api/releases`, `/{id}`, publish, revoke | `ReleaseSummary`, `Release`, `ReleasePackage`, `ReleaseEntitlement`, `BuildReleaseInput` | Đủ | `BuildReleaseInput` không khai báo các trường override tùy chọn của BE (FE không dùng) |
 | GET `/api/buildings/{id}/trainings` | `TrainingItem[]` | Đủ | |
 | POST `/api/scenarios/{id}/playtests` | `PreparePlaytestInput` / `PlaytestPreparation` | Đủ | Input bỏ các trường tùy chọn (`scenarioDraftId`, hash, runtime) mà Web không dùng |
-| GET `/api/playtests/{id}`, POST `/cancel` | `PlaytestStatus` | Đã bổ sung | `completion: unknown` → `PlaytestCompletionView \| null`; thêm `openHandoffId?`, `rejectedEvents?` (`PlaytestRejectedEvents`); `recovery.canIssueHandoff?` |
+| GET `/api/playtests/{id}`, POST `/cancel` | `PlaytestStatus` | Đã bổ sung | `completion: unknown` → `PlaytestCompletionView \| null`; `openHandoffId`, `recovery.canIssueHandoff` (bắt buộc, FE dùng thay cho suy luận từ trạng thái); `rejectedEvents?` (`PlaytestRejectedEvents`) |
 | POST `/api/playtests/{id}/handoffs` | `PlaytestHandoff` | Đủ | |
-| GET `/api/scenarios/{id}/playtests`, `/playtest-availability` | – | Thiếu (chưa dùng) | BE có `PlaytestPage`, `PlaytestAvailability`; FE chưa gọi. Nên thêm type khi tích hợp |
+| GET `/api/scenarios/{id}/playtests`, `/playtest-availability` | `PlaytestPage`, `PlaytestSummary`, `PlaytestAvailability`, `PlaytestEntitlementView` | Đủ | `PlaytestPage` dùng `total` (không phải `totalCount`); FE chưa gửi bộ lọc `scenarioVersionId`/`status` của danh sách |
 
 ---
 
@@ -1868,8 +1873,6 @@ Mã lỗi nội dung (FE mirror trong `library/payload.ts#checkForm`): `STRING_I
   - `GET /api/validation-runs/{id}`
   - `POST /api/revisions/{id}/reviews`
   - `PATCH /api/admin/learn/situations/{id}`
-  - `GET /api/scenarios/{id}/playtests`
-  - `GET /api/scenarios/{id}/playtest-availability`
   - `GET /api/learn/bookmarks/{postId}`
   - `GET /api/admin/billing/quota-policies/{id}`
 - **`EditorPreview`** (`buildings/types.ts`) thiếu `schemaVersion`, `units`, `upAxis`, `handedness`. Có thể dùng `EditorPreviewDetails` trong `ifc-types.ts`.

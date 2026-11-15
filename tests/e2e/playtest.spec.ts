@@ -1,6 +1,8 @@
 /**
  * Evidence level: Playwright route MOCKS of the BE contract at main @ 1eaf988 (PlaytestsController, POST /api/scenarios/{id}/playtests,
- * ScenariosController readiness/versions, ReleasesController list, processing jobs). The mock keeps the state a real server keeps
+ * ScenariosController readiness/versions, ReleasesController list, processing jobs), plus the playtest reads of BE#85/#120 as
+ * written in PlaytestContracts.cs and PlaytestReads.sql (GET /api/scenarios/{id}/playtests, /playtest-availability,
+ * recovery.canIssueHandoff, openHandoffId, rejectedEvents). The mock keeps the state a real server keeps
  * (playtest status, open handoff, idempotency replay) so reload proves recovery from the server. Not integration evidence:
  * Mobile redeem/start/launch and Unity are NOT exercised here, and the mock treats any request to those endpoints as a failure.
  */
@@ -32,10 +34,18 @@ type PlaytestRow = {
   status: string;
   boundToMobile: boolean;
   openHandoffExpiresAt: string | null;
+  /** Newest open code, as BE reports it. */
+  openHandoffId: string | null;
   completion: unknown;
   canCancel: boolean;
+  /** Overrides `recovery.canIssueHandoff`; BE's own rule (status Created) applies when undefined. */
+  canIssueHandoff?: boolean;
+  rejectedEvents?: { total: number; byCode: Record<string, number>; recent: Array<{ eventId: string; sequence: number; type: string; code: string; receivedAt: string }> } | null;
   versionId: string;
 };
+
+type Availability = { launchEnabled: boolean; handoffEnabled: boolean; entitlement: { kind: string; endsAt: string | null; trialUnitsRemaining: number | null }; scenarioVersionId: string | null; packageReady: boolean | null; blockers: string[]; canCreate: boolean };
+type SummaryRow = { id: string; scenarioVersionId: string; versionNumber: number; revisionId: string; status: string; createdAt: string; startedAt: string | null; endedAt: string | null; boundToMobile: boolean };
 
 type Mock = {
   prepareReplies: Reply[];
@@ -48,7 +58,14 @@ type Mock = {
   getDelays: number[];
   getFails: Reply | null;
   handoffTtlMs: number;
+  /** `GET /playtest-availability` answer; a Reply makes the read fail. */
+  availability: Availability | Reply;
+  /** `GET /api/scenarios/{id}/playtests` rows; null lists the stored playtest (if any). A Reply makes the read fail. */
+  history: SummaryRow[] | Reply | null;
+  historyTotal: number | undefined;
   // recorded
+  listCalls: string[];
+  availabilityCalls: string[];
   prepareCalls: Array<{ key: string | null; body: unknown; query: string }>;
   handoffCalls: Array<{ key: string | null }>;
   cancelCalls: Array<{ key: string | null }>;
@@ -56,7 +73,7 @@ type Mock = {
   forbidden: string[];
   // server state
   playtest: PlaytestRow | null;
-  handoffsByKey: Map<string, { code: string; expiresAt: string }>;
+  handoffsByKey: Map<string, { code: string; expiresAt: string; handoffId: string }>;
   codeCount: number;
   // version side
   jobs: Array<{ id: string; status: string; kind: string }>;
@@ -69,9 +86,15 @@ type Mock = {
   role: number;
 };
 
+const available = (patch: Partial<Availability> = {}): Availability => ({
+  launchEnabled: true, handoffEnabled: true, entitlement: { kind: "Paid", endsAt: "2027-01-31T00:00:00Z", trialUnitsRemaining: null },
+  scenarioVersionId: IDS.version, packageReady: true, blockers: [], canCreate: true, ...patch,
+});
+
 function newMock(patch: Partial<Mock> = {}): Mock {
   return {
     prepareReplies: [201], handoffReplies: [201], cancelReplies: [200], progress: [], progressIndex: 0, getDelays: [], getFails: null, handoffTtlMs: 5 * 60_000,
+    availability: available(), history: null, historyTotal: undefined, listCalls: [], availabilityCalls: [],
     prepareCalls: [], handoffCalls: [], cancelCalls: [], getCalls: 0, forbidden: [],
     playtest: null, handoffsByKey: new Map(), codeCount: 0,
     jobs: [{ id: IDS.job, status: "Succeeded", kind: "PlaytestPackage" }], qa: "passed",
@@ -81,6 +104,9 @@ function newMock(patch: Partial<Mock> = {}): Mock {
     ...patch,
   };
 }
+
+/** Each code is its own handoff row on the server; a new one revokes the previous. */
+const handoffId = (n: number) => `ffffffff-ffff-4fff-8fff-${String(n).padStart(12, "0")}`;
 
 const problem = (route: Route, status: number, code: string, headers: Record<string, string> = {}) =>
   route.fulfill({ status, contentType: "application/problem+json", headers, json: { title: code, status, code } });
@@ -99,15 +125,20 @@ function statusBody(row: PlaytestRow) {
     package: { artifactId: IDS.artifact, manifestArtifactId: "99999999-9999-4999-8999-999999999999", validationRunId: IDS.run, packageHash: "c".repeat(64), manifestHash: "d".repeat(64), buildTarget: "Android", protocolVersion: "1", manifestSchemaVersion: "1" },
     grant: started ? { generation: 1, issuedAt: "2026-10-12T01:05:00Z", expiresAt: "2026-10-12T01:10:00Z" } : null,
     launchedAt: launched ? "2026-10-12T01:06:00Z" : null, lastHeartbeatAt: launched ? "2026-10-12T01:07:00Z" : null, acknowledgedSequence: launched ? 12 : 0,
-    boundToMobile: row.boundToMobile, launchSession: true, openHandoffExpiresAt: row.openHandoffExpiresAt,
-    recovery: { canStart: false, canReissueGrant: false, canSync: false, canCancel: row.canCancel && !ended },
+    boundToMobile: row.boundToMobile, launchSession: true, openHandoffExpiresAt: row.openHandoffExpiresAt, openHandoffId: row.openHandoffId,
+    recovery: { canStart: false, canReissueGrant: false, canSync: false, canCancel: row.canCancel && !ended, canIssueHandoff: row.canIssueHandoff ?? row.status === "Created" },
     completion: row.status === "Completed" ? row.completion : null,
+    rejectedEvents: row.rejectedEvents === undefined ? { total: 0, byCode: { EVENT_TYPE_UNSUPPORTED: 0, EVENT_PAYLOAD_INVALID: 0 }, recent: [] } : row.rejectedEvents,
   };
 }
 
 function newRow(patch: Partial<PlaytestRow> = {}): PlaytestRow {
-  return { id: IDS.playtest, status: "Created", boundToMobile: false, openHandoffExpiresAt: null, completion: null, canCancel: true, versionId: IDS.version, ...patch };
+  return { id: IDS.playtest, status: "Created", boundToMobile: false, openHandoffExpiresAt: null, openHandoffId: null, completion: null, canCancel: true, versionId: IDS.version, ...patch };
 }
+
+const summaryRow = (patch: Partial<SummaryRow> = {}): SummaryRow => ({
+  id: IDS.playtest, scenarioVersionId: IDS.version, versionNumber: 1, revisionId: IDS.revision, status: "Created", createdAt: "2026-10-12T01:00:00Z", startedAt: null, endedAt: null, boundToMobile: false, ...patch,
+});
 
 const versionSummary = (mock: Mock, id = IDS.version, number = 1) => ({
   id, scenarioId: IDS.scenario, revisionId: IDS.revision, buildingId: "building-1", organizationId: "org-1", versionNumber: number, name: "Sơ tán tầng 3", schemaVersion: "7", algorithmVersion: "1", timeLimitSeconds: 300,
@@ -152,8 +183,27 @@ async function setup(page: Page, mock: Mock) {
   });
   await page.route(`**/api/revisions/${IDS.revision}/issues?*`, (route) => route.fulfill({ json: { items: mock.qa === "failed" ? [{ id: "iss-1", revisionId: IDS.revision, validationRunId: IDS.run, processingAttemptId: "att-1", artifactId: null, issueCode: "X", severity: "Error", status: "Open", message: "x", isCurrentAttempt: true, createdAt: "2026-10-10T02:05:00Z" }] : [], totalCount: 0, page: 1, pageSize: 100 } }));
 
+  await page.route(`**/api/scenarios/${IDS.scenario}/playtest-availability*`, (route) => {
+    mock.availabilityCalls.push(new URL(route.request().url()).search);
+    const next = mock.availability;
+    if (next === 0) return route.abort("failed");
+    if (typeof next === "number") return problem(route, next, "INTERNAL_ERROR");
+    if ("code" in next) return problem(route, next.status, next.code);
+    return route.fulfill({ json: next });
+  });
+
   await page.route(`**/api/scenarios/${IDS.scenario}/playtests*`, async (route) => {
     const request = route.request();
+    if (request.method() === "GET") {
+      mock.listCalls.push(new URL(request.url()).search);
+      const next = mock.history;
+      if (next === 0) return route.abort("failed");
+      if (typeof next === "number") return problem(route, next, "INTERNAL_ERROR");
+      if (next !== null && !Array.isArray(next)) return problem(route, next.status, next.code);
+      const stored = mock.playtest;
+      const items = next ?? (stored ? [summaryRow({ id: stored.id, scenarioVersionId: stored.versionId, status: stored.status, boundToMobile: stored.boundToMobile, endedAt: ["Completed", "Cancelled"].includes(stored.status) ? "2026-10-12T01:20:00Z" : null })] : []);
+      return route.fulfill({ json: { items, total: mock.historyTotal ?? items.length, page: 1, pageSize: 10 } });
+    }
     const count = mock.prepareCalls.push({ key: request.headers()["idempotency-key"] ?? null, body: request.postDataJSON(), query: new URL(request.url()).search });
     const next = reply(mock.prepareReplies, count);
     if (next === 0) return route.abort("failed");
@@ -184,6 +234,8 @@ async function setup(page: Page, mock: Mock) {
       }
       if (mock.progress.length) { row.status = mock.progress[Math.min(mock.progressIndex, mock.progress.length - 1)]; mock.progressIndex += 1; }
       if (row.status === "Completed") row.completion = row.completion ?? { result: "Passed", durationSeconds: 42, detail: { exits: 2 } };
+      // An expired code is no longer open on the server either.
+      if (row.openHandoffExpiresAt && Date.parse(row.openHandoffExpiresAt) <= Date.now()) { row.openHandoffExpiresAt = null; row.openHandoffId = null; }
       const body = statusBody(row);
       const delay = mock.getDelays[mock.getCalls - 1] ?? 0;
       if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
@@ -198,11 +250,12 @@ async function setup(page: Page, mock: Mock) {
       let handoff = key ? mock.handoffsByKey.get(key) : undefined;
       if (!handoff) {
         mock.codeCount += 1;
-        handoff = { code: `Hf${String(mock.codeCount).padStart(2, "0")}`.padEnd(43, "x"), expiresAt: new Date(Date.now() + mock.handoffTtlMs).toISOString() };
+        handoff = { code: `Hf${String(mock.codeCount).padStart(2, "0")}`.padEnd(43, "x"), expiresAt: new Date(Date.now() + mock.handoffTtlMs).toISOString(), handoffId: handoffId(mock.codeCount) };
         if (key) mock.handoffsByKey.set(key, handoff);
         row.openHandoffExpiresAt = handoff.expiresAt;
+        row.openHandoffId = handoff.handoffId;
       }
-      return route.fulfill({ status: 201, json: { handoffId: "ffffffff-ffff-4fff-8fff-ffffffffffff", playtestId: id, code: handoff.code, deepLink: `fet3d://playtest/handoff?code=${handoff.code}`, expiresAt: handoff.expiresAt } });
+      return route.fulfill({ status: 201, json: { handoffId: handoff.handoffId, playtestId: id, code: handoff.code, deepLink: `fet3d://playtest/handoff?code=${handoff.code}`, expiresAt: handoff.expiresAt } });
     }
     if (action === "cancel") {
       const count = mock.cancelCalls.push({ key: request.headers()["idempotency-key"] ?? null });
@@ -211,6 +264,7 @@ async function setup(page: Page, mock: Mock) {
       if (typeof next === "object") return problem(route, next.status, next.code);
       row.status = "Cancelled";
       row.openHandoffExpiresAt = null;
+      row.openHandoffId = null;
       return route.fulfill({ json: statusBody(row) });
     }
     return problem(route, 404, "NOT_FOUND");
@@ -317,17 +371,23 @@ test.describe("prepare and follow", () => {
     expect(mock.forbidden).toEqual([]);
   });
 
-  test("a Mobile session that redeemed the code hides the QR and stops Web from issuing more", async ({ page }) => {
+  test("a Mobile session that redeemed the code hides the QR; a new code is offered only while the server allows it", async ({ page }) => {
     const mock = newMock({ playtest: newRow(), progress: [] });
     await setup(page, mock);
     await openTab(page, `&playtest=${IDS.playtest}`);
     await page.getByRole("button", { name: "Tạo mã QR mở trên điện thoại" }).click();
     await expect(page.getByTestId("qr-code")).toBeVisible();
-    mock.playtest = { ...(mock.playtest as PlaytestRow), boundToMobile: true, openHandoffExpiresAt: null };
+    // The phone redeemed the code: it is no longer the open one. BE still allows a new code while the status is Created.
+    mock.playtest = { ...(mock.playtest as PlaytestRow), boundToMobile: true, openHandoffExpiresAt: null, openHandoffId: null };
     await expect(statusBox(page)).toContainText("Điện thoại đã nhận mã", { timeout: 10_000 });
     await expect(page.getByTestId("qr-code")).toHaveCount(0);
+    await expect(page.getByTestId("handoff-bound")).toContainText("đang giữ lượt chạy thử");
+    await expect(page.getByTestId("handoff-card").getByRole("button", { name: "Cấp lại mã" })).toBeVisible();
+    // The phone started: the server withdraws the permission and the button goes with it.
+    mock.playtest = { ...(mock.playtest as PlaytestRow), status: "Launching" };
+    await expect(statusBox(page)).toContainText("Đang khởi chạy", { timeout: 10_000 });
     await expect(page.getByRole("button", { name: /Cấp lại mã|Tạo mã/ })).toHaveCount(0);
-    await expect(page.getByTestId("handoff-card")).toContainText("đang giữ lượt chạy thử");
+    await expect(page.getByTestId("handoff-card")).toContainText("Đã bắt đầu chơi trên điện thoại");
   });
 });
 
@@ -444,6 +504,191 @@ test.describe("reload", () => {
     expect(mock.getCalls).toBe(0);
     await page.getByRole("button", { name: "Bỏ mã này" }).click();
     await expect(create(page)).toBeVisible();
+  });
+});
+
+test.describe("playtests of the scenario come from the server", () => {
+  test("a playtest started elsewhere is listed and reopened without its link", async ({ page }) => {
+    const mock = newMock({ playtest: newRow({ status: "Running" }) });
+    mock.history = [
+      summaryRow({ status: "Running", startedAt: "2026-10-12T01:05:00Z" }),
+      summaryRow({ id: IDS.playtest2, scenarioVersionId: IDS.version2, versionNumber: 2, status: "Completed", createdAt: "2026-10-11T01:00:00Z", endedAt: "2026-10-11T01:20:00Z" }),
+    ];
+    mock.historyTotal = 14;
+    await setup(page, mock);
+    await openTab(page); // no ?playtest= in the URL: another computer started it
+    const rows = page.getByTestId("playtest-history-row");
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toContainText("Đang chạy trên thiết bị");
+    await expect(rows.nth(0)).toContainText("Phiên bản 1 (đang xem)");
+    await expect(rows.nth(1)).toContainText("Đã hoàn tất");
+    await expect(rows.nth(1)).toContainText("Phiên bản 2");
+    await expect(page.getByTestId("playtest-history")).toContainText("2 lượt mới nhất trong tổng số 14 lượt");
+    expect(mock.listCalls).toHaveLength(1);
+    expect(mock.listCalls[0]).toContain("pageSize=10");
+    expect(mock.getCalls).toBe(0);
+
+    await rows.nth(0).getByRole("button", { name: "Mở lại" }).click();
+    await expect(page).toHaveURL(new RegExp(`playtest=${IDS.playtest}`));
+    await expect(statusBox(page)).toContainText("Đang chạy trên thiết bị");
+    expect(mock.prepareCalls).toHaveLength(0);
+    expect(mock.forbidden).toEqual([]);
+  });
+
+  test("no playtest yet, and a list that cannot be read, never block starting one", async ({ page }) => {
+    const mock = newMock();
+    await setup(page, mock);
+    await openTab(page);
+    await expect(page.getByTestId("playtest-history")).toContainText("Bạn chưa tạo lượt chạy thử nào");
+    await expect(page.getByTestId("playtest-history-row")).toHaveCount(0);
+
+    const failing = newMock({ history: 500 });
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await setup(page, failing);
+    await openTab(page);
+    await expect(page.getByTestId("playtest-history").getByRole("status")).toContainText("Không tải được danh sách lượt chạy thử");
+    await expect(create(page)).toBeEnabled();
+    failing.history = [summaryRow({ status: "Cancelled", endedAt: "2026-10-12T01:20:00Z" })];
+    await page.getByTestId("playtest-history").getByRole("button", { name: "Thử lại" }).click();
+    await expect(page.getByTestId("playtest-history-row")).toContainText("Đã hủy");
+    await expect(page.getByTestId("playtest-history-row").getByRole("button", { name: "Xem lại" })).toBeVisible();
+  });
+});
+
+test.describe("availability comes from the server", () => {
+  test("a paid service is shown and the pre-check asks about this version", async ({ page }) => {
+    const mock = newMock();
+    await setup(page, mock);
+    await openTab(page);
+    await expect(page.getByTestId("playtest-service")).toContainText("Đang có dịch vụ");
+    await expect(page.getByTestId("playtest-blockers")).toHaveCount(0);
+    await expect(create(page)).toBeEnabled();
+    expect(mock.availabilityCalls[0]).toContain(`scenarioVersionId=${IDS.version}`);
+  });
+
+  test("a Trial shows the units left", async ({ page }) => {
+    const mock = newMock({ availability: available({ entitlement: { kind: "Trial", endsAt: "2026-12-01T00:00:00Z", trialUnitsRemaining: 3 } }) });
+    await setup(page, mock);
+    await openTab(page);
+    await expect(page.getByTestId("playtest-service")).toContainText("Dùng thử: còn 3 lượt chạy thử");
+    await expect(create(page)).toBeEnabled();
+  });
+
+  test("blockers are listed in plain words, hold the button and clear on a re-check", async ({ page }) => {
+    const mock = newMock({ availability: available({
+      launchEnabled: false, handoffEnabled: false, entitlement: { kind: "Trial", endsAt: "2026-12-01T00:00:00Z", trialUnitsRemaining: 0 },
+      blockers: ["PLAYTEST_LAUNCH_UNAVAILABLE", "PLAYTEST_HANDOFF_UNAVAILABLE", "PLAYTEST_ENTITLEMENT_REQUIRED", "SOMETHING_NEW"], canCreate: false,
+    }) });
+    await setup(page, mock);
+    await openTab(page);
+    const blockers = page.getByTestId("playtest-blockers");
+    await expect(blockers.getByRole("listitem")).toHaveCount(4);
+    await expect(blockers).toContainText("Chức năng chạy thử chưa được bật");
+    await expect(blockers).toContainText("mở bài trên điện thoại chưa được bật");
+    await expect(blockers).toContainText("gói dùng thử không còn lượt chạy thử");
+    await expect(blockers).toContainText("Còn một điều kiện khác chưa đạt");
+    await expect(page.getByTestId("playtest-service")).toContainText("hết lượt chạy thử");
+    // Codes stay out of the page text.
+    await expect(page.getByTestId("playtest-package")).not.toContainText(/PLAYTEST_|SOMETHING_NEW/);
+    await expect(create(page)).toBeDisabled();
+    expect(mock.prepareCalls).toHaveLength(0);
+
+    mock.availability = available();
+    await page.getByRole("button", { name: "Kiểm tra lại" }).click();
+    await expect(blockers).toHaveCount(0);
+    await expect(create(page)).toBeEnabled();
+  });
+
+  test("the package blocker is not repeated when the page already lists the missing package steps", async ({ page }) => {
+    const mock = newMock({ jobs: [], availability: available({ packageReady: false, blockers: ["PLAYTEST_PACKAGE_REQUIRED"], canCreate: false }) });
+    await setup(page, mock);
+    await openTab(page);
+    await expect(page.getByTestId("playtest-missing")).toContainText(/Chưa dựng gói chạy thử/);
+    await expect(page.getByTestId("playtest-service")).toContainText("Đang có dịch vụ");
+    await expect(page.getByTestId("playtest-blockers")).toHaveCount(0);
+    await expect(create(page)).toBeDisabled();
+  });
+
+  test("a pre-check that cannot be read warns but does not block: the server still decides", async ({ page }) => {
+    const mock = newMock({ availability: 500 });
+    await setup(page, mock);
+    await openTab(page);
+    await expect(page.getByTestId("playtest-package").getByRole("status").filter({ hasText: "Chưa kiểm tra được điều kiện chạy thử" })).toBeVisible();
+    await expect(create(page)).toBeEnabled();
+    await create(page).click();
+    await expect(statusBox(page)).toContainText("Đã chuẩn bị");
+  });
+});
+
+test.describe("handoff follows the server's recovery fields", () => {
+  test("canIssueHandoff false hides the button even while the status is Created", async ({ page }) => {
+    const mock = newMock({ playtest: newRow({ canIssueHandoff: false }) });
+    await setup(page, mock);
+    await openTab(page, `&playtest=${IDS.playtest}`);
+    await expect(statusBox(page)).toContainText("Đã chuẩn bị");
+    await expect(page.getByTestId("handoff-card")).toContainText("Hiện chưa tạo được mã mới");
+    await expect(page.getByTestId("handoff-card").getByRole("button")).toHaveCount(0);
+    expect(mock.handoffCalls).toHaveLength(0);
+  });
+
+  test("a code replaced from another tab (openHandoffId changed) is withdrawn here", async ({ page }) => {
+    const mock = newMock({ playtest: newRow() });
+    await setup(page, mock);
+    await openTab(page, `&playtest=${IDS.playtest}`);
+    await page.getByRole("button", { name: "Tạo mã QR mở trên điện thoại" }).click();
+    await expect(page.getByTestId("qr-code")).toBeVisible();
+    await expect.poll(() => mock.getCalls, { timeout: 8000 }).toBeGreaterThanOrEqual(2); // the server has reported this code as the open one
+    // Another tab rotates the code: still open, still unexpired, but under a different id.
+    mock.playtest = { ...(mock.playtest as PlaytestRow), openHandoffId: handoffId(99) };
+    await expect(page.getByTestId("handoff-card").getByRole("status").filter({ hasText: "Mã này đã được thay bằng mã mới" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId("qr-code")).toHaveCount(0);
+    await page.getByRole("button", { name: "Cấp lại mã" }).click();
+    await expect(page.getByTestId("qr-code")).toBeVisible();
+    await expect(page.getByTestId("handoff-code")).toHaveText("Hf02".padEnd(43, "x"));
+  });
+});
+
+test.describe("rejected events", () => {
+  const rejected = {
+    total: 23, byCode: { EVENT_TYPE_UNSUPPORTED: 21, EVENT_PAYLOAD_INVALID: 2 },
+    recent: [
+      { eventId: "eeeeeeee-eeee-4eee-8eee-000000000002", sequence: 41, type: "valve.closed", code: "EVENT_TYPE_UNSUPPORTED", receivedAt: "2026-10-12T01:15:00Z" },
+      { eventId: "eeeeeeee-eeee-4eee-8eee-000000000001", sequence: 17, type: "door.opened", code: "EVENT_PAYLOAD_INVALID", receivedAt: "2026-10-12T01:10:00Z" },
+    ],
+  };
+
+  test("the result shows how many events were refused and why, with the raw rows folded away", async ({ page }) => {
+    const mock = newMock({ playtest: newRow({ status: "Completed", rejectedEvents: rejected }) });
+    await setup(page, mock);
+    await openTab(page, `&playtest=${IDS.playtest}`);
+    await expect(page.getByTestId("playtest-completion")).toContainText("Passed");
+    const box = page.getByTestId("playtest-rejected");
+    await expect(page.getByRole("status").filter({ hasText: "23 sự kiện từ điện thoại không được ghi nhận" })).toBeVisible();
+    await expect(box.getByRole("listitem")).toHaveCount(2);
+    await expect(box).toContainText("chưa hỗ trợ: 21");
+    await expect(box).toContainText("không đúng định dạng: 2");
+    // Event names and codes are for support only: folded until opened.
+    await expect(box.getByText("valve.closed")).toBeHidden();
+    await box.getByText("Thông tin cho bộ phận hỗ trợ").click();
+    await expect(box.getByTestId("playtest-rejected-event")).toHaveCount(2);
+    await expect(box.getByTestId("playtest-rejected-event").first()).toContainText("Sự kiện thứ 41");
+    await expect(box.getByText("valve.closed")).toBeVisible();
+    await expect(box).toContainText("Chỉ liệt kê 2 sự kiện mới nhất");
+  });
+
+  test("nothing is shown when the server reports none, or omits the field", async ({ page }) => {
+    const mock = newMock({ playtest: newRow({ status: "Completed" }) });
+    await setup(page, mock);
+    await openTab(page, `&playtest=${IDS.playtest}`);
+    await expect(page.getByTestId("playtest-completion")).toContainText("Passed");
+    await expect(page.getByTestId("playtest-rejected")).toHaveCount(0);
+
+    const older = newMock({ playtest: newRow({ status: "Completed", rejectedEvents: null }) });
+    await page.unrouteAll({ behavior: "ignoreErrors" });
+    await setup(page, older);
+    await openTab(page, `&playtest=${IDS.playtest}`);
+    await expect(page.getByTestId("playtest-completion")).toContainText("Passed");
+    await expect(page.getByTestId("playtest-rejected")).toHaveCount(0);
   });
 });
 
