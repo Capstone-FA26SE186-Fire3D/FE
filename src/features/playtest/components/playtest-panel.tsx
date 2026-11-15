@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { useIdempotencyKey } from "@/api";
+import { useAsyncData, type AsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/dialog";
@@ -17,14 +18,17 @@ import { formatDateTime } from "@/features/scenarios/components/versions/version
 
 import "./playtest.css";
 import { playtestApi } from "../api";
+import { describeBlockers, describeEntitlement } from "../availability";
 import { describePlaytestError, outcomeIsUnknown, type PlaytestErrorView } from "../errors";
 import { canCancel, describeStatus, isPlaytestTerminal } from "../status";
-import type { PlaytestStatus } from "../types";
+import type { PlaytestAvailability, PlaytestStatus } from "../types";
 import { packageMissing, type PlaytestPackageState, type PlaytestPackageWatch } from "../use-playtest-package";
 import { useNow } from "@/api/use-now";
 import { usePlaytestStatus } from "../use-playtest-status";
 import { CompletionView } from "./completion-view";
 import { HandoffCard } from "./handoff-card";
+import { PlaytestHistory } from "./playtest-history";
+import { RejectedEventsView } from "./rejected-events";
 
 export type PlaytestVersionRef = { id: string; revisionId: string; scenarioId: string; buildingId: string };
 
@@ -51,9 +55,18 @@ function packageLabel(state: PlaytestPackageState) {
   }
 }
 
-function PackageChecklist({ watch, buildHref }: { watch: PlaytestPackageWatch; buildHref?: string }) {
+/**
+ * What must be true before a playtest can be prepared: the version's package (processing jobs + QA) and the server's own
+ * pre-check (`playtest-availability`: rollout, the Building's service or Trial units, package). The pre-check is advisory;
+ * the server checks again when the phone starts.
+ */
+function PackageChecklist({ watch, availability, buildHref }: { watch: PlaytestPackageWatch; availability: AsyncData<PlaytestAvailability>; buildHref?: string }) {
   const { state } = watch;
   const missing = packageMissing(state);
+  const checked = availability.data;
+  const service = checked ? describeEntitlement(checked.entitlement) : undefined;
+  const blockers = checked ? describeBlockers(checked, missing.length > 0) : [];
+  const recheck = () => { availability.reload(); watch.reload(); };
   return <section className="pt-card" aria-labelledby="pt-pkg-title" data-testid="playtest-package">
     <h3 id="pt-pkg-title" className="ver-section-title">Điều kiện trước khi chạy thử</h3>
     <div className="ver-actions-row">
@@ -67,7 +80,16 @@ function PackageChecklist({ watch, buildHref }: { watch: PlaytestPackageWatch; b
       <ul className="ver-list" data-testid="playtest-missing">{missing.map((line) => <li key={line}>{line}</li>)}</ul>
       {buildHref && <Link href={buildHref} className="pt-link">Mở tab Dựng gói</Link>}
     </>}
-    <p className="ver-note" style={{ marginTop: 8 }}>Dịch vụ của công trình và lượt dùng thử được kiểm tra khi bạn bắt đầu chạy thử và khi ứng dụng điện thoại mở bài. Trang web không trừ lượt dùng thử.</p>
+    <div className="ver-actions-row" data-testid="playtest-service">
+      <span className="ver-note">Dịch vụ của công trình:</span>
+      <StatusBadge tone={service ? service.tone : availability.error !== undefined ? "warning" : "pending"}>{service ? service.label : availability.error !== undefined ? "Không đọc được" : "Đang đọc"}</StatusBadge>
+    </div>
+    {service && <p className="ver-note">{service.detail}</p>}
+    {!checked && availability.error !== undefined && <Alert tone="warning" title="Chưa kiểm tra được điều kiện chạy thử" action={<Button size="sm" variant="secondary" className="mt-3" onClick={availability.reload}>Thử lại</Button>}>Bạn vẫn có thể bắt đầu; hệ thống kiểm tra lại khi chuẩn bị và khi điện thoại mở bài.</Alert>}
+    {blockers.length > 0 && <Alert tone="warning" title="Chưa chạy thử được" action={<Button size="sm" variant="secondary" className="mt-3" onClick={recheck}>Kiểm tra lại</Button>}>
+      <ul className="ver-list" data-testid="playtest-blockers">{blockers.map((line) => <li key={line.text}>{line.text}</li>)}</ul>
+    </Alert>}
+    <p className="ver-note" style={{ marginTop: 8 }}>Các điều kiện này được kiểm tra lại khi ứng dụng điện thoại mở bài. Trang web không trừ lượt dùng thử.</p>
   </section>;
 }
 
@@ -177,10 +199,13 @@ function PlaytestSession({ accessToken, playtestId, canAct, versionId, onForget,
       <p className="ver-note" style={{ marginTop: 6 }}>{view.detail}</p>
     </div>
 
-    {playtest.status.toLowerCase() === "completed" && <section className="pt-card" aria-labelledby="pt-result-title">
-      <h3 id="pt-result-title" className="ver-section-title">Kết quả từ ứng dụng điện thoại</h3>
-      <CompletionView completion={playtest.completion} />
-    </section>}
+    {playtest.status.toLowerCase() === "completed"
+      ? <section className="pt-card" aria-labelledby="pt-result-title">
+        <h3 id="pt-result-title" className="ver-section-title">Kết quả từ ứng dụng điện thoại</h3>
+        <CompletionView completion={playtest.completion} />
+        <RejectedEventsView rejected={playtest.rejectedEvents} />
+      </section>
+      : <RejectedEventsView rejected={playtest.rejectedEvents} />}
 
     <HandoffCard accessToken={accessToken} playtest={playtest} canAct={canAct} onIssued={watch.refresh} />
     <Facts playtest={playtest} />
@@ -206,7 +231,8 @@ function PlaytestSession({ accessToken, playtestId, canAct, versionId, onForget,
 
 /**
  * Prepare, follow and hand off one playtest of a scenario version. The playtest id lives in the caller's URL
- * (`?playtest=`), so a reload or another tab reopens it from `GET /api/playtests/{id}`.
+ * (`?playtest=`), so a reload or another tab reopens it from `GET /api/playtests/{id}`; without it, the start view lists
+ * the user's playtests of the scenario from the server so one started elsewhere can be reopened.
  * Web never redeems, starts, launches or consumes a grant: that is the Mobile session's job.
  */
 export function PlaytestPanel({ accessToken, version, packageWatch, canPlaytest, playtestId, onPlaytestIdChange, buildHref, onOpenVersion }: {
@@ -228,9 +254,20 @@ export function PlaytestPanel({ accessToken, version, packageWatch, canPlaytest,
   const [blockedUntil, setBlockedUntil] = useState(0);
   const missing = packageMissing(packageWatch.state);
   const validId = UUID.test(playtestId);
+  // Only read while the start view is on screen: an open playtest is governed by its own recovery flags.
+  const starting = canPlaytest && !(playtestId && validId);
+  const availability = useAsyncData(
+    `playtest-availability:${version.scenarioId}:${version.id}`,
+    (signal) => playtestApi.availability(accessToken, version.scenarioId, version.id, signal),
+    starting,
+    { keepPrevious: false },
+  );
+  // Advisory pre-check: a server-listed blocker holds the button; a pre-check that cannot be read does not.
+  const checking = starting && !availability.data && availability.error === undefined;
+  const blockedByServer = availability.data ? !availability.data.canCreate : false;
 
   const create = async () => {
-    if (busy || !canPlaytest || missing.length > 0) return;
+    if (busy || !canPlaytest || missing.length > 0 || checking || blockedByServer) return;
     setBusy(true);
     setError(null);
     try {
@@ -245,6 +282,7 @@ export function PlaytestPanel({ accessToken, version, packageWatch, canPlaytest,
       if (!outcomeIsUnknown(cause)) key.done();
       if (view.retryAfterSeconds) setBlockedUntil(Date.now() + view.retryAfterSeconds * 1000);
       if (view.code === "PLAYTEST_PACKAGE_REQUIRED" || view.code === "RUNTIME_INCOMPATIBLE" || view.code === "DRAFT_SNAPSHOT_REQUIRED") packageWatch.reload();
+      if (!outcomeIsUnknown(cause)) availability.reload();
     } finally {
       setBusy(false);
     }
@@ -265,15 +303,16 @@ export function PlaytestPanel({ accessToken, version, packageWatch, canPlaytest,
       {canPlaytest && playtestId && validId
         ? <PlaytestSession key={playtestId} accessToken={accessToken} playtestId={playtestId} canAct={canPlaytest} versionId={version.id} onForget={() => onPlaytestIdChange("")} onOpenVersion={onOpenVersion} />
         : canPlaytest && <>
-          <PackageChecklist watch={packageWatch} buildHref={buildHref} />
+          <PackageChecklist watch={packageWatch} availability={availability} buildHref={buildHref} />
           {error && <Alert tone="danger" title={error.title} className="pt-error"><ErrorLine error={error} /></Alert>}
           <div className="ver-actions-row">
-            <Button onClick={() => void create()} disabled={busy || missing.length > 0 || retryLeft} data-testid="playtest-create">
+            <Button onClick={() => void create()} disabled={busy || missing.length > 0 || retryLeft || checking || blockedByServer} data-testid="playtest-create">
               <FlaskConical size={16} aria-hidden="true" />{busy ? "Đang chuẩn bị…" : "Bắt đầu chạy thử"}
             </Button>
             {retryLeft && <StatusBadge tone="warning">Chờ rồi thử lại</StatusBadge>}
           </div>
           <p className="ver-caption">Bắt đầu chỉ chuẩn bị gói của phiên bản này; chưa trừ lượt dùng thử.</p>
+          <PlaytestHistory accessToken={accessToken} scenarioId={version.scenarioId} versionId={version.id} onOpen={onPlaytestIdChange} />
         </>}
     </div>
   </Panel>;

@@ -13,7 +13,7 @@ import { useToast } from "@/components/ui/toast";
 
 import { playtestApi } from "../api";
 import { describePlaytestError, outcomeIsUnknown, type PlaytestErrorView } from "../errors";
-import { canIssueHandoff, formatCountdown, isPlaytestTerminal, msUntil } from "../status";
+import { canIssueHandoff, formatCountdown, heldCodeState, isPlaytestTerminal, msUntil } from "../status";
 import type { PlaytestHandoff, PlaytestStatus } from "../types";
 import { useNow } from "@/api/use-now";
 
@@ -29,7 +29,9 @@ async function copy(text: string) {
 /**
  * Short-lived Mobile handoff. The QR encodes exactly the `deepLink` BE returned (an opaque one-time code, 5 minutes): no
  * credential, package or permission is added by Web. The code exists only in this component's memory: after a reload the
- * server still reports the open handoff (`openHandoffExpiresAt`) but cannot show the code again, so a new one is issued.
+ * server still reports the open handoff (`openHandoffId`, `openHandoffExpiresAt`) but cannot show the code again, so a new
+ * one is issued. Whether a code may be issued (`recovery.canIssueHandoff`) and whether the code shown here is still the
+ * open one (`openHandoffId`) are read from the server, never worked out from the status.
  */
 export function HandoffCard({ accessToken, playtest, canAct, onIssued }: {
   accessToken: string;
@@ -44,15 +46,23 @@ export function HandoffCard({ accessToken, playtest, canAct, onIssued }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<PlaytestErrorView | null>(null);
   const [blockedUntil, setBlockedUntil] = useState(0);
+  /** Id of the held code once a status read has reported it as the open one. */
+  const [confirmedId, setConfirmedId] = useState<string | undefined>();
 
   const issuable = canIssueHandoff(playtest);
+  const bound = playtest.boundToMobile;
   const held = handoff && handoff.playtestId === playtest.id ? handoff : undefined;
-  const serverOpen = playtest.openHandoffExpiresAt;
+  const heldState = held ? heldCodeState(playtest, held.handoffId) : undefined;
+  // A status read from before the code was created does not know it yet, so the code only counts as no longer open after
+  // the server has reported it open once (derived during render, no effect).
+  if (held && heldState === "current" && confirmedId !== held.handoffId) setConfirmedId(held.handoffId);
+  const lost = held && confirmedId === held.handoffId && heldState !== "current" ? heldState : undefined;
+  const serverOpen = playtest.openHandoffId ? playtest.openHandoffExpiresAt : null;
   const watchClock = Boolean(held || serverOpen || blockedUntil);
   const now = useNow(watchClock);
 
   const codeLeft = held ? msUntil(held.expiresAt, now) : undefined;
-  const codeLive = Boolean(held && codeLeft !== undefined && codeLeft > 0 && issuable);
+  const codeLive = Boolean(held && codeLeft !== undefined && codeLeft > 0 && issuable && !lost);
   const serverLeft = msUntil(serverOpen, now);
   const serverOpenLive = serverLeft !== undefined && serverLeft > 0;
   const blocked = blockedUntil > now;
@@ -84,14 +94,15 @@ export function HandoffCard({ accessToken, playtest, canAct, onIssued }: {
 
   if (terminal) return null;
 
-  const label = held || serverOpen ? "Cấp lại mã" : "Tạo mã QR mở trên điện thoại";
+  const label = held || serverOpen || bound ? "Cấp lại mã" : "Tạo mã QR mở trên điện thoại";
 
   return <section className="pt-card" aria-labelledby="pt-handoff-title" data-testid="handoff-card">
     <h3 id="pt-handoff-title" className="ver-section-title"><QrIcon size={16} aria-hidden="true" style={{ verticalAlign: "-3px", marginRight: 6 }} />Mở trên điện thoại</h3>
 
-    {!issuable && <p className="ver-note">{playtest.boundToMobile
-      ? "Điện thoại đã nhận mã và đang giữ lượt chạy thử này."
+    {!issuable && <p className="ver-note">{playtest.status.toLowerCase() === "created"
+      ? "Hiện chưa tạo được mã mới cho lượt chạy thử này."
       : "Đã bắt đầu chơi trên điện thoại: mã QR chỉ cấp được trước khi bắt đầu."}</p>}
+    {issuable && bound && !codeLive && <p className="ver-note" data-testid="handoff-bound">Điện thoại đã nhận mã và đang giữ lượt chạy thử này. Cấp lại mã nếu muốn chuyển sang điện thoại khác.</p>}
 
     {issuable && codeLive && held && <div className="pt-qr-row">
       <div className="pt-qr-frame"><QrCode value={held.deepLink} size={192} label="Mã QR mở lượt chạy thử trên điện thoại" /></div>
@@ -107,9 +118,10 @@ export function HandoffCard({ accessToken, playtest, canAct, onIssued }: {
       </div>
     </div>}
 
-    {issuable && !codeLive && held && <Alert tone="warning" title="Mã đã hết hạn">Mã chỉ có hiệu lực 5 phút. Cấp lại mã để có QR mới; mã cũ không dùng được nữa.</Alert>}
+    {issuable && !codeLive && held && lost === "replaced" && <Alert tone="warning" title="Mã này đã được thay bằng mã mới">Một mã mới hơn vừa được tạo ở tab hoặc máy tính khác nên mã ở đây không dùng được nữa. Cấp lại mã nếu muốn hiện QR tại đây.</Alert>}
+    {issuable && !codeLive && held && lost !== "replaced" && !bound && <Alert tone="warning" title="Mã đã hết hạn">Mã chỉ có hiệu lực 5 phút. Cấp lại mã để có QR mới; mã cũ không dùng được nữa.</Alert>}
     {issuable && !held && serverOpenLive && <Alert tone="info" title="Đang có một mã mở">Máy chủ báo có mã còn hiệu lực đến {new Date(serverOpen as string).toLocaleTimeString("vi-VN")}, nhưng mã chỉ hiển thị một lần lúc tạo nên không thể xem lại. Cấp lại mã sẽ thay mã đó.</Alert>}
-    {issuable && !held && !serverOpenLive && <p className="ver-note">Chưa có mã đang mở. Tạo mã để hiện QR cho ứng dụng điện thoại. Tạo mã không trừ lượt dùng thử.</p>}
+    {issuable && !held && !serverOpenLive && !bound && <p className="ver-note">Chưa có mã đang mở. Tạo mã để hiện QR cho ứng dụng điện thoại. Tạo mã không trừ lượt dùng thử.</p>}
 
     {error && <Alert tone="danger" title={error.title} className="pt-error">
       {error.message}{error.retryAfterSeconds ? ` Thử lại sau ${error.retryAfterSeconds} giây.` : ""}
