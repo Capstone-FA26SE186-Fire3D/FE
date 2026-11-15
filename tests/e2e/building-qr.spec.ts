@@ -1,7 +1,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { storedSession } from "./session";
 import { postLoginRoute, safeNext } from "../../src/features/auth/redirect";
-import { isQrToken, qrLandingUrl } from "../../src/features/qr-landing/token";
+import { isQrToken, issuedQrContent, qrLandingUrl } from "../../src/features/qr-landing/token";
 
 // Everything here is mocked with Playwright routes: evidence for UI behaviour, not for BE integration.
 // The mock keeps state like the server does (one Active code per Building, token returned once, SHA-256 only stored),
@@ -52,6 +52,14 @@ class QrWorld {
   private clock = Date.parse("2026-10-10T08:00:00Z");
 
   failNext: Array<{ match: RegExp; status: number; code: string; retryAfter?: string; body?: unknown }> = [];
+  /** BE `AuthEmail:FrontendUrl`. When set, create/rotate return `content` = `<frontendUrl>/qr/<token>` like the real BE; null = not configured (no `content`). */
+  frontendUrl: string | null = null;
+  /** Overrides `content` to prove the page never prints something scanners would reject. */
+  contentOf: ((token: string) => string) | null = null;
+  private content(token: string) {
+    if (this.contentOf) return { content: this.contentOf(token) };
+    return this.frontendUrl ? { content: `${this.frontendUrl}/qr/${token}` } : {};
+  }
 
   private tick() { this.clock += 60_000; return new Date(this.clock).toISOString(); }
   active() { return this.codes.find((code) => code.status === "Active"); }
@@ -72,6 +80,10 @@ class QrWorld {
   resolvable(token: string) {
     const id = this.tokens.get(token);
     return Boolean(id && this.codes.find((code) => code.id === id)?.status === "Active");
+  }
+  /** Like the BE: a revoked or replaced code answers 410 QR_REVOKED, an unknown token 404 QR_NOT_FOUND. */
+  notResolvable(token: string) {
+    return this.tokens.has(token) ? { status: 410, json: { title: "QR code was revoked.", code: "QR_REVOKED" } } : { status: 404, json: { title: "QR code not found.", code: "QR_NOT_FOUND" } };
   }
 
   private consume(path: string) {
@@ -107,7 +119,7 @@ class QrWorld {
       if (this.active()) return problem(route, 409, "QR_ALREADY_EXISTS");
       const label = (entry.body as { label: string | null }).label;
       const issued = this.issue(label, null);
-      return route.fulfill({ status: 201, json: { code: issued.code, token: issued.token } });
+      return route.fulfill({ status: 201, json: { code: issued.code, token: issued.token, ...this.content(issued.token) } });
     });
     await page.route("**/api/buildings/building-1/qr-codes/*/rotate", (route) => {
       const entry = record(route);
@@ -119,7 +131,7 @@ class QrWorld {
       if (old.status !== "Active") return problem(route, 409, "QR_ALREADY_REVOKED");
       old.status = "Revoked"; old.revokedAt = this.tick();
       const issued = this.issue((entry.body as { label: string | null }).label, old);
-      return route.fulfill({ json: { code: issued.code, token: issued.token } });
+      return route.fulfill({ json: { code: issued.code, token: issued.token, ...this.content(issued.token) } });
     });
     await page.route("**/api/buildings/building-1/qr-codes/*/revoke", (route) => {
       const entry = record(route);
@@ -135,7 +147,9 @@ class QrWorld {
   }
 }
 
-type Landing = { visibility: "Public" | "Private"; granted: boolean; trainings: unknown[]; participationCode: string; verifyFailures: Array<{ status: number; code: string; retryAfter?: string }>; trainingsFailures: Array<{ status: number; code: string }>; resolveStatus?: number };
+type Landing = { visibility: "Public" | "Private"; granted: boolean; trainings: unknown[]; participationCode: string; verifyFailures: Array<{ status: number; code: string; retryAfter?: string }>; trainingsFailures: Array<{ status: number; code: string }>; resolveStatus?: number;
+  /** BE `ServiceStatus` + `ServiceEndsAt` of the Building. Absent = an older server that sends no service fields. */
+  service?: { status: "Active" | "Expired" | "NotPurchased"; endsAt: string | null } };
 const training = (id: string, extra: Record<string, unknown> = {}) => ({ id, releaseId: `rel-${id}`, name: `Thoát hiểm ${id}`, description: `Mô tả bài ${id}`, status: "Active", startDate: null, endDate: null, allowedModes: ["Learn", "Guided"], createdAt: "2026-10-08T00:00:00Z", releaseStatus: "Published", scenarioVersionId: `ver-${id}`, reviewStatus: "Approved", ...extra });
 
 /** Landing-side mock: resolve / trainings / verify, driven by the same world so rotate/revoke affect resolve. */
@@ -153,14 +167,16 @@ async function installLanding(page: Page, world: QrWorld, init: Partial<Landing>
   await page.route("**/api/qr/*", (route) => {
     record(route);
     if (state.resolveStatus) return route.fulfill({ status: state.resolveStatus, json: { title: "x", code: state.resolveStatus === 401 ? "UNAUTHORIZED" : "ERR" } });
-    if (!world.resolvable(tokenFrom(route))) return route.fulfill({ status: 404, json: { title: "QR code not found.", code: "QR_NOT_FOUND" } });
-    return route.fulfill({ json: { buildingId: "building-1", buildingName: building.name, visibility: state.visibility, hasAccess: has() } });
+    if (!world.resolvable(tokenFrom(route))) return route.fulfill(world.notResolvable(tokenFrom(route)));
+    // canStartNewSessions mirrors the BE: Active service AND access.
+    const service = state.service ? { serviceStatus: state.service.status, serviceEndsAt: state.service.endsAt, canStartNewSessions: state.service.status === "Active" && has() } : {};
+    return route.fulfill({ json: { buildingId: "building-1", buildingName: building.name, visibility: state.visibility, hasAccess: has(), ...service } });
   });
   await page.route("**/api/qr/*/trainings", (route) => {
     record(route);
     const failure = state.trainingsFailures.shift();
     if (failure) return route.fulfill({ status: failure.status, json: { title: "x", code: failure.code } });
-    if (!world.resolvable(tokenFrom(route))) return route.fulfill({ status: 404, json: { title: "QR code not found.", code: "QR_NOT_FOUND" } });
+    if (!world.resolvable(tokenFrom(route))) return route.fulfill(world.notResolvable(tokenFrom(route)));
     if (!has()) return route.fulfill({ status: 403, json: { title: "Building access required.", code: "BUILDING_ACCESS_REQUIRED" } });
     return route.fulfill({ json: state.trainings });
   });
@@ -292,7 +308,7 @@ test.describe("Building QR management tab", () => {
 
     // The old QR is dead on the landing; the new one works.
     await page.goto(`/qr/${first.token}`);
-    await expect(page.getByRole("heading", { name: "Không tìm thấy công trình" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Mã QR này đã bị thu hồi" })).toBeVisible();
     await page.goto(`/qr/${second}`);
     await expect(page.getByRole("heading", { name: building.name, level: 1 })).toBeVisible();
   });
@@ -317,7 +333,49 @@ test.describe("Building QR management tab", () => {
     await dialog(page).getByRole("button", { name: "Tạo mã QR", exact: true }).click();
     await expect(page.getByTestId("qr-link")).toHaveText(new RegExp(tokenOf(2)));
     await page.goto(`/qr/${seeded.token}`);
-    await expect(page.getByRole("heading", { name: "Không tìm thấy công trình" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Mã QR này đã bị thu hồi" })).toBeVisible();
+  });
+
+  test("the QR, the link, the copy and the print sheet all carry the content the BE returned, not this site's address", async ({ page, context, baseURL }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    const world = new QrWorld();
+    world.frontendUrl = "https://fet3d.io.vn"; // BE AuthEmail:FrontendUrl, different from the origin under test
+    await signIn(page);
+    await world.install(page);
+    await page.goto("/workspace/buildings/building-1?tab=qr");
+    await page.getByRole("button", { name: "Tạo mã QR", exact: true }).click();
+    await dialog(page).getByRole("button", { name: "Tạo mã QR", exact: true }).click();
+
+    const content = `https://fet3d.io.vn/qr/${tokenOf(1)}`;
+    expect(content).not.toBe(qrLandingUrl(baseURL!, tokenOf(1)));
+    await expect(page.getByTestId("qr-link")).toHaveText(content);
+    await expect(page.getByTestId("qr-issued").getByTestId("qr-code")).toHaveAttribute("data-qr-value-length", String(content.length));
+    await expect(page.getByTestId("qr-print-sheet").getByTestId("qr-code")).toHaveAttribute("data-qr-value-length", String(content.length));
+    await page.getByRole("button", { name: "Sao chép liên kết" }).click();
+    await expect(page.getByText("Đã sao chép liên kết QR")).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(content);
+    await expect(page.getByText("Liên kết đang trỏ về máy của bạn")).toHaveCount(0);
+    // What the Android app accepts when scanning (Mobile `parseQrToken`): https, path exactly /qr/<43 chars>, no query or fragment.
+    const scanned = new URL(content);
+    expect(scanned.protocol).toBe("https:");
+    expect(/^\/qr\/([A-Za-z0-9_-]{43})\/?$/.exec(scanned.pathname)?.[1]).toBe(tokenOf(1));
+    expect(scanned.search + scanned.hash).toBe("");
+
+    // Rotate: the new code is printed from the new content too.
+    await page.getByRole("button", { name: "Tạo mã mới", exact: true }).click();
+    await dialog(page).getByRole("button", { name: "Tạo mã mới", exact: true }).click();
+    await expect(page.getByTestId("qr-link")).toHaveText(`https://fet3d.io.vn/qr/${tokenOf(2)}`);
+  });
+
+  test("content that scanners would reject (a query string) is not printed: the site address is used instead", async ({ page, baseURL }) => {
+    const world = new QrWorld();
+    world.contentOf = (token) => `https://fet3d.io.vn/qr/${token}?ref=print`;
+    await signIn(page);
+    await world.install(page);
+    await page.goto("/workspace/buildings/building-1?tab=qr");
+    await page.getByRole("button", { name: "Tạo mã QR", exact: true }).click();
+    await dialog(page).getByRole("button", { name: "Tạo mã QR", exact: true }).click();
+    await expect(page.getByTestId("qr-link")).toHaveText(qrLandingUrl(baseURL!, tokenOf(1)));
   });
 
   test("409 QR_ALREADY_EXISTS (someone else created it) points to rotate and reloads the list", async ({ page }) => {
@@ -560,9 +618,12 @@ test.describe("Building QR landing", () => {
     await expect(guide).toContainText("chỉ cần cài một lần");
     await expect(guide).toContainText("quét lại mã QR của công trình bằng chức năng quét trong ứng dụng");
     await expect(guide).toContainText("không biết ứng dụng đã được cài hay chưa");
-    await expect(guide.getByRole("link", { name: "trạng thái tải ứng dụng" })).toHaveAttribute("href", "/download");
-    // Service expiry: BE exposes no flag on resolve/trainings, so the copy states the rule instead of guessing a state.
+    // The app is in testing on Google Play: the guide says how to get it and links to /download, never to a store.
+    await expect(guide).toContainText("Ứng dụng đang thử nghiệm trên Google Play: bạn nhận lời mời cài từ tổ chức của mình hoặc nhóm FET3D");
+    await expect(guide.getByRole("link", { name: "cách nhận ứng dụng" })).toHaveAttribute("href", "/download");
+    // This mock sends no service fields (older server): the copy states the rule and shows no service state.
     await expect(page.getByText(/Hết hạn dịch vụ vẫn xem được trang này nhưng không bắt đầu được phiên mới/)).toBeVisible();
+    await expect(page.getByTestId("qr-service-status")).toHaveCount(0);
     expect(await storageHolds(page, token)).toBe(false);
   });
 
@@ -669,8 +730,11 @@ test.describe("Building QR landing", () => {
     page.on("pageerror", (error) => logs.push(error.message));
 
     await page.goto(`/qr/${seeded.token}`);
-    await expect(page.getByRole("heading", { name: "Không tìm thấy công trình" })).toBeVisible();
-    await expect(page.getByText(/đã bị thu hồi hoặc đã được thay bằng mã mới/)).toBeVisible();
+    // Revoked is its own state (BE 410), told apart from an unknown code and from an expired service.
+    await expect(page.getByRole("heading", { name: "Mã QR này đã bị thu hồi" })).toBeVisible();
+    await expect(page.getByText(/đã thu hồi mã này hoặc thay bằng mã mới/)).toBeVisible();
+    await expect(page.getByText(/không liên quan tới hạn dịch vụ/)).toBeVisible();
+    await expect(page.getByTestId("qr-service-status")).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Thoát hiểm a" })).toHaveCount(0);
     expect(landing.calls.some((call) => call.path.endsWith("/trainings"))).toBe(false);
     expect(await page.locator("main").innerText()).not.toContain(seeded.token);
@@ -730,16 +794,81 @@ test.describe("Building QR landing", () => {
     await expect(page.getByRole("heading", { name: "Nhập mã tham gia" })).toBeVisible();
   });
 
-  test("service-expired Building: the landing is still readable (BE returns the same resolve/list) and states the app-side rule", async ({ page }) => {
+  test("expired service: the landing says so (not a revoked QR), still lists the lessons and offers no start", async ({ page }) => {
     const world = new QrWorld();
     world.seed();
     await signIn(page, trainee);
     await world.install(page);
-    await installLanding(page, world, { visibility: "Public", trainings: [training("a")] });
+    await installLanding(page, world, { visibility: "Public", trainings: [training("a")], service: { status: "Expired", endsAt: "2026-11-01T05:00:00Z" } });
     await page.goto(`/qr/${token}`);
+
     await expect(page.getByRole("heading", { name: building.name, level: 1 })).toBeVisible();
-    await expect(page.getByText(/hạn dịch vụ của công trình và số suất người học/)).toBeVisible();
+    await expect(page.getByTestId("qr-service-status")).toHaveText("Dịch vụ đã hết hạn");
+    await expect(page.getByText("Dịch vụ của công trình đã hết hạn", { exact: true })).toBeVisible();
+    await expect(page.getByText(/đã hết hạn từ ngày .*2026\. Mã QR vẫn đúng và bạn vẫn xem được danh sách bài, nhưng chưa bắt đầu được bài nào/)).toBeVisible();
+    await expect(page.getByText(/Hãy báo tổ chức quản lý công trình gia hạn dịch vụ/)).toBeVisible();
+    // Not the revoked / unknown state.
+    await expect(page.getByRole("heading", { name: "Mã QR này đã bị thu hồi" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Không tìm thấy công trình" })).toHaveCount(0);
+
+    // The lessons stay readable, marked as read-only; the guide no longer walks to "choose a lesson and start".
+    await expect(page.getByRole("heading", { name: "Thoát hiểm a" })).toBeVisible();
+    await expect(page.getByText(/Danh sách chỉ để xem: hiện chưa bắt đầu được bài nào/)).toBeVisible();
+    const guide = page.locator("section").filter({ has: page.getByRole("heading", { name: "Mở trên điện thoại" }) });
+    await expect(guide.getByTestId("qr-guide-blocked")).toContainText("Hiện chưa bắt đầu được bài của công trình này trong ứng dụng");
+    await expect(guide).not.toContainText("Chọn bài");
+    await expect(guide.getByRole("link", { name: "cách nhận ứng dụng" })).toHaveAttribute("href", "/download");
     await expect(page.getByRole("button", { name: /bắt đầu/i })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /bắt đầu/i })).toHaveCount(0);
+    // No raw BE value on screen.
+    const text = await page.locator("main").innerText();
+    for (const raw of ["Expired", "NotPurchased", "serviceStatus", "canStartNewSessions"]) expect(text).not.toContain(raw);
+  });
+
+  test("service never bought: a different message from expired; the manager is pointed to the service page", async ({ page }) => {
+    const world = new QrWorld();
+    world.seed();
+    await signIn(page, owner);
+    await world.install(page);
+    await installLanding(page, world, { visibility: "Private", trainings: [training("a")], service: { status: "NotPurchased", endsAt: null } }, "OrganizationUser");
+    await page.goto(`/qr/${token}`);
+
+    await expect(page.getByTestId("qr-service-status")).toHaveText("Chưa có dịch vụ");
+    await expect(page.getByText("Công trình chưa có dịch vụ tập huấn", { exact: true })).toBeVisible();
+    await expect(page.getByText(/Hãy mua dịch vụ cho công trình trong mục Dịch vụ & thanh toán/)).toBeVisible();
+    await expect(page.getByText("Dịch vụ của công trình đã hết hạn", { exact: true })).toHaveCount(0);
+    await expect(page.getByText(/Danh sách chỉ để xem: hiện chưa bắt đầu được bài nào/)).toBeVisible();
+    await expect(page.getByTestId("qr-guide-blocked")).toBeVisible();
+  });
+
+  test("running service: shows it with its end date and keeps the steps to open a lesson in the app", async ({ page }) => {
+    const world = new QrWorld();
+    world.seed();
+    await signIn(page, trainee);
+    await world.install(page);
+    await installLanding(page, world, { visibility: "Public", trainings: [training("a")], service: { status: "Active", endsAt: "2027-05-01T05:00:00Z" } });
+    await page.goto(`/qr/${token}`);
+
+    await expect(page.getByTestId("qr-service-status")).toHaveText("Dịch vụ đang hiệu lực");
+    await expect(page.getByText(/Dịch vụ của công trình có hiệu lực đến ngày .*2027\./)).toBeVisible();
+    await expect(page.getByText("Dịch vụ của công trình đã hết hạn", { exact: true })).toHaveCount(0);
+    await expect(page.getByText(/Danh sách chỉ để xem/)).toHaveCount(0);
+    await expect(page.getByTestId("qr-guide-blocked")).toHaveCount(0);
+    const guide = page.locator("section").filter({ has: page.getByRole("heading", { name: "Mở trên điện thoại" }) });
+    await expect(guide).toContainText("Chọn bài");
+  });
+
+  test("expired service on a private Building without access: the code form stays, and the expiry is already stated", async ({ page }) => {
+    const world = new QrWorld();
+    world.seed();
+    await signIn(page, trainee);
+    await world.install(page);
+    await installLanding(page, world, { visibility: "Private", trainings: [training("a")], service: { status: "Expired", endsAt: null } });
+    await page.goto(`/qr/${token}`);
+    await expect(page.getByRole("heading", { name: "Nhập mã tham gia" })).toBeVisible();
+    await expect(page.getByText("Dịch vụ của công trình đã hết hạn", { exact: true })).toBeVisible();
+    await expect(page.getByText(/đã hết hạn\. Mã QR vẫn đúng/)).toBeVisible(); // no date from the BE: none is invented
+    await expect(page.getByTestId("qr-guide-blocked")).toBeVisible();
   });
 
   test("the landing is not indexed and does not send a Referer: robots meta, referrer meta and response headers", async ({ page }) => {
@@ -805,5 +934,15 @@ test.describe("safeNext / postLoginRoute for the QR landing", () => {
     expect(good).toHaveLength(43);
     for (const bad of ["", "short", `${good}!`, `${good} `, "a".repeat(129), null, undefined]) expect(isQrToken(bad as string | null | undefined), String(bad)).toBe(false);
     expect(qrLandingUrl("https://fet3d.example/", good)).toBe(`https://fet3d.example/qr/${good}`);
+  });
+
+  test("issuedQrContent keeps the BE content only when it is the landing URL of that exact token", () => {
+    const other = tokenOf(2);
+    expect(issuedQrContent(`https://fet3d.io.vn/qr/${good}`, good)).toBe(`https://fet3d.io.vn/qr/${good}`);
+    expect(issuedQrContent(`http://localhost:5173/qr/${good}`, good)).toBe(`http://localhost:5173/qr/${good}`); // local BE: shown with the "local address" notice
+    for (const bad of [null, undefined, "", good, `https://fet3d.io.vn/qr/${other}`, `https://fet3d.io.vn/qr/${good}?x=1`, `https://fet3d.io.vn/qr/${good}#a`, `https://fet3d.io.vn/qr/${good}/extra`, `https://user:pw@fet3d.io.vn/qr/${good}`, `fet3d://qr/${good}`, `javascript:alert(1)//qr/${good}`, "not a url"]) {
+      expect(issuedQrContent(bad, good), String(bad)).toBeNull();
+    }
+    expect(issuedQrContent("https://fet3d.io.vn/qr/short", "short")).toBeNull();
   });
 });

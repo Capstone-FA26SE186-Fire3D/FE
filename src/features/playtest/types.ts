@@ -41,8 +41,8 @@ export type PlaytestRecoveryView = {
   canReissueGrant: boolean;
   canSync: boolean;
   canCancel: boolean;
-  /** A new Mobile handoff code may be created (status Created). Missing on BE builds older than the handoff flow. */
-  canIssueHandoff?: boolean;
+  /** A new Mobile handoff code may be created (BE: status Created). Redeeming it moves the playtest to that phone. */
+  canIssueHandoff: boolean;
 };
 
 /** BE `PlaytestCompletionView`: stored once at completion. `summary` is the object the runtime sent (opaque, never scored by BE). */
@@ -75,10 +75,47 @@ export type PlaytestStatus = {
   openHandoffExpiresAt: string | null;
   recovery: PlaytestRecoveryView;
   completion: PlaytestCompletionView | null;
-  /** Id of the open (unredeemed) handoff code, if any. */
-  openHandoffId?: string | null;
+  /**
+   * Id of the newest open handoff code (not redeemed, not revoked, not expired), or null. A code this tab holds is only
+   * current while its `handoffId` equals this value: another tab issuing a code, or a phone redeeming it, changes it.
+   */
+  openHandoffId: string | null;
   rejectedEvents?: PlaytestRejectedEvents | null;
 };
 
 /** 201 of `POST /api/playtests/{id}/handoffs`. The QR encodes only `deepLink`; `code` is 43 base64url chars, 5 minutes, single use. */
 export type PlaytestHandoff = { handoffId: string; playtestId: string; code: string; deepLink: string; expiresAt: string };
+
+/** One row of `GET /api/scenarios/{id}/playtests` (BE `PlaytestSummary`): the caller's own playtests only, newest first. */
+export type PlaytestSummary = {
+  id: string;
+  scenarioVersionId: string;
+  versionNumber: number;
+  revisionId: string;
+  status: PlaytestStatusName | string;
+  createdAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
+  boundToMobile: boolean;
+};
+
+/** BE `PlaytestPage`. Note `total` (not `totalCount` as in the other paged lists). */
+export type PlaytestPage = { items: PlaytestSummary[]; total: number; page: number; pageSize: number };
+
+/** BE `PlaytestEntitlementView`. `trialUnitsRemaining` is null unless a Trial entitlement is in its window. */
+export type PlaytestEntitlementView = { kind: "Paid" | "Trial" | "None" | string; endsAt: string | null; trialUnitsRemaining: number | null };
+
+/**
+ * `GET /api/scenarios/{id}/playtest-availability` (BE `PlaytestAvailability`). Advisory: start rechecks everything.
+ * `blockers` holds PLAYTEST_LAUNCH_UNAVAILABLE | PLAYTEST_HANDOFF_UNAVAILABLE | PLAYTEST_ENTITLEMENT_REQUIRED |
+ * PLAYTEST_PACKAGE_REQUIRED; `packageReady` and `scenarioVersionId` are null when no version was asked about.
+ */
+export type PlaytestAvailability = {
+  launchEnabled: boolean;
+  handoffEnabled: boolean;
+  entitlement: PlaytestEntitlementView;
+  scenarioVersionId: string | null;
+  packageReady: boolean | null;
+  blockers: string[];
+  canCreate: boolean;
+};

@@ -80,7 +80,7 @@ function AiUsageCard({ usage }: { usage: AiUsage }) {
  * outcome donut, then scenarios / modes / duration. Only real learner sessions started in the period are counted
  * (server definition); playtests and package preparation never are. An empty period is an explanation, not an error.
  */
-export function TrainingReportView({ data, groupBy: requestedGroup, organizationNames, showOrganizationLinks }: { data: TrainingReport; /** Grouping the request asked for, used when the server does not echo `filters.groupBy`. */ groupBy?: GroupBy; organizationNames?: Map<string, string>; showOrganizationLinks?: boolean }) {
+export function TrainingReportView({ data, groupBy: requestedGroup, showOrganizationLinks }: { data: TrainingReport; /** Grouping the request asked for, used when the server does not echo `filters.groupBy`. */ groupBy?: GroupBy; showOrganizationLinks?: boolean }) {
   const [scenarioTable, setScenarioTable] = useState(false);
   const empty = data.plays === 0;
   const groupBy = data.groupBy ?? requestedGroup ?? null;
@@ -97,7 +97,8 @@ export function TrainingReportView({ data, groupBy: requestedGroup, organization
   const scenarios = [...data.byScenario].sort((a, b) => b.plays - a.plays);
   const scenarioName = (row: TrainingReport["byScenario"][number]) => row.scenarioName ?? "Kịch bản chưa đặt tên";
   const modes = data.byMode.map((row) => ({ mode: modeLabels[row.mode] ?? row.mode, plays: row.plays, completed: row.completed }));
-  const organizationName = (id: string) => organizationNames?.get(id) ?? "Tổ chức chưa đặt tên";
+  // The report carries each organization's current name (null once the organization no longer exists).
+  const organizationName = (row: NonNullable<TrainingReport["byOrganization"]>[number]) => row.organizationName ?? "Tổ chức không còn tồn tại";
 
   return <div className={styles.report}>
     <div className={styles.kpis} role="group" aria-label="Chỉ số huấn luyện">
@@ -169,11 +170,11 @@ export function TrainingReportView({ data, groupBy: requestedGroup, organization
         {data.byOrganization && <ChartCard title="Theo tổ chức" description="Tối đa 100 tổ chức có nhiều lượt chơi nhất trong kỳ" height={120} empty={data.byOrganization.length === 0} emptyText="Chưa có tổ chức nào có lượt chơi trong kỳ" data-testid="chart-organizations"
           table={<ReportTable caption="Lượt chơi theo tổ chức">
             <thead><tr><th>Tổ chức</th><Num header>Lượt chơi</Num><Num header>Học viên</Num><Num header>Có kết quả</Num></tr></thead>
-            <tbody>{data.byOrganization.map((row) => <tr key={row.organizationId}><td>{organizationName(row.organizationId)}</td><Num>{fmt(row.plays)}</Num><Num>{fmt(row.uniqueTrainees)}</Num><Num>{fmt(row.completed)}</Num></tr>)}</tbody>
+            <tbody>{data.byOrganization.map((row) => <tr key={row.organizationId}><td>{organizationName(row)}</td><Num>{fmt(row.plays)}</Num><Num>{fmt(row.uniqueTrainees)}</Num><Num>{fmt(row.completed)}</Num></tr>)}</tbody>
           </ReportTable>}>
           <RankedBars label="Lượt chơi theo tổ chức" color={seriesColor.plays} rows={data.byOrganization.slice(0, 8).map((row) => ({
             key: row.organizationId,
-            label: showOrganizationLinks ? <Link href={`${routes.adminOrganizations}/${row.organizationId}/analytics`}>{organizationName(row.organizationId)}</Link> : organizationName(row.organizationId),
+            label: showOrganizationLinks ? <Link href={`${routes.adminOrganizations}/${row.organizationId}/analytics`}>{organizationName(row)}</Link> : organizationName(row),
             value: row.plays,
             hint: `Học viên ${fmt(row.uniqueTrainees)} · Có kết quả ${fmt(row.completed)}`,
           }))} />

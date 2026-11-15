@@ -41,7 +41,8 @@ const operations = (extra: Record<string, unknown> = {}) => ({
   tickets: [{ status: "Open", count: 2 }, { status: "Resolved", count: 3 }], created: { buildings: 1, processingJobs: 9, tickets: 5 }, ...extra,
 });
 const platformOps = () => operations({ accounts: [{ role: "Trainee", isActive: true, count: 40 }, { role: "OrganizationUser", isActive: true, count: 5 }], organizations: [{ isActive: true, count: 5 }, { isActive: false, count: 1 }], created: { accounts: 3, organizations: 1, buildings: 1, processingJobs: 9, tickets: 5 } });
-const platformTraining = () => training({ byOrganization: [{ organizationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", plays: 30, uniqueTrainees: 12, completed: 24 }, { organizationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", plays: 10, uniqueTrainees: 6, completed: 6 }] });
+// BE AnalyticsOrganizationRow: organizationName is the current name, null when the organization no longer exists.
+const platformTraining = () => training({ byOrganization: [{ organizationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organizationName: "Trường An Toàn", plays: 30, uniqueTrainees: 12, completed: 24 }, { organizationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", organizationName: null, plays: 10, uniqueTrainees: 6, completed: 6 }] });
 const revenue = () => ({
   ...head, totals: [{ currency: "USD", amount: 120.5, transactions: 2 }, { currency: "VND", amount: 3500000, transactions: 5 }],
   byPurpose: [{ purpose: "Purchase", currency: "VND", amount: 3000000, transactions: 4 }, { purpose: "Renewal", currency: "VND", amount: 500000, transactions: 1 }, { purpose: "Purchase", currency: "USD", amount: 120.5, transactions: 2 }],
@@ -330,7 +331,7 @@ test.describe("admin analytics", () => {
   test("overview tabs: training with organization names and links, revenue per currency; the overview tiles read each default report once", async ({ page }) => {
     const urls: string[] = [];
     await signIn(page, admin);
-    await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Trường An Toàn", slug: "an-toan", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }], totalCount: 1, page: 1, pageSize: 100 } }));
+    await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Tên trong danh sách tổ chức", slug: "an-toan", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }], totalCount: 1, page: 1, pageSize: 100 } }));
     await page.route("**/api/admin/analytics/**", (route) => {
       const path = new URL(route.request().url()).pathname;
       urls.push(path);
@@ -356,7 +357,9 @@ test.describe("admin analytics", () => {
 
     await page.getByRole("tab", { name: "Huấn luyện" }).click();
     await expect(page.getByRole("link", { name: "Trường An Toàn" })).toHaveAttribute("href", "/admin/organizations/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/analytics");
-    await expect(page.getByText("Tổ chức chưa đặt tên").first()).toBeVisible();
+    // The name comes from the report itself (`organizationName`), not from the organization list.
+    await expect(page.getByText("Tên trong danh sách tổ chức")).toHaveCount(0);
+    await expect(page.getByText("Tổ chức không còn tồn tại").first()).toBeVisible();
     await expect(page.getByText("Sử dụng AI")).toBeVisible();
 
     await page.getByRole("tab", { name: "Doanh thu" }).click();
@@ -378,6 +381,47 @@ test.describe("admin analytics", () => {
     await page.reload();
     await expect(page.getByRole("tab", { name: "Doanh thu" })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByTestId("kpi-revenue-VND")).toBeVisible();
+  });
+
+  test("CSV export on the admin side: the platform route on the training tab only, the organization route on its report, limits explained", async ({ page }) => {
+    const exports: string[] = [];
+    await signIn(page, admin);
+    await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 100 } }));
+    let limited = false;
+    await page.route("**/api/admin/**/analytics/**", (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname.endsWith("/export")) {
+        exports.push(`${url.pathname}?groupBy=${url.searchParams.get("groupBy")}`);
+        if (limited) return route.fulfill({ status: 429, json: { code: "EXPORT_DAILY_LIMIT_EXCEEDED", title: "Daily export limit exceeded." }, headers: { "Retry-After": "3600" } });
+        return route.fulfill({ body: "groupBy,key\nday,2026-10-01\n", contentType: "text/csv" });
+      }
+      const organization = { id: "org-9", name: "Trường Cũ", isActive: true };
+      return route.fulfill({ json: url.pathname.endsWith("/operations") ? platformOps() : url.pathname.endsWith("/revenue") ? revenue() : url.pathname.includes("/organizations/") ? training({ organization }) : platformTraining() });
+    });
+    await page.goto("/admin/overview");
+    // Operations (default) and revenue have no export endpoint.
+    await expect(page.getByRole("group", { name: "Chỉ số vận hành" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Xuất CSV" })).toHaveCount(0);
+    await page.getByRole("tab", { name: "Huấn luyện" }).click();
+    await expect(page.getByTestId("chart-organizations")).toBeVisible();
+    const download = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Xuất CSV" }).click();
+    expect((await download).suggestedFilename()).toBe("bao-cao-huan-luyen-toan-he-thong.csv");
+    expect(exports).toEqual(["/api/admin/analytics/training/export?groupBy=day"]);
+    await page.getByRole("tab", { name: "Doanh thu" }).click();
+    await expect(page.getByRole("button", { name: "Xuất CSV" })).toHaveCount(0);
+
+    await page.goto("/admin/organizations/org-9/analytics");
+    await expect(page.getByText("Trường Cũ")).toBeVisible();
+    const second = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Xuất CSV" }).click();
+    expect((await second).suggestedFilename()).toBe("bao-cao-huan-luyen-to-chuc.csv");
+    expect(exports[1]).toBe("/api/admin/organizations/org-9/analytics/training/export?groupBy=day");
+
+    limited = true;
+    await page.getByRole("button", { name: "Xuất CSV" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "Không xuất được CSV" })).toContainText("Hãy thử lại sau");
+    await expect(page.getByText("EXPORT_DAILY_LIMIT_EXCEEDED")).toHaveCount(0);
   });
 
   test("an empty revenue period is explained and an organization user cannot open the admin overview", async ({ page }) => {

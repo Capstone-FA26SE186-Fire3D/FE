@@ -1,6 +1,6 @@
 import { apiClient } from "@/api/client";
 
-import type { PlaytestHandoff, PlaytestPreparation, PlaytestStatus, PreparePlaytestInput } from "./types";
+import type { PlaytestAvailability, PlaytestHandoff, PlaytestPage, PlaytestPreparation, PlaytestStatus, PreparePlaytestInput } from "./types";
 
 function headers(accessToken: string): HeadersInit {
   return { Authorization: `Bearer ${accessToken}` };
@@ -28,7 +28,18 @@ export const playtestApi = {
   get(accessToken: string, playtestId: string, signal?: AbortSignal) {
     return apiClient.request<PlaytestStatus>(`/api/playtests/${playtestId}`, { headers: headers(accessToken), signal });
   },
-  /** 201 opaque 5-minute single-use code + deep link. A new code revokes earlier open codes. Only while status is Created. */
+  /**
+   * The caller's own playtests of a scenario, newest first (other users' never appear), so one started on another
+   * computer can be reopened by id. `pageSize` 1-100.
+   */
+  list(accessToken: string, scenarioId: string, query: { page?: number; pageSize?: number; scenarioVersionId?: string; status?: string } = {}, signal?: AbortSignal) {
+    return apiClient.request<PlaytestPage>(`/api/scenarios/${scenarioId}/playtests`, { headers: headers(accessToken), query, signal });
+  },
+  /** Advisory pre-check (rollout, Building service or Trial units, package of the version). Read-only; consumes nothing. */
+  availability(accessToken: string, scenarioId: string, scenarioVersionId: string, signal?: AbortSignal) {
+    return apiClient.request<PlaytestAvailability>(`/api/scenarios/${scenarioId}/playtest-availability`, { headers: headers(accessToken), query: { scenarioVersionId }, signal });
+  },
+  /** 201 opaque 5-minute single-use code + deep link. A new code revokes earlier open codes. Allowed while `recovery.canIssueHandoff`. */
   createHandoff(accessToken: string, playtestId: string, idempotencyKey: string) {
     return apiClient.request<PlaytestHandoff>(`/api/playtests/${playtestId}/handoffs`, { headers: headers(accessToken), idempotencyKey, method: "POST" });
   },

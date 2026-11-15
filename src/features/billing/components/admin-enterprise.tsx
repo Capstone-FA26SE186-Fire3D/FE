@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, Mail, PhoneCall, Send, UserCheck, UserX, XCircle } from "lucide-react";
+import { Eye, Mail, PhoneCall, Send, UserCheck, UserPlus, UserX, XCircle } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { ApiError } from "@/api";
 import { useIdempotencyKey } from "@/api/idempotency";
@@ -11,13 +11,13 @@ import { Button } from "@/components/ui/button";
 import { CellTitle, DataTable, type DataColumn } from "@/components/ui/data-table";
 import { ConfirmDialog, Drawer, Modal } from "@/components/ui/dialog";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Field, Textarea } from "@/components/ui/field";
+import { Field, Select, Textarea } from "@/components/ui/field";
 import { SkeletonDetail } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/toast";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { buildingsApi } from "@/features/buildings/api";
 import { organizationsApi } from "@/features/organizations/api";
-import { billingApi } from "../api";
+import { billingApi, type PlatformAdminOption } from "../api";
 import { hasPaidHistory } from "../entitlements";
 import { billingErrorText, hasCode, isStatus } from "../errors";
 import { billingEtag, formatDateTime } from "../format";
@@ -29,10 +29,10 @@ import "../billing.css";
 const PAGE_SIZE = 20;
 const CHANGEABLE = ["New", "Contacted", "Quoted"];
 
-type Panel = null | "reject" | "cancel" | "close" | "quote";
+type Panel = null | "reject" | "cancel" | "close" | "quote" | "assign";
 
 /** One request handled end to end (drawer body): status, assignment, replies, a Draft quotation for the requester, and closing. */
-function EnterpriseDetail({ accessToken, requestId, orgName, onChanged, onOpenQuotation }: { accessToken: string; requestId: string; orgName: string; onChanged: () => void; onOpenQuotation: (id: string) => void }) {
+function EnterpriseDetail({ accessToken, requestId, orgName, admins, adminsLoading, onChanged, onOpenQuotation }: { accessToken: string; requestId: string; orgName: string; /** Active platform admins (assignee names and choices). */ admins: PlatformAdminOption[]; adminsLoading: boolean; onChanged: () => void; onOpenQuotation: (id: string) => void }) {
   const toast = useToast();
   const { user } = useAuthSession();
   const loaded = useAsyncData(`commerce:enterprise:detail:${requestId}`, (signal) => billingApi.getEnterpriseRequest(accessToken, "admin", requestId, signal));
@@ -47,6 +47,7 @@ function EnterpriseDetail({ accessToken, requestId, orgName, onChanged, onOpenQu
   const [panel, setPanel] = useState<Panel>(null);
   const [message, setMessage] = useState("");
   const [reason, setReason] = useState("");
+  const [assignee, setAssignee] = useState("");
   const [fieldError, setFieldError] = useState("");
   const replyKey = useIdempotencyKey();
   const closeKey = useIdempotencyKey();
@@ -55,7 +56,7 @@ function EnterpriseDetail({ accessToken, requestId, orgName, onChanged, onOpenQu
   const closed = request?.status === "Closed";
   const changeable = Boolean(request) && CHANGEABLE.includes(request!.status);
 
-  const run = async (label: string, action: () => Promise<void>) => {
+  const run = async (label: string, action: () => Promise<void>, describe: (cause: unknown) => string = billingErrorText) => {
     if (lock.current) return;
     lock.current = true;
     setBusy(label);
@@ -63,7 +64,7 @@ function EnterpriseDetail({ accessToken, requestId, orgName, onChanged, onOpenQu
     try {
       await action();
     } catch (cause) {
-      setError(billingErrorText(cause));
+      setError(describe(cause));
       if (isStatus(cause, 412) || hasCode(cause, "BILLING_STATE_CONFLICT")) setStale(true);
     } finally {
       lock.current = false;
@@ -80,6 +81,21 @@ function EnterpriseDetail({ accessToken, requestId, orgName, onChanged, onOpenQu
     onChanged();
     toast.notify({ tone: "success", title: done });
   });
+
+  const confirmAssign = () => {
+    const picked = admins.find((admin) => admin.id === assignee);
+    if (!picked) { setFieldError("Chọn một quản trị viên."); return; }
+    setFieldError("");
+    // The BE accepts only an active platform admin: its 400 here means the chosen account was just disabled.
+    void run("assign-other", async () => {
+      const next = await billingApi.updateEnterpriseRequest(accessToken, requestId, { assignedTo: picked.id }, current?.etag ?? "");
+      setOverride(next);
+      setPanel(null);
+      setAssignee("");
+      onChanged();
+      toast.notify({ tone: "success", title: "Đã giao yêu cầu", description: `${picked.name} là người phụ trách.` });
+    }, (cause) => (hasCode(cause, "BILLING_VALIDATION_FAILED") ? "Người này không còn là quản trị viên đang hoạt động. Hãy chọn người khác." : billingErrorText(cause)));
+  };
 
   const sendReply = () => {
     const text = message.trim();
@@ -115,13 +131,17 @@ function EnterpriseDetail({ accessToken, requestId, orgName, onChanged, onOpenQu
   if (!request) return null;
 
   const mine = Boolean(user?.id) && request.assignedTo === user?.id;
+  const assigneeName = admins.find((admin) => admin.id === request.assignedTo)?.name;
+  const assigneeText = !request.assignedTo ? "Chưa phân công" : mine ? "Đang do bạn phụ trách" : assigneeName ? `Đang do ${assigneeName} phụ trách` : "Đang do quản trị viên khác phụ trách";
+  // "Nhận xử lý" already covers the signed-in admin, so the picker lists everyone else except the current assignee.
+  const others = admins.filter((admin) => admin.id !== user?.id && admin.id !== request.assignedTo);
   return <div className="ops-stack" data-testid="enterprise-admin-detail">
     <div className="bill-row"><strong>{request.requestedBuildingCount} công trình{request.requestedDurationMonths ? ` · ${request.requestedDurationMonths} tháng` : ""}</strong><EnterpriseStatusBadge status={request.status} /></div>
     <dl className="ops-kv">
       <dt>Tổ chức</dt><dd>{orgName}</dd>
       <dt>Liên hệ</dt><dd>{request.contactName} · {request.contactEmail}{request.contactPhone ? ` · ${request.contactPhone}` : ""}</dd>
       <dt>Gửi lúc</dt><dd>{formatDateTime(request.createdAt)}{request.closedAt ? ` · đóng ${formatDateTime(request.closedAt)}` : ""}</dd>
-      <dt>Phụ trách</dt><dd data-testid="enterprise-assignee">{request.assignedTo ? (mine ? "Đang do bạn phụ trách" : "Đang do quản trị viên khác phụ trách") : "Chưa phân công"}{request.closeReason ? ` · lý do đóng: ${request.closeReason}` : ""}</dd>
+      <dt>Phụ trách</dt><dd data-testid="enterprise-assignee">{assigneeText}{request.closeReason ? ` · lý do đóng: ${request.closeReason}` : ""}</dd>
     </dl>
     {request.notes && <p className="bill-wrap" style={{ margin: 0, whiteSpace: "pre-wrap" }}>{request.notes}</p>}
     {request.quotationId && <Alert tone="success" title="Đã tạo báo giá cho yêu cầu này" action={<Button size="sm" variant="secondary" className="mt-3" onClick={() => onOpenQuotation(request.quotationId as string)}>Mở báo giá</Button>}>Báo giá ở trạng thái nháp cho tới khi bạn phát hành; chưa có thanh toán hay dịch vụ.</Alert>}
@@ -133,6 +153,7 @@ function EnterpriseDetail({ accessToken, requestId, orgName, onChanged, onOpenQu
       <div className="ops-actions" role="group" aria-label="Thao tác xử lý">
         {request.status === "New" && <Button variant="secondary" onClick={() => void patch("contacted", { status: "Contacted" }, "Đã đánh dấu đã liên hệ")} disabled={busy !== null}><PhoneCall size={16} aria-hidden="true" />Đã liên hệ</Button>}
         {!mine && <Button variant="quiet" onClick={() => void patch("assign", { assignedTo: user?.id }, "Đã nhận xử lý")} disabled={busy !== null || !user?.id}><UserCheck size={16} aria-hidden="true" />Nhận xử lý</Button>}
+        <Button variant="quiet" onClick={() => { setFieldError(""); setError(""); setAssignee(""); setPanel("assign"); }} disabled={busy !== null}><UserPlus size={16} aria-hidden="true" />Giao cho người khác</Button>
         {request.assignedTo && <Button variant="quiet" onClick={() => void patch("unassign", { clearAssignment: true }, "Đã bỏ phân công")} disabled={busy !== null}><UserX size={16} aria-hidden="true" />Bỏ phân công</Button>}
         {changeable && <Button variant="quiet" onClick={() => { setFieldError(""); setPanel("reject"); }} disabled={busy !== null}>Từ chối</Button>}
         {changeable && <Button variant="quiet" onClick={() => { setFieldError(""); setPanel("cancel"); }} disabled={busy !== null}>Hủy yêu cầu</Button>}
@@ -159,6 +180,19 @@ function EnterpriseDetail({ accessToken, requestId, orgName, onChanged, onOpenQu
       <div className="ops-stack">
         <Field label="Lý do đóng" required error={fieldError && panel === "close" ? fieldError : undefined} hint="Chỉ quản trị FET3D thấy lý do.">{(p) => <Textarea {...p} maxLength={1000} value={reason} onChange={(event) => { setReason(event.target.value); setFieldError(""); }} />}</Field>
         {error && <Alert tone="danger" title="Chưa đóng được">{error}</Alert>}
+      </div>
+    </Modal>
+
+    <Modal open={panel === "assign"} onOpenChange={(open) => { if (!open && busy === null) setPanel(null); }} size="sm" title="Giao cho quản trị viên khác" description="Người được giao sẽ phụ trách yêu cầu này. Trạng thái yêu cầu không đổi."
+      footer={<><Button variant="quiet" onClick={() => setPanel(null)} disabled={busy !== null}>Quay lại</Button><Button onClick={confirmAssign} disabled={busy !== null || others.length === 0}>{busy === "assign-other" ? "Đang lưu…" : "Giao việc"}</Button></>}>
+      <div className="ops-stack">
+        {adminsLoading && others.length === 0 ? <SkeletonDetail rows={1} /> : others.length === 0
+          ? <p className="bill-muted" style={{ margin: 0 }}>Chưa có quản trị viên nào khác đang hoạt động để giao.</p>
+          : <Field label="Người phụ trách" required error={fieldError && panel === "assign" ? fieldError : undefined}>{(p) => <Select {...p} value={assignee} onChange={(event) => { setAssignee(event.target.value); setFieldError(""); }}>
+            <option value="">Chọn quản trị viên…</option>
+            {others.map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}
+          </Select>}</Field>}
+        {error && <Alert tone="danger" title="Chưa giao được">{error}</Alert>}
       </div>
     </Modal>
 
@@ -239,6 +273,10 @@ export function EnterpriseAdminSection({ accessToken }: { accessToken: string })
   const list = useAsyncData(`commerce:enterprise:${page}`, (signal) => billingApi.listEnterpriseRequests(accessToken, page, PAGE_SIZE, "admin", signal));
   const organizations = useAsyncData("commerce:orgs", () => organizationsApi.list(accessToken, { page: 1, pageSize: 100 }));
   const orgName = useMemo(() => Object.fromEntries((organizations.data?.items ?? []).map((item) => [item.id, item.name])), [organizations.data]);
+  // Assignee names and the "Giao cho người khác" choices. If this list fails, assignees fall back to a neutral label.
+  const adminList = useAsyncData("commerce:enterprise:admins", (signal) => billingApi.listPlatformAdmins(accessToken, signal));
+  const admins = useMemo(() => adminList.data ?? [], [adminList.data]);
+  const adminName = (id: string) => (id === user?.id ? "bạn" : admins.find((admin) => admin.id === id)?.name);
   const items = list.data?.items ?? [];
   const total = list.data?.totalCount ?? 0;
   const selected = items.find((item) => item.id === requestId);
@@ -271,7 +309,7 @@ export function EnterpriseAdminSection({ accessToken }: { accessToken: string })
     { key: "organization", header: "Tổ chức", primary: true, render: (item) => <CellTitle title={orgName[item.organizationId] ?? "Tổ chức không còn tồn tại"} sub={formatDateTime(item.createdAt)} /> },
     { key: "need", header: "Nhu cầu", width: 220, render: (item) => <CellTitle title={`${item.requestedBuildingCount} công trình${item.requestedDurationMonths ? ` · ${item.requestedDurationMonths} tháng` : ""}`} sub={item.notes ? <span className="bill-wrap">{item.notes}</span> : undefined} /> },
     { key: "contact", header: "Liên hệ", width: 240, hideBelow: 1000, render: (item) => <CellTitle title={item.contactName} sub={`${item.contactEmail}${item.contactPhone ? ` · ${item.contactPhone}` : ""}`} /> },
-    { key: "status", header: "Trạng thái", width: 170, render: (item) => <CellTitle title={<EnterpriseStatusBadge status={item.status} />} sub={item.assignedTo ? "Đã phân công" : undefined} /> },
+    { key: "status", header: "Trạng thái", width: 170, render: (item) => <CellTitle title={<EnterpriseStatusBadge status={item.status} />} sub={item.assignedTo ? (adminName(item.assignedTo) ? `Phụ trách: ${adminName(item.assignedTo)}` : "Đã phân công") : undefined} /> },
   ];
 
   return <div className="ops-stack">
@@ -294,14 +332,14 @@ export function EnterpriseAdminSection({ accessToken }: { accessToken: string })
         ];
       }}
       error={list.error !== undefined ? <Alert tone="danger" title="Không tải được yêu cầu" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert> : undefined}
-      toolbar={<p className="bill-muted ops-toolbar-grow" style={{ margin: 0 }}>Yêu cầu báo giá số lượng lớn của các tổ chức. Đánh dấu đã liên hệ, phân công, trả lời, tạo báo giá nháp hoặc đóng. Không bước nào tự thu tiền hay cấp dịch vụ.</p>}
+      toolbar={<p className="bill-muted ops-toolbar-grow" style={{ margin: 0 }}>Yêu cầu báo giá số lượng lớn của các tổ chức. Đánh dấu đã liên hệ, nhận xử lý hoặc giao cho quản trị viên khác, trả lời, tạo báo giá nháp hoặc đóng. Không bước nào tự thu tiền hay cấp dịch vụ.</p>}
       empty={<EmptyState icon={Mail} title="Chưa có yêu cầu liên hệ" description="Yêu cầu của tổ chức cần số lượng lớn sẽ hiện ở đây." />}
       pagination={total > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount: total, onPageChange: setPage } : undefined}
     />
     <p className="bill-hint">Bấm hàng để xử lý trong ngăn bên phải; menu “···” đổi trạng thái ngay trên danh sách.</p>
 
     <Drawer open={Boolean(requestId)} onOpenChange={(open) => { if (!open) setParams({ request: null }); }} size="lg" data-testid="enterprise-drawer" title="Xử lý yêu cầu doanh nghiệp" description="Nếu có người khác vừa sửa yêu cầu, bạn sẽ được báo và nội dung đang nhập vẫn được giữ.">
-      {requestId && <EnterpriseDetail key={requestId} accessToken={accessToken} requestId={requestId} orgName={selected ? orgName[selected.organizationId] ?? "Tổ chức không còn tồn tại" : "Tổ chức"} onChanged={list.reload} onOpenQuotation={(id) => setParams({ tab: "quotes", quotation: id, request: null, page: null })} />}
+      {requestId && <EnterpriseDetail key={requestId} accessToken={accessToken} requestId={requestId} orgName={selected ? orgName[selected.organizationId] ?? "Tổ chức không còn tồn tại" : "Tổ chức"} admins={admins} adminsLoading={adminList.loading && !adminList.data} onChanged={list.reload} onOpenQuotation={(id) => setParams({ tab: "quotes", quotation: id, request: null, page: null })} />}
     </Drawer>
 
     <ConfirmDialog open={quick !== null} onOpenChange={(open) => { if (!open && !quickBusy) setQuick(null); }} busy={quickBusy} tone="danger"

@@ -35,7 +35,7 @@ export function acceptStatus(current: PlaytestStatus | undefined, next: Playtest
 }
 
 /** Plain-language state from the status BE returned; Web never derives a state of its own. */
-export function describeStatus(playtest: PlaytestStatus): StatusView {
+export function describeStatus(playtest: Pick<PlaytestStatus, "status" | "boundToMobile">): StatusView {
   switch (playtest.status.toLowerCase()) {
     case "created":
       return playtest.boundToMobile
@@ -49,9 +49,21 @@ export function describeStatus(playtest: PlaytestStatus): StatusView {
   }
 }
 
-/** Opening a new handoff code is only allowed by BE before start (status Created) and while no Mobile session holds it. */
+/** Whether a new handoff code may be created is the server's call (`recovery.canIssueHandoff`); Web does not derive it. */
 export function canIssueHandoff(playtest: PlaytestStatus) {
-  return playtest.status.toLowerCase() === "created" && !playtest.boundToMobile;
+  return playtest.recovery.canIssueHandoff === true;
+}
+
+export type HeldCodeState = "current" | "replaced" | "redeemed" | "closed";
+
+/**
+ * Whether the code this tab holds is still the one the server has open. `openHandoffId` names the newest open code: a
+ * different id means another tab issued a newer one; none means it was redeemed by a phone, revoked or has expired.
+ */
+export function heldCodeState(playtest: PlaytestStatus, handoffId: string): HeldCodeState {
+  if (playtest.openHandoffId === handoffId) return "current";
+  if (playtest.openHandoffId) return "replaced";
+  return playtest.boundToMobile ? "redeemed" : "closed";
 }
 
 export function canCancel(playtest: PlaytestStatus) {

@@ -37,11 +37,13 @@ function schedule(item: QrTraining) {
  * Published Trainings of the QR Building (`GET /api/qr/{token}/trainings`). It is read-only: starting a session is the
  * app's online step, so there is deliberately no "Bắt đầu" button here.
  */
-export function TrainingList({ accessToken, token, staff, onSessionLost, onRecheckAccess }: {
+export function TrainingList({ accessToken, token, staff, canStart, onSessionLost, onRecheckAccess }: {
   accessToken: string;
   token: string;
   /** OrganizationUser / PlatformAdmin see every Training of the Building, not only what a Trainee may open. */
   staff: boolean;
+  /** False when the Building cannot start new sessions (BE `canStartNewSessions`): the list is for reading only. */
+  canStart: boolean;
   onSessionLost: () => void;
   onRecheckAccess: () => void;
 }) {
@@ -53,12 +55,12 @@ export function TrainingList({ accessToken, token, staff, onSessionLost, onReche
 
   if (list.error !== undefined && !list.data) {
     if (status === 403) return <Panel title="Bài tập huấn"><Alert tone="warning" title="Chưa có quyền xem danh sách bài" action={<Button size="sm" variant="secondary" className="mt-3" onClick={onRecheckAccess}>Kiểm tra lại quyền</Button>}>Quyền tham gia công trình có thể đã thay đổi (ví dụ tổ chức vừa đổi mã hoặc chế độ truy cập). Hãy kiểm tra lại quyền, rồi nhập mã tham gia nếu được yêu cầu.</Alert></Panel>;
-    if (status === 404) return <Panel title="Bài tập huấn"><Alert tone="warning" title="Không tìm thấy công trình">Mã QR có thể đã bị thu hồi hoặc thay bằng mã mới. Hãy quét lại mã QR hiện hành.</Alert></Panel>;
+    if (status === 404 || status === 410) return <Panel title="Bài tập huấn"><Alert tone="warning" title="Không tìm thấy công trình">Mã QR có thể đã bị thu hồi hoặc thay bằng mã mới. Hãy quét lại mã QR hiện hành.</Alert></Panel>;
     return <Panel title="Bài tập huấn"><Alert tone="danger" title="Không tải được danh sách bài" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}><RefreshCw size={14} aria-hidden="true" />Thử lại</Button>}>{status === 429 || status === 503 ? "Hệ thống đang bận. Hãy thử lại sau ít phút." : status >= 500 ? "Máy chủ gặp lỗi. Hãy thử lại sau." : "Mất kết nối tới máy chủ. Kiểm tra mạng rồi thử lại."}</Alert></Panel>;
   }
 
   const items = list.data ?? [];
-  return <Panel title="Bài tập huấn" description={staff ? "Bạn xem với vai trò quản lý: danh sách gồm cả bài chưa mở cho học viên." : "Các bài đã phát hành và đang mở cho công trình này."} bodyClassName="ops-stack">
+  return <Panel title="Bài tập huấn" description={`${staff ? "Bạn xem với vai trò quản lý: danh sách gồm cả bài chưa mở cho học viên." : "Các bài đã phát hành và đang mở cho công trình này."}${canStart ? "" : " Danh sách chỉ để xem: hiện chưa bắt đầu được bài nào."}`} bodyClassName="ops-stack">
     {list.error !== undefined && <Alert tone="warning" title="Dữ liệu có thể đã cũ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Tải lại</Button>}>Không làm mới được danh sách. Đang hiển thị lần tải gần nhất.</Alert>}
     {items.length === 0
       ? <EmptyState icon={ClipboardList} title="Chưa có bài tập huấn nào" description="Tổ chức chưa phát hành bài cho công trình này, hoặc chưa tới thời gian mở bài. Hãy quay lại sau." action={<Button variant="secondary" onClick={list.reload}><RefreshCw size={16} aria-hidden="true" />Tải lại danh sách</Button>} />
