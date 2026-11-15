@@ -43,6 +43,8 @@ function etagOf(responseHeaders: Headers, id: string, revision: number) {
   return responseHeaders.get("ETag") ?? billingEtag(id, revision);
 }
 
+/** One platform admin as an assignee choice: the name falls back to the email when the account has no full name. */
+export type PlatformAdminOption = { id: string; name: string };
 export type CheckoutResult = { checkout: PayosCheckout; httpStatus: number };
 export type QuotationScope = "organization" | "admin";
 export type LedgerKind = "checkouts" | "requests";
@@ -153,6 +155,14 @@ export const billingApi = {
   async updateEnterpriseRequest(accessToken: string, id: string, input: EnterpriseStatusInput, etag: string): Promise<WithEtag<EnterpriseRequest>> {
     const response = await apiClient.requestWithMeta<EnterpriseRequest>(`/api/admin/enterprise-quote-requests/${id}`, { headers: headers(accessToken), json: input, method: "PATCH", ifMatch: etag });
     return { data: response.data, etag: etagOf(response.headers, id, response.data.revision ?? 1) };
+  },
+  /**
+   * Active platform admins an enterprise request can be assigned to (`GET /api/accounts`, BE `AccountFilter`; pageSize is
+   * capped at 100). The BE accepts only an active PlatformAdmin as `assignedTo`.
+   */
+  async listPlatformAdmins(accessToken: string, signal?: AbortSignal): Promise<PlatformAdminOption[]> {
+    const page = await apiClient.request<PageResponse<{ id: string; email: string; fullName: string | null }>>("/api/accounts", { headers: headers(accessToken), query: { role: "PlatformAdmin", isActive: true, page: 1, pageSize: 100, sort: "fullName" }, signal });
+    return page.items.map((item) => ({ id: item.id, name: item.fullName?.trim() || item.email }));
   },
   addEnterpriseResponse(accessToken: string, id: string, message: string, idempotencyKey: string) {
     return apiClient.request<EnterpriseResponse>(`/api/admin/enterprise-quote-requests/${id}/responses`, { headers: headers(accessToken), json: { message }, idempotencyKey });

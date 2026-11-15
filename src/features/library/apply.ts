@@ -2,14 +2,15 @@ import { deepEqual, isObject, type Json, type JsonObject, type Path } from "@/fe
 import type { CapabilityOption } from "@/features/scenario-editor/v1/catalog";
 import { LIMITS, MODE_LABEL, TRAINING_MODES, type TrainingMode } from "@/features/scenario-editor/v1/contract";
 import { TEMPLATE_FIELDS, ignoredTemplateParts, templateFieldLabel, type TemplateField } from "./payload";
-import type { LibraryVersion } from "./types";
+import { isScenarioKind, type LibraryVersion, type ScenarioLibraryKind } from "./types";
 import { capabilityName } from "@/configs/capability-labels";
 import { metricName } from "@/configs/metric-labels";
 
 /*
  * Planning how a PUBLISHED library version would change the open draft. Pure: it reads the draft and the version and returns
  * groups of fields with what the draft holds now, what the version brings and which actions are allowed. Nothing is written
- * here; the editor applies the chosen changes as ONE undoable command (see `setFieldsCommand`).
+ * here; the editor applies the chosen changes as ONE undoable command (see `setFieldsCommand`), together with the
+ * `libraryRefs[]` entry that records where the content came from (see `libraryRefChange`).
  *
  * Rules (FR-LIBRARY-01/02, BE docs/learn-library.md):
  *  - a template fills only the non-spatial fields of `fet3d.editor/1`; it never creates positions, objects, geometry or runtime;
@@ -229,6 +230,38 @@ export function changesFor(plan: ApplyPlan, choices: Choices): Change[] {
     for (const write of item.writes[action] ?? []) out.push({ groupId: item.id, ...write });
   }
   return out;
+}
+
+/*
+ * Provenance (BE `ScenarioStateV1Validator`, docs/learn-library.md): the draft's optional root field `libraryRefs[]` records
+ * which Library versions the author copied from. Each entry is `{ versionId, kind, code? }` and nothing else: `versionId` is
+ * the Library VERSION id (not the item id), `kind` is ScenarioTemplate | RubricSample | Equipment, `code` is the item code
+ * (at most 80 characters). At most 50 entries. The BE checks the shape only (it does not look the version up) and the field
+ * never changes how the scenario runs.
+ */
+export type LibraryRef = { versionId: string; kind: ScenarioLibraryKind; code?: string };
+export const LIBRARY_REFS_MAX = 50;
+const LIBRARY_REF_CODE_MAX = 80;
+
+/** The refs the draft holds that can be shown; entries this client cannot read stay in the draft untouched. */
+export function readLibraryRefs(draft: JsonObject): LibraryRef[] {
+  if (!Array.isArray(draft.libraryRefs)) return [];
+  return draft.libraryRefs.flatMap((entry) => (isObject(entry) && typeof entry.versionId === "string" && isScenarioKind(entry.kind)
+    ? [{ versionId: entry.versionId, kind: entry.kind, ...(typeof entry.code === "string" ? { code: entry.code } : {}) }] : []));
+}
+
+/**
+ * The write that records `version` as a source of the draft, or null when the draft already names that version. Existing
+ * entries are kept as they are and in order; the new one goes last. At the BE limit the oldest entry gives way, so a save is
+ * never refused because of provenance. The caller puts this write in the SAME command as the copied fields, so one undo
+ * removes both.
+ */
+export function libraryRefChange(draft: JsonObject, version: { id: string; kind: ScenarioLibraryKind; code: string }): { path: Path; value: Json } | null {
+  const existing: Json[] = Array.isArray(draft.libraryRefs) ? draft.libraryRefs : [];
+  if (existing.some((entry) => isObject(entry) && entry.versionId === version.id)) return null;
+  const code = version.code.trim();
+  const ref: JsonObject = { versionId: version.id, kind: version.kind, ...(code && code.length <= LIBRARY_REF_CODE_MAX ? { code } : {}) };
+  return { path: ["libraryRefs"], value: [...existing, ref].slice(-LIBRARY_REFS_MAX) };
 }
 
 export type ApplySummary = { filled: string[]; replaced: string[]; merged: string[]; kept: string[] };

@@ -31,7 +31,7 @@
 .qrl-steps li { display: flex; align-items: flex-start; gap: 12px; color: var(--muted); font-size: 14px; line-height: 1.55; counter-increment: qrl-step; }
 .qrl-steps li::before { content: counter(qrl-step); display: inline-grid; flex: 0 0 auto; place-items: center; width: 26px; height: 26px; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--ember); font-size: 12px; font-weight: 650; }
 .qrl-steps strong { color: var(--text); }
-.qrl-steps a { color: var(--ember); text-decoration: underline; text-underline-offset: 3px; }
+.qrl-steps a, .qrl-note a { color: var(--ember); text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 767px) {
   .qrl-topbar { padding: 0 16px; }

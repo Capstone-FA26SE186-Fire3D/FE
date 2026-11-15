@@ -409,6 +409,23 @@ export class LearnBackend {
         return { status: 201, json: { id: created.id, slug: created.slug, name: created.name, description: created.description } };
       });
     }
+    // BE `UpdateSituation`: no If-Match and no Idempotency-Key; at least one of name (1-255), description (<= 2000, "" clears), isActive.
+    const situationById = /^\/api\/admin\/learn\/situations\/([^/]+)$/.exec(path);
+    if (method === "PATCH" && situationById) {
+      const input = (body ?? {}) as Json;
+      const has = (key: string) => input[key] !== undefined && input[key] !== null;
+      if ((!has("name") && !has("description") && !has("isActive"))
+        || (has("name") && (typeof input.name !== "string" || !input.name.trim() || input.name.length > 255))
+        || (has("description") && (typeof input.description !== "string" || input.description.length > 2000))
+        || (has("isActive") && typeof input.isActive !== "boolean")) return this.problem(400, "VALIDATION_ERROR", "Send name (1-255), description (max 2000) or isActive.");
+      const found = this.situations.find((item) => item.id === situationById[1]);
+      if (!found) return this.problem(404, "NOT_FOUND", "The situation was not found.");
+      if (has("name")) found.name = (input.name as string).trim();
+      if (has("description")) found.description = (input.description as string).trim() || null;
+      if (has("isActive")) found.isActive = input.isActive as boolean;
+      found.updatedAt = this.tick();
+      return { status: 200, json: { id: found.id, slug: found.slug, name: found.name, description: found.description, isActive: found.isActive, updatedAt: found.updatedAt } };
+    }
     if (method === "POST" && path === "/api/admin/learn/media/images/upload-intent") {
       const input = (body ?? {}) as Json;
       return this.withKey(headers["idempotency-key"], "LearnImage", input, true, () => {

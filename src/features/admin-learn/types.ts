@@ -106,6 +106,12 @@ export type MediaDescriptor = { provider: string; videoId: string; canonicalUrl:
 
 /** Body of `POST /api/admin/learn/situations` (BE `CreateLearnSituationRequest`). */
 export type CreateSituationInput = { slug: string; name: string; description?: string };
+/**
+ * Body of `PATCH /api/admin/learn/situations/{id}` (BE `UpdateLearnSituationRequest`): at least one field. `name` 1–255,
+ * `description` up to 2000 where an empty string clears it, `isActive: false` takes the situation out of the public filters
+ * and blocks publishing or showing a version that uses it. The slug never changes and a situation is never deleted.
+ */
+export type UpdateSituationInput = { name?: string; description?: string; isActive?: boolean };
 
 /** Wire form of a version for POST /posts (inside `version`), POST /posts/{id}/versions and PUT /versions/{id}. */
 export type VersionInput = {

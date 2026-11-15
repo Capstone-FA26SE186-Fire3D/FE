@@ -14,7 +14,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Table } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { QrCode } from "@/components/ui/qr-code";
-import { isLocalOrigin, qrLandingUrl, resolveQrLandingOrigin } from "@/features/qr-landing/token";
+import { isLocalOrigin, issuedQrContent, qrLandingUrl, resolveQrLandingOrigin } from "@/features/qr-landing/token";
 import { formatDateTime, isStatus } from "../format";
 import { buildingQrApi, type BuildingQrCode } from "../qr-api";
 import { QrPrintSheet } from "./qr-print-sheet";
@@ -55,7 +55,7 @@ function codeNote(code: BuildingQrCode) {
 /**
  * Figma "Truy cập · Mã QR": the Active code card (or an empty state with "Tạo mã QR"), the one-time view + print of a
  * freshly issued code, "Lịch sử mã" in a drawer (never the token), create / rotate / revoke behind an impact confirmation.
- * The QR encodes `<origin>/qr/<token>`; it identifies the Building and grants nothing.
+ * The QR encodes the `content` the BE returns with the token (`<web address>/qr/<token>`); it identifies the Building and grants nothing.
  */
 export function QrPanel({ accessToken, buildingId, buildingName }: { accessToken: string; buildingId: string; buildingName: string }) {
   const toast = useToast();
@@ -106,7 +106,8 @@ export function QrPanel({ accessToken, buildingId, buildingName }: { accessToken
         const result = pending.kind === "create"
           ? await buildingQrApi.create(accessToken, buildingId, wanted)
           : await buildingQrApi.rotate(accessToken, buildingId, pending.code.id, wanted);
-        const url = qrLandingUrl(resolveQrLandingOrigin(window.location.origin), result.token);
+        // The server's `content` is what the QR encodes; this site's own address is only used when the server sent none.
+        const url = issuedQrContent(result.content, result.token) ?? qrLandingUrl(resolveQrLandingOrigin(window.location.origin), result.token);
         setIssued({ token: result.token, url, label: result.code.label ?? wanted, kind: pending.kind === "create" ? "created" : "rotated", localOrigin: isLocalOrigin(url) });
         setNotice(null);
         toast.notify({ tone: "success", title: pending.kind === "create" ? "Đã tạo mã QR" : "Đã tạo mã QR mới", description: pending.kind === "rotate" ? "QR cũ đã ngừng hoạt động." : undefined });
@@ -164,7 +165,7 @@ export function QrPanel({ accessToken, buildingId, buildingName }: { accessToken
       <h2 id="qr-issued-title" className="org-card-title">{issued.kind === "created" ? "Mã QR mới" : "Mã QR mới (đã thay mã cũ)"}</h2>
       <div className="ops-stack">
         <Alert tone="warning" title="Mã này chỉ hiển thị một lần">Hệ thống chỉ lưu dấu băm của mã, nên không xem lại được. In hoặc sao chép liên kết ngay. Rời tab, tải lại trang hoặc bấm “Ẩn mã” là mất; khi đó chỉ có thể tạo mã mới và mã hiện tại sẽ ngừng hoạt động.{issued.kind === "rotated" ? " QR cũ đã ngừng hoạt động: hãy thay mọi bản in cũ." : ""}</Alert>
-        {issued.localOrigin && <Alert tone="info" title="Liên kết đang trỏ về máy của bạn">QR này mở {new URL(issued.url).origin}, chỉ truy cập được trên mạng hiện tại. Hãy tạo mã khi đang dùng địa chỉ chính thức của FET3D để in ra dùng thật.</Alert>}
+        {issued.localOrigin && <Alert tone="info" title="Liên kết đang trỏ về máy của bạn">QR này mở {new URL(issued.url).origin}, chỉ truy cập được trên máy hoặc mạng hiện tại, nên chưa dùng để in ra dùng thật được.</Alert>}
         <div className="qr-issued-body">
           <div className="qr-frame"><QrCode value={issued.url} size={220} label={`Mã QR của ${buildingName}`} /></div>
           <div className="ops-stack">

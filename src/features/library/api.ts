@@ -82,14 +82,18 @@ async function versionWithEtag(promise: Promise<{ data: unknown; headers: Header
   return { data: version, etag: etagOf(response.headers, version.revision) };
 }
 
-/** `search` is part of the item code (BE: wildcards literal, max 80), applied before paging. */
-type ListQuery = { kind?: LibraryKind | ""; search?: string; page: number; pageSize: number };
-const listQuery = (query: ListQuery) => ({ kind: query.kind || undefined, search: query.search?.trim() || undefined, page: query.page, pageSize: query.pageSize });
+/** `GET /api/library/items` reads only `kind`, `page` and `pageSize`: it has no search, state or capability filter. */
+type ListQuery = { kind?: LibraryKind | ""; page: number; pageSize: number };
+/**
+ * `GET /api/admin/library/items` also filters before paging: `search` is part of the item code (wildcards literal, max 80)
+ * and `isActive` is the item's own flag (not whether it has a Published version).
+ */
+type AdminListQuery = ListQuery & { search?: string; isActive?: boolean };
 
 /** Read side for OrganizationUser and PlatformAdmin. */
 export const libraryApi = {
   async listItems(accessToken: string, query: ListQuery, signal?: AbortSignal): Promise<Page<LibraryItem>> {
-    const raw = await apiClient.request<unknown>("/api/library/items", { headers: auth(accessToken), query: listQuery(query), signal });
+    const raw = await apiClient.request<unknown>("/api/library/items", { headers: auth(accessToken), query: { kind: query.kind || undefined, page: query.page, pageSize: query.pageSize }, signal });
     return parsePage(raw, parseItem);
   },
   /** 404 when the item is inactive or has no Published version (for organizations). */
@@ -103,8 +107,8 @@ export const libraryApi = {
 };
 
 export const libraryAdminApi = {
-  async listItems(accessToken: string, query: ListQuery, signal?: AbortSignal): Promise<Page<LibraryItem>> {
-    const raw = await apiClient.request<unknown>("/api/admin/library/items", { headers: auth(accessToken), query: listQuery(query), signal });
+  async listItems(accessToken: string, query: AdminListQuery, signal?: AbortSignal): Promise<Page<LibraryItem>> {
+    const raw = await apiClient.request<unknown>("/api/admin/library/items", { headers: auth(accessToken), query: { kind: query.kind || undefined, isActive: query.isActive, search: query.search?.trim() || undefined, page: query.page, pageSize: query.pageSize }, signal });
     return parsePage(raw, parseItem);
   },
   getItem: (accessToken: string, id: string, signal?: AbortSignal) => itemWithEtag(apiClient.requestWithMeta<unknown>(`/api/admin/library/items/${encodeURIComponent(id)}`, { headers: auth(accessToken), signal })),

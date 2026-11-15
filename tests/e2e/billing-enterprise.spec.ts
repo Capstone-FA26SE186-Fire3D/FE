@@ -74,7 +74,8 @@ test.describe("enterprise requests: administrator side (mock)", () => {
     await expect(enterpriseRows(page)).toHaveCount(2);
     await expect(enterpriseRows(page).first()).toContainText("FET3D Lab");
     await expect(enterpriseRows(page).first()).toContainText("150 công trình");
-    await expect(enterpriseRows(page).nth(1)).toContainText("Đã phân công");
+    // The signed-in admin is the assignee of the second request.
+    await expect(enterpriseRows(page).nth(1)).toContainText("Phụ trách: bạn");
     await expect(page.getByText("Chờ BE: xử lý yêu cầu liên hệ")).toHaveCount(0);
   });
 
@@ -122,6 +123,58 @@ test.describe("enterprise requests: administrator side (mock)", () => {
     expect(replies[1].headers["idempotency-key"]).toBe(replies[0].headers["idempotency-key"]);
     expect(replies[0].body).toEqual({ message: "Chúng tôi sẽ liên hệ trong ngày." });
     await expect(page.getByLabel("Nội dung phản hồi")).toHaveValue("");
+  });
+
+  test("assigning to another platform admin: choices come from the active admin accounts, the PATCH carries the id, the name is shown", async ({ page }) => {
+    const mock = newMock();
+    mock.enterprise = [request()];
+    mock.admins.push({ id: "old-admin", email: "old@fire3d.test", fullName: "Người Đã Nghỉ", role: "PlatformAdmin", organizationId: null, isActive: false });
+    await signIn(page, admin);
+    await mockBilling(page, mock);
+    await page.goto(`/admin/commerce?tab=enterprise&request=${ids.enterprise}`);
+    const detail = page.getByTestId("enterprise-admin-detail");
+    await expect(detail.getByTestId("enterprise-assignee")).toContainText("Chưa phân công");
+    const listed = callsTo(mock, "GET", "/api/accounts");
+    expect(listed.length).toBeGreaterThan(0);
+    expect(Object.fromEntries(new URLSearchParams(listed[0].search))).toMatchObject({ role: "PlatformAdmin", isActive: "true", pageSize: "100" });
+
+    await detail.getByRole("button", { name: "Giao cho người khác" }).click();
+    const picker = page.getByLabel("Người phụ trách");
+    // Neither the signed-in admin ("Nhận xử lý" covers that) nor a disabled account is offered.
+    await expect(picker.locator("option")).toHaveText(["Chọn quản trị viên…", "Trần Thị C"]);
+    await page.getByRole("button", { name: "Giao việc" }).click();
+    await expect(page.getByText("Chọn một quản trị viên.")).toBeVisible();
+    expect(callsTo(mock, "PATCH", `/api/admin/enterprise-quote-requests/${ids.enterprise}`)).toHaveLength(0);
+    await picker.selectOption({ label: "Trần Thị C" });
+    await page.getByRole("button", { name: "Giao việc" }).click();
+    await expect(detail.getByTestId("enterprise-assignee")).toContainText("Đang do Trần Thị C phụ trách");
+    const patches = callsTo(mock, "PATCH", `/api/admin/enterprise-quote-requests/${ids.enterprise}`);
+    expect(patches).toHaveLength(1);
+    expect(patches[0].headers["if-match"]).toBe(etagOf(ids.enterprise, 1));
+    expect(patches[0].body).toEqual({ assignedTo: ids.admin2 });
+    expect(mock.enterprise[0].status).toBe("New");
+    // The current assignee is no longer a choice; the list row names them too.
+    await detail.getByRole("button", { name: "Giao cho người khác" }).click();
+    await expect(page.getByText("Chưa có quản trị viên nào khác đang hoạt động để giao.")).toBeVisible();
+    await page.getByRole("button", { name: "Quay lại" }).click();
+    await expect(enterpriseRows(page).first()).toContainText("Phụ trách: Trần Thị C");
+  });
+
+  test("assigning: an account disabled meanwhile is refused in plain words, and an unknown assignee stays a neutral label", async ({ page }) => {
+    const mock = newMock();
+    mock.enterprise = [request({ assignedTo: "someone-gone" })];
+    await signIn(page, admin);
+    await mockBilling(page, mock);
+    await page.goto(`/admin/commerce?tab=enterprise&request=${ids.enterprise}`);
+    const detail = page.getByTestId("enterprise-admin-detail");
+    await expect(detail.getByTestId("enterprise-assignee")).toContainText("Đang do quản trị viên khác phụ trách");
+    await detail.getByRole("button", { name: "Giao cho người khác" }).click();
+    await page.getByLabel("Người phụ trách").selectOption({ label: "Trần Thị C" });
+    mock.admins[1].isActive = false;
+    await page.getByRole("button", { name: "Giao việc" }).click();
+    await expect(page.getByText("Người này không còn là quản trị viên đang hoạt động. Hãy chọn người khác.").first()).toBeVisible();
+    await expect(page.getByText("BILLING_VALIDATION_FAILED")).toHaveCount(0);
+    expect(mock.enterprise[0].assignedTo).toBe("someone-gone");
   });
 
   test("full lifecycle across both sides: contact -> reply -> quotation -> organization sees it -> close (reason, If-Match, key)", async ({ page, browser }) => {

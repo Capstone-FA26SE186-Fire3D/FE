@@ -110,15 +110,37 @@ test.describe("list: filters and paging live in the URL", () => {
     await expect(rowOf(page, "EQ-21")).toBeVisible();
     await expect(page.getByTestId("chip-Equipment")).toHaveAttribute("data-state", "active");
 
-    // The server has no status filter: this one narrows the loaded page only and says so.
+    // The state chip is a server filter (isActive): it reaches items on every page and starts again at page 1.
     await page.getByRole("button", { name: /^Trạng thái:/ }).click();
+    await expect(page.getByRole("option")).toHaveText(["tất cả", "Đang dùng", "Ngừng dùng"]); // only what the server can filter by
     await page.getByRole("option", { name: "Ngừng dùng", exact: true }).click();
-    await expect(page.getByText("Bộ lọc trạng thái chỉ áp dụng cho")).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Không có mục khớp bộ lọc." })).toBeVisible(); // EQ-21..23 are all active
+    await expect(page).toHaveURL(/state=inactive/);
+    await expect(page).not.toHaveURL(/page=/);
+    for (const code of ["EQ-05", "EQ-10", "EQ-15", "EQ-20"]) await expect(rowOf(page, code)).toBeVisible(); // from page 1 AND page 2 of the unfiltered list
+    await expect(rowOf(page, "EQ-21")).toHaveCount(0);
+    await expect(page.getByText("Bộ lọc trạng thái chỉ áp dụng cho")).toHaveCount(0);
+    const inactive = backend.callsTo("GET", /^\/api\/admin\/library\/items$/).filter((call) => call.search.includes("isActive=false"));
+    expect(inactive.length).toBeGreaterThan(0);
+    expect(inactive.every((call) => call.search.includes("kind=Equipment") && call.search.includes("page=1"))).toBe(true);
+
     await page.getByRole("button", { name: /^Trạng thái:/ }).click();
     await page.getByRole("option", { name: "Đang dùng", exact: true }).click();
-    await expect(rowOf(page, "EQ-21")).toBeVisible();
-    await expect(page).toHaveURL(/page=2/); // the state filter never changes the server page
+    await expect(page).toHaveURL(/state=active/);
+    await expect(rowOf(page, "EQ-01")).toBeVisible();
+    await expect(rowOf(page, "EQ-23")).toBeVisible(); // 19 active items fit one page
+    await expect(rowOf(page, "EQ-05")).toHaveCount(0);
+    expect(backend.callsTo("GET", /^\/api\/admin\/library\/items$/).some((call) => call.search.includes("isActive=true"))).toBe(true);
+    await page.reload();
+    await expect(rowOf(page, "EQ-23")).toBeVisible();
+    await expect(rowOf(page, "EQ-05")).toHaveCount(0);
+
+    // without the chip the request carries no isActive at all
+    await page.getByRole("button", { name: /^Trạng thái:/ }).click();
+    await page.getByRole("option", { name: "tất cả", exact: true }).click();
+    await expect(page).not.toHaveURL(/state=/);
+    await expect(rowOf(page, "EQ-05")).toBeVisible();
+    const last = backend.callsTo("GET", /^\/api\/admin\/library\/items$/).filter((call) => call.search.includes("pageSize=20")).at(-1)!;
+    expect(last.search).not.toContain("isActive");
   });
 });
 

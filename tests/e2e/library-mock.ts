@@ -208,8 +208,10 @@ export class LibraryBackend {
     const items = /^\/api\/(?:admin\/)?library\/items$/.exec(path);
     if (items && method === "GET") {
       const kind = params.get("kind");
-      const search = (params.get("search") ?? "").toLowerCase();
-      const rows = this.items.filter((entry) => (!kind || entry.kind === kind) && (!search || entry.code.toLowerCase().includes(search)) && (admin || this.visibleToOrg(entry))).sort((a, b) => a.code.localeCompare(b.code));
+      // Like the BE controllers: only the admin route reads `search` (part of the code) and `isActive`; the organization route reads `kind` alone.
+      const search = admin ? (params.get("search") ?? "").toLowerCase() : "";
+      const active = admin ? params.get("isActive") : null;
+      const rows = this.items.filter((entry) => (!kind || entry.kind === kind) && (!search || entry.code.toLowerCase().includes(search)) && (active === null || entry.isActive === (active === "true")) && (admin || this.visibleToOrg(entry))).sort((a, b) => a.code.localeCompare(b.code));
       const { page, size, slice } = this.page(rows, params);
       return { status: 200, json: { items: slice.map((entry) => this.itemJson(entry, admin)), total: rows.length, page, pageSize: size } };
     }

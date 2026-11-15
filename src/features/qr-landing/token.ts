@@ -16,11 +16,29 @@ export function qrLandingPath(token: string) {
 }
 
 /**
- * What a Building QR encodes: the landing URL of this site. BE only returns the opaque token and publishes no URL,
- * so the origin is `NEXT_PUBLIC_QR_LANDING_ORIGIN` when configured, otherwise the origin the manager is using.
+ * Landing URL of this site for a token. Only a fallback: what a Building QR encodes is the BE's `content`
+ * (`issuedQrContent`). It is used when the server sent none (its public web address is not configured).
  */
 export function qrLandingUrl(origin: string, token: string) {
   return `${origin.replace(/\/+$/, "")}${qrLandingPath(token)}`;
+}
+
+/**
+ * The BE's `content` of a freshly issued code (`BuildingQrCreated.Content`, `{FrontendUrl}/qr/{token}`) when it is
+ * what scanners accept: an http(s) URL whose path is exactly `/qr/<this token>`, with no query, fragment or
+ * credentials (the app's `parseQrToken` rejects those). Anything else returns null so the caller does not print it.
+ */
+export function issuedQrContent(content: string | null | undefined, token: string): string | null {
+  if (typeof content !== "string" || !isQrToken(token)) return null;
+  const value = content.trim();
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    if (url.username || url.password || url.search || url.hash) return null;
+    return url.pathname === qrLandingPath(token) ? value : null;
+  } catch {
+    return null;
+  }
 }
 
 export function resolveQrLandingOrigin(browserOrigin: string) {
