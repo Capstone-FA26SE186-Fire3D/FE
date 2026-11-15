@@ -9,7 +9,6 @@ import { FilterChips } from "@/components/ui/filter-chip";
 import { PageHeader, type Crumb } from "@/components/ui/page-header";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthSession } from "@/features/auth/auth-session";
-import { accountsApi } from "@/features/accounts/api";
 import { describeApiError } from "@/api/describe-error";
 import { analyticsApi } from "../api";
 import type { AnalyticsScope, OperationsReport } from "../types";
@@ -59,7 +58,6 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
   // The operations tab's "Hoạt động huấn luyện theo ngày" line chart: daily cohorts of the same period, without the training filters.
   const activity = useAsyncData(`activity:${key}`, (signal) => analyticsApi.training(accessToken as string, scope, range, signal, { groupBy: "day" }), enabled && tab === "operations", { keepWhenDenied: true });
   const revenue = useAsyncData(`revenue:${key}`, (signal) => analyticsApi.revenue(accessToken as string, range, signal), enabled && tab === "revenue" && variant === "platform", { keepWhenDenied: true });
-  const names = useAsyncData("analytics:organization-names", () => accountsApi.organizations(accessToken as string).then((page) => new Map(page.items.map((item) => [item.id, item.name]))), enabled && tab === "training" && variant === "platform");
 
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -72,7 +70,7 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
       const url = URL.createObjectURL(new Blob(["﻿", text], { type: "text/csv;charset=utf-8" }));
       const link = document.createElement("a");
       link.href = url;
-      link.download = "bao-cao-huan-luyen.csv";
+      link.download = variant === "organization" ? "bao-cao-huan-luyen.csv" : variant === "platform" ? "bao-cao-huan-luyen-toan-he-thong.csv" : "bao-cao-huan-luyen-to-chuc.csv";
       link.click();
       URL.revokeObjectURL(url);
     } catch (cause) {
@@ -95,8 +93,9 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
   const refresh = <Button variant="quiet" onClick={active.reload} disabled={active.loading || Boolean(rangeError)}><RefreshCw size={16} aria-hidden="true" />{active.loading ? "Đang tải…" : "Tải lại"}</Button>;
 
   const org = variant === "organization" && !sectionHeading;
-  // CSV export exists for the training report only (`{training route}/export`); the operations tab has no export endpoint.
-  const exportButton = org && tab === "training" ? <Button variant="secondary" onClick={() => void exportCsv()} disabled={exporting || Boolean(rangeError)}><Download size={16} aria-hidden="true" />{exporting ? "Đang xuất…" : "Xuất CSV"}</Button> : null;
+  // CSV export exists for the training report only (`{training route}/export`, one route per scope: own organization,
+  // whole platform, one organization seen by an Admin); the operations and revenue tabs have no export endpoint.
+  const exportButton = tab === "training" ? <Button variant="secondary" onClick={() => void exportCsv()} disabled={exporting || Boolean(rangeError)}><Download size={16} aria-hidden="true" />{exporting ? "Đang xuất…" : "Xuất CSV"}</Button> : null;
 
   const toolbar = <div className={styles.toolbar}>
     <FilterChips label="Bộ lọc báo cáo">
@@ -108,7 +107,7 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
 
   return <div className={org ? "org" : undefined}>
     {sectionHeading
-      ? <div className="ops-page-header" style={{ marginBottom: 14 }}><div><h2 className="adm-section-title" style={{ margin: 0 }}>{title}</h2><p className="ops-muted" style={{ marginTop: 6 }}>{description}</p></div><div className="ops-actions">{refresh}</div></div>
+      ? <div className="ops-page-header" style={{ marginBottom: 14 }}><div><h2 className="adm-section-title" style={{ margin: 0 }}>{title}</h2><p className="ops-muted" style={{ marginTop: 6 }}>{description}</p></div><div className="ops-actions">{exportButton}{refresh}</div></div>
       : <PageHeader title={title} description={description} breadcrumbs={breadcrumbs} eyebrow={eyebrow} actions={<>{exportButton}{refresh}</>} />}
     {exportError && <Alert tone="danger" title="Không xuất được CSV">{exportError}</Alert>}
     {identity && <p className={styles.identity}>Tổ chức: <strong>{identity.name}</strong> · {identity.isActive ? "đang hoạt động" : "đã vô hiệu hóa (vẫn đọc được số liệu)"}</p>}
@@ -117,7 +116,7 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
       {tabs.length > 1 && <TabsList aria-label="Loại báo cáo">{tabs.map((key) => <TabsTrigger key={key} value={key}>{TAB_LABELS[key]}</TabsTrigger>)}</TabsList>}
       {toolbar}
       <RangeError message={rangeError} />
-      <TabsContent value="training">{!rangeError && <ReportShell query={training} title="báo cáo huấn luyện">{(data) => <TrainingReportView data={data} groupBy={requestFilters.groupBy} organizationNames={names.data} showOrganizationLinks={variant === "platform"} />}</ReportShell>}</TabsContent>
+      <TabsContent value="training">{!rangeError && <ReportShell query={training} title="báo cáo huấn luyện">{(data) => <TrainingReportView data={data} groupBy={requestFilters.groupBy} showOrganizationLinks={variant === "platform"} />}</ReportShell>}</TabsContent>
       <TabsContent value="operations">{!rangeError && <ReportShell query={operations} title="báo cáo vận hành">{(data) => <OperationsReportView data={data} scope={variant === "organization" ? "organization" : variant === "platform" ? "platform" : "admin-organization"} organizationId={organizationId} activity={{ report: activity.data, loading: activity.loading && !activity.data, failed: activity.error !== undefined && !activity.data }} />}</ReportShell>}</TabsContent>
       {variant === "platform" && <TabsContent value="revenue">{!rangeError && <ReportShell query={revenue} title="báo cáo doanh thu">{(data) => <RevenueReportView data={data} />}</ReportShell>}</TabsContent>}
     </Tabs>

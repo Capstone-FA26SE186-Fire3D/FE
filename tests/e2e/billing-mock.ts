@@ -23,6 +23,7 @@ export const ids = {
   policy: "99999999-0000-0000-0000-000000000001",
   entitlement: "88888888-0000-0000-0000-000000000001",
   enterprise: "77777777-0000-0000-0000-000000000001",
+  admin2: "99999999-0000-0000-0000-000000000002",
   topUpQuote: "aaaaaaaa-0000-0000-0000-000000000003",
 };
 
@@ -79,6 +80,8 @@ export type Mock = {
   quota: { units: Rec[]; grants: Rec[]; usage: Rec[] };
   notifications: Rec[];
   enterprise: Rec[];
+  /** `GET /api/accounts?role=PlatformAdmin&isActive=true`: assignee names and choices of an enterprise request. */
+  admins: Rec[];
   responses: Record<string, Rec[]>;
   /** True once a checkout exists for `quotationId` of `checkout` (created by POST or seeded). */
   checkoutExists: boolean;
@@ -106,6 +109,7 @@ export function newMock(): Mock {
     quota: { units: [], grants: [], usage: [] },
     notifications: [],
     enterprise: [],
+    admins: [{ id: admin.id, email: admin.email, fullName: admin.fullName, role: "PlatformAdmin", organizationId: null, isActive: true }, { id: ids.admin2, email: "tran.c@fire3d.test", fullName: "Trần Thị C", role: "PlatformAdmin", organizationId: null, isActive: true }],
     responses: {},
     checkoutExists: false,
     checkout: checkoutFixture(),
@@ -206,6 +210,13 @@ export async function mockBilling(page: Page, mock: Mock) {
     if (method === "GET" && path === "/api/buildings") return send(200, { items: [building("b-1"), building("b-2")], totalCount: 2, page: 1, pageSize: 100 });
     if (method === "GET" && /^\/api\/buildings\/[^/]+$/.test(path)) return send(200, building(path.split("/").pop()));
     if (method === "GET" && path === "/api/organizations") return send(200, { items: [{ id: "org-1", name: "FET3D Lab", slug: "fet3d-lab", isActive: true, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" }, { id: "org-2", name: "Trường Mẫu", slug: "truong-mau", isActive: true, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" }], totalCount: 2, page: 1, pageSize: 100 });
+
+    // BE AccountFilter: role by name, isActive, pageSize at most 100.
+    if (method === "GET" && path === "/api/accounts") {
+      if (pageSize > 100) return send(400, { title: "Invalid filters." });
+      const items = mock.admins.filter((entry) => (!q.get("role") || entry.role === q.get("role")) && (q.get("isActive") === null || String(entry.isActive) === q.get("isActive")));
+      return send(200, { items, totalCount: items.length, page: 1, pageSize });
+    }
 
     // --- catalog -----------------------------------------------------------------------------------------------
     if (method === "GET" && path === "/api/billing/service-packages") return send(200, mock.packages);
@@ -360,6 +371,8 @@ export async function mockBilling(page: Page, mock: Mock) {
         const input = body as { status?: string; assignedTo?: string; clearAssignment?: boolean };
         if (input.status === "Contacted" && item.status !== "New") return send(409, { code: "BILLING_STATE_CONFLICT" });
         if (input.status) item.status = input.status;
+        // BE: assignedTo must be an active PlatformAdmin, else 400 with a field error.
+        if (input.assignedTo && !mock.admins.some((entry) => entry.id === input.assignedTo && entry.isActive)) return send(400, { code: "BILLING_VALIDATION_FAILED", title: "Assign an active PlatformAdmin.", errors: { assignedTo: ["Assign an active PlatformAdmin."] } });
         if (input.assignedTo) item.assignedTo = input.assignedTo;
         if (input.clearAssignment) item.assignedTo = null;
         item.revision += 1;
