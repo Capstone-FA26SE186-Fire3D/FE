@@ -12,6 +12,7 @@ export const routes = {
   organizations: "/organizations",
   about: "/about",
   privacy: "/privacy",
+  credits: "/credits",
   download: "/download",
   adminOverview: "/admin/overview",
   adminAccounts: "/admin/accounts",
