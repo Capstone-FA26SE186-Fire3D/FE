@@ -610,7 +610,8 @@ test.describe("decisions", () => {
     const server = new ReviewServer(baseSeeds());
     await install(page, server);
     await page.goto(`/admin/reviews?review=${server.reviews[0].summary.reviewId}`);
-    const navCount = page.getByRole("navigation", { name: "Quản trị hệ thống" }).getByRole("link", { name: /Duyệt kịch bản/ }).locator(".ops-nav-count");
+    // The open drawer hides the rest of the page from the accessibility tree, so the sidebar badge is found by its link.
+    const navCount = page.locator('a[href="/admin/reviews"] .ops-nav-count').first();
     await expect(navCount).toHaveText("2");
     await drawer(page).getByRole("button", { name: "Duyệt nội dung" }).click();
     const confirm = confirmDialog(page, "approve");
