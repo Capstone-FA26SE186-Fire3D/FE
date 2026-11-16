@@ -60,8 +60,11 @@ test.describe("PlatformAdmin runtime catalog", () => {
     const detail = page.getByTestId("runtime-detail");
     await expect(detail).toContainText("Nút báo cháy");
     await expect(detail).toContainText("Di chuyển của người chơi");
-    await expect(detail).toContainText("jumped");
+    await expect(detail).toContainText("Chấm điểm: Số lần nhảy"); // the scored metric by its plain name, not "jumped"
     await expect(detail).toContainText("press");
+    // Events and actions read as plain words; the code is only small print.
+    await expect(detail.getByTestId("rt-action").first()).toHaveText("Nhấn");
+    await expect(detail.getByTestId("rt-event").filter({ hasText: "Kích hoạt báo cháy" }).first()).toBeVisible();
     await expect(page).toHaveURL(/runtime=00000000-0000-4000-8000-000000000220/);
   });
 

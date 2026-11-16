@@ -6,7 +6,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, Select } from "@/components/ui/field";
 import { Skeleton } from "@/components/ui/skeleton";
-import { metricName } from "@/configs/metric-labels";
+import { metricHint, metricName, operatorLabel } from "@/configs/metric-labels";
 
 import { isObject, type JsonObject } from "../../store/json";
 import type { Issue } from "../../store/validation";
@@ -131,7 +131,7 @@ export function RubricGroup({ draft, issues, actions, catalog, pathPrefix = "$" 
             {at(path) && <span className="ops-field-error" role="alert">{at(path)}</span>}
             <div className="se-coord-grid">
               <TextField label="Mã tiêu chí" required value={typeof c.id === "string" ? c.id : ""} maxLength={view?.idMaxLength} error={at(`${path}.id`)} data-testid={`criterion-${index}-id`} onCommit={(value) => actions.setField(["rubric", "criteria", index, "id"], value, "Sửa mã tiêu chí")} />
-              <Field label="Chỉ số (metric)" required error={at(`${path}.metric`)} hint={known?.description}>
+              <Field label="Chỉ số chấm điểm" required error={at(`${path}.metric`)} hint={metric ? metricHint(metric) : undefined}>
                 {(props) => <Select {...props} data-testid={`criterion-${index}-metric`} value={metric} onChange={(event) => actions.setField(["rubric", "criteria", index, "metric"], event.target.value || undefined, "Chọn chỉ số", false)}>
                   <option value="">Chọn…</option>
                   {metric && !known && <option value={metric}>{metricName(metric)} (không có trong danh mục)</option>}
@@ -141,7 +141,7 @@ export function RubricGroup({ draft, issues, actions, catalog, pathPrefix = "$" 
               <Field label="Toán tử" required error={at(`${path}.operator`)}>
                 {(props) => <Select {...props} data-testid={`criterion-${index}-operator`} value={typeof c.operator === "string" ? c.operator : ""} onChange={(event) => actions.setField(["rubric", "criteria", index, "operator"], event.target.value || undefined, "Sửa toán tử", false)}>
                   <option value="">Chọn…</option>
-                  {(view?.operators.length ? view.operators : [...RUBRIC_OPERATORS]).map((operator) => <option key={operator} value={operator}>{operator}</option>)}
+                  {(view?.operators.length ? view.operators : [...RUBRIC_OPERATORS]).map((operator) => <option key={operator} value={operator}>{operatorLabel(operator)}</option>)}
                 </Select>}
               </Field>
               <NumberField label="Ngưỡng" required data-testid={`criterion-${index}-threshold`} value={typeof c.threshold === "number" ? c.threshold : undefined} error={at(`${path}.threshold`)} onCommit={(value) => actions.setField(["rubric", "criteria", index, "threshold"], value, "Sửa ngưỡng")} />

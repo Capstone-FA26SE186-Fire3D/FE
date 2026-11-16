@@ -526,6 +526,23 @@ test.describe("participation access", () => {
     expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }).includes("ONE-TIME-CODE"))).toBe(false);
   });
 
+  test("after changing the access mode the building header shows the new mode without a reload", async ({ page }) => {
+    await signIn(page);
+    await mockBuilding(page);
+    let visibility = "Private";
+    await page.route("**/api/buildings/building-1/access", async (route) => {
+      if (route.request().method() === "PATCH") visibility = (route.request().postDataJSON() as { visibility: string }).visibility;
+      return route.fulfill({ json: { buildingId: "building-1", visibility, accessRevision: visibility === "Public" ? 4 : 3, hasParticipationCode: true }, headers: { ETag: visibility === "Public" ? '"access-4"' : '"access-3"' } });
+    });
+    await page.goto("/workspace/buildings/building-1?tab=access");
+    await expect(page.getByTestId("building-visibility")).toHaveText("Riêng tư");
+    await pickOption(page, "Chế độ truy cập", "Công khai (chỉ cần đăng nhập)");
+    await page.getByRole("button", { name: "Áp dụng chế độ" }).click();
+    await page.getByRole("button", { name: "Đổi chế độ" }).click();
+    await expect(page.getByText("Đã đổi chế độ truy cập")).toBeVisible();
+    await expect(page.getByTestId("building-visibility")).toHaveText("Công khai");
+  });
+
   test("changing visibility and revoking need confirmation; a 412 asks to reload and applies nothing", async ({ page }) => {
     await signIn(page);
     await mockBuilding(page);

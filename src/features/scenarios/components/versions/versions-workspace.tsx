@@ -24,7 +24,7 @@ import type { JourneyInput } from "../../journey";
 import { useVersionJobs } from "../../use-version-jobs";
 import { useVersionServerState } from "../../use-version-server-state";
 import { approvalGate, describeError, isJobTerminal, releaseGate, shortHash, technicalGate } from "../../version-readiness";
-import type { ScenarioDetail, ScenarioVersionDetail, ScenarioVersionSummary } from "../../version-types";
+import type { ContentReviewSubmission, ScenarioDetail, ScenarioVersionDetail, ScenarioVersionSummary } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
 import { GateStepper } from "./gate-stepper";
 import { JourneyPanel } from "./journey-panel";
@@ -94,13 +94,13 @@ function Workbench({ accessToken, buildingId, scenario, versionCount, editorHref
   onPlaytestId: (id: string) => void;
   onSnapshot: () => void;
   /** A command changed server state the page header/list also shows (review status): reload version detail and list. */
-  onVersionChanged: () => void;
+  onVersionChanged: (submission?: ContentReviewSubmission) => void;
 }) {
   const server = useVersionServerState({ accessToken, version });
   const readiness = server.readiness.data;
   const jobs = useVersionJobs({ accessToken, revisionId: version.revisionId, versionId: version.id, preferredJobId: readiness?.packageJob?.jobId });
   const playtestPackage = usePlaytestPackage({ accessToken, revisionId: version.revisionId, versionId: version.id });
-  const refreshAll = () => { server.refresh(); onVersionChanged(); };
+  const refreshAll = (submission?: ContentReviewSubmission) => { server.refresh(); onVersionChanged(submission); };
   // When the watched build finishes (or its check result arrives) the server's readiness and the playtest package change:
   // read them again so "Còn thiếu gì" never keeps saying the package is missing after it passed.
   const outcomeKey = `${jobs.detail?.job.status ?? ""}:${jobs.verdict?.kind ?? ""}`;
@@ -198,7 +198,16 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
   const tab: TabId = (TABS as readonly string[]).includes(rawTab) ? (rawTab as TabId) : "content";
 
   const detail = useAsyncData(`version:${selectedId}`, (signal) => scenarioVersionsApi.getVersion(token, selectedId, signal), enabled && Boolean(selectedId));
-  const detailForSelection = detail.data && detail.data.id === selectedId ? detail.data : undefined;
+  // The submit response says the version is now under review; until the re-read reports it (a slow or failed read would
+  // leave "Chưa gửi duyệt" and an enabled button on screen), the page shows that state. The server's answer wins as soon
+  // as it says anything other than "not submitted".
+  const [submittedHere, setSubmittedHere] = useState<{ versionId: string; submission: ContentReviewSubmission } | null>(null);
+  const detailForSelection = useMemo(() => {
+    const server = detail.data && detail.data.id === selectedId ? detail.data : undefined;
+    if (!server || submittedHere?.versionId !== server.id) return server;
+    const pending = !server.reviewStatus || server.reviewStatus.toLowerCase() === "notsubmitted";
+    return pending ? { ...server, reviewStatus: submittedHere.submission.status || "Submitted", reviewId: submittedHere.submission.reviewId } : server;
+  }, [detail.data, selectedId, submittedHere]);
   const selected: ScenarioVersionSummary | undefined = detailForSelection ?? items.find((item) => item.id === selectedId);
 
   const canAct = user?.role === 1 || user?.role === 0;
@@ -214,7 +223,11 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
 
   const reloadAll = () => { versions.reload(); detail.reload(); scenario.reload(); };
-  const reloadVersion = () => { versions.reload(); detail.reload(); };
+  const reloadVersion = (submission?: ContentReviewSubmission) => {
+    if (submission && selectedId) setSubmittedHere({ versionId: selectedId, submission });
+    versions.reload();
+    detail.reload();
+  };
   const openSnapshot = () => setSnapshotOpen(true);
   const selectedGate = selected ? approvalGate(selected.reviewStatus, selected.rejectReason) : undefined;
 

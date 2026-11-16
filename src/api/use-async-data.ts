@@ -30,7 +30,19 @@ export type AsyncDataOptions = {
    * shows. Pass true for a report that deliberately keeps its last numbers under a warning (analytics).
    */
   keepWhenDenied?: boolean;
+  /**
+   * Names other screens use to say "what you show changed" (`invalidateAsyncData("admin-review-queue")`): a header badge,
+   * a sidebar count or a dialog read the same server state through their own query, and a command elsewhere re-reads them.
+   */
+  tags?: readonly string[];
 };
+
+const invalidationListeners = new Set<(tag: string) => void>();
+
+/** Re-reads every mounted `useAsyncData` that lists one of these tags (after a command changed what they show). */
+export function invalidateAsyncData(...tags: string[]) {
+  for (const tag of tags) for (const listener of [...invalidationListeners]) listener(tag);
+}
 
 /**
  * Loads data for a screen. `key` identifies the query (route + filters): when it changes the previous
@@ -51,10 +63,18 @@ export function useAsyncData<T>(key: string, load: (signal: AbortSignal) => Prom
   const [settledKey, setSettledKey] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
   const loadRef = useRef(load);
+  const tagsRef = useRef(options.tags);
 
   useEffect(() => {
     loadRef.current = load;
+    tagsRef.current = options.tags;
   });
+
+  useEffect(() => {
+    const listener = (tag: string) => { if (tagsRef.current?.includes(tag)) setReloadToken((token) => token + 1); };
+    invalidationListeners.add(listener);
+    return () => { invalidationListeners.delete(listener); };
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;

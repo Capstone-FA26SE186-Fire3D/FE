@@ -610,11 +610,14 @@ test.describe("decisions", () => {
     const server = new ReviewServer(baseSeeds());
     await install(page, server);
     await page.goto(`/admin/reviews?review=${server.reviews[0].summary.reviewId}`);
+    const navCount = page.getByRole("navigation", { name: "Quản trị hệ thống" }).getByRole("link", { name: /Duyệt kịch bản/ }).locator(".ops-nav-count");
+    await expect(navCount).toHaveText("2");
     await drawer(page).getByRole("button", { name: "Duyệt nội dung" }).click();
     const confirm = confirmDialog(page, "approve");
     await confirm.getByTestId("confirm-decision").dblclick();
     await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Approved");
     expect(server.decisionRequests).toHaveLength(1);
+    await expect(navCount).toHaveText("1"); // the sidebar badge follows the decision without a reload
   });
 });
 

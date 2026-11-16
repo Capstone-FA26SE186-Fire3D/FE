@@ -149,6 +149,10 @@ test("places all six kinds, fills capability/parameter forms from the catalog, s
   await expect(page.getByTestId("save")).toBeDisabled();
   await page.getByTestId("criterion-0-id").fill("reached-exit");
   await page.getByTestId("criterion-0-metric").selectOption("reached_exit");
+  // The metric is explained in plain Vietnamese, never with the catalog's English text; operators read as words.
+  await expect(page.getByTestId("criterion-0")).toContainText("Bằng 1 khi học viên ra tới lối thoát");
+  await expect(page.getByTestId("criterion-0")).not.toContainText("when the trainee reached");
+  await expect(page.getByTestId("criterion-0-operator").locator("option[value=gte]")).toHaveText("≥ (từ ngưỡng trở lên)");
   await page.getByTestId("criterion-0-operator").selectOption("eq");
   await page.getByTestId("criterion-0-threshold").fill("1");
   await page.getByTestId("criterion-0-weight").fill("1");

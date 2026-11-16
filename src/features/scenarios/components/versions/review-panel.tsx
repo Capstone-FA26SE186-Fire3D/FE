@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
 
 import { approvalGate, describeError, type DescribedError } from "../../version-readiness";
-import type { ScenarioVersionDetail, VersionReview } from "../../version-types";
+import type { ContentReviewSubmission, ScenarioVersionDetail, VersionReview } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
 import { SupportCode } from "@/components/ui/support-code";
 import { formatDateTime } from "./version-content";
@@ -28,7 +28,8 @@ export function ReviewPanel({ accessToken, version, review, canSubmit, onSubmitt
   version: ScenarioVersionDetail;
   review: AsyncData<VersionReview>;
   canSubmit: boolean;
-  onSubmitted: () => void;
+  /** After a submit (with its response) or after the server said it was already submitted: re-read the version. */
+  onSubmitted: (submission?: ContentReviewSubmission) => void;
 }) {
   const toast = useToast();
   const { keyFor, done } = useIdempotencyKey();
@@ -46,10 +47,10 @@ export function ReviewPanel({ accessToken, version, review, canSubmit, onSubmitt
     setBusy(true);
     setError(null);
     try {
-      await scenarioVersionsApi.submitForReview(accessToken, version.id, keyFor({ versionId: version.id }));
+      const submission = await scenarioVersionsApi.submitForReview(accessToken, version.id, keyFor({ versionId: version.id }));
       done();
       setConfirming(false);
-      onSubmitted();
+      onSubmitted(submission);
       toast.notify({ tone: "success", title: "Đã gửi duyệt", description: "Nội dung và tiêu chí chấm của phiên bản này đã gửi cho quản trị FET3D." });
     } catch (cause) {
       const described = describeError(cause, "Không gửi duyệt được.");

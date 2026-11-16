@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog, Modal } from "@/components/ui/dialog";
@@ -50,6 +50,7 @@ export function NewPostModal({ accessToken, onClose, onCreated }: { accessToken:
   const [form, setForm] = useState<EditorContent>(() => ({ ...emptyContent(), blocks: [newBlock("paragraph")] }));
   // The slug follows the title until the author types one.
   const [typedSlug, setTypedSlug] = useState<string | null>(null);
+  const slugSelectedOnFocus = useRef(false);
   const slug = typedSlug ?? slugFromTitle(form.title);
   const [publishNow, setPublishNow] = useState(false);
   const [showIssues, setShowIssues] = useState(false);
@@ -116,7 +117,13 @@ export function NewPostModal({ accessToken, onClose, onCreated }: { accessToken:
         {showIssues && (clientIssues.length > 0 || checkSlug(slug)) && <Alert tone="danger" title="Còn điểm cần sửa trước khi tạo bài"><ul style={{ margin: 0, paddingLeft: 18, listStyle: "disc" }}>{checkSlug(slug) && <li>{checkSlug(slug)}</li>}{clientIssues.map((issue, index) => <li key={`${issue.path}-${index}`}>{issue.message}</li>)}</ul></Alert>}
         <ContentFields accessToken={accessToken} form={form} onChange={setKindBlocks} readOnly={false} busy={busy} issues={shown} compact
           slugField={<Field label="Đường dẫn rút gọn" required hint="Tự tạo từ tiêu đề; sửa nếu muốn. Chữ thường không dấu, số và dấu gạch ngang; không đổi được sau khi tạo." error={showIssues || error?.code === "SLUG_EXISTS" ? slugProblem : undefined}>
-            {(p) => <div className="newpost-slug"><span aria-hidden="true">fet3d.io.vn/learn/</span><Input {...p} maxLength={180} value={slug} onChange={(event) => { setTypedSlug(event.target.value.toLowerCase()); if (error?.code === "SLUG_EXISTS") setError(null); }} /></div>}
+            {(p) => <div className="newpost-slug"><span aria-hidden="true">fet3d.io.vn/learn/</span><Input {...p} maxLength={180} value={slug} data-auto={typedSlug === null || undefined}
+              // While the slug still follows the title, entering the field selects it, so what the author types replaces
+              // the suggestion instead of being appended to it. The click that focused it must not drop that selection.
+              onFocus={(event) => { if (typedSlug === null) { event.currentTarget.select(); slugSelectedOnFocus.current = true; } }}
+              onMouseUp={(event) => { if (slugSelectedOnFocus.current) { slugSelectedOnFocus.current = false; event.preventDefault(); } }}
+              onBlur={() => { slugSelectedOnFocus.current = false; }}
+              onChange={(event) => { setTypedSlug(event.target.value.toLowerCase()); if (error?.code === "SLUG_EXISTS") setError(null); }} /></div>}
           </Field>} />
         <fieldset disabled={busy} className="ops-stack" style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
           {paragraph && <Field label="Đoạn mở đầu" required hint="Khối đoạn văn đầu tiên của bài (văn bản thuần). Thêm tiêu đề phụ, danh sách, ảnh và video trong trình soạn." error={issueFor("$.blocks[0].text") ?? issueFor("$.blocks")}>

@@ -99,3 +99,6 @@ export function describeReadError(error: unknown, what: "queue" | "detail"): Rea
   }
   return { title, message: "Không kết nối được tới máy chủ. Kiểm tra kết nối rồi thử lại.", denied: false };
 }
+
+/** Tag of reads that count the review queue (sidebar badge): re-read after a decision (`invalidateAsyncData`). */
+export const REVIEW_QUEUE_TAG = "admin-review-queue";

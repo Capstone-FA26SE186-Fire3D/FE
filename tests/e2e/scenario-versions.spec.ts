@@ -406,7 +406,10 @@ test.describe("package build and technical readiness", () => {
     await expect(page.getByText("Kiểm tra đạt", { exact: true }).first()).toBeVisible();
     await expect(page.locator("[data-gate=approval]")).toContainText("Chưa gửi duyệt");
     await expect(page.getByTestId("readiness-missing").locator('[data-code="CONFIRMATION_REQUIRED"]')).toHaveCount(1);
-    await page.getByRole("tabpanel", { name: "Kiểm tra", exact: true }).getByRole("button", { name: "Chốt gói phát hành" }).click();
+    // One real "Chốt gói phát hành" button on the page; the journey's next step only navigates.
+    await expect(page.getByRole("button", { name: "Chốt gói phát hành" })).toHaveCount(1);
+    await expect(page.getByTestId("journey").getByRole("button", { name: "Mở Kiểm tra" })).toBeVisible();
+    await page.getByRole("button", { name: "Chốt gói phát hành" }).click();
     await expect(page.getByTestId("confirm-review-id")).toHaveText(IDS.confirm);
     expect(mock.confirmBody).toEqual({ scenarioVersionId: IDS.version, validationRunId: IDS.run });
     await expect(page.locator("[data-gate=technical]")).toContainText("Đã chốt gói");
@@ -430,6 +433,7 @@ test.describe("review and release", () => {
     await expect(page.getByText("phiên bản mới", { exact: false }).first()).toBeVisible();
     await expect(page.getByText("phải được duyệt lại")).toBeVisible();
     await expect(page.locator("[data-gate=approval]")).toContainText("Chưa gửi duyệt");
+    await expect(page.getByRole("button", { name: "Gửi duyệt", exact: true })).toHaveCount(1); // the journey says "Mở Gửi duyệt"
     await page.getByRole("button", { name: "Gửi duyệt", exact: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Gửi duyệt", exact: true }).click();
     await expect(page.getByTestId("review-id")).toHaveText(IDS.review);
@@ -445,6 +449,20 @@ test.describe("review and release", () => {
     await expect(page.locator("[data-gate=approval]")).toContainText("Đã gửi, chờ duyệt");
     await expect(page.getByRole("button", { name: "Gửi duyệt", exact: true })).toBeDisabled();
     expect(await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.includes("version-memory")))).toEqual([]);
+  });
+
+  test("after Gửi duyệt the page shows the submitted state at once, even when the version re-read still lags", async ({ page }) => {
+    const mock = newMock();
+    await setup(page, mock);
+    // The version read keeps answering "not submitted" (a lagging read): the submit response alone must update the page.
+    await page.route(`**/api/scenario-versions/${IDS.version}`, (route) => route.fulfill({ json: { ...versionBase, ...versionExtra, reviewStatus: "NotSubmitted", reviewId: null, rejectReason: null } }));
+    await page.goto(`${base}?tab=review`);
+    await expect(page.locator("[data-gate=approval]")).toContainText("Chưa gửi duyệt");
+    await page.getByRole("button", { name: "Gửi duyệt", exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Gửi duyệt", exact: true }).click();
+    await expect(page.locator("[data-gate=approval]")).toContainText("Đã gửi, chờ duyệt");
+    await expect(page.getByRole("button", { name: "Gửi duyệt", exact: true })).toBeDisabled();
+    await expect(page.getByTestId("review-id")).toHaveText(IDS.review);
   });
 
   test("a rejection and its reason are shown after reload; the version list carries the review badge", async ({ page }) => {

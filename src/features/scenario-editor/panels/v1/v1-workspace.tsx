@@ -309,7 +309,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
       <Button asChild variant="secondary" size="sm"><Link href={listHref} aria-label="Về danh sách kịch bản"><ChevronLeft size={16} aria-hidden="true" />Kịch bản</Link></Button>
       <div className="se-title">
         <h1>{readString(state.draft, "name") || scenario.data?.name || "Soạn kịch bản"}</h1>
-        <p>Bản nháp #{meta.draftNumber} · <StatusBadge tone="info" data-testid="schema-badge">Soạn trên mô hình 3D</StatusBadge>{activeFloorV1 ? <> · {activeFloorV1.name}</> : null}</p>
+        <p>Bản nháp #{meta.draftNumber} · <StatusBadge tone="info" data-testid="schema-badge">Soạn trên mô hình 3D</StatusBadge>{activeFloorV1 ? <> · <span data-testid="active-floor">Tầng đang soạn: {activeFloorV1.name}</span></> : null}</p>
       </div>
       <V1Actions status={status} saveBlockedReason={saveBlockedReason} onSave={() => void onSave()} onValidate={() => void onValidate()} validating={editor.validating} versionsHref={versionsHref} />
     </header>
