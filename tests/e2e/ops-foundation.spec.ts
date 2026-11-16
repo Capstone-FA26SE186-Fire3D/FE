@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 import { parseFieldErrors, parseRetryAfter } from "../../src/api/errors";
 import { stableStringify } from "../../src/api/idempotency";
@@ -9,7 +10,7 @@ const admin = { id: "admin", email: "admin@fire3d.test", fullName: "Platform Adm
 
 async function signIn(page: Page, user: typeof owner | typeof admin) {
   await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" })));
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ...EXPOSED, ETag: '"1"' } }));
 }
 
 const buildings = Array.from({ length: 3 }, (_, index) => ({ id: `b-${index}`, name: `Công trình ${index + 1}`, buildingType: "Trường học", totalFloors: 3, isActive: true, createdAt: "2026-10-05T00:00:00Z" }));

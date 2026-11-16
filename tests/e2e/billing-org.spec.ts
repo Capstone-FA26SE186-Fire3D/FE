@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test } from "@playwright/test";
 import { admin, callsTo, checkoutFixture, ids, iso, mockBilling, newMock, owner, paymentFixture, quotationFixture, queue, seedCheckout, signIn } from "./billing-mock";
 
@@ -242,7 +243,7 @@ test.describe("organization billing workspace (mock)", () => {
     mock.quotations[ids.quote] = quotationFixture({ status: "Accepted", acceptedAt: iso(-0.1), revision: 5 });
     await signIn(page, owner);
     await mockBilling(page, mock);
-    queue(mock, `GET /api/payments/payos/requests/${ids.payment}`, { status: 429, json: {}, headers: { "Retry-After": "2" } });
+    queue(mock, `GET /api/payments/payos/requests/${ids.payment}`, { status: 429, json: {}, headers: { ...EXPOSED, "Retry-After": "2" } });
     await page.goto(`/workspace/billing?quotation=${ids.quote}&payment=${ids.payment}`);
     await expect(page.getByTestId("payment-status")).toBeVisible({ timeout: 15_000 });
     const before = callsTo(mock, "GET", `/api/payments/payos/requests/${ids.payment}`).length;
@@ -278,7 +279,7 @@ test.describe("organization billing workspace (mock)", () => {
     mock.quotations[ids.quote] = quotationFixture({ status: "Accepted", acceptedAt: iso(-0.1), revision: 5 });
     await signIn(page, owner);
     await mockBilling(page, mock);
-    queue(mock, "POST /api/payments/payos/create", { status: 409, json: { code: "IDEMPOTENCY_KEY_CONFLICT", title: "used" } }, { status: 409, json: { code: "ZERO_AMOUNT_NOT_SUPPORTED", title: "zero" } }, { status: 429, json: {}, headers: { "Retry-After": "12" } });
+    queue(mock, "POST /api/payments/payos/create", { status: 409, json: { code: "IDEMPOTENCY_KEY_CONFLICT", title: "used" } }, { status: 409, json: { code: "ZERO_AMOUNT_NOT_SUPPORTED", title: "zero" } }, { status: 429, json: {}, headers: { ...EXPOSED, "Retry-After": "12" } });
     await page.goto(`/workspace/billing?quotation=${ids.quote}`);
     const pay = page.getByRole("button", { name: /Thanh toán qua PayOS|Thử lại thanh toán/ });
     await pay.click();

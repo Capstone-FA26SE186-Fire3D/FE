@@ -60,3 +60,11 @@ test("an article offers saving, and the hub Q&A opens after sign-in", async ({ p
   await expect(page.getByRole("link", { name: /^Trợ lý AI/ }).first()).toBeVisible();
   expect(await page.evaluate(() => sessionStorage.getItem("fire3d-prototype-content"))).toBeNull();
 });
+
+test("the area roots open their first screen instead of a 404", async ({ request }) => {
+  for (const [from, to] of [["/admin", "/admin/overview"], ["/workspace", "/workspace/buildings"]]) {
+    const response = await request.get(from, { maxRedirects: 0 });
+    expect(response.status()).toBe(307);
+    expect(response.headers()["location"]).toBe(to);
+  }
+});

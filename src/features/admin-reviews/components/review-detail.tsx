@@ -3,7 +3,7 @@
 import { CircleCheck, CircleX, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { useIdempotencyKey } from "@/api/idempotency";
-import { useAsyncData } from "@/api/use-async-data";
+import { invalidateAsyncData, useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/dialog";
@@ -11,7 +11,7 @@ import { SkeletonDetail } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { useToast } from "@/components/ui/toast";
 import { formatDateTime } from "@/utils/date-range";
-import { describeReadError, reviewsApi, type DecisionFailure } from "../api";
+import { describeReadError, REVIEW_QUEUE_TAG, reviewsApi, type DecisionFailure } from "../api";
 import { shortId, statusLabel, statusTone } from "../format";
 import type { ContentReviewDecision, ReviewAction, ReviewSummary } from "../types";
 import { DecisionDialog } from "./decision-dialog";
@@ -63,6 +63,7 @@ export function ReviewDrawer({ open, reviewId, accessToken, summary, onChanged, 
     if (data) toast.notify({ tone: "success", title: result.status === "Approved" ? "Đã duyệt nội dung" : "Đã từ chối phiên bản", description: `${data.review.scenarioName} · v${data.review.versionNumber}` });
     detail.reload();
     onChanged();
+    invalidateAsyncData(REVIEW_QUEUE_TAG);
   };
 
   const handleStale = (failure: DecisionFailure) => {
@@ -70,6 +71,7 @@ export function ReviewDrawer({ open, reviewId, accessToken, summary, onChanged, 
     setNotice({ tone: "warning", title: "Quyết định chưa được ghi", text: failure.message });
     detail.reload();
     onChanged();
+    invalidateAsyncData(REVIEW_QUEUE_TAG);
   };
 
   const title = review ? review.scenarioName : readFailure ? readFailure.title : "Đang tải bản duyệt…";

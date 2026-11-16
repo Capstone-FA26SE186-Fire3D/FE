@@ -174,6 +174,9 @@ test.describe("rubric sample lifecycle", () => {
     await page.getByTestId("add-criterion").click();
     await page.getByTestId("criterion-0-id").fill("reached-exit");
     await page.getByTestId("criterion-0-metric").selectOption("reached_exit");
+    await expect(page.getByTestId("criterion-0")).toContainText("Bằng 1 khi học viên ra tới lối thoát");
+    await expect(page.getByTestId("criterion-0")).not.toContainText("when the trainee reached");
+    await expect(page.getByTestId("criterion-0-operator").locator("option[value=eq]")).toHaveText("= (đúng bằng ngưỡng)");
     await page.getByTestId("criterion-0-operator").selectOption("eq");
     await page.getByTestId("criterion-0-threshold").fill("1");
     await page.getByTestId("criterion-0-weight").fill("1");
@@ -219,6 +222,8 @@ test.describe("rubric sample lifecycle", () => {
     await page.getByTestId("publish-version").click();
     await page.getByTestId("confirm-publish").click();
     await expect(page.getByText("Đã xuất bản phiên bản")).toBeVisible();
+    // the dialog header follows the publish at once (no reload)
+    await expect(page.getByTestId("version-status-badge")).toHaveText("Đã xuất bản");
     const publishCalls = backend.callsTo("POST", /\/publish$/);
     expect(publishCalls).toHaveLength(1);
     expect(publishCalls[0].headers["if-match"]).toBe('"3"');

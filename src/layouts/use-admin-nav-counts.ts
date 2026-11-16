@@ -1,7 +1,7 @@
 "use client";
 
 import { useAsyncData } from "@/api/use-async-data";
-import { reviewsApi } from "@/features/admin-reviews/api";
+import { REVIEW_QUEUE_TAG, reviewsApi } from "@/features/admin-reviews/api";
 import { supportApi } from "@/features/support/api";
 
 /**
@@ -19,7 +19,7 @@ export function useAdminNavCounts(accessToken: string | null, enabled: boolean):
       return { "/admin/reviews": reviews?.totalCount, "/admin/support": tickets?.total } as Record<string, number | undefined>;
     },
     enabled && Boolean(accessToken),
-    { keepPrevious: true },
+    { keepPrevious: true, tags: [REVIEW_QUEUE_TAG] },
   );
   return counts.data ?? {};
 }

@@ -2,7 +2,7 @@
 
 import { Copy, KeyRound, Lock, RefreshCw, ShieldOff } from "lucide-react";
 import { useRef, useState } from "react";
-import { useAsyncData } from "@/api/use-async-data";
+import { invalidateAsyncData, useAsyncData } from "@/api/use-async-data";
 import { ApiError } from "@/api/types/common";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,9 @@ const visibilityOptions = [
  * Figma "Truy cập · Quyền tham gia": left card = mode + apply; right card = participation code (create / rotate / revoke,
  * the new code shown once in its own dialog). Every change sends If-Match "access-<n>" and asks for confirmation first.
  */
+/** Tag of every read of one building's access settings (`invalidateAsyncData`). */
+export const buildingAccessTag = (buildingId: string) => `building-access:${buildingId}`;
+
 export function BuildingAccessPanel({ accessToken, buildingId }: { accessToken: string; buildingId: string }) {
   const toast = useToast();
   const busy = useRef(false);
@@ -77,6 +80,8 @@ export function BuildingAccessPanel({ accessToken, buildingId }: { accessToken: 
       setStale(false);
       setShownCode(pending.kind === "rotate" && code ? code : null);
       setPending(null);
+      // The building header shows the access mode from its own read: tell it to read again.
+      invalidateAsyncData(buildingAccessTag(buildingId));
       toast.notify({ tone: "success", title: pending.kind === "rotate" ? "Đã tạo mã tham gia mới" : pending.kind === "revoke" ? "Đã thu hồi mã tham gia" : "Đã đổi chế độ truy cập", description: "Quyền cũ của học viên đã bị vô hiệu." });
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 412) {

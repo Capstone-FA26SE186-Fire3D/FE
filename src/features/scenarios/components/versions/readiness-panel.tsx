@@ -172,7 +172,7 @@ export function ReadinessPanel({ accessToken, version, jobs, readiness, canAct, 
         </>}
       </Panel>
 
-      <Panel title="Chốt gói phát hành" description="Bạn xác nhận dùng đúng gói vừa kiểm tra đạt này khi tạo bản phát hành. Đây không phải duyệt nội dung: phần đó do quản trị FET3D làm ở tab Gửi duyệt." bodyClassName="ops-stack">
+      <Panel title="Xác nhận gói để phát hành" description="Bạn xác nhận dùng đúng gói vừa kiểm tra đạt này khi tạo bản phát hành. Đây không phải duyệt nội dung: phần đó do quản trị FET3D làm ở tab Gửi duyệt." bodyClassName="ops-stack">
         {confirmedId && <Alert tone="success" title="Đã chốt gói">
           Tab Phát hành sẽ dùng đúng gói này. Muốn đổi gói, hãy tạo phiên bản mới và dựng lại.
           <details className="support-code"><summary>Thông tin cho bộ phận hỗ trợ</summary><span>Mã chốt: <code className="ver-hash" data-testid="confirm-review-id">{confirmedId}</code></span></details>

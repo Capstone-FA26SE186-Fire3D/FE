@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { sha256OfFile } from "../../src/features/buildings/sha256";
 import { classifyUploadError, IfcPutError, uploadIfcRevision } from "../../src/features/buildings/ifc-upload";
@@ -19,7 +20,7 @@ async function signIn(page: Page, user: typeof owner | typeof admin = owner) {
     sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" }));
     localStorage.setItem("fire3d-org-tour", "done"); // the spotlight tour must never cover the page under test
   });
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ...EXPOSED, ETag: '"1"' } }));
 }
 
 /** Combobox (`src/components/ui/combobox.tsx`): a `button[role=combobox]` that opens a cmdk list; picks an option by its text. */
@@ -39,7 +40,7 @@ type Mock = { revisions?: unknown[]; jobs?: () => unknown[]; qa?: unknown; issue
 
 /** Default happy-path mocks; each test overrides the routes it cares about (later routes win). */
 async function mockBuilding(page: Page, mock: Mock = {}) {
-  await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ETag: '"3"' } }));
+  await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ...EXPOSED, ETag: '"3"' } }));
   await page.route("**/api/buildings/building-1/revisions?*", (route) => route.fulfill({ json: page1(mock.revisions ?? [rev2, rev1]) }));
   await page.route("**/api/buildings/building-1/scenarios?*", (route) => route.fulfill({ json: page1(mock.scenarios ?? []) }));
   await page.route("**/api/scenarios/*/versions?*", (route) => route.fulfill({ json: page1([]) }));
@@ -54,7 +55,7 @@ async function mockBuilding(page: Page, mock: Mock = {}) {
   await page.route("**/api/buildings/building-1/editor-preview?*", (route) => route.fulfill({ json: mock.preview ?? { buildingId: "building-1", revisionId: "rev-2", revisionStatus: "Uploaded", status: "NotReady", artifactId: null, attemptId: null, sha256Hash: null, downloadUrl: null, expiresAt: null, coordinateTransform: null, floors: null, semanticMapping: null } }));
   await page.route("**/api/revisions/*/equipment-candidates", (route) => route.fulfill({ status: 409, contentType: "application/problem+json", body: JSON.stringify({ status: 409, title: "unavailable", code: "EQUIPMENT_CANDIDATES_UNAVAILABLE" }) }));
   await page.route("**/api/scenario-interactions/catalog", (route) => route.fulfill({ json: [] }));
-  await page.route("**/api/buildings/building-1/access", (route) => route.fulfill({ json: { buildingId: "building-1", visibility: "Private", accessRevision: 3, hasParticipationCode: true }, headers: { ETag: '"access-3"' } }));
+  await page.route("**/api/buildings/building-1/access", (route) => route.fulfill({ json: { buildingId: "building-1", visibility: "Private", accessRevision: 3, hasParticipationCode: true }, headers: { ...EXPOSED, ETag: '"access-3"' } }));
 }
 
 const job = (status: string, id = "job-1") => ({ id, revisionId: "rev-2", sourceDocumentId: "src-2", scenarioVersionId: null, kind: "Geometry", status, createdAt: "2026-10-02T01:00:00Z" });
@@ -138,7 +139,7 @@ test.describe("IFC upload stepper", () => {
       const request = route.request();
       log.initiates.push({ key: request.headers()["idempotency-key"], body: request.postDataJSON() });
       const failure = options.initiateFailures?.[failureIndex++];
-      if (failure) return route.fulfill({ status: failure.status, headers: failure.retryAfter ? { "Retry-After": failure.retryAfter } : {}, json: { title: "x", code: failure.code } });
+      if (failure) return route.fulfill({ status: failure.status, headers: failure.retryAfter ? { ...EXPOSED, "Retry-After": failure.retryAfter } : {}, json: { title: "x", code: failure.code } });
       return route.fulfill({ status: 201, json: { revisionId: "rev-new", uploadUrl: `${baseURL}${storagePath}?sig=${log.initiates.length}`, objectKey: "staging/key" } });
     });
     await page.route(`**${storagePath}*`, async (route: Route) => {
@@ -507,7 +508,7 @@ test.describe("participation access", () => {
     const rotate: Array<string | undefined> = [];
     await page.route("**/api/buildings/building-1/participation-code/rotate", async (route) => {
       rotate.push(route.request().headers()["if-match"]);
-      await route.fulfill({ json: { buildingId: "building-1", visibility: "Private", accessRevision: 4, hasParticipationCode: true, code: "ONE-TIME-CODE-abc123" }, headers: { ETag: '"access-4"' } });
+      await route.fulfill({ json: { buildingId: "building-1", visibility: "Private", accessRevision: 4, hasParticipationCode: true, code: "ONE-TIME-CODE-abc123" }, headers: { ...EXPOSED, ETag: '"access-4"' } });
     });
     await page.goto("/workspace/buildings/building-1?tab=access");
     await page.getByRole("button", { name: "Tạo mã mới" }).click();
@@ -526,13 +527,30 @@ test.describe("participation access", () => {
     expect(await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }).includes("ONE-TIME-CODE"))).toBe(false);
   });
 
+  test("after changing the access mode the building header shows the new mode without a reload", async ({ page }) => {
+    await signIn(page);
+    await mockBuilding(page);
+    let visibility = "Private";
+    await page.route("**/api/buildings/building-1/access", async (route) => {
+      if (route.request().method() === "PATCH") visibility = (route.request().postDataJSON() as { visibility: string }).visibility;
+      return route.fulfill({ json: { buildingId: "building-1", visibility, accessRevision: visibility === "Public" ? 4 : 3, hasParticipationCode: true }, headers: { ...EXPOSED, ETag: visibility === "Public" ? '"access-4"' : '"access-3"' } });
+    });
+    await page.goto("/workspace/buildings/building-1?tab=access");
+    await expect(page.getByTestId("building-visibility")).toHaveText("Riêng tư");
+    await pickOption(page, "Chế độ truy cập", "Công khai (chỉ cần đăng nhập)");
+    await page.getByRole("button", { name: "Áp dụng chế độ" }).click();
+    await page.getByRole("button", { name: "Đổi chế độ" }).click();
+    await expect(page.getByText("Đã đổi chế độ truy cập")).toBeVisible();
+    await expect(page.getByTestId("building-visibility")).toHaveText("Công khai");
+  });
+
   test("changing visibility and revoking need confirmation; a 412 asks to reload and applies nothing", async ({ page }) => {
     await signIn(page);
     await mockBuilding(page);
     const patches: Array<{ ifMatch: string | undefined; body: unknown }> = [];
     await page.route("**/api/buildings/building-1/access", async (route) => {
       if (route.request().method() === "PATCH") { patches.push({ ifMatch: route.request().headers()["if-match"], body: route.request().postDataJSON() }); return route.fulfill({ status: 412, json: { title: "stale", code: "PRECONDITION_FAILED" } }); }
-      return route.fulfill({ json: { buildingId: "building-1", visibility: "Private", accessRevision: 3, hasParticipationCode: true }, headers: { ETag: '"access-3"' } });
+      return route.fulfill({ json: { buildingId: "building-1", visibility: "Private", accessRevision: 3, hasParticipationCode: true }, headers: { ...EXPOSED, ETag: '"access-3"' } });
     });
     let revokes = 0;
     await page.route("**/api/buildings/building-1/participation-code", async (route) => { revokes++; await route.fulfill({ json: { buildingId: "building-1", visibility: "Private", accessRevision: 4, hasParticipationCode: false } }); });
@@ -592,11 +610,11 @@ test.describe("journey info card edit", () => {
     const ifMatch: Array<string | undefined> = [];
     await page.route("**/api/buildings/building-1?*", async (route) => { query = new URL(route.request().url()).search; await route.fulfill({ json: building }); });
     await page.route("**/api/buildings/building-1", async (route) => {
-      if (route.request().method() !== "PUT") return route.fulfill({ json: building, headers: { ETag: '"7"' } });
+      if (route.request().method() !== "PUT") return route.fulfill({ json: building, headers: { ...EXPOSED, ETag: '"7"' } });
       attempts++;
       ifMatch.push(route.request().headers()["if-match"]);
       if (attempts === 1) return route.fulfill({ status: 500, json: { title: "x" } });
-      return route.fulfill({ json: { ...building, name: "Tên mới" }, headers: { ETag: '"8"' } });
+      return route.fulfill({ json: { ...building, name: "Tên mới" }, headers: { ...EXPOSED, ETag: '"8"' } });
     });
     await page.goto("/workspace/buildings/building-1");
     await page.getByRole("button", { name: "Sửa thông tin" }).click();
@@ -624,8 +642,8 @@ test.describe("PlatformAdmin by organization", () => {
     await page.route("**/api/organizations/org-1", (route) => route.fulfill({ json: orgs.items[0] }));
     await page.route("**/api/buildings?*", (route) => { requests.push({ method: "GET", url: new URL(route.request().url()) }); return route.fulfill({ json: page1([summary]) }); });
     await page.route("**/api/buildings", async (route) => { requests.push({ method: route.request().method(), url: new URL(route.request().url()), body: route.request().postDataJSON() }); await route.fulfill({ status: 201, json: building }); });
-    await page.route("**/api/buildings/building-1?*", async (route) => { requests.push({ method: route.request().method(), url: new URL(route.request().url()), body: route.request().headers()["if-match"] }); await route.fulfill({ json: summary, headers: { ETag: '"10"' } }); });
-    await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ETag: '"9"' } }));
+    await page.route("**/api/buildings/building-1?*", async (route) => { requests.push({ method: route.request().method(), url: new URL(route.request().url()), body: route.request().headers()["if-match"] }); await route.fulfill({ json: summary, headers: { ...EXPOSED, ETag: '"10"' } }); });
+    await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ...EXPOSED, ETag: '"9"' } }));
 
     await page.goto("/admin/organizations/org-1/buildings");
     await expect(page.getByRole("heading", { name: "Công trình · FET3D Lab" })).toBeVisible();

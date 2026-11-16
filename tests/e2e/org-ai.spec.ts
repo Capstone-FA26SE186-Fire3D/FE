@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 
 import { admin, calls, mockAi, newAiMock, outcomeFields, owner, requestId, seedRequest, signInAs, type AiMock } from "./org-ai-mock";
@@ -129,7 +130,7 @@ test.describe("Organization AI page: history", () => {
   test("a polling error in the drawer keeps the last data, honors Retry-After and recovers", async ({ page }) => {
     const mock = newAiMock({ pendingPolls: 0 });
     const seeded = seedRequest(mock, { status: "Processing", result: undefined, consumedUnits: undefined, completedAt: undefined });
-    mock.getFaults.push({ status: 429, json: { status: 429, title: "slow down", code: "RATE_LIMITED" }, headers: { "Retry-After": "1" } });
+    mock.getFaults.push({ status: 429, json: { status: 429, title: "slow down", code: "RATE_LIMITED" }, headers: { ...EXPOSED, "Retry-After": "1" } });
     await open(page, mock, `/workspace/ai?request=${seeded.requestId}`);
     await expect(page.getByText("Không tải được yêu cầu")).toBeVisible();
     await expect(page.getByTestId("ai-answer")).toBeVisible({ timeout: 15_000 });

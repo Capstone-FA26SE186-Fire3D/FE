@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import type { Page, Route } from "@playwright/test";
 
 import { BUILDING_ID, REVISION_ID, SCENARIO_ID } from "../fixtures/scenario-editor/fixture-building";
@@ -190,7 +191,7 @@ const lowered = (headers: Record<string, string>) => Object.fromEntries(Object.e
 
 export async function signInAs(page: Page, user: typeof owner | typeof admin) {
   await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ai-access", refreshToken: "ai-refresh" })));
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ...EXPOSED, ETag: '"1"' } }));
 }
 
 function page_(url: URL, items: Rec[], mapper: (item: Rec) => Rec = (item) => item) {
@@ -232,7 +233,7 @@ export async function mockAi(page: Page, mock: AiMock) {
       const fault = mock.submitFaults.shift();
       if (fault === "never-arrives") return route.abort("connectionreset");
       if (fault === "status-503") return problem(route, 503, "AI_PROVIDER_UNAVAILABLE", "The AI service is not configured.");
-      if (fault === "status-429") return problem(route, 429, "RATE_LIMITED", "Too many requests.", {}, { "Retry-After": "7" });
+      if (fault === "status-429") return problem(route, 429, "RATE_LIMITED", "Too many requests.", {}, { ...EXPOSED, "Retry-After": "7" });
       if (fault && typeof fault === "object") return route.fulfill({ status: fault.status, contentType: "application/problem+json", headers: fault.headers, body: JSON.stringify(fault.json) });
       const hash = JSON.stringify({ operation, body });
       const receipt = mock.receipts.get(key);
@@ -389,7 +390,7 @@ export async function mockAi(page: Page, mock: AiMock) {
     if (source) {
       const found = mock.knowledge.find((item) => item.id === source[1]);
       if (!found) return problem(route, 404, "NOT_FOUND", "Not found.");
-      if (method === "GET" && !source[2]) return route.fulfill({ json: found, headers: { ETag: `"${found.revision}"` } });
+      if (method === "GET" && !source[2]) return route.fulfill({ json: found, headers: { ...EXPOSED, ETag: `"${found.revision}"` } });
       if (method === "POST" && source[2]) {
         const ifMatch = headers["if-match"];
         if (!ifMatch) return problem(route, 428, "PRECONDITION_REQUIRED", "If-Match is required.");
@@ -398,7 +399,7 @@ export async function mockAi(page: Page, mock: AiMock) {
         found.approvalStatus = source[2] === "approve" ? "Approved" : "Retired";
         if (source[2] === "approve") { found.approvedAt = iso(0); found.canPublishReference = found.visibility === "Common"; } else found.canPublishReference = false;
         found.revision = (found.revision as number) + 1;
-        return route.fulfill({ json: found, headers: { ETag: `"${found.revision}"` } });
+        return route.fulfill({ json: found, headers: { ...EXPOSED, ETag: `"${found.revision}"` } });
       }
     }
     return route.fallback();

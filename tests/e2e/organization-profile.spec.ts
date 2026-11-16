@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 
 // /workspace/profile: the organization's own profile (GET/PATCH /api/organizations/me with ETag + If-Match).
@@ -8,7 +9,7 @@ const profile = (revision: number, over: Record<string, unknown> = {}) => ({ id:
 
 async function signIn(page: Page, user: object = owner) {
   await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "org-access", refreshToken: "org-refresh" })));
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ...EXPOSED, ETag: '"1"' } }));
 }
 
 test("shows name, read-only slug, address and phone only (the API has no other field), and saves with If-Match", async ({ page }) => {
@@ -17,9 +18,9 @@ test("shows name, read-only slug, address and phone only (the API has no other f
   await page.route("**/api/organizations/me", async (route) => {
     if (route.request().method() === "PATCH") {
       puts.push({ ifMatch: route.request().headers()["if-match"], body: route.request().postDataJSON() });
-      return route.fulfill({ json: profile(2, { name: "Trường ĐH Bách Khoa 2" }), headers: { ETag: '"2"' } });
+      return route.fulfill({ json: profile(2, { name: "Trường ĐH Bách Khoa 2" }), headers: { ...EXPOSED, ETag: '"2"' } });
     }
-    return route.fulfill({ json: profile(1), headers: { ETag: '"1"' } });
+    return route.fulfill({ json: profile(1), headers: { ...EXPOSED, ETag: '"1"' } });
   });
   await page.goto("/workspace/profile");
   await expect(page.getByRole("heading", { level: 1, name: "Hồ sơ tổ chức" })).toBeVisible();
@@ -48,9 +49,9 @@ test("412 keeps my edits: Tải bản mới refreshes the ETag and the untouched
       patches.push(route.request().headers()["if-match"]);
       if (route.request().headers()["if-match"] !== `"${current}"`) return route.fulfill({ status: 412, contentType: "application/problem+json", body: JSON.stringify({ status: 412, title: "stale", code: "PRECONDITION_FAILED" }) });
       current += 1;
-      return route.fulfill({ json: profile(current, { name: "Giá trị của tôi" }), headers: { ETag: `"${current}"` } });
+      return route.fulfill({ json: profile(current, { name: "Giá trị của tôi" }), headers: { ...EXPOSED, ETag: `"${current}"` } });
     }
-    return route.fulfill({ json: profile(current, current > 1 || patches.length ? { name: "Bản của người khác", address: "Địa chỉ mới của người khác" } : {}), headers: { ETag: `"${current}"` } });
+    return route.fulfill({ json: profile(current, current > 1 || patches.length ? { name: "Bản của người khác", address: "Địa chỉ mới của người khác" } : {}), headers: { ...EXPOSED, ETag: `"${current}"` } });
   });
   await page.goto("/workspace/profile");
   await expect(page.getByLabel("Tên tổ chức")).toHaveValue("Trường ĐH Bách Khoa");

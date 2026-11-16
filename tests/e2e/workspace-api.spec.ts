@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { putIfcObject, sha256Hex, uploadIfcRevision, validateIfcFile } from "../../src/features/buildings/ifc-upload";
+import { IfcPutError, putIfcObject, sha256Hex, uploadIfcRevision, validateIfcFile } from "../../src/features/buildings/ifc-upload";
 import { hasRuntimePreview } from "../../src/features/buildings/runtime-preview";
 
 test("accepts a non-empty IFC file and produces lowercase SHA-256 hex", async () => {
@@ -43,7 +43,8 @@ test("stops before finalize when the signed object upload fails", async () => {
       versionLabel: "v1",
       initiate: async () => ({ revisionId: "revision-1", uploadUrl: "https://storage.example/upload", objectKey: "private-key" }),
       finalize: async () => { finalized = true; },
-      put: async () => { throw new Error("Không thể tải IFC lên kho lưu trữ."); },
+      // What the real storage PUT throws on a 5xx (a plain Error's text is never shown, only a generic message).
+      put: async () => { throw new IfcPutError("Không thể tải IFC lên kho lưu trữ.", 500); },
     }),
   ).rejects.toThrow("Không thể tải IFC lên kho lưu trữ.");
 

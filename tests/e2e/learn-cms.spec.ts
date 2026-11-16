@@ -903,6 +903,23 @@ for (const width of [1440, 375]) {
 }
 
 test.describe("Docs-style editor (Trình soạn v3)", () => {
+  test("typing in the suggested slug replaces it (never appended), and once typed the title no longer changes it", async ({ page }) => {
+    await setup(page);
+    const dialog = await openNew(page);
+    const slug = dialog.getByLabel(/^Đường dẫn rút gọn/);
+    await dialog.getByLabel("Tiêu đề", { exact: true }).fill("UAT 16/11 bài thử nghiệm");
+    await expect(slug).toHaveValue("uat-16-11-bai-thu-nghiem");
+    await slug.click();
+    await slug.pressSequentially("bai-cua-toi");
+    await expect(slug).toHaveValue("bai-cua-toi");
+    await dialog.getByLabel("Tiêu đề", { exact: true }).fill("Tiêu đề khác");
+    await expect(slug).toHaveValue("bai-cua-toi");
+    // select all + type replaces what was typed
+    await slug.press("ControlOrMeta+a");
+    await slug.pressSequentially("duong-dan-moi");
+    await expect(slug).toHaveValue("duong-dan-moi");
+  });
+
   test("the slug follows the title, the card preview updates, and the editor opens on a page", async ({ page }, testInfo) => {
     const backend = await setup(page);
     const dialog = await openNew(page);

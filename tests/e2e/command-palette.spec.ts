@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 
 // All network is mocked with Playwright routes: evidence for UI behaviour, not for BE integration.
@@ -13,7 +14,7 @@ async function signIn(page: Page) {
     sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" }));
     localStorage.setItem("fire3d-org-tour", "done"); // the spotlight tour must not cover the palette
   });
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ...EXPOSED, ETag: '"1"' } }));
 }
 
 async function mockBuildings(page: Page) {
@@ -22,7 +23,7 @@ async function mockBuildings(page: Page) {
     const items = buildings.filter((item) => !search || item.name.toLowerCase().includes(search));
     return route.fulfill({ json: { items, totalCount: items.length, page: 1, pageSize: 20 } });
   });
-  await page.route("**/api/buildings/*", (route) => route.fulfill({ json: { ...buildings[0], organizationId: "org-1", location: null, contact: null }, headers: { ETag: '"1"' } }));
+  await page.route("**/api/buildings/*", (route) => route.fulfill({ json: { ...buildings[0], organizationId: "org-1", location: null, contact: null }, headers: { ...EXPOSED, ETag: '"1"' } }));
   await page.route("**/api/buildings/*/**", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 20 } }));
   await page.route("**/api/releases?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 20 } }));
   await page.route("**/api/billing/**", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 50 } }));

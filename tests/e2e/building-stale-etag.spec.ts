@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 // When the first read of a Building has no readable ETag, the save reads the Building again. That ETag belongs to the data
@@ -17,7 +18,7 @@ async function session(page: Page) {
     sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" }));
     localStorage.setItem("fire3d-org-tour", "done"); // the spotlight tour must never cover the page under test
   });
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ...EXPOSED, ETag: '"1"' } }));
   await page.route("**/api/buildings?*", (route) => route.fulfill({ json: { items: [summary], totalCount: 1, page: 1, pageSize: 20 } }));
   await page.route("**/api/buildings/building-1/revisions?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 20 } }));
   await page.route("**/api/buildings/building-1/scenarios?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 20 } }));
@@ -31,9 +32,9 @@ async function session(page: Page) {
 function detail(writes: Write[], later: typeof building, state: { saving: boolean }) {
   return async (route: Route) => {
     const request = route.request();
-    if (request.method() === "GET") return state.saving ? route.fulfill({ json: later, headers: { ETag: '"9"' } }) : route.fulfill({ json: building });
+    if (request.method() === "GET") return state.saving ? route.fulfill({ json: later, headers: { ...EXPOSED, ETag: '"9"' } }) : route.fulfill({ json: building });
     writes.push({ ifMatch: request.headers()["if-match"], body: request.postDataJSON() });
-    return route.fulfill({ json: { ...later, name: (request.postDataJSON() as { name: string }).name }, headers: { ETag: '"10"' } });
+    return route.fulfill({ json: { ...later, name: (request.postDataJSON() as { name: string }).name }, headers: { ...EXPOSED, ETag: '"10"' } });
   };
 }
 

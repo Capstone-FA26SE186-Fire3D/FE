@@ -116,7 +116,7 @@ export function buildJourney(input: JourneyInput): JourneyStep[] {
   else if (!readiness) ready = unknown("readiness", "Kiểm tra và chốt gói", readyTarget, "Mở Kiểm tra");
   else if (readiness.technicalReady) ready = step("readiness", "Kiểm tra và chốt gói", readyTarget, "Mở Kiểm tra", "done", "Đã chốt gói", "Kiểm tra đạt và gói đã chốt để phát hành.");
   else if (readiness.outcome && (readiness.outcome.toLowerCase() !== "passed" || readiness.blockerCount > 0)) ready = step("readiness", "Kiểm tra và chốt gói", readyTarget, "Xem lỗi", "blocked", "Kiểm tra không đạt", readiness.blockerCount > 0 ? `Có ${readiness.blockerCount} lỗi chặn.` : "Lần kiểm tra mới nhất không đạt.");
-  else if (readiness.outcome) ready = step("readiness", "Kiểm tra và chốt gói", readyTarget, "Chốt gói phát hành", "active", "Kiểm tra đạt, chờ chốt", readiness.missing.length ? readiness.missing.map(missingText).join(" ") : "Bấm Chốt gói phát hành ở tab Kiểm tra.");
+  else if (readiness.outcome) ready = step("readiness", "Kiểm tra và chốt gói", readyTarget, "Mở Kiểm tra", "active", "Kiểm tra đạt, chờ chốt", readiness.missing.length ? readiness.missing.map(missingText).join(" ") : "Bấm Chốt gói phát hành ở tab Kiểm tra.");
   else ready = step("readiness", "Kiểm tra và chốt gói", readyTarget, "Mở Kiểm tra", "todo", "Chưa có kết quả kiểm tra", readiness.missing.length ? readiness.missing.map(missingText).join(" ") : "Chưa có lần kiểm tra nào.");
 
   // 6. Content review: the version's own reviewStatus.
@@ -129,7 +129,7 @@ export function buildJourney(input: JourneyInput): JourneyStep[] {
     if (status === "approved") review = step("review", "Gửi duyệt", reviewTarget, "Xem duyệt", "done", "Đã duyệt", "Quản trị FET3D đã duyệt nội dung và tiêu chí chấm.");
     else if (status === "submitted") review = step("review", "Gửi duyệt", reviewTarget, "Xem duyệt", "active", "Chờ duyệt", "Đã gửi, đang chờ quản trị FET3D.");
     else if (status === "rejected") review = step("review", "Gửi duyệt", reviewTarget, "Xem lý do", "blocked", "Bị từ chối", version.rejectReason ? `Lý do: ${version.rejectReason}` : "Sửa nội dung sẽ tạo phiên bản mới.");
-    else if (status === "notsubmitted") review = step("review", "Gửi duyệt", reviewTarget, "Gửi duyệt", "todo", "Chưa gửi duyệt", "Gửi để quản trị FET3D duyệt nội dung và tiêu chí chấm.");
+    else if (status === "notsubmitted") review = step("review", "Gửi duyệt", reviewTarget, "Mở Gửi duyệt", "todo", "Chưa gửi duyệt", "Gửi để quản trị FET3D duyệt nội dung và tiêu chí chấm.");
     else review = step("review", "Gửi duyệt", reviewTarget, "Mở Gửi duyệt", "active", version.reviewStatus, "Trạng thái duyệt do hệ thống báo.");
   }
 

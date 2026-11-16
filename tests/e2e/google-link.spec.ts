@@ -4,6 +4,7 @@
  * (tests/fixtures/google) and the Fire3D API is a stateful Playwright route mock of GoogleLinkController and
  * GooglePasswordController. It does not prove Firebase, the deployed API or the provider.
  */
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 import { storedSession } from "./session";
 import { googleFixtureBundle } from "../fixtures/google/build.mjs";
@@ -33,7 +34,7 @@ async function openProfile(page: Page, user: Record<string, unknown> = localUser
   await page.route("**/api/auth/me", async (route) => {
     server.meCalls++;
     if (server.revoked) return route.fulfill(problem(401, "UNAUTHORIZED"));
-    return route.fulfill({ json: server.user, headers: { ETag: `"${server.user.profileRevision}"` } });
+    return route.fulfill({ json: server.user, headers: { ...EXPOSED, ETag: `"${server.user.profileRevision}"` } });
   });
   await page.route("**/api/me/link-google", async (route) => {
     const body = route.request().postDataJSON() as Record<string, unknown>;
@@ -46,14 +47,14 @@ async function openProfile(page: Page, user: Record<string, unknown> = localUser
     if (uid === "uid-replace") return route.fulfill(problem(409, "GOOGLE_ACCOUNT_REPLACEMENT_FORBIDDEN"));
     if (uid === "uid-reset") return route.fulfill(problem(409, "PASSWORD_RESET_PENDING"));
     if (uid === "uid-invalid") return route.fulfill(problem(401, "INVALID_FIREBASE_TOKEN"));
-    if (uid === "uid-503") return route.fulfill(problem(503, "GOOGLE_PROVIDER_UNAVAILABLE", {}, { "Retry-After": "2" }));
-    if (uid === "uid-429") return route.fulfill(problem(429, "RATE_LIMITED", {}, { "Retry-After": "2" }));
+    if (uid === "uid-503") return route.fulfill(problem(503, "GOOGLE_PROVIDER_UNAVAILABLE", {}, { ...EXPOSED, "Retry-After": "2" }));
+    if (uid === "uid-429") return route.fulfill(problem(429, "RATE_LIMITED", {}, { ...EXPOSED, "Retry-After": "2" }));
     if (uid === "uid-unverified") return route.fulfill(problem(403, "EMAIL_NOT_VERIFIED"));
     if (uid === "uid-abort") return route.abort("connectionreset");
-    if (server.linkedUid === uid) return route.fulfill({ json: { user: server.user, alreadyLinked: true, requiresLogin: false }, headers: { ETag: `"${server.user.profileRevision}"` } });
+    if (server.linkedUid === uid) return route.fulfill({ json: { user: server.user, alreadyLinked: true, requiresLogin: false }, headers: { ...EXPOSED, ETag: `"${server.user.profileRevision}"` } });
     server.linkedUid = uid; server.revoked = true;
     server.user = { ...server.user, googleLinked: true, profileRevision: Number(server.user.profileRevision) + 1 };
-    return route.fulfill({ json: { user: server.user, alreadyLinked: false, requiresLogin: true }, headers: { ETag: `"${server.user.profileRevision}"` } });
+    return route.fulfill({ json: { user: server.user, alreadyLinked: false, requiresLogin: true }, headers: { ...EXPOSED, ETag: `"${server.user.profileRevision}"` } });
   });
   await page.route("**/api/me/password", async (route) => {
     const body = route.request().postDataJSON() as Record<string, unknown>;
@@ -62,7 +63,7 @@ async function openProfile(page: Page, user: Record<string, unknown> = localUser
     if (uid === "uid-recent") return route.fulfill(problem(401, "RECENT_LOGIN_REQUIRED"));
     if (uid === "uid-invalid") return route.fulfill(problem(401, "INVALID_FIREBASE_TOKEN"));
     if (uid === "uid-reset") return route.fulfill(problem(409, "PASSWORD_RESET_PENDING"));
-    if (uid === "uid-503") return route.fulfill(problem(503, "GOOGLE_PROVIDER_UNAVAILABLE", {}, { "Retry-After": "2" }));
+    if (uid === "uid-503") return route.fulfill(problem(503, "GOOGLE_PROVIDER_UNAVAILABLE", {}, { ...EXPOSED, "Retry-After": "2" }));
     if (uid === "uid-weak") return route.fulfill(problem(400, "VALIDATION_ERROR", { errors: { newPassword: ["Mật khẩu quá yếu."] } }));
     if (uid === "uid-set") { server.user = { ...server.user, hasLocalLogin: true, profileRevision: Number(server.user.profileRevision) + 1 }; server.hasPassword = true; return route.fulfill(problem(409, "PASSWORD_ALREADY_SET")); }
     if (server.hasPassword) return route.fulfill(problem(409, "PASSWORD_ALREADY_SET"));
@@ -306,8 +307,8 @@ test.describe("layout on the real profile page", () => {
       for (const width of [375, 1440]) {
         test(`${label} has no horizontal overflow in ${scheme} at ${width}px`, async ({ page }, testInfo) => {
           await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "a", refreshToken: "r" })));
-          await page.route("**/api/auth/me", (route) => route.fulfill({ json: { ...owner, ...flags }, headers: { ETag: '"2"' } }));
-          await page.route("**/api/organizations/me", (route) => route.fulfill({ json: { id: "org-1", name: "Fire3D Lab", slug: "f", address: "Đà Nẵng", phoneNumber: "+842361234567", isActive: true, profileRevision: 1, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }, headers: { ETag: '"1"' } }));
+          await page.route("**/api/auth/me", (route) => route.fulfill({ json: { ...owner, ...flags }, headers: { ...EXPOSED, ETag: '"2"' } }));
+          await page.route("**/api/organizations/me", (route) => route.fulfill({ json: { id: "org-1", name: "Fire3D Lab", slug: "f", address: "Đà Nẵng", phoneNumber: "+842361234567", isActive: true, profileRevision: 1, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }, headers: { ...EXPOSED, ETag: '"1"' } }));
           await page.emulateMedia({ colorScheme: scheme });
           await page.setViewportSize({ width, height: width < 768 ? 800 : 900 });
           await page.goto("/account");

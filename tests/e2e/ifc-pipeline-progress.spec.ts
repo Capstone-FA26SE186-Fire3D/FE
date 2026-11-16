@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 import { derivePipelineProgress, emptyPipeline } from "../../src/features/buildings/pipeline";
 
@@ -36,8 +37,8 @@ async function open(page: Page, mock: Mock, url = "/workspace/buildings/building
     sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" }));
     localStorage.setItem("fire3d-org-tour", "done"); // the spotlight tour must never cover the page under test
   });
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ETag: '"1"' } }));
-  await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ETag: '"3"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ...EXPOSED, ETag: '"1"' } }));
+  await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ...EXPOSED, ETag: '"3"' } }));
   await page.route("**/api/buildings/building-1/revisions?*", (route) => route.fulfill({ json: page1(mock.revisions) }));
   await page.route("**/api/buildings/building-1/scenarios?*", (route) => route.fulfill({ json: page1([]) }));
   await page.route("**/api/revisions/*", (route) => { calls.revision++; return route.fulfill({ json: mock.revision?.() ?? mock.revisions.find((item) => (item as { id: string }).id === route.request().url().split("/").pop()) }); });
@@ -50,7 +51,7 @@ async function open(page: Page, mock: Mock, url = "/workspace/buildings/building
   await page.route("**/api/revisions/*/annotations", (route) => route.fulfill({ json: { revisionId: "rev-2", id: null, version: 0, data: { items: [] }, provenance: null, createdBy: null, createdAt: null } }));
   await page.route("**/api/buildings/building-1/editor-preview?*", (route) => { calls.preview++; return route.fulfill({ json: mock.preview?.() ?? notReady }); });
   await page.route("**/api/revisions/*/equipment-candidates", (route) => mock.equipment
-    ? route.fulfill({ json: mock.equipment, headers: { ETag: '"1"' } })
+    ? route.fulfill({ json: mock.equipment, headers: { ...EXPOSED, ETag: '"1"' } })
     : route.fulfill({ status: 409, contentType: "application/problem+json", body: JSON.stringify({ status: 409, title: "unavailable", code: "EQUIPMENT_CANDIDATES_UNAVAILABLE" }) }));
   await page.route("**/api/scenario-interactions/catalog", (route) => route.fulfill({ json: [{ runtimeVersion: "2.0.0", protocolVersion: "1", capabilities: ["door.standard", "door.exit"], capabilityContracts: { "door.standard": { version: "1.0.0", objectKinds: ["Equipment"] }, "door.exit": { version: "1.0.0", objectKinds: ["Equipment"] } } }] }));
   await page.goto(url);

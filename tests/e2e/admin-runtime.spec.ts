@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 
 /*
@@ -21,7 +22,7 @@ async function setup(page: Page) {
   ];
   const calls: Call[] = [];
   await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "rt-access", refreshToken: "rt-refresh" })));
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: admin, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: admin, headers: { ...EXPOSED, ETag: '"1"' } }));
   await page.route("**/api/admin/runtime-catalog**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -60,8 +61,11 @@ test.describe("PlatformAdmin runtime catalog", () => {
     const detail = page.getByTestId("runtime-detail");
     await expect(detail).toContainText("Nút báo cháy");
     await expect(detail).toContainText("Di chuyển của người chơi");
-    await expect(detail).toContainText("jumped");
+    await expect(detail).toContainText("Chấm điểm: Số lần nhảy"); // the scored metric by its plain name, not "jumped"
     await expect(detail).toContainText("press");
+    // Events and actions read as plain words; the code is only small print.
+    await expect(detail.getByTestId("rt-action").first()).toHaveText("Nhấn");
+    await expect(detail.getByTestId("rt-event").filter({ hasText: "Kích hoạt báo cháy" }).first()).toBeVisible();
     await expect(page).toHaveURL(/runtime=00000000-0000-4000-8000-000000000220/);
   });
 

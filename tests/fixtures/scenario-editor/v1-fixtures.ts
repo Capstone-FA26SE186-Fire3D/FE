@@ -63,8 +63,9 @@ export const SAMPLE_RUNTIME_CATALOG = [{
 export const RUBRIC_CATALOG = {
   supportedSchemaVersions: ["1"], defaultSchemaVersion: "1",
   metrics: [
-    { id: "reached_exit", description: "Người học đến được lối thoát." }, { id: "completion_time_seconds", description: "Thời gian hoàn thành (giây)." },
-    { id: "wrong_exits", description: "Số lần chọn sai lối thoát." }, { id: "hazard_exposure", description: "Mức tiếp xúc nguy cơ." }, { id: "distance_meters", description: "Quãng đường di chuyển (mét)." },
+    // English, as the server catalog sends it: the editor must never show these to people (it has its own plain hints).
+    { id: "reached_exit", description: "1 when the trainee reached an exit, otherwise 0." }, { id: "completion_time_seconds", description: "Seconds until the first exit (or the last event when no exit was reached)." },
+    { id: "wrong_exits", description: "Number of WrongExit events." }, { id: "hazard_exposure", description: "Sum of HazardExposure amounts." }, { id: "distance_meters", description: "Sum of Moved distances in metres." },
   ],
   operators: ["gte", "lte", "eq"], maxCriteria: 100, rubricFields: ["schema_version", "pass_threshold", "criteria"],
   criterion: { requiredFields: ["id", "metric", "mandatory", "weight", "threshold", "operator"], optionalFields: ["description"], idPattern: "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$", idMaxLength: 128, descriptionMaxLength: 1000, weightMinimum: 0 },

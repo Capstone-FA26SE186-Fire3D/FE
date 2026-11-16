@@ -6,6 +6,7 @@
  * (playtest status, open handoff, idempotency replay) so reload proves recovery from the server. Not integration evidence:
  * Mobile redeem/start/launch and Unity are NOT exercised here, and the mock treats any request to those endpoints as a failure.
  */
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 import { acceptStatus } from "../../src/features/playtest/status";
@@ -155,7 +156,7 @@ const jobRow = (job: { id: string; status: string; kind: string }) => ({ id: job
 async function setup(page: Page, mock: Mock) {
   await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "pt-access", refreshToken: "pt-refresh" })));
   await page.route("**/api/**", (route) => problem(route, 404, "NOT_FOUND")); // anything unmocked fails loudly instead of reaching Next
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: { ...owner, role: mock.role }, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: { ...owner, role: mock.role }, headers: { ...EXPOSED, ETag: '"1"' } }));
   await page.route(`**/api/scenarios/${IDS.scenario}`, (route) => route.fulfill({ json: { id: IDS.scenario, buildingId: "building-1", organizationId: "org-1", name: "Kịch bản tầng 3", createdAt: "2026-10-01T00:00:00Z", ...(mock.draftCount === undefined ? {} : { currentDraftId: mock.draftCount ? "44444444-4444-4444-8444-444444444444" : null, currentDraftVersion: 12, draftCount: mock.draftCount }) } }));
   await page.route(`**/api/scenarios/${IDS.scenario}/versions?*`, (route) => route.fulfill({ json: { items: mock.versions ? [versionSummary(mock)] : [], totalCount: mock.versions ? 1 : 0, page: 1, pageSize: 20 } }));
   await page.route(`**/api/scenario-versions/${IDS.version}`, (route) => route.fulfill({ json: { ...versionSummary(mock), ...versionExtra } }));
@@ -207,7 +208,7 @@ async function setup(page: Page, mock: Mock) {
     const count = mock.prepareCalls.push({ key: request.headers()["idempotency-key"] ?? null, body: request.postDataJSON(), query: new URL(request.url()).search });
     const next = reply(mock.prepareReplies, count);
     if (next === 0) return route.abort("failed");
-    if (typeof next === "object") return problem(route, next.status, next.code, next.retryAfter ? { "Retry-After": next.retryAfter } : {});
+    if (typeof next === "object") return problem(route, next.status, next.code, next.retryAfter ? { ...EXPOSED, "Retry-After": next.retryAfter } : {});
     mock.playtest = newRow();
     return route.fulfill({ status: 201, json: { id: IDS.playtest, scenarioVersionId: IDS.version, artifactId: IDS.artifact, validationRunId: IDS.run, packageHash: "c".repeat(64), manifestHash: "d".repeat(64), buildTarget: "Android" } });
   });
@@ -230,7 +231,7 @@ async function setup(page: Page, mock: Mock) {
       if (mock.getFails !== null) {
         const fail = mock.getFails;
         if (typeof fail === "number") return route.abort("failed");
-        return problem(route, fail.status, fail.code, fail.retryAfter ? { "Retry-After": fail.retryAfter } : {});
+        return problem(route, fail.status, fail.code, fail.retryAfter ? { ...EXPOSED, "Retry-After": fail.retryAfter } : {});
       }
       if (mock.progress.length) { row.status = mock.progress[Math.min(mock.progressIndex, mock.progress.length - 1)]; mock.progressIndex += 1; }
       if (row.status === "Completed") row.completion = row.completion ?? { result: "Passed", durationSeconds: 42, detail: { exits: 2 } };
@@ -246,7 +247,7 @@ async function setup(page: Page, mock: Mock) {
       const count = mock.handoffCalls.push({ key });
       const next = reply(mock.handoffReplies, count);
       if (next === 0) return route.abort("failed");
-      if (typeof next === "object") return problem(route, next.status, next.code, next.retryAfter ? { "Retry-After": next.retryAfter } : {});
+      if (typeof next === "object") return problem(route, next.status, next.code, next.retryAfter ? { ...EXPOSED, "Retry-After": next.retryAfter } : {});
       let handoff = key ? mock.handoffsByKey.get(key) : undefined;
       if (!handoff) {
         mock.codeCount += 1;
