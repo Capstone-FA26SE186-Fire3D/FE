@@ -4,6 +4,7 @@
  * The mock keeps the state a real server would keep (review status, confirmation, release) so a reload proves recovery
  * from server state. This is not integration evidence against a real BE.
  */
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { postLoginRoute, safeNext } from "../../src/features/auth/redirect";
 
@@ -119,7 +120,7 @@ function releaseBody(status: string) {
 async function setup(page: Page, mock: Mock, role = 1) {
   const summary = () => ({ ...versionBase, reviewStatus: mock.reviewStatus, reviewId: mock.reviewId, rejectReason: mock.rejectReason });
   await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ver-access", refreshToken: "ver-refresh" })));
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: { ...owner, role }, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: { ...owner, role }, headers: { ...EXPOSED, ETag: '"1"' } }));
   await page.route(`**/api/scenarios/${IDS.scenario}`, (route) => route.fulfill({ json: { id: IDS.scenario, buildingId: "building-1", organizationId: "org-1", name: "Kịch bản tầng 3", createdAt: "2026-10-01T00:00:00Z", currentDraftId: mock.currentDraftId, currentDraftVersion: 12, draftCount: mock.drafts.length, latestVersionId: IDS.version, latestVersionNumber: 1 } }));
   await page.route(`**/api/scenarios/${IDS.scenario}/versions?*`, (route) => route.fulfill({ json: { items: [{ ...summary() }], totalCount: 1, page: 1, pageSize: 20 } }));
   await page.route(`**/api/scenarios/${IDS.scenario}/drafts?*`, (route) => route.fulfill({ json: { items: mock.drafts.map((draft) => ({ id: draft.id, scenarioId: IDS.scenario, revisionId: IDS.revision, draftNumber: draft.draftNumber, source: "Manual", schemaVersion: "fet3d.editor/1", version: draft.version, createdBy: "owner", createdAt: "2026-10-01T00:00:00Z", updatedAt: draft.updatedAt, lastEditedById: "owner", lastEditedByName: draft.lastEditedByName })), totalCount: mock.drafts.length, page: 1, pageSize: 50 } }));
@@ -132,9 +133,9 @@ async function setup(page: Page, mock: Mock, role = 1) {
   });
   await page.route(`**/api/scenario-drafts/${IDS.draft}`, (route) => {
     const etag = mock.draftEtags.length ? mock.draftEtags.shift() as string : mock.draftEtag;
-    return route.fulfill({ json: { id: IDS.draft, scenarioId: IDS.scenario, revisionId: IDS.revision, draftNumber: 2, state: { name: etag === '"12"' ? "Bản cũ" : "Bản mới", rubric: { criteria: [{}, {}] }, learningObjectives: ["a"] }, updatedAt: "2026-10-10T01:00:00Z", version: 12 }, headers: { ETag: etag } });
+    return route.fulfill({ json: { id: IDS.draft, scenarioId: IDS.scenario, revisionId: IDS.revision, draftNumber: 2, state: { name: etag === '"12"' ? "Bản cũ" : "Bản mới", rubric: { criteria: [{}, {}] }, learningObjectives: ["a"] }, updatedAt: "2026-10-10T01:00:00Z", version: 12 }, headers: { ...EXPOSED, ETag: etag } });
   });
-  await page.route(`**/api/scenario-drafts/${IDS.draft2}`, (route) => route.fulfill({ json: { id: IDS.draft2, scenarioId: IDS.scenario, revisionId: IDS.revision, draftNumber: 3, state: { name: "Bản thứ hai", rubric: { criteria: [{}] }, learningObjectives: [] }, updatedAt: "2026-10-11T01:00:00Z", version: 4 }, headers: { ETag: '"4"' } }));
+  await page.route(`**/api/scenario-drafts/${IDS.draft2}`, (route) => route.fulfill({ json: { id: IDS.draft2, scenarioId: IDS.scenario, revisionId: IDS.revision, draftNumber: 3, state: { name: "Bản thứ hai", rubric: { criteria: [{}] }, learningObjectives: [] }, updatedAt: "2026-10-11T01:00:00Z", version: 4 }, headers: { ...EXPOSED, ETag: '"4"' } }));
   await page.route(`**/api/scenario-drafts/${IDS.draft}/validate`, (route) => route.fulfill({ json: { draftId: IDS.draft, version: 12, isValid: false, issues: [{ code: "SPAWN_REQUIRED", path: "$.spawnPoints", message: "At least one spawn point is required." }] } }));
   await page.route(`**/api/scenario-drafts/${IDS.draft}/snapshot`, (route) => {
     const request = route.request();

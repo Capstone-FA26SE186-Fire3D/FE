@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 // Building create/update/archive headers (BE#94, FE#48): POST needs Idempotency-Key, PUT/DELETE need If-Match with the
@@ -15,7 +16,7 @@ async function session(page: Page) {
     sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" }));
     localStorage.setItem("fire3d-org-tour", "done"); // the spotlight tour must never cover the page under test
   });
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ...EXPOSED, ETag: '"1"' } }));
   await page.route("**/api/buildings?*", (route) => route.fulfill({ json: { items: [summary], totalCount: 1, page: 1, pageSize: 20 } }));
   await page.route("**/api/buildings/building-1/revisions?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 20 } }));
   await page.route("**/api/buildings/building-1/scenarios?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 20 } }));
@@ -42,9 +43,9 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
     await page.route("**/api/buildings", async (route) => {
       record(writes, route);
       if (writes.length === 1) return route.abort("timedout"); // stored by the server, response lost
-      return route.fulfill({ status: 201, json: building, headers: { ETag: '"1"' } });
+      return route.fulfill({ status: 201, json: building, headers: { ...EXPOSED, ETag: '"1"' } });
     });
-    await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ETag: '"1"' } }));
+    await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ...EXPOSED, ETag: '"1"' } }));
     await page.goto("/workspace/buildings");
     await page.getByRole("button", { name: "Thêm công trình", exact: true }).click();
     await createDialog(page).getByLabel("Tên công trình", { exact: true }).fill("Công trình mới");
@@ -64,9 +65,9 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
       record(writes, route);
       if (writes.length === 1) return route.fulfill({ status: 500, json: { title: "x" } });
       if (writes.length === 2) return route.fulfill({ status: 409, contentType: "application/problem+json", body: JSON.stringify({ status: 409, title: "conflict", code: "IDEMPOTENCY_KEY_CONFLICT" }) });
-      return route.fulfill({ status: 201, json: building, headers: { ETag: '"1"' } });
+      return route.fulfill({ status: 201, json: building, headers: { ...EXPOSED, ETag: '"1"' } });
     });
-    await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ETag: '"1"' } }));
+    await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ...EXPOSED, ETag: '"1"' } }));
     await page.goto("/workspace/buildings");
     await page.getByRole("button", { name: "Thêm công trình", exact: true }).click();
     const dialog = createDialog(page);
@@ -85,10 +86,10 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
     await session(page);
     const writes: Write[] = [];
     await page.route("**/api/buildings/building-1", async (route) => {
-      if (route.request().method() === "GET") return route.fulfill({ json: building, headers: { ETag: '"5"' } });
+      if (route.request().method() === "GET") return route.fulfill({ json: building, headers: { ...EXPOSED, ETag: '"5"' } });
       record(writes, route);
-      if (writes.length === 1) return route.fulfill({ status: 412, contentType: "application/problem+json", headers: { ETag: '"6"' }, body: JSON.stringify({ status: 412, title: "stale", code: "PRECONDITION_FAILED", current: newer }) });
-      return route.fulfill({ json: { ...newer, name: "Tên của tôi" }, headers: { ETag: '"7"' } });
+      if (writes.length === 1) return route.fulfill({ status: 412, contentType: "application/problem+json", headers: { ...EXPOSED, ETag: '"6"' }, body: JSON.stringify({ status: 412, title: "stale", code: "PRECONDITION_FAILED", current: newer }) });
+      return route.fulfill({ json: { ...newer, name: "Tên của tôi" }, headers: { ...EXPOSED, ETag: '"7"' } });
     });
     await page.goto("/workspace/buildings");
     await rowAction(page, /^Sửa thông tin/);
@@ -108,10 +109,10 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
     await session(page);
     const writes: Write[] = [];
     await page.route("**/api/buildings/building-1", async (route) => {
-      if (route.request().method() === "GET") return route.fulfill({ json: building, headers: { ETag: '"5"' } });
+      if (route.request().method() === "GET") return route.fulfill({ json: building, headers: { ...EXPOSED, ETag: '"5"' } });
       record(writes, route);
-      if (writes.length === 1) return route.fulfill({ status: 412, contentType: "application/problem+json", headers: { ETag: '"6"' }, body: JSON.stringify({ status: 412, title: "stale", code: "PRECONDITION_FAILED", current: newer }) });
-      return route.fulfill({ json: newer, headers: { ETag: '"7"' } });
+      if (writes.length === 1) return route.fulfill({ status: 412, contentType: "application/problem+json", headers: { ...EXPOSED, ETag: '"6"' }, body: JSON.stringify({ status: 412, title: "stale", code: "PRECONDITION_FAILED", current: newer }) });
+      return route.fulfill({ json: newer, headers: { ...EXPOSED, ETag: '"7"' } });
     });
     await page.goto("/workspace/buildings/building-1");
     await page.getByRole("button", { name: "Sửa thông tin" }).click(); // "Thông tin công trình" card on the Hành trình tab
@@ -130,7 +131,7 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
   test("428 PRECONDITION_REQUIRED is explained and the input is kept", async ({ page }) => {
     await session(page);
     await page.route("**/api/buildings/building-1", async (route) => {
-      if (route.request().method() === "GET") return route.fulfill({ json: building, headers: { ETag: '"5"' } });
+      if (route.request().method() === "GET") return route.fulfill({ json: building, headers: { ...EXPOSED, ETag: '"5"' } });
       return route.fulfill({ status: 428, contentType: "application/problem+json", body: JSON.stringify({ status: 428, title: "required", code: "PRECONDITION_REQUIRED" }) });
     });
     await page.goto("/workspace/buildings");
@@ -145,9 +146,9 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
     await session(page);
     const writes: Write[] = [];
     await page.route("**/api/buildings/building-1", async (route) => {
-      if (route.request().method() === "GET") return route.fulfill({ json: building, headers: { ETag: '"5"' } });
+      if (route.request().method() === "GET") return route.fulfill({ json: building, headers: { ...EXPOSED, ETag: '"5"' } });
       record(writes, route);
-      return route.fulfill({ json: { ...summary, isActive: false }, headers: { ETag: '"6"' } });
+      return route.fulfill({ json: { ...summary, isActive: false }, headers: { ...EXPOSED, ETag: '"6"' } });
     });
     await page.goto("/workspace/buildings");
     await rowAction(page, /^Lưu trữ/);
@@ -161,10 +162,10 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
     const writes: Write[] = [];
     const newest = { ...newer, name: "Tên mới nhất", updatedAt: "2026-10-06T09:00:00Z" };
     await page.route("**/api/buildings/building-1", async (route) => {
-      if (route.request().method() === "GET") return route.fulfill({ json: newer, headers: { ETag: '"6"' } });
+      if (route.request().method() === "GET") return route.fulfill({ json: newer, headers: { ...EXPOSED, ETag: '"6"' } });
       record(writes, route);
-      if (writes.length === 1) return route.fulfill({ status: 412, contentType: "application/problem+json", headers: { ETag: '"7"' }, body: JSON.stringify({ status: 412, title: "stale", code: "PRECONDITION_FAILED", current: newest }) });
-      return route.fulfill({ json: { ...summary, isActive: false }, headers: { ETag: '"8"' } });
+      if (writes.length === 1) return route.fulfill({ status: 412, contentType: "application/problem+json", headers: { ...EXPOSED, ETag: '"7"' }, body: JSON.stringify({ status: 412, title: "stale", code: "PRECONDITION_FAILED", current: newest }) });
+      return route.fulfill({ json: { ...summary, isActive: false }, headers: { ...EXPOSED, ETag: '"8"' } });
     });
     await page.goto("/workspace/buildings");
     await rowAction(page, /^Lưu trữ/);
