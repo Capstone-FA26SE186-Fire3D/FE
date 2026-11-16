@@ -3,6 +3,7 @@
  * Evidence level: Playwright route mocks of the BE contract (SupportController, AuditLogsController,
  * OperationsAnalyticsController, OrganizationProfileController). Not an integration test against the real API.
  */
+import { EXPOSED } from "./api-headers";
 import { expectChipValue, openChip, pick } from "./chip-helpers";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { buildRange } from "../../src/utils/date-range";
@@ -14,7 +15,7 @@ const trainee = { id: "t-1", email: "t@fire3d.test", fullName: "Học viên", ro
 
 async function signIn(page: Page, user: object) {
   await page.addInitScript((stored) => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify(stored)), { accessToken: "ops-access", refreshToken: "ops-refresh" });
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ...EXPOSED, ETag: '"1"' } }));
 }
 
 const ticket = (over: Record<string, unknown> = {}) => ({
@@ -151,7 +152,7 @@ test.describe("admin support inbox", () => {
     await mockAdminLookups(page);
     // The sidebar badge counts open tickets with pageSize=1; only the list's own queries are recorded.
     await page.route("**/api/admin/support/tickets?*", (route) => { const params = new URL(route.request().url()).searchParams; if (params.get("pageSize") !== "1") queries.push(params); return route.fulfill({ json: { items: [ticket()], total: 45, page: 2, pageSize: 20 } }); });
-    await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ETag: '"support-2"' }, json: { ...ticket(), messages: messagesPage([message("m1", "u-9", "Em cần hỗ trợ gấp")]) } }));
+    await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ...EXPOSED, ETag: '"support-2"' }, json: { ...ticket(), messages: messagesPage([message("m1", "u-9", "Em cần hỗ trợ gấp")]) } }));
 
     await page.goto("/admin/support?page=2&status=InProgress&priority=High");
     await expectChipValue(page, "Trạng thái", "InProgress");
@@ -178,7 +179,7 @@ test.describe("admin support inbox", () => {
     await signIn(page, admin);
     await mockAdminLookups(page);
     await page.route("**/api/admin/support/tickets?*", (route) => route.fulfill({ json: page1([ticket({ revision })]) }));
-    await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ETag: `"support-${revision}"` }, json: { ...ticket({ revision }), messages: messagesPage([]) } }));
+    await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ...EXPOSED, ETag: `"support-${revision}"` }, json: { ...ticket({ revision }), messages: messagesPage([]) } }));
     await page.route("**/api/admin/support/tickets/ticket-1", async (route) => {
       patches.push({ ifMatch: await route.request().headerValue("if-match"), body: route.request().postDataJSON() });
       if (patches.length === 1) {
@@ -187,7 +188,7 @@ test.describe("admin support inbox", () => {
         return;
       }
       revision = 4;
-      await route.fulfill({ headers: { ETag: '"support-4"' }, json: ticket({ revision: 4, status: "InProgress", priority: "High", assignedTo: "admin-1" }) });
+      await route.fulfill({ headers: { ...EXPOSED, ETag: '"support-4"' }, json: ticket({ revision: 4, status: "InProgress", priority: "High", assignedTo: "admin-1" }) });
     });
 
     await page.goto("/admin/support?ticket=ticket-1");
@@ -223,7 +224,7 @@ test.describe("admin support inbox", () => {
     await signIn(page, admin);
     await mockAdminLookups(page);
     await page.route("**/api/admin/support/tickets?*", (route) => route.fulfill({ json: page1([ticket()]) }));
-    await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ETag: '"support-2"' }, json: { ...ticket(), messages: messagesPage([]) } }));
+    await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ...EXPOSED, ETag: '"support-2"' }, json: { ...ticket(), messages: messagesPage([]) } }));
     await page.route("**/api/admin/support/tickets/ticket-1/messages", async (route: Route) => {
       sends.push({ key: await route.request().headerValue("idempotency-key"), body: route.request().postDataJSON() });
       await new Promise((resolve) => setTimeout(resolve, 250));
@@ -255,7 +256,7 @@ test.describe("admin support inbox", () => {
     await signIn(page, admin);
     await mockAdminLookups(page);
     await page.route("**/api/admin/support/tickets?*", (route) => route.fulfill({ json: page1([ticket({ status: "Closed" })]) }));
-    await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ETag: '"support-2"' }, json: { ...ticket({ status: "Closed" }), messages: messagesPage([]) } }));
+    await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ...EXPOSED, ETag: '"support-2"' }, json: { ...ticket({ status: "Closed" }), messages: messagesPage([]) } }));
     await page.goto("/admin/support?ticket=ticket-1");
     const drawer = page.getByTestId("admin-ticket-drawer");
     await expect(drawer.getByText(/Yêu cầu đã đóng/)).toBeVisible();
@@ -288,7 +289,7 @@ test.describe("admin support inbox", () => {
     await mockAdminLookups(page);
     await page.route("**/api/admin/support/tickets?*", (route) => route.fulfill({ json: page1([]) }));
     await page.route("**/api/admin/feedback?*", (route) => route.fulfill({ json: page1([feedback]) }));
-    await page.route("**/api/admin/feedback/f-1", (route) => route.fulfill({ headers: { ETag: '"support-1"' }, json: feedback }));
+    await page.route("**/api/admin/feedback/f-1", (route) => route.fulfill({ headers: { ...EXPOSED, ETag: '"support-1"' }, json: feedback }));
     await page.route("**/api/admin/feedback/f-1/status", async (route) => {
       patches.push({ ifMatch: await route.request().headerValue("if-match"), body: route.request().postDataJSON() });
       if (patches.length === 1) return route.fulfill({ status: 412, json: { code: "PRECONDITION_FAILED" } });
@@ -416,9 +417,9 @@ test.describe("organization support", () => {
     await page.route("**/api/support/tickets", async (route) => {
       creates.push({ key: await route.request().headerValue("idempotency-key"), body: route.request().postDataJSON() });
       if (creates.length === 1) return route.fulfill({ status: 500, json: { title: "boom" } });
-      return route.fulfill({ status: 201, headers: { ETag: '"support-1"' }, json: ticket({ revision: 1 }) });
+      return route.fulfill({ status: 201, headers: { ...EXPOSED, ETag: '"support-1"' }, json: ticket({ revision: 1 }) });
     });
-    await page.route("**/api/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ETag: '"support-2"' }, json: { ...ticket(), messages: messagesPage([message("m1", "support-admin", "Chúng tôi đã nhận yêu cầu"), message("m2", "owner-1", "Cảm ơn")]) } }));
+    await page.route("**/api/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ...EXPOSED, ETag: '"support-2"' }, json: { ...ticket(), messages: messagesPage([message("m1", "support-admin", "Chúng tôi đã nhận yêu cầu"), message("m2", "owner-1", "Cảm ơn")]) } }));
 
     await page.goto("/workspace/support");
     await expect(page.getByText("Bạn chưa gửi yêu cầu hỗ trợ nào")).toBeVisible();
@@ -452,7 +453,7 @@ test.describe("organization support", () => {
     const feedbackPosts: { key: string | undefined; body: unknown }[] = [];
     await signIn(page, owner);
     await page.route("**/api/support/tickets?*", (route) => { queries.push(new URL(route.request().url()).searchParams); return route.fulfill({ json: page1([ticket()]) }); });
-    await page.route("**/api/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ETag: '"support-2"' }, json: { ...ticket(), messages: messagesPage([]) } }));
+    await page.route("**/api/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ...EXPOSED, ETag: '"support-2"' }, json: { ...ticket(), messages: messagesPage([]) } }));
     await page.route("**/api/support/tickets/ticket-1/messages", async (route) => { sends.push({ key: await route.request().headerValue("idempotency-key"), body: route.request().postDataJSON() }); await route.fulfill({ status: 201, json: message("m", "owner-1", "x") }); });
     await page.route("**/api/feedback?*", (route) => route.fulfill({ json: page1([]) }));
     await page.route("**/api/feedback", async (route) => { feedbackPosts.push({ key: await route.request().headerValue("idempotency-key"), body: route.request().postDataJSON() }); await route.fulfill({ status: 201, json: { id: "f", category: "UI", message: "ok", rating: 5, status: "Submitted", reviewedBy: null, reviewedAt: null, revision: 1, createdAt: "2026-10-10T00:00:00Z", updatedAt: "2026-10-10T00:00:00Z" } }); });
@@ -523,11 +524,11 @@ test.describe("organization profile (new style)", () => {
     let etag = '"4"';
     await signIn(page, owner);
     await page.route("**/api/organizations/me", async (route) => {
-      if (route.request().method() === "GET") return route.fulfill({ headers: { ETag: etag }, json: organization });
+      if (route.request().method() === "GET") return route.fulfill({ headers: { ...EXPOSED, ETag: etag }, json: organization });
       updates.push({ ifMatch: await route.request().headerValue("if-match"), body: route.request().postDataJSON() });
       if (updates.length === 1) { etag = '"5"'; return route.fulfill({ status: 412, json: { code: "PRECONDITION_FAILED" } }); }
       if (updates.length === 2) return route.fulfill({ status: 409, json: { code: "ORGANIZATION_PHONE_EXISTS", title: "Phone exists", errors: { phoneNumber: ["Số điện thoại đã được tổ chức khác sử dụng."] } } });
-      return route.fulfill({ headers: { ETag: '"6"' }, json: { ...organization, name: "Fire3D Safety", profileRevision: 6 } });
+      return route.fulfill({ headers: { ...EXPOSED, ETag: '"6"' }, json: { ...organization, name: "Fire3D Safety", profileRevision: 6 } });
     });
 
     await page.goto("/workspace/profile");

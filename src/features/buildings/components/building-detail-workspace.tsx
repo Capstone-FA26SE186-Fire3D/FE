@@ -28,7 +28,7 @@ import type { QaAction } from "../qa-codes";
 import type { BuildingRevision, ProcessingJob, ProcessingLog } from "../types";
 import { useProcessingActions } from "../use-processing-actions";
 import { AnnotationsPanel } from "./annotations-panel";
-import { BuildingAccessPanel } from "./building-access-panel";
+import { BuildingAccessPanel, buildingAccessTag } from "./building-access-panel";
 import { ConfirmTrainingPanel } from "./confirm-training-panel";
 import { EquipmentPanel } from "./equipment-panel";
 import { IfcUploadModal } from "./ifc-upload-modal";
@@ -129,7 +129,7 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
   const building = useAsyncData(`building:${buildingId}`, (signal) => buildingsApi.getVersioned(token, buildingId, signal), enabled);
   const revisions = useAsyncData(`revisions:${buildingId}`, (signal) => buildingsApi.listRevisions(token, buildingId, 1, 50, signal), enabled);
   // Header chips: visibility and the service period. Both are optional context; a failed read just hides the chip.
-  const access = useAsyncData(`building-access:${buildingId}`, (signal) => buildingsApi.getAccess(token, buildingId, signal), enabled && !isAdmin);
+  const access = useAsyncData(`building-access:${buildingId}`, (signal) => buildingsApi.getAccess(token, buildingId, signal), enabled && !isAdmin, { tags: [buildingAccessTag(buildingId)] });
   const entitlements = useAsyncData(`billing:entitlements:${buildingId}`, (signal) => billingApi.listEntitlements(token, { buildingId, pageSize: 50 }, signal), enabled && !isAdmin);
   const service = useMemo(() => (entitlements.data ? summarizeEntitlements(entitlements.data.items) : undefined), [entitlements.data]);
   const scenarios = useAsyncData(`scenarios:${buildingId}:${scenarioPage}`, (signal) => buildingsApi.listScenarios(token, buildingId, scenarioPage, SCENARIO_PAGE_SIZE, signal), enabled);
@@ -292,7 +292,7 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
       </>}
     />
     {!isAdmin && (access.data || service) && <div className="ops-chips bd-chips" aria-label="Tình trạng công trình">
-      {access.data && <StatusBadge tone="neutral">{access.data.visibility === "Public" ? "Công khai" : "Riêng tư"}</StatusBadge>}
+      {access.data && <StatusBadge tone="neutral" data-testid="building-visibility">{access.data.visibility === "Public" ? "Công khai" : "Riêng tư"}</StatusBadge>}
       {service?.current && <StatusBadge tone={service.state === "expiring" ? "warning" : "success"}>Dịch vụ đến {formatDate(service.current.endsAt)}{service.daysLeft !== null ? ` · còn ${Math.max(service.daysLeft, 0)} ngày` : ""}</StatusBadge>}
       {service && !service.current && <StatusBadge tone={service.state === "expired" ? "danger" : "warning"}>{service.state === "expired" ? "Dịch vụ đã hết hạn" : service.state === "upcoming" ? "Dịch vụ chưa đến kỳ" : "Chưa có dịch vụ"}</StatusBadge>}
     </div>}

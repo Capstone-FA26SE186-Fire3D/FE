@@ -43,6 +43,13 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async redirects() {
+    // The area roots have no page of their own: open each area's first screen instead of a 404.
+    return [
+      { source: "/admin", destination: "/admin/overview", permanent: false },
+      { source: "/workspace", destination: "/workspace/buildings", permanent: false },
+    ];
+  },
   async rewrites() {
     return devApiProxy ? [{ source: "/api/:path*", destination: `${devApiProxy}/api/:path*` }] : [];
   },

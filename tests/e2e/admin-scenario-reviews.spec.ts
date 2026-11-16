@@ -4,6 +4,7 @@
  * BE contract (ScenarioReviewQueriesController, ScenarioContentReviewsController, OpenAPI @1eaf988). Not an integration
  * test against the real API. Run against a production build (`NEXT_PUBLIC_API_BASE_URL=` empty so the mock is same-origin).
  */
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { expectChipValue, pick } from "./chip-helpers";
 
@@ -95,7 +96,7 @@ class ReviewServer {
     const fingerprint = JSON.stringify([action, versionId, body]);
     const receipt = this.receipts.get(key);
     if (receipt) return receipt.fingerprint === fingerprint ? { status: 200, body: receipt.response } : { status: 409, body: { title: "Idempotency-Key reused.", code: "IDEMPOTENCY_KEY_CONFLICT" } };
-    if (this.faults.rateLimitNext) { this.faults.rateLimitNext = false; return { status: 429, body: { title: "Too many requests." }, headers: { "Retry-After": "2" } }; }
+    if (this.faults.rateLimitNext) { this.faults.rateLimitNext = false; return { status: 429, body: { title: "Too many requests." }, headers: { ...EXPOSED, "Retry-After": "2" } }; }
     if (this.faults.failNext) { const fail = this.faults.failNext; this.faults.failNext = undefined; return { status: fail.status, body: { title: "Injected error.", ...(fail.code ? { code: fail.code } : {}) } }; }
     const review = this.byVersion(versionId);
     if (!review) return { status: 404, body: { title: "Not found.", code: "NOT_FOUND" } };
@@ -119,7 +120,7 @@ const problem = (route: Route, status: number, body: Record<string, unknown>, he
 
 async function install(page: Page, server: ReviewServer, user: object = admin) {
   await page.addInitScript((stored) => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify(stored)), { accessToken: "ops-access", refreshToken: "ops-refresh" });
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ...EXPOSED, ETag: '"1"' } }));
   await page.route((url) => url.pathname === "/api/organizations", (route) => route.fulfill({ json: { items: [
     { id: ORG_1, name: "Trường THPT Lê Quý Đôn", slug: "le-quy-don", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
     { id: ORG_2, name: "Công ty Sao Mai", slug: "sao-mai", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
@@ -610,11 +611,15 @@ test.describe("decisions", () => {
     const server = new ReviewServer(baseSeeds());
     await install(page, server);
     await page.goto(`/admin/reviews?review=${server.reviews[0].summary.reviewId}`);
+    // The open drawer hides the rest of the page from the accessibility tree, so the sidebar badge is found by its link.
+    const navCount = page.locator('a[href="/admin/reviews"] .ops-nav-count').first();
+    await expect(navCount).toHaveText("2");
     await drawer(page).getByRole("button", { name: "Duyệt nội dung" }).click();
     const confirm = confirmDialog(page, "approve");
     await confirm.getByTestId("confirm-decision").dblclick();
     await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Approved");
     expect(server.decisionRequests).toHaveLength(1);
+    await expect(navCount).toHaveText("1"); // the sidebar badge follows the decision without a reload
   });
 });
 

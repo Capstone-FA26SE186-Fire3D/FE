@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 
 import { BUILDING_ID, SCENARIO_ID } from "../fixtures/scenario-editor/fixture-building";
@@ -21,7 +22,7 @@ async function open(page: Page, mock: AiMock, url: string, user: typeof owner | 
   await page.route("**/api/**", (route) => route.fulfill({ status: 404, contentType: "application/problem+json", body: JSON.stringify({ status: 404, title: "Not found", code: "NOT_FOUND" }) }));
   await signInAs(page, user);
   await mockAi(page, mock);
-  await page.route(`**/api/buildings/${BUILDING_ID}`, (route) => route.fulfill({ json: building, headers: { ETag: '"1"' } }));
+  await page.route(`**/api/buildings/${BUILDING_ID}`, (route) => route.fulfill({ json: building, headers: { ...EXPOSED, ETag: '"1"' } }));
   await page.route(`**/api/scenarios/${SCENARIO_ID}`, (route) => route.fulfill({ json: scenario }));
   await page.goto(url);
 }

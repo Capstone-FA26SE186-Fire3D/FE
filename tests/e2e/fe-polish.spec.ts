@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 import { storedSession } from "./session";
 
@@ -26,13 +27,13 @@ async function seed(page: Page, accessToken: string) {
 
 async function mockOrg(page: Page, buildings: () => { status: number; headers?: Record<string, string>; json: unknown }) {
   const authHeaders: string[] = [];
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ...EXPOSED, ETag: '"1"' } }));
   await page.route("**/api/buildings?*", (route) => {
     authHeaders.push(route.request().headers()["authorization"] ?? "");
     const answer = buildings();
-    return route.fulfill({ status: answer.status, headers: answer.headers, contentType: "application/json", body: JSON.stringify(answer.json) });
+    return route.fulfill({ status: answer.status, headers: { ...EXPOSED, ...answer.headers }, contentType: "application/json", body: JSON.stringify(answer.json) });
   });
-  await page.route("**/api/organizations/me", (route) => route.fulfill({ json: { id: "org-1", name: "Tổ chức 1", slug: "org-1", address: "", phoneNumber: "", isActive: true, revision: 1 }, headers: { ETag: '"1"' } }));
+  await page.route("**/api/organizations/me", (route) => route.fulfill({ json: { id: "org-1", name: "Tổ chức 1", slug: "org-1", address: "", phoneNumber: "", isActive: true, revision: 1 }, headers: { ...EXPOSED, ETag: '"1"' } }));
   return authHeaders;
 }
 
@@ -94,7 +95,7 @@ test.describe("access token refresh during the session", () => {
 test("retry waits for the server's Retry-After window before it can be pressed", async ({ page }) => {
   let failures = 1;
   await seed(page, "plain-token");
-  await mockOrg(page, () => (failures-- > 0 ? { status: 429, headers: { "Retry-After": "2" }, json: { title: "Too many", code: "RATE_LIMITED" } } : emptyPage()));
+  await mockOrg(page, () => (failures-- > 0 ? { status: 429, headers: { ...EXPOSED, "Retry-After": "2" }, json: { title: "Too many", code: "RATE_LIMITED" } } : emptyPage()));
   await page.goto("/workspace/buildings");
   const retry = page.getByTestId("retry-button").first();
   await expect(retry).toBeDisabled();

@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 import { storedSession } from "./session";
 import { safeNext, postLoginRoute } from "../../src/features/auth/redirect";
@@ -9,8 +10,8 @@ async function session(page: Page, role = 1) {
     sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "workspace-access", refreshToken: "workspace-refresh" }));
     localStorage.setItem("fire3d-org-tour", "done"); // the spotlight tour must never cover the page under test
   });
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: { ...owner, role }, headers: { ETag: '"1"' } }));
-  await page.route("**/api/organizations/me", (route) => route.fulfill({ json: { id: "org-1", name: "FET3D Lab", address: "1 Test Street", phoneNumber: "+84123456789", profileRevision: 1 }, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: { ...owner, role }, headers: { ...EXPOSED, ETag: '"1"' } }));
+  await page.route("**/api/organizations/me", (route) => route.fulfill({ json: { id: "org-1", name: "FET3D Lab", address: "1 Test Street", phoneNumber: "+84123456789", profileRevision: 1 }, headers: { ...EXPOSED, ETag: '"1"' } }));
   await page.route("**/api/buildings?*", (route) => {
     const search = new URL(route.request().url()).searchParams.get("search");
     return route.fulfill({ json: { items: search && !building.name.includes(search) ? [] : [building], totalCount: 1, page: 1, pageSize: 50 } });

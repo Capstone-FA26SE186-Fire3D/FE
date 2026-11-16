@@ -4,10 +4,15 @@ import { DetailList, formatDateTime } from "@/components/ops/detail-parts";
 import { Modal } from "@/components/ui/dialog";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { capabilityName } from "@/configs/capability-labels";
+import { metricName } from "@/configs/metric-labels";
+import { runtimeActionName, runtimeEventName } from "@/configs/runtime-event-labels";
 import type { RuntimeCatalogEntry } from "../model";
 
 const KIND_LABELS: Record<string, string> = { Spawn: "Điểm xuất phát", Hazard: "Nguy cơ", Goal: "Đích đến", Npc: "Nhân vật", BlockedElement: "Lối bị chặn", Equipment: "Thiết bị" };
 const kindName = (kind: string) => KIND_LABELS[kind] ?? kind;
+
+/** The contract key, as small print for support next to its plain name. */
+const Code = ({ value }: { value: string }) => <small className="rt-code adm-mono">{value}</small>;
 
 /** Read-only detail of one registered version: every capability with its events (and scored metric) and actions. */
 export function RuntimeDetailModal({ entry, onClose }: { entry: RuntimeCatalogEntry; onClose: () => void }) {
@@ -34,11 +39,11 @@ export function RuntimeDetailModal({ entry, onClose }: { entry: RuntimeCatalogEn
             {contract && contract.events.length === 0 && contract.actions.length === 0 && <p className="rt-cap-empty">Không ghi sự kiện hay thao tác.</p>}
             {contract && contract.events.length > 0 && <div className="rt-cap-group">
               <span className="rt-cap-label">Sự kiện</span>
-              <ul>{contract.events.map((event) => <li key={event.type}><span className="adm-mono">{event.type}</span>{event.metric ? <span className="rt-metric">Chấm điểm: <span className="adm-mono">{event.metric}</span></span> : <span className="rt-metric rt-metric--none">Không chấm điểm</span>}</li>)}</ul>
+              <ul>{contract.events.map((event) => <li key={event.type}><span data-testid="rt-event">{runtimeEventName(event.type)}</span><Code value={event.type} />{event.metric ? <span className="rt-metric">Chấm điểm: {metricName(event.metric)}</span> : <span className="rt-metric rt-metric--none">Không chấm điểm</span>}</li>)}</ul>
             </div>}
             {contract && contract.actions.length > 0 && <div className="rt-cap-group">
               <span className="rt-cap-label">Thao tác</span>
-              <ul>{contract.actions.map((action) => <li key={action.id}><span className="adm-mono">{action.id}</span>{action.event && <span className="rt-metric">tạo sự kiện <span className="adm-mono">{action.event}</span></span>}</li>)}</ul>
+              <ul>{contract.actions.map((action) => <li key={action.id}><span data-testid="rt-action">{runtimeActionName(action.id)}</span><Code value={action.id} />{action.event && <span className="rt-metric">ghi nhận: {runtimeEventName(action.event)}</span>}</li>)}</ul>
             </div>}
           </li>;
         })}

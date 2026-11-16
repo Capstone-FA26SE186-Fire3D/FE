@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import type { Page, Route } from "@playwright/test";
 
 /*
@@ -85,8 +86,8 @@ export async function installTenantServer(page: Page, tenants: Tenant[], log = n
     if (path === "/api/auth/logout") return route.fulfill({ status: 204, body: "" });
     const tenant = byToken(route);
     if (!tenant) return route.fulfill({ status: 401, json: { title: "Unauthorized", code: "UNAUTHORIZED" } });
-    if (path === "/api/auth/me") return route.fulfill({ json: tenant.user, headers: { ETag: `"${tenant.user.profileRevision}"` } });
-    if (path === "/api/organizations/me") return route.fulfill({ json: { id: tenant.user.organizationId, name: `Tổ chức ${tenant.user.organizationId}`, slug: "org", address: "", phoneNumber: "", isActive: true, profileRevision: 1, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }, headers: { ETag: '"1"' } });
+    if (path === "/api/auth/me") return route.fulfill({ json: tenant.user, headers: { ...EXPOSED, ETag: `"${tenant.user.profileRevision}"` } });
+    if (path === "/api/organizations/me") return route.fulfill({ json: { id: tenant.user.organizationId, name: `Tổ chức ${tenant.user.organizationId}`, slug: "org", address: "", phoneNumber: "", isActive: true, profileRevision: 1, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }, headers: { ...EXPOSED, ETag: '"1"' } });
     if (path === "/api/buildings" && method === "GET") return route.fulfill({ json: page1(tenant.buildings.map((item) => buildingJson(tenant, item))) });
     const match = /^\/api\/buildings\/([^/]+)$/.exec(path);
     if (match) {

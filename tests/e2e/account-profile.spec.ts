@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 
 const organizationUser = {
@@ -30,7 +31,7 @@ test("account profile uses the latest ETags to update a user and its organizatio
   await restoreSession(page);
   await page.route("**/api/auth/me", async (route) => {
     if (route.request().method() === "GET") {
-      await route.fulfill({ headers: { etag: '"7"' }, json: organizationUser });
+      await route.fulfill({ headers: { ...EXPOSED, etag: '"7"' }, json: organizationUser });
       return;
     }
 
@@ -39,14 +40,14 @@ test("account profile uses the latest ETags to update a user and its organizatio
       ifMatch: await route.request().headerValue("if-match"),
     });
     await route.fulfill({
-      headers: { etag: '"8"' },
+      headers: { ...EXPOSED, etag: '"8"' },
       json: { ...organizationUser, fullName: "Nguyen Van B", phoneNumber: "+84908889999" },
     });
   });
   await page.route("**/api/organizations/me", async (route) => {
     if (route.request().method() === "GET") {
       await route.fulfill({
-        headers: { etag: '"4"' },
+        headers: { ...EXPOSED, etag: '"4"' },
         json: {
           id: "organization-1",
           name: "Fire3D Studio",
@@ -67,7 +68,7 @@ test("account profile uses the latest ETags to update a user and its organizatio
       ifMatch: await route.request().headerValue("if-match"),
     });
     await route.fulfill({
-      headers: { etag: '"5"' },
+      headers: { ...EXPOSED, etag: '"5"' },
       json: {
         id: "organization-1",
         name: "Fire3D Safety Studio",
@@ -115,14 +116,14 @@ test("account profile maps the gender enum name returned by the API to its selec
   await restoreSession(page);
   await page.route("**/api/auth/me", async (route) => {
     if (route.request().method() === "GET") {
-      await route.fulfill({ headers: { etag: '"7"' }, json: { ...organizationUser, gender: "PreferNotToSay" } });
+      await route.fulfill({ headers: { ...EXPOSED, etag: '"7"' }, json: { ...organizationUser, gender: "PreferNotToSay" } });
       return;
     }
     updateBody = route.request().postDataJSON();
-    await route.fulfill({ headers: { etag: '"8"' }, json: { ...organizationUser, gender: "PreferNotToSay", profileRevision: 8 } });
+    await route.fulfill({ headers: { ...EXPOSED, etag: '"8"' }, json: { ...organizationUser, gender: "PreferNotToSay", profileRevision: 8 } });
   });
   await page.route("**/api/organizations/me", (route) => route.fulfill({
-    headers: { etag: '"4"' },
+    headers: { ...EXPOSED, etag: '"4"' },
     json: {
       id: "organization-1", name: "Fire3D Studio", slug: "fire3d-studio", address: "Da Nang", phoneNumber: "+842361234567",
       isActive: true, profileRevision: 4, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z",
@@ -140,7 +141,7 @@ test("changing a password ends the current local session", async ({ page }) => {
   let changePasswordPayload: unknown;
 
   await restoreSession(page);
-  await page.route("**/api/auth/me", (route) => route.fulfill({ headers: { etag: '"2"' }, json: { ...organizationUser, role: 2, organizationId: null } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ headers: { ...EXPOSED, etag: '"2"' }, json: { ...organizationUser, role: 2, organizationId: null } }));
   await page.route("**/api/auth/change-password", async (route) => {
     changePasswordPayload = route.request().postDataJSON();
     await route.fulfill({ status: 204 });
@@ -160,9 +161,9 @@ test("avatar upload creates an intent, sends the image to storage, then complete
   const requests: { step: string; body?: unknown; contentType?: string | undefined; ifMatch?: string | undefined }[] = [];
 
   await restoreSession(page);
-  await page.route("**/api/auth/me", (route) => route.fulfill({ headers: { etag: '"7"' }, json: organizationUser }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ headers: { ...EXPOSED, etag: '"7"' }, json: organizationUser }));
   await page.route("**/api/organizations/me", (route) => route.fulfill({
-    headers: { etag: '"4"' },
+    headers: { ...EXPOSED, etag: '"4"' },
     json: {
       id: "organization-1", name: "Fire3D Studio", slug: "fire3d-studio", address: "Da Nang", phoneNumber: "+842361234567",
       isActive: true, profileRevision: 4, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z",
@@ -179,7 +180,7 @@ test("avatar upload creates an intent, sends the image to storage, then complete
   await page.route("**/api/me/avatar/complete", async (route) => {
     requests.push({ step: "complete", body: route.request().postDataJSON(), ifMatch: await route.request().headerValue("if-match") });
     await route.fulfill({
-      headers: { etag: '"8"' },
+      headers: { ...EXPOSED, etag: '"8"' },
       json: { url: "https://download.fire3d.test/avatar-1", expiresAt: "2026-10-07T10:05:00Z", profileRevision: 8 },
     });
   });

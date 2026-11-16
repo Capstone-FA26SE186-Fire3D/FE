@@ -35,7 +35,7 @@ function ErrorBody({ view }: { view: LibraryErrorView }) {
  * Published version is immutable and offers only "new version from this one". 412 keeps the author's content and compares
  * with the server; every command's Idempotency-Key is durable (same key while the same intent is retried).
  */
-export function VersionEditor({ accessToken, item, version, seed, onCreated, onChanged, onFork, onClose }: {
+export function VersionEditor({ accessToken, item, version, seed, onCreated, onChanged, onServerVersion, onFork, onClose }: {
   accessToken: string;
   item: LibraryItem;
   /** The version being opened; null while creating a new one. */
@@ -45,6 +45,8 @@ export function VersionEditor({ accessToken, item, version, seed, onCreated, onC
   onCreated: (version: LibraryVersion) => void;
   /** The item or its versions moved on the server: reload the item and the list. */
   onChanged: () => void;
+  /** The server returned a newer state of this version (saved, published): the dialog header shows it too. */
+  onServerVersion?: (version: WithEtag<LibraryVersion>) => void;
   onFork: (form: VersionForm | null, fromVersion: LibraryVersion | null) => void;
   onClose: () => void;
 }) {
@@ -82,6 +84,7 @@ export function VersionEditor({ accessToken, item, version, seed, onCreated, onC
     setSavedPrint(fingerprint(kind, content));
     setServerIssues(null);
     setShowIssues(false);
+    onServerVersion?.(next);
   };
 
   const loadConflict = async (mine: VersionForm) => {

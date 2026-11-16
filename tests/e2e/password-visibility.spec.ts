@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test } from "@playwright/test";
 
 test("login password can be revealed and hidden again", async ({ page }) => {
@@ -14,7 +15,7 @@ test("login password can be revealed and hidden again", async ({ page }) => {
 test("account password fields can be revealed independently", async ({ page }) => {
   const user = { id: "trainee-1", email: "trainee@fire3d.test", fullName: "Trainee", role: 2, organizationId: null, profileRevision: 1 };
   await page.addInitScript((stored) => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify(stored)), { accessToken: "access", refreshToken: "refresh" });
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: "\"1\"" } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ...EXPOSED, ETag: "\"1\"" } }));
 
   await page.goto("/account");
 

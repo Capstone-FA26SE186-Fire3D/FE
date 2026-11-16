@@ -66,6 +66,8 @@ export const apiClient = {
     }
 
     const response = await fetch(buildUrl(path, options.query), {
+      // Every answer is per account and changes with each command: never reuse a stored copy after a command.
+      cache: "no-store",
       body: hasJsonBody ? JSON.stringify(options.json) : options.body,
       headers,
       method: options.method ?? (hasJsonBody || options.body ? "POST" : "GET"),

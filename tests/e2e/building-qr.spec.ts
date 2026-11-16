@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { storedSession } from "./session";
 import { postLoginRoute, safeNext } from "../../src/features/auth/redirect";
@@ -100,7 +101,7 @@ class QrWorld {
       this.log.push(entry);
       return entry;
     };
-    const problem = (route: Route, status: number, code: string, extra: { retryAfter?: string; body?: unknown } = {}) => route.fulfill({ status, headers: extra.retryAfter ? { "Retry-After": extra.retryAfter } : {}, json: extra.body ?? { title: code, code } });
+    const problem = (route: Route, status: number, code: string, extra: { retryAfter?: string; body?: unknown } = {}) => route.fulfill({ status, headers: extra.retryAfter ? { ...EXPOSED, "Retry-After": extra.retryAfter } : {}, json: extra.body ?? { title: code, code } });
 
     await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building }));
     await page.route("**/api/buildings/building-1/revisions?*", (route) => route.fulfill({ json: page1([]) }));
@@ -183,7 +184,7 @@ async function installLanding(page: Page, world: QrWorld, init: Partial<Landing>
   await page.route("**/api/buildings/building-1/participation/verify", (route) => {
     record(route);
     const failure = state.verifyFailures.shift();
-    if (failure) return route.fulfill({ status: failure.status, headers: failure.retryAfter ? { "Retry-After": failure.retryAfter } : {}, json: { title: "x", code: failure.code } });
+    if (failure) return route.fulfill({ status: failure.status, headers: failure.retryAfter ? { ...EXPOSED, "Retry-After": failure.retryAfter } : {}, json: { title: "x", code: failure.code } });
     const code = (route.request().postDataJSON() as { code: string }).code;
     if (code !== state.participationCode) return route.fulfill({ status: 400, json: { title: "Use the current participation code.", code: "PARTICIPATION_CODE_INVALID" } });
     state.granted = true;

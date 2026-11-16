@@ -4,6 +4,7 @@
  * Evidence level: Playwright route mocks of OrganizationsController, SupportController and AuditLogsController
  * (state is kept like the server so a reload proves recovery). Not an integration test against the real API.
  */
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const admin = { id: "admin-1", email: "admin@fire3d.test", fullName: "Platform Admin", role: 0, organizationId: null, profileRevision: 1 };
@@ -12,7 +13,7 @@ const trainee = { id: "trainee-1", email: "t@fire3d.test", fullName: "Học Viê
 
 async function signIn(page: Page, user: object) {
   await page.addInitScript((stored) => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify(stored)), { accessToken: "people-access", refreshToken: "people-refresh" });
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ...EXPOSED, ETag: '"1"' } }));
 }
 
 const overflow = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -29,7 +30,7 @@ async function mockOrganizations(page: Page, state: OrgState) {
     if (route.request().method() === "GET") {
       state.detailCalls += 1;
       if (state.detailDelayMs && state.detailCalls > 1) await new Promise((resolve) => setTimeout(resolve, state.detailDelayMs));
-      return route.fulfill({ json: body(), headers: { ETag: `"${state.revision}"` } });
+      return route.fulfill({ json: body(), headers: { ...EXPOSED, ETag: `"${state.revision}"` } });
     }
     const ifMatch = (await route.request().headerValue("if-match")) ?? undefined;
     const payload = route.request().postDataJSON() as Record<string, unknown>;
@@ -41,7 +42,7 @@ async function mockOrganizations(page: Page, state: OrgState) {
     if (typeof payload.address === "string") state.address = payload.address;
     if (typeof payload.phoneNumber === "string") state.phoneNumber = payload.phoneNumber;
     state.revision += 1;
-    return route.fulfill({ json: body(), headers: { ETag: `"${state.revision}"` } });
+    return route.fulfill({ json: body(), headers: { ...EXPOSED, ETag: `"${state.revision}"` } });
   });
 }
 
@@ -174,7 +175,7 @@ test.describe("who sent it", () => {
     await signIn(page, admin);
     await mockAdminLookups(page);
     await page.route("**/api/admin/support/tickets?*", (route) => route.fulfill({ json: page1([ticket(), ticket({ id: "ticket-2", ticketNumber: "SUP-0002", subject: "Xin hướng dẫn", createdBy: { id: "gone", displayName: null, available: false }, organization: { id: "gone-org", name: null, available: false } }), ticket({ id: "ticket-3", ticketNumber: "SUP-0003", subject: "Học viên hỏi", createdBy: { id: "t", displayName: "Học Viên", available: true, email: "t@x.test" }, organization: null })]) }));
-    await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ETag: '"support-2"' }, json: { ...ticket(), messages: { items: [
+    await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ...EXPOSED, ETag: '"support-2"' }, json: { ...ticket(), messages: { items: [
       { id: "m1", authorId: "u-9", message: "Em cần hỗ trợ gấp", createdAt: "2026-10-02T09:00:00Z", author: person },
       { id: "m2", authorId: "admin-1", message: "Đã nhận", createdAt: "2026-10-02T09:30:00Z", author: { id: "admin-1", displayName: "Platform Admin", available: true, email: "admin@fire3d.test" } },
     ], total: 2, page: 1, pageSize: 100 } } }));
@@ -204,13 +205,13 @@ test.describe("who sent it", () => {
     await mockAdminLookups(page);
     await page.route("**/api/admin/support/tickets?*", (route) => route.fulfill({ json: page1([]) }));
     await page.route("**/api/admin/feedback?*", (route) => route.fulfill({ json: page1([listItem]) }));
-    await page.route("**/api/admin/feedback/f-1", (route) => route.fulfill({ headers: { ETag: `"support-${detailRevision}"` }, json: { ...listItem, revision: detailRevision, createdBy: person } }));
+    await page.route("**/api/admin/feedback/f-1", (route) => route.fulfill({ headers: { ...EXPOSED, ETag: `"support-${detailRevision}"` }, json: { ...listItem, revision: detailRevision, createdBy: person } }));
     await page.route("**/api/admin/feedback/f-1/status", async (route) => {
       const ifMatch = (await route.request().headerValue("if-match")) ?? undefined;
       patches.push(ifMatch);
       if (ifMatch !== `"support-${detailRevision}"`) return route.fulfill({ status: 412, json: { code: "PRECONDITION_FAILED" } });
       detailRevision += 1;
-      return route.fulfill({ headers: { ETag: `"support-${detailRevision}"` }, json: { ...listItem, status: "Reviewed", revision: detailRevision, reviewedAt: "2026-10-03T00:00:00Z", createdBy: person } });
+      return route.fulfill({ headers: { ...EXPOSED, ETag: `"support-${detailRevision}"` }, json: { ...listItem, status: "Reviewed", revision: detailRevision, reviewedAt: "2026-10-03T00:00:00Z", createdBy: person } });
     });
     await page.goto("/admin/support?tab=feedback");
     const row = page.getByRole("row").filter({ hasText: "Nút hơi nhỏ" });
@@ -238,7 +239,7 @@ test.describe("who sent it", () => {
     await mockAdminLookups(page);
     await page.route("**/api/admin/support/tickets?*", (route) => route.fulfill({ json: page1([]) }));
     await page.route("**/api/admin/feedback?*", (route) => route.fulfill({ json: page1([listItem]) }));
-    await page.route("**/api/admin/feedback/f-1", (route) => route.fulfill({ headers: { ETag: '"support-1"' }, json: listItem }));
+    await page.route("**/api/admin/feedback/f-1", (route) => route.fulfill({ headers: { ...EXPOSED, ETag: '"support-1"' }, json: listItem }));
     await page.route("**/api/admin/feedback/f-1/status", (route) => route.fulfill(mode === "412" ? { status: 412, json: { code: "PRECONDITION_FAILED" } } : { status: 404, json: { code: "NOT_FOUND" } }));
     await page.goto("/admin/support?tab=feedback&feedback=f-1");
     const drawer = page.getByTestId("admin-feedback-drawer");
@@ -340,7 +341,7 @@ async function mockUserSupport(page: Page, state: SupportState) {
   await page.route(/\/api\/support\/tickets\/ticket-\d+\?.*$/, (route) => {
     const id = route.request().url().match(/tickets\/(ticket-\d+)/)?.[1];
     const found = state.tickets.find((item) => item.id === id);
-    return found ? route.fulfill({ headers: { ETag: '"support-1"' }, json: { ...found, messages: { items: [{ id: "m1", authorId: "staff-1", message: "Chúng tôi đang kiểm tra.", createdAt: "2026-10-12T09:00:00Z", author: { id: "staff-1", displayName: "Nhân viên Fire3D", available: true } }], total: 1, page: 1, pageSize: 100 } } }) : route.fulfill({ status: 404, json: { code: "NOT_FOUND" } });
+    return found ? route.fulfill({ headers: { ...EXPOSED, ETag: '"support-1"' }, json: { ...found, messages: { items: [{ id: "m1", authorId: "staff-1", message: "Chúng tôi đang kiểm tra.", createdAt: "2026-10-12T09:00:00Z", author: { id: "staff-1", displayName: "Nhân viên Fire3D", available: true } }], total: 1, page: 1, pageSize: 100 } } }) : route.fulfill({ status: 404, json: { code: "NOT_FOUND" } });
   });
 }
 
@@ -433,7 +434,7 @@ test.describe("layout", () => {
         await mockAdminLookups(page);
         await mockOrganizations(page, org);
         await page.route("**/api/admin/support/tickets?*", (route) => route.fulfill({ json: page1([ticket({ subject: "Không tải được mô hình IFC của công trình có tên rất dài ".repeat(3) })]) }));
-        await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ETag: '"support-2"' }, json: { ...ticket(), messages: { items: [{ id: "m1", authorId: "u-9", message: "Em cần hỗ trợ", createdAt: "2026-10-02T09:00:00Z", author: person }], total: 1, page: 1, pageSize: 100 } } }));
+        await page.route("**/api/admin/support/tickets/ticket-1?*", (route) => route.fulfill({ headers: { ...EXPOSED, ETag: '"support-2"' }, json: { ...ticket(), messages: { items: [{ id: "m1", authorId: "u-9", message: "Em cần hỗ trợ", createdAt: "2026-10-02T09:00:00Z", author: person }], total: 1, page: 1, pageSize: 100 } } }));
         await page.route("**/api/admin/audit-logs?*", (route) => route.fulfill({ json: { items: [auditRow], total: 1, page: 1, pageSize: 20, from: "2026-09-10T00:00:00Z", to: "2026-10-10T00:00:00Z" } }));
         await page.route(`**/api/admin/audit-logs/${guid(5)}`, (route) => route.fulfill({ json: { ...auditRow, reason: "x", changes: [{ field: "status", before: "Open", after: "InProgress" }, { field: "assignedTo", before: null, after: guid(1) }] } }));
 

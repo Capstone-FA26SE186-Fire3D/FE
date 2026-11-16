@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 
 // All network is mocked with Playwright routes: evidence for UI behaviour, not for BE integration.
@@ -11,7 +12,7 @@ async function signIn(page: Page, user: typeof owner | typeof admin = owner, tou
     sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" }));
     if (tourValue) localStorage.setItem("fire3d-org-tour", tourValue);
   }, { tourValue: tour ?? null });
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ...EXPOSED, ETag: '"1"' } }));
   await page.route("**/api/buildings?*", (route) => route.fulfill({ json: { items: buildings, totalCount: 1, page: 1, pageSize: 20 } }));
 }
 

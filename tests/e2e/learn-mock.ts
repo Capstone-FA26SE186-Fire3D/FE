@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import type { Page, Route } from "@playwright/test";
 
 /*
@@ -616,7 +617,7 @@ export async function signIn(page: Page, backend: LearnBackend, who: Actor) {
   if (who !== "guest") await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "learn-access", refreshToken: "learn-refresh" })));
   await page.route("**/api/auth/me", (route) => {
     const user = userFor(backend.actor);
-    return user ? route.fulfill({ json: user, headers: { ETag: '"1"' } }) : route.fulfill({ status: 401, body: "" });
+    return user ? route.fulfill({ json: user, headers: { ...EXPOSED, ETag: '"1"' } }) : route.fulfill({ status: 401, body: "" });
   });
 }
 

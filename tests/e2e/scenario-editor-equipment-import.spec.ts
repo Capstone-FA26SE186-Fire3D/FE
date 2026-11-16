@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -56,7 +57,7 @@ async function open(page: Page, mock: MockState, equipment: { status?: number; b
     calls.push(route.request().method());
     return equipment.status && equipment.status >= 400
       ? route.fulfill({ status: equipment.status, contentType: "application/problem+json", body: JSON.stringify(equipment.body) })
-      : route.fulfill({ json: equipment.body, headers: { ETag: '"3"' } });
+      : route.fulfill({ json: equipment.body, headers: { ...EXPOSED, ETag: '"3"' } });
   });
   await page.goto(EDITOR_URL);
   await expect(page.getByTestId("scenario-editor")).toHaveAttribute("data-draft-mode", "v1");
@@ -154,7 +155,7 @@ test("the import dialog fits a 375px phone without horizontal page scroll", asyn
   await page.setViewportSize({ width: 375, height: 812 });
   const mock = newMock({ state: v1State(), previewKind: "v1", catalog: CATALOG });
   await installEditorMocks(page, mock);
-  await page.route(`**/api/revisions/${REVISION_ID}/equipment-candidates`, (route) => route.fulfill({ json: view(CANDIDATES), headers: { ETag: '"3"' } }));
+  await page.route(`**/api/revisions/${REVISION_ID}/equipment-candidates`, (route) => route.fulfill({ json: view(CANDIDATES), headers: { ...EXPOSED, ETag: '"3"' } }));
   await page.goto(EDITOR_URL);
   await page.getByRole("button", { name: "Đối tượng", exact: true }).click();
   await page.getByTestId("import-equipment").click();

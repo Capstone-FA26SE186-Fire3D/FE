@@ -56,6 +56,10 @@ export function ItemDetail({ accessToken, itemId, versionParam, onVersion, onClo
 
   // The query keeps the previous version while the next one loads; only a version that matches the URL is shown.
   const loaded = versionQuery.data && versionQuery.data.data.id === versionParam ? versionQuery.data : undefined;
+  // What the open editor last got back from the server (save, publish): the header badge and title follow it, not the
+  // read that opened the editor.
+  const [edited, setEdited] = useState<WithEtag<LibraryVersion> | null>(null);
+  const shownVersion = loaded && edited?.data.id === loaded.data.id ? edited : loaded;
   const reloadItem = () => { setRev((value) => value + 1); onListChanged(); };
   const editing = versionParam !== "";
 
@@ -106,11 +110,11 @@ export function ItemDetail({ accessToken, itemId, versionParam, onVersion, onClo
   const reloadNote = <p className="ops-field-hint" style={{ margin: 0 }}>Dữ liệu lấy từ máy chủ. <button type="button" onClick={() => { reloadItem(); setVersionRev((value) => value + 1); }} style={{ background: "none", border: 0, padding: 0, color: "var(--ember)", textDecoration: "underline", cursor: "pointer", font: "inherit" }}>Tải lại</button> sẽ bỏ thay đổi chưa lưu trong phiên bản đang mở.</p>;
 
   if (editing) {
-    const editorTitle = versionParam === "new" ? "Phiên bản mới" : loaded ? `v${loaded.data.versionNumber} · ${loaded.data.name}` : "Phiên bản";
+    const editorTitle = versionParam === "new" ? "Phiên bản mới" : shownVersion ? `v${shownVersion.data.versionNumber} · ${shownVersion.data.name}` : "Phiên bản";
     return shell({
       title: editorTitle,
       description: `${kindLabel[item.kind]} · mục ${item.code}`,
-      eyebrow: <>{activeBadge}{loaded && <StatusBadge tone={loaded.data.status === "Published" ? "success" : "warning"}>{loaded.data.status === "Published" ? "Đã xuất bản" : "Bản nháp"}</StatusBadge>}</>,
+      eyebrow: <>{activeBadge}{shownVersion && <StatusBadge tone={shownVersion.data.status === "Published" ? "success" : "warning"} data-testid="version-status-badge">{shownVersion.data.status === "Published" ? "Đã xuất bản" : "Bản nháp"}</StatusBadge>}</>,
       headerExtra: <Button size="sm" variant="quiet" onClick={() => onVersion(null)}><ArrowLeft size={16} aria-hidden="true" />Về mục</Button>,
       children: <div className="ops-stack" data-testid="item-detail">
         {versionParam === "new" && <VersionEditor key={`new:${seed.from ?? "blank"}`} accessToken={accessToken} item={item} version={null} seed={seed.form} onCreated={(created) => onVersion(created.id)} onChanged={reloadItem} onFork={startNew} onClose={() => onVersion(null)} />}
@@ -121,7 +125,7 @@ export function ItemDetail({ accessToken, itemId, versionParam, onVersion, onClo
         })()}
         {wantsVersion && !loaded && versionQuery.error === undefined && <SkeletonRows rows={5} label="Đang tải phiên bản…" />}
         {/* Keyed by ETag: a cached copy shown on reopen is replaced by the server's newer state (e.g. Published). */}
-        {loaded && loaded.data.itemId === item.id && <VersionEditor key={`${loaded.data.id}:${loaded.etag}:${versionRev}`} accessToken={accessToken} item={item} version={loaded} seed={null} onCreated={(created) => onVersion(created.id)} onChanged={reloadItem} onFork={startNew} onClose={() => onVersion(null)} />}
+        {loaded && loaded.data.itemId === item.id && <VersionEditor key={`${loaded.data.id}:${loaded.etag}:${versionRev}`} accessToken={accessToken} item={item} version={loaded} seed={null} onCreated={(created) => onVersion(created.id)} onChanged={reloadItem} onServerVersion={setEdited} onFork={startNew} onClose={() => onVersion(null)} />}
         {loaded && loaded.data.itemId !== item.id && <Alert tone="danger" title="Phiên bản không thuộc mục này">Mở lại từ danh sách phiên bản của mục.</Alert>}
         {reloadNote}
       </div>,
