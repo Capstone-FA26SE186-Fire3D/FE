@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 import { storedSession } from "./session";
 import { googleFixtureBundle } from "../fixtures/google/build.mjs";
@@ -185,7 +186,7 @@ for (const [code, status, header, seconds] of [
     let calls = 0;
     await page.route("**/api/auth/google/onboarding/complete", (route) => {
       calls++;
-      return route.fulfill({ status, headers: header ? { "Retry-After": header } : {}, json: { code, title: "Wait" } });
+      return route.fulfill({ status, headers: header ? { ...EXPOSED, "Retry-After": header } : {}, json: { code, title: "Wait" } });
     });
     await page.getByRole("button", { name: "Hoàn tất tài khoản" }).click();
     await expect(page.getByText(`Có thể thử lại sau ${seconds} giây.`)).toBeVisible();
@@ -220,7 +221,7 @@ test("proof expiry during cooldown still requires Google verification", async ({
   await page.clock.install();
   await openFixture(page, { status: "OnboardingRequired", onboarding: { ...proof(), expiresAt: new Date(Date.now() + 3000).toISOString() } });
   await page.getByLabel("Tên người dùng").fill("expiry_user");
-  await page.route("**/api/auth/google/onboarding/complete", (route) => route.fulfill({ status: 503, headers: { "Retry-After": "5" }, json: { code: "ONBOARDING_RETRY_REQUIRED" } }));
+  await page.route("**/api/auth/google/onboarding/complete", (route) => route.fulfill({ status: 503, headers: { ...EXPOSED, "Retry-After": "5" }, json: { code: "ONBOARDING_RETRY_REQUIRED" } }));
   await page.getByRole("button", { name: "Hoàn tất tài khoản" }).click();
   await page.clock.fastForward(5500);
   await expect(page.getByRole("button", { name: "Hoàn tất tài khoản" })).toBeDisabled();
@@ -257,7 +258,7 @@ test("Google exchange rate limiting waits before another popup", async ({ page }
   let calls = 0;
   await page.route("**/api/auth/login-firebase", (route) => {
     calls++;
-    return route.fulfill({ status: 429, headers: { "Retry-After": "3" }, json: { code: "GOOGLE_ONBOARDING_RATE_LIMITED" } });
+    return route.fulfill({ status: 429, headers: { ...EXPOSED, "Retry-After": "3" }, json: { code: "GOOGLE_ONBOARDING_RATE_LIMITED" } });
   });
   await page.getByRole("button", { name: "Thử lại Google" }).click();
   await expect(page.getByText("Có thể thử lại sau 3 giây.")).toBeVisible();

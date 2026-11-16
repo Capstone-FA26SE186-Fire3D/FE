@@ -14,20 +14,21 @@ async function expectReconcileOffered(page: Page, row: Locator, offered: boolean
   await page.keyboard.press("Escape");
 }
 
-const rows = (count: number) => Array.from({ length: count }, (_, index) => {
+/** `end` is the newest row's time; the date-filter test needs fixed dates, the 30-day chart needs rows near "now". */
+const rows = (count: number, end = Date.UTC(2026, 9, 12, 12, 0)) => Array.from({ length: count }, (_, index) => {
   const n = index + 1;
   const stuck = n % 3 === 0;
   return ledgerRow({
     checkoutId: `dddddddd-0000-0000-0000-${String(n).padStart(12, "0")}`, paymentRequestId: `eeeeeeee-0000-0000-0000-${String(n).padStart(12, "0")}`, quotationNumber: `FET-Q-${String(n).padStart(4, "0")}`,
     checkoutStatus: stuck ? "NeedsReconcile" : "Completed", paymentStatus: "Paid", provisioningStatus: stuck ? "NeedsReconcile" : "Succeeded", provisioningLines: 2, provisioningSucceeded: stuck ? 1 : 2,
-    createdAt: new Date(Date.UTC(2026, 9, 12, 12, 0) - n * 3_600_000).toISOString(), paidAt: new Date(Date.UTC(2026, 9, 12, 12, 1) - n * 3_600_000).toISOString(), organizationId: n % 2 ? "org-1" : "org-2",
+    createdAt: new Date(end - n * 3_600_000).toISOString(), paidAt: new Date(end + 60_000 - n * 3_600_000).toISOString(), organizationId: n % 2 ? "org-1" : "org-2",
   });
 });
 
 test.describe("admin payments ledger (mock)", () => {
   test("the status chart shows one tile per state with its count and share beside it", async ({ page }, testInfo) => {
     const mock = newMock();
-    mock.ledger = rows(45);
+    mock.ledger = rows(45, Date.now()); // the chart counts the last 30 days: fixed dates fall out of it as time passes
     await signIn(page, admin);
     await mockBilling(page, mock);
     await page.setViewportSize({ width: 1440, height: 900 });

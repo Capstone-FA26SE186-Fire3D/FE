@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 
 import { BUILDING_ID, DRAFT_ID, REVISION_ID, SCENARIO_ID } from "../fixtures/scenario-editor/fixture-building";
@@ -415,7 +416,7 @@ test("changing drafts aborts a pending validation and does not apply its result 
     finished.resolve();
   });
   const nextId = "11111111-1111-4111-8111-111111111112";
-  await page.route(`**/api/scenario-drafts/${nextId}`, (route) => route.fulfill({ json: { id: nextId, scenarioId: SCENARIO_ID, buildingId: BUILDING_ID, revisionId: REVISION_ID, draftNumber: 4, state: sampleDraftState(), source: "Manual", version: 86 }, headers: { ETag: '"86"' } }));
+  await page.route(`**/api/scenario-drafts/${nextId}`, (route) => route.fulfill({ json: { id: nextId, scenarioId: SCENARIO_ID, buildingId: BUILDING_ID, revisionId: REVISION_ID, draftNumber: 4, state: sampleDraftState(), source: "Manual", version: 86 }, headers: { ...EXPOSED, ETag: '"86"' } }));
   await page.getByTestId("validate").click();
   await started.promise;
   const aborted = page.waitForEvent("requestfailed", { predicate: (request) => request.url().endsWith(`/${DRAFT_ID}/validate`) });

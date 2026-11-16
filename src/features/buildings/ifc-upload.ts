@@ -37,7 +37,8 @@ export async function putIfcObject(uploadUrl: string, file: File, fetchImpl: typ
   });
 
   if (!response.ok) {
-    throw new Error("Không thể tải IFC lên kho lưu trữ.");
+    // Same error type as the XHR variant, so the upload flow classifies it (a plain Error only gets the generic text).
+    throw new IfcPutError("Không thể tải IFC lên kho lưu trữ.", response.status);
   }
 }
 

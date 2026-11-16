@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 import { admin as billingAdmin, callsTo, etagOf, ids, mockBilling, newMock, signIn as billingSignIn } from "./billing-mock";
 import { tokenSession } from "./regression-helpers";
@@ -18,13 +19,13 @@ function etagServer(initial: Rec) {
     otherEditor(changes: Record<string, unknown>) { state.record = { ...state.record, ...changes, profileRevision: state.record.profileRevision + 1 }; },
     async handle(route: import("@playwright/test").Route) {
       const request = route.request();
-      if (request.method() === "GET") { state.reads += 1; return route.fulfill({ json: state.record, headers: { ETag: `"${state.record.profileRevision}"` } }); }
+      if (request.method() === "GET") { state.reads += 1; return route.fulfill({ json: state.record, headers: { ...EXPOSED, ETag: `"${state.record.profileRevision}"` } }); }
       const body = request.postDataJSON() as Record<string, unknown>;
       const ifMatch = request.headers()["if-match"];
       state.patches.push({ ifMatch, body });
       if (ifMatch !== `"${state.record.profileRevision}"`) return route.fulfill({ status: 412, json: { title: "Precondition failed", code: "PROFILE_REVISION_MISMATCH" } });
       state.record = { ...state.record, ...body, profileRevision: state.record.profileRevision + 1 };
-      return route.fulfill({ json: state.record, headers: { ETag: `"${state.record.profileRevision}"` } });
+      return route.fulfill({ json: state.record, headers: { ...EXPOSED, ETag: `"${state.record.profileRevision}"` } });
     },
   };
 }
@@ -128,12 +129,12 @@ test.describe("412 on commerce catalog edits (PATCH replaces every field)", () =
     // The shared mock has no single-rule route: a minimal one with the same If-Match rule as the server.
     await page.route("**/api/admin/discount-rules/*", async (route) => {
       const request = route.request();
-      if (request.method() === "GET") return route.fulfill({ json: rule, headers: { ETag: etagOf(ids.discount, rule.revision) } });
+      if (request.method() === "GET") return route.fulfill({ json: rule, headers: { ...EXPOSED, ETag: etagOf(ids.discount, rule.revision) } });
       const body = request.postDataJSON() as Record<string, unknown>;
       patches.push({ ifMatch: request.headers()["if-match"], body });
       if (request.headers()["if-match"] !== etagOf(ids.discount, rule.revision)) return route.fulfill({ status: 412, json: { code: "BILLING_PRECONDITION_FAILED", title: "stale" } });
       Object.assign(rule, body, { revision: rule.revision + 1 });
-      return route.fulfill({ json: rule, headers: { ETag: etagOf(ids.discount, rule.revision) } });
+      return route.fulfill({ json: rule, headers: { ...EXPOSED, ETag: etagOf(ids.discount, rule.revision) } });
     });
     await page.goto("/admin/commerce?tab=discounts");
     await page.getByTestId("admin-discounts-table").locator("tbody tr").first().click();
@@ -175,7 +176,7 @@ test.describe("412 on the PlatformAdmin organization editor", () => {
   test("typed value stays, the newer version is offered, and only the changed fields are sent", async ({ page }) => {
     const server = etagServer({ ...organization(), accountCount: 2, buildingCount: 1 });
     await tokenSession(page, "tok-admin");
-    await page.route("**/api/auth/me", (route) => route.fulfill({ json: { id: "adm", email: "adm@fire3d.test", fullName: "Quản trị", role: 0, organizationId: null, profileRevision: 1 }, headers: { ETag: '"1"' } }));
+    await page.route("**/api/auth/me", (route) => route.fulfill({ json: { id: "adm", email: "adm@fire3d.test", fullName: "Quản trị", role: 0, organizationId: null, profileRevision: 1 }, headers: { ...EXPOSED, ETag: '"1"' } }));
     await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [server.state.record], totalCount: 1, page: 1, pageSize: 20 } }));
     await page.route("**/api/organizations/org-1", (route) => server.handle(route));
     await page.goto("/admin/organizations?organization=org-1");

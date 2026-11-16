@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 
 /*
@@ -21,7 +22,7 @@ const accounts = [
 
 async function open(page: Page, user: typeof owner | typeof admin, url: string, theme: "light" | "dark") {
   await page.addInitScript(([value]) => { sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ui-access", refreshToken: "ui-refresh" })); localStorage.setItem("fire3d-ops-theme", value); }, [theme]);
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ...EXPOSED, ETag: '"1"' } }));
   await page.route((u) => u.pathname === "/api/buildings", (route) => route.fulfill({ json: { items: buildings, totalCount: 3, page: 1, pageSize: 20 } }));
   await page.route((u) => u.pathname === "/api/accounts", (route) => route.fulfill({ json: { items: accounts, totalCount: 2, page: 1, pageSize: 20 } }));
   await page.route((u) => u.pathname === "/api/organizations", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 100 } }));

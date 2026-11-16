@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 
 /*
@@ -21,7 +22,7 @@ async function setup(page: Page) {
   ];
   const calls: Call[] = [];
   await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "rt-access", refreshToken: "rt-refresh" })));
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: admin, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: admin, headers: { ...EXPOSED, ETag: '"1"' } }));
   await page.route("**/api/admin/runtime-catalog**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;

@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import type { Page, Route } from "@playwright/test";
 
 /**
@@ -139,7 +140,7 @@ const page_ = <T,>(items: T[], pageNo = 1, pageSize = 20) => ({ items: items.sli
 
 export async function signIn(page: Page, user: typeof owner | typeof admin) {
   await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "billing-access", refreshToken: "billing-refresh" })));
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ...EXPOSED, ETag: '"1"' } }));
 }
 
 function lower(headers: Record<string, string>) {
@@ -182,14 +183,14 @@ export async function mockBilling(page: Page, mock: Mock) {
     const queued = mock.overrides.get(`${method} ${path}`)?.shift();
     if (queued) {
       if (queued.delayMs) await new Promise((resolve) => setTimeout(resolve, queued.delayMs));
-      return route.fulfill({ status: queued.status, json: queued.json, headers: queued.headers });
+      return route.fulfill({ status: queued.status, json: queued.json, headers: { ...EXPOSED, ...queued.headers } });
     }
 
     const h = lower(request.headers());
     const q = url.searchParams;
     const pageNo = Number(q.get("page") ?? 1);
     const pageSize = Number(q.get("pageSize") ?? 20);
-    const send = (status: number, json?: unknown, headers?: Record<string, string>) => route.fulfill({ status, json, headers });
+    const send = (status: number, json?: unknown, headers?: Record<string, string>) => route.fulfill({ status, json, headers: { ...EXPOSED, ...headers } });
 
     /** Idempotent create: the same key + body replays the stored response, a different body is a 409. */
     const receipt = async (scope: string, create: () => { status: number; json: unknown; headers?: Record<string, string> }) => {
@@ -272,7 +273,7 @@ export async function mockBilling(page: Page, mock: Mock) {
         if (input.purpose === "AIQuotaTopUp") {
           const created = quotationFixture({ id, quotationNumber: number, status: "Draft", revision: 1, taxAmount: null, terms: null, discountAmount: 0, subtotalAmount: 0, totalAmount: 0, discountRuleId: null, pricingStatus: "Estimated", issuedAt: null, purpose: "AIQuotaTopUp", items: [], topUp: { id: `t-${id}`, requestedQuotaUnits: input.topUp?.requestedQuotaUnits ?? null, policyVersionId: null, quotaUnit: null, quotaUnits: null, amount: null, startsAt: null, endsAt: null } });
           mock.quotations[id] = created;
-          return { status: 201, json: created, headers: { ETag: etagOf(id, 1) } };
+          return { status: 201, json: created, headers: { ...EXPOSED, ETag: etagOf(id, 1) } };
         }
         const lines: Rec[] = [];
         for (const [index, item] of (input.items ?? []).entries()) {
@@ -289,7 +290,7 @@ export async function mockBilling(page: Page, mock: Mock) {
         const subtotal = lines.reduce((sum, line) => sum + (line.subtotalAmount as number), 0);
         const created = quotationFixture({ id, quotationNumber: number, status: "Draft", revision: 1, taxAmount: null, terms: null, discountAmount: 0, subtotalAmount: subtotal, totalAmount: subtotal, discountRuleId: null, pricingStatus: "Estimated", issuedAt: null, items: lines });
         mock.quotations[id] = created;
-        return { status: 201, json: created, headers: { ETag: etagOf(id, 1) } };
+        return { status: 201, json: created, headers: { ...EXPOSED, ETag: etagOf(id, 1) } };
       });
     }
     if (quoteMatch && method === "GET" && !quoteMatch[2]) {
@@ -390,7 +391,7 @@ export async function mockBilling(page: Page, mock: Mock) {
         return receipt(path, () => {
           if (h["if-match"] !== etagOf(id, item.revision)) return { status: 412, json: { code: "REVISION_MISMATCH" } };
           Object.assign(item, { status: "Closed", closedAt: new Date().toISOString(), closeReason: (body as { reason: string }).reason, revision: item.revision + 1 });
-          return { status: 200, json: item, headers: { ETag: etagOf(id, item.revision) } };
+          return { status: 200, json: item, headers: { ...EXPOSED, ETag: etagOf(id, item.revision) } };
         });
       }
       if (method === "POST" && sub === "quotations") {
@@ -403,7 +404,7 @@ export async function mockBilling(page: Page, mock: Mock) {
           const created = quotationFixture({ id: qid, quotationNumber: `FET-Q-${String(mock.sequence).padStart(4, "0")}`, status: "Draft", revision: 1, taxAmount: null, terms: null, pricingStatus: "Estimated", issuedAt: null, items: lines, subtotalAmount: pkg.unitPrice * pkg.durationMonths * lines.length, totalAmount: pkg.unitPrice * pkg.durationMonths * lines.length, discountAmount: 0 });
           mock.quotations[qid] = created;
           Object.assign(item, { status: "Quoted", quotationId: qid, revision: item.revision + 1 });
-          return { status: 201, json: created, headers: { ETag: etagOf(qid, 1) } };
+          return { status: 201, json: created, headers: { ...EXPOSED, ETag: etagOf(qid, 1) } };
         });
       }
     }

@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { ApiError } from "../../src/api/types/common";
 import { classifyUploadError } from "../../src/features/buildings/ifc-upload";
@@ -37,8 +38,8 @@ async function setup(page: Page, state: State, issues: unknown[] = []) {
     sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" }));
     localStorage.setItem("fire3d-org-tour", "done"); // the spotlight tour must never cover the page under test
   });
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ETag: '"1"' } }));
-  await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ETag: '"3"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: owner, headers: { ...EXPOSED, ETag: '"1"' } }));
+  await page.route("**/api/buildings/building-1", (route) => route.fulfill({ json: building, headers: { ...EXPOSED, ETag: '"3"' } }));
   await page.route("**/api/buildings/building-1/revisions?*", (route) => route.fulfill({ json: page1([revision(state.status)]) }));
   await page.route("**/api/buildings/building-1/scenarios?*", (route) => route.fulfill({ json: page1([]) }));
   await page.route("**/api/revisions/*/processing-jobs?*", (route) => route.fulfill({ json: page1([]) }));
@@ -48,7 +49,7 @@ async function setup(page: Page, state: State, issues: unknown[] = []) {
   await page.route("**/api/buildings/building-1/editor-preview?*", (route) => route.fulfill({ json: { buildingId: "building-1", revisionId: "rev-1", revisionStatus: state.status, status: "Ready", artifactId: "art-1", attemptId: "att-1", sha256Hash: "a".repeat(64), downloadUrl: "https://storage.fire3d.test/model.glb?sig=x", expiresAt: "2026-10-18T00:00:00Z", coordinateTransform: null, floors: [], semanticMapping: [{ ifcGlobalId: DOOR_A, nodeId: "door_101", floorId: "L1", semanticType: "IfcDoor" }] } }));
   await page.route("https://storage.fire3d.test/**", (route) => route.fulfill({ status: 404, body: "" }));
   await page.route("**/api/scenario-interactions/catalog", (route) => route.fulfill({ json: catalog }));
-  await page.route("**/api/revisions/rev-1/equipment-candidates", (route) => route.fulfill({ json: view(state), headers: { ETag: `"${state.version}"` } }));
+  await page.route("**/api/revisions/rev-1/equipment-candidates", (route) => route.fulfill({ json: view(state), headers: { ...EXPOSED, ETag: `"${state.version}"` } }));
   await page.route("**/api/revisions/rev-1/equipment-decisions", async (route: Route) => {
     const request = route.request();
     const body = request.postDataJSON();
@@ -65,7 +66,7 @@ async function setup(page: Page, state: State, issues: unknown[] = []) {
     state.version += 1;
     const exit = state.items.some((entry) => entry.ifcClass === "IfcDoor" && entry.decision && entry.decision.decision !== "Rejected" && entry.decision.catalogKey === "door.exit");
     if (state.exitRequired && exit) { state.exitRequired = false; state.status = "ReadyForScenario"; }
-    return route.fulfill({ json: view(state), headers: { ETag: `"${state.version}"` } });
+    return route.fulfill({ json: view(state), headers: { ...EXPOSED, ETag: `"${state.version}"` } });
   });
 }
 

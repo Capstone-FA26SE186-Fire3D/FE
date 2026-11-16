@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { expectChipValue, pick } from "./chip-helpers";
 import { CallLog, delay, page1, tokenSession } from "./regression-helpers";
@@ -17,7 +18,7 @@ const ARCHIVED = [building("b9", "Tòa đã lưu trữ", false)];
 
 async function session(page: Page, user: typeof orgUser) {
   await tokenSession(page, "tok");
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ...EXPOSED, ETag: '"1"' } }));
 }
 
 /**
@@ -61,7 +62,7 @@ for (const screen of screens) {
     const cases: Array<{ name: string; plan: (route: Route) => Promise<void> | void; text: RegExp }> = [
       { name: "401 says the session expired", plan: fail(401), text: /Phiên đăng nhập đã hết hạn/ },
       { name: "403 says there is no permission", plan: fail(403), text: /không có quyền/ },
-      { name: "429 shows the server's Retry-After", plan: fail(429, { "Retry-After": "7" }), text: /7 giây/ },
+      { name: "429 shows the server's Retry-After", plan: fail(429, { ...EXPOSED, "Retry-After": "7" }), text: /7 giây/ },
       { name: "500 says the server failed", plan: fail(500), text: /Máy chủ gặp lỗi/ },
       { name: "a dropped connection says the network is down", plan: (route) => route.abort("connectionreset"), text: /Mất kết nối/ },
     ];

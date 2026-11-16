@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { chip, chipOptions, expectChipValue, openChip, pick } from "./chip-helpers";
 import { expect, test, type Page } from "@playwright/test";
 import { buildingIds, criteriaFixture, installTrainingBackend, learner, metricsFixture, signInAs, TrainingBackend, type Actor } from "./training-history-mock";
@@ -239,7 +240,7 @@ test.describe("list: empty, loading, errors", () => {
   test("429/503 shows the server's Retry-After", async ({ page }) => {
     const backend = new TrainingBackend();
     seedMix(backend);
-    backend.failNext("GET", /^\/api\/training\/sessions$/, { status: 503, headers: { "Retry-After": "7" }, json: { title: "busy", status: 503, code: "SERVICE_UNAVAILABLE" } });
+    backend.failNext("GET", /^\/api\/training\/sessions$/, { status: 503, headers: { ...EXPOSED, "Retry-After": "7" }, json: { title: "busy", status: 503, code: "SERVICE_UNAVAILABLE" } });
     await start(page, backend);
     await expect(page.getByRole("alert").filter({ hasText: "Máy chủ đang bận" })).toContainText("thử lại sau 7 giây");
     await page.getByRole("button", { name: "Thử lại" }).click();

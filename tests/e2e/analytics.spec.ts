@@ -3,6 +3,7 @@
  * Evidence level: Playwright route mocks shaped like LearnerAnalytics.sql / OperationsQueries (OpenAPI types the training and
  * revenue bodies only as JsonElement, so the shape comes from BE source and docs/learner-analytics.md). Not an integration test.
  */
+import { EXPOSED } from "./api-headers";
 import { chip, chipOptions, expectChipValue, openChip, pick } from "./chip-helpers";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { parseOperations, parseRevenue, parseTraining } from "../../src/features/analytics/parse";
@@ -13,7 +14,7 @@ const trainee = { id: "t-1", email: "t@fire3d.test", fullName: "Học Viên", ro
 
 async function signIn(page: Page, user: object) {
   await page.addInitScript((stored) => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify(stored)), { accessToken: "an-access", refreshToken: "an-refresh" });
-  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ETag: '"1"' } }));
+  await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ...EXPOSED, ETag: '"1"' } }));
   // The organization report's building/scenario selects read the tenant lists; tests that care override these.
   await page.route("**/api/buildings*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 100 } }));
 }
@@ -392,7 +393,7 @@ test.describe("admin analytics", () => {
       const url = new URL(route.request().url());
       if (url.pathname.endsWith("/export")) {
         exports.push(`${url.pathname}?groupBy=${url.searchParams.get("groupBy")}`);
-        if (limited) return route.fulfill({ status: 429, json: { code: "EXPORT_DAILY_LIMIT_EXCEEDED", title: "Daily export limit exceeded." }, headers: { "Retry-After": "3600" } });
+        if (limited) return route.fulfill({ status: 429, json: { code: "EXPORT_DAILY_LIMIT_EXCEEDED", title: "Daily export limit exceeded." }, headers: { ...EXPOSED, "Retry-After": "3600" } });
         return route.fulfill({ body: "groupBy,key\nday,2026-10-01\n", contentType: "text/csv" });
       }
       const organization = { id: "org-9", name: "Trường Cũ", isActive: true };
@@ -469,7 +470,7 @@ test.describe("admin analytics", () => {
   test("the organization drawer links to its report", async ({ page }) => {
     await signIn(page, admin);
     await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [{ id: "org-1", name: "Fire3D Lab", slug: "fire3d-lab", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }], totalCount: 1, page: 1, pageSize: 20 } }));
-    await page.route("**/api/organizations/org-1", (route) => route.fulfill({ json: { id: "org-1", name: "Fire3D Lab", slug: "fire3d-lab", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }, headers: { ETag: '"1"' } }));
+    await page.route("**/api/organizations/org-1", (route) => route.fulfill({ json: { id: "org-1", name: "Fire3D Lab", slug: "fire3d-lab", isActive: true, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }, headers: { ...EXPOSED, ETag: '"1"' } }));
     await page.goto("/admin/organizations?organization=org-1");
     await expect(page.getByTestId("organization-drawer").getByRole("link", { name: "Xem báo cáo" })).toHaveAttribute("href", "/admin/organizations/org-1/analytics");
   });

@@ -1,3 +1,4 @@
+import { EXPOSED } from "./api-headers";
 import { expect, test, type Page } from "@playwright/test";
 import { admin, callsTo, ids, mockBilling, newMock, owner, queue, signIn as billingSignIn } from "./billing-mock";
 import { installLibraryBackend, LibraryBackend, signIn as librarySignIn } from "./library-mock";
@@ -108,7 +109,7 @@ test.describe("tenant switch inside one mounted screen", () => {
     const orgs = [{ id: "org-a", name: "Tổ chức Alpha", slug: "alpha", isActive: true, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" }, { id: "org-b", name: "Tổ chức Beta", slug: "beta", isActive: true, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" }];
     const buildingOf = (id: string, name: string, organizationId: string) => ({ id, name, buildingType: "Trường học", totalFloors: 2, isActive: true, organizationId, createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: { id: `l-${id}`, address: "1 Test", city: null, district: null, latitude: null, longitude: null, geojson: null }, contact: null });
     await tokenSession(page, "tok-admin");
-    await page.route("**/api/auth/me", (route) => route.fulfill({ json: { id: "adm", email: "adm@fire3d.test", fullName: "Quản trị", role: 0, organizationId: null, profileRevision: 1 }, headers: { ETag: '"1"' } }));
+    await page.route("**/api/auth/me", (route) => route.fulfill({ json: { id: "adm", email: "adm@fire3d.test", fullName: "Quản trị", role: 0, organizationId: null, profileRevision: 1 }, headers: { ...EXPOSED, ETag: '"1"' } }));
     await page.route("**/api/organizations?*", (route) => route.fulfill({ json: page1(orgs) }));
     await page.route(/\/api\/organizations\/org-[ab]$/, (route) => route.fulfill({ json: orgs.find((item) => route.request().url().endsWith(item.id)) }));
     await page.route("**/api/buildings?*", (route) => {
@@ -134,7 +135,7 @@ test.describe("tenant switch inside one mounted screen", () => {
 
   test("paging inside one organization still keeps the previous page visible while the next one loads", async ({ page }) => {
     await tokenSession(page, "tok-org");
-    await page.route("**/api/auth/me", (route) => route.fulfill({ json: { id: "o", email: "o@fire3d.test", fullName: "Chủ", role: 1, organizationId: "org-1", profileRevision: 1 }, headers: { ETag: '"1"' } }));
+    await page.route("**/api/auth/me", (route) => route.fulfill({ json: { id: "o", email: "o@fire3d.test", fullName: "Chủ", role: 1, organizationId: "org-1", profileRevision: 1 }, headers: { ...EXPOSED, ETag: '"1"' } }));
     const row = (id: string, name: string) => ({ id, name, buildingType: "Trường học", totalFloors: 2, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: { id: `l-${id}`, address: "1 Test", city: null, district: null, latitude: null, longitude: null, geojson: null }, contact: null });
     const second = gate();
     await page.route("**/api/buildings?*", async (route) => {
