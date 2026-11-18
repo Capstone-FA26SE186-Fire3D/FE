@@ -99,23 +99,23 @@ export function parseRuntimeFile(text: string): RuntimeFileResult {
   if (!manifestSchemaVersion || manifestSchemaVersion.length > 50) problems.push("Thiếu phiên bản định dạng gói bài (tối đa 50 ký tự).");
 
   const capabilities: string[] = [];
-  if (!Array.isArray(raw.capabilities)) problems.push("Thiếu danh sách năng lực.");
+  if (!Array.isArray(raw.capabilities)) problems.push("Thiếu danh sách khả năng.");
   else {
     const bad = raw.capabilities.filter((item) => typeof item !== "string" || !CAPABILITY_ID.test(item));
-    if (bad.length) problems.push(`${bad.length} năng lực có mã không hợp lệ (chỉ gồm chữ không dấu, số và . _ : -, tối đa 128 ký tự).`);
+    if (bad.length) problems.push(`${bad.length} khả năng có mã không hợp lệ (chỉ gồm chữ không dấu, số và . _ : -, tối đa 128 ký tự).`);
     for (const item of raw.capabilities) if (typeof item === "string") capabilities.push(item);
     const seen = new Set<string>();
     const dup = capabilities.filter((item) => (seen.has(item) ? true : (seen.add(item), false)));
-    if (dup.length) problems.push(`Năng lực bị lặp: ${[...new Set(dup)].map(capabilityName).join(", ")}.`);
+    if (dup.length) problems.push(`Khả năng bị lặp: ${[...new Set(dup)].map(capabilityName).join(", ")}.`);
   }
 
   let capabilityContracts: Record<string, unknown> | undefined;
   if (raw.capabilityContracts !== undefined && raw.capabilityContracts !== null) {
-    if (!isRecord(raw.capabilityContracts)) problems.push("Phần mô tả năng lực phải là một nhóm theo từng năng lực.");
+    if (!isRecord(raw.capabilityContracts)) problems.push("Phần mô tả khả năng phải là một nhóm theo từng khả năng.");
     else {
       capabilityContracts = raw.capabilityContracts;
       const orphans = Object.keys(capabilityContracts).filter((id) => !capabilities.includes(id));
-      if (orphans.length) problems.push(`Có mô tả cho năng lực không nằm trong danh sách: ${orphans.map(capabilityName).join(", ")}.`);
+      if (orphans.length) problems.push(`Có mô tả cho khả năng không nằm trong danh sách: ${orphans.map(capabilityName).join(", ")}.`);
     }
   }
   if (raw.isActive !== undefined && typeof raw.isActive !== "boolean") problems.push("Trường bật/tắt trong tệp phải là đúng hoặc sai.");
@@ -131,8 +131,8 @@ export function parseRuntimeFile(text: string): RuntimeFileResult {
 export const withActive = (payload: RuntimeRegistration, isActive: boolean): RuntimeRegistration => ({ ...payload, isActive });
 
 const PART_NAMES: Record<string, string> = {
-  runtimeVersion: "Số phiên bản", protocolVersion: "Phiên bản giao thức", manifestSchemaVersion: "Phiên bản định dạng gói bài", capabilities: "Danh sách năng lực",
-  capabilityContracts: "Mô tả năng lực", version: "Phiên bản mô tả", objectKinds: "Loại đối tượng", description: "Mô tả", parameters: "Thông số",
+  runtimeVersion: "Số phiên bản", protocolVersion: "Phiên bản giao thức", manifestSchemaVersion: "Phiên bản định dạng gói bài", capabilities: "Danh sách khả năng",
+  capabilityContracts: "Mô tả khả năng", version: "Phiên bản mô tả", objectKinds: "Loại đối tượng", description: "Mô tả", parameters: "Thông số",
   events: "Sự kiện", actions: "Thao tác", payload: "Dữ liệu sự kiện", type: "Tên sự kiện", metric: "Chỉ số chấm điểm", isActive: "Bật/tắt",
 };
 
@@ -147,8 +147,8 @@ export function runtimeFieldLabel(path: string, capabilities: string[] = []): st
   if (rest.startsWith("capabilityContracts.")) {
     rest = rest.slice("capabilityContracts.".length);
     const id = [...capabilities].sort((a, b) => b.length - a.length).find((candidate) => rest === candidate || rest.startsWith(`${candidate}.`) || rest.startsWith(`${candidate}[`));
-    if (id) { parts.push(`Năng lực “${capabilityName(id)}”`); rest = rest.slice(id.length).replace(/^\./, ""); }
-    else { parts.push("Mô tả năng lực"); rest = ""; }
+    if (id) { parts.push(`Khả năng “${capabilityName(id)}”`); rest = rest.slice(id.length).replace(/^\./, ""); }
+    else { parts.push("Mô tả khả năng"); rest = ""; }
   }
   for (const match of rest.matchAll(/([A-Za-z_]+)(?:\[(\d+)\])?/g)) {
     const [, name, index] = match;
@@ -163,10 +163,10 @@ export function runtimeFieldLabel(path: string, capabilities: string[] = []): st
 function plainMessage(serverMessage: string, translated: string): string {
   const text = serverMessage.trim();
   if (/^Required\.?$/i.test(text) || /is required/i.test(text)) return "Bắt buộc phải có.";
-  if (/must belong to a capability listed/i.test(text)) return "Mô tả này thuộc một năng lực không có trong danh sách năng lực.";
+  if (/must belong to a capability listed/i.test(text)) return "Mô tả này thuộc một khả năng không có trong danh sách khả năng.";
   if (/must be unique/i.test(text)) return "Không được lặp lại.";
-  if (/core metric|counts .* events|is declared by/i.test(text)) return "Chỉ số chấm điểm này trùng với một chỉ số đã có của hệ thống hoặc của năng lực khác.";
-  if (/conflict/i.test(text)) return "Mâu thuẫn với một năng lực khác trong cùng phiên bản.";
+  if (/core metric|counts .* events|is declared by/i.test(text)) return "Chỉ số chấm điểm này trùng với một chỉ số đã có của hệ thống hoặc của khả năng khác.";
+  if (/conflict/i.test(text)) return "Mâu thuẫn với một khả năng khác trong cùng phiên bản.";
   return translated;
 }
 
@@ -186,7 +186,7 @@ export function describeRuntimeError(error: unknown, capabilities: string[] = []
       const count = error.fieldErrors.slice(0, index).filter((item) => item.path === field.path).length;
       issues.push({ field: runtimeFieldLabel(field.path, capabilities), message: plainMessage(String(server[count] ?? ""), field.message) });
     });
-    return { kind: "invalid", title: "Nội dung tệp chưa hợp lệ", message: issues.length ? "Máy chủ từ chối các điểm dưới đây. Sửa trong dự án Unity, xuất lại tệp rồi đăng ký lại." : "Máy chủ từ chối tệp (số phiên bản, giao thức, định dạng hoặc danh sách năng lực sai). Xuất lại tệp từ dự án Unity rồi thử lại.", issues };
+    return { kind: "invalid", title: "Nội dung tệp chưa hợp lệ", message: issues.length ? "Máy chủ từ chối các điểm dưới đây. Sửa trong dự án Unity, xuất lại tệp rồi đăng ký lại." : "Máy chủ từ chối tệp (số phiên bản, giao thức, định dạng hoặc danh sách khả năng sai). Xuất lại tệp từ dự án Unity rồi thử lại.", issues };
   }
   if (error.status === 404) return { kind: "notFound", title: "Không tìm thấy phiên bản", message: "Phiên bản này không còn trong danh sách. Danh sách đã được tải lại.", issues: [] };
   if (error.status === 401) return { kind: "denied", title: "Phiên đăng nhập đã hết hạn", message: "Đăng nhập lại rồi thử lại.", issues: [] };

@@ -50,7 +50,7 @@ test("opens a fet3d.editor/1 draft: six kinds, pinned Geometry, floor-local coor
   await item(page, 1).click();
   await expect(page.getByTestId("object-form")).toHaveAttribute("data-kind", "Goal");
   await expect(page.getByTestId("field-anchor")).toHaveValue("1hOSvn6df7F8_7GcBWlRGQ");
-  await expect(page.getByTestId("field-anchor").locator("option:checked")).toHaveText("IfcDoor · door_101");
+  await expect(page.getByTestId("field-anchor").locator("option:checked")).toHaveText("Cửa 1");
 
   // NPC on L2 at local (1, 0, 1): GLB position = floor transform * local = (1, 3.5, 1); then local z = 2 gives the BE example (1, 3.5, 2).
   await item(page, 3).click();
@@ -163,7 +163,7 @@ test("places all six kinds, fills capability/parameter forms from the catalog, s
   await page.getByTestId("add-Spawn").click();
   await expect(page.getByTestId("object-form")).toHaveAttribute("data-kind", "Spawn");
   await page.getByTestId("add-Goal").click();
-  await page.getByTestId("field-anchor").selectOption({ label: "IfcDoor · door_101" });
+  await page.getByTestId("field-anchor").selectOption({ label: "Cửa 1" });
   await page.getByTestId("add-Hazard").click();
   await expect(page.getByTestId("capability-field")).toContainText("Bắt buộc");
   await page.getByTestId("field-capability").selectOption("fire.source");
@@ -173,14 +173,14 @@ test("places all six kinds, fills capability/parameter forms from the catalog, s
   await coord(page, "z").fill("4");
   await page.getByTestId("add-Npc").click();
   await page.getByTestId("field-capability").selectOption("npc.evacuee");
-  await page.getByTestId("param-behaviour").selectOption({ label: "panic" });
+  await page.getByTestId("param-behaviour").selectOption({ label: "Hoảng loạn" });
   await page.getByTestId("param-mobilityImpaired").selectOption("false");
   await page.getByTestId("add-BlockedElement").click();
   await expect(page.getByTestId("anchor-field")).toContainText("Bắt buộc");
-  await page.getByTestId("field-anchor").selectOption({ label: "IfcDoor · door_102" });
+  await page.getByTestId("field-anchor").selectOption({ label: "Cửa 2" });
   await page.getByTestId("add-Equipment").click();
   await page.getByTestId("field-capability").selectOption("equipment.extinguisher");
-  await page.getByTestId("param-agent").selectOption({ label: "CO2" });
+  await page.getByTestId("param-agent").selectOption({ label: "CO2 (khí)" });
 
   await page.getByTestId("save").click();
   await expect(status(page)).toHaveText("Đã lưu");
@@ -558,19 +558,19 @@ test("a wall picked on the model can be used as the anchor of an object on the s
   const point = await page.evaluate(() => window.__fire3dEditorScene?.projectNode("Floor_0_WallN"));
   expect(point).toBeTruthy();
   await page.mouse.click(point!.x, point!.y); // empty click on the model: reports the node under the pointer
-  await expect(page.locator(".se-pick")).toContainText("Floor_0_WallN");
+  await expect(page.locator(".se-pick")).toHaveAttribute("data-node", "Floor_0_WallN");
   await item(page, 4).click();
-  await expect(page.getByTestId("use-picked-anchor")).toContainText("Floor_0_WallN");
+  await expect(page.getByTestId("use-picked-anchor")).toContainText("tường 1");
   await page.getByTestId("use-picked-anchor").click();
   await expect(page.getByTestId("field-anchor")).toHaveValue(gid("4wallN"));
-  await expect(page.getByTestId("field-anchor").locator("option:checked")).toHaveText("IfcWall · Floor_0_WallN");
+  await expect(page.getByTestId("field-anchor").locator("option:checked")).toHaveText("Tường 1");
   // a node of another floor is recognised but refused as an anchor for this floor
   const other = await page.evaluate(() => window.__fire3dEditorScene?.projectNode("Floor_1_WallN"));
   await page.getByRole("radiogroup", { name: "Chọn tầng" }).getByRole("radio", { name: "Tất cả" }).click();
   await page.mouse.click(other!.x, other!.y);
-  await expect(page.locator(".se-pick")).toContainText("Floor_1_WallN");
+  await expect(page.locator(".se-pick")).toHaveAttribute("data-node", "Floor_1_WallN");
   await item(page, 4).click();
-  await expect(page.getByTestId("anchor-field")).toContainText("thuộc tầng khác");
+  await expect(page.getByTestId("anchor-field")).toContainText("nằm ở tầng khác");
 });
 
 test("object ids are unique: a duplicate id is flagged on the second object and blocks saving", async ({ page }) => {

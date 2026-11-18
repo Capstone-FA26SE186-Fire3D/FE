@@ -1,5 +1,6 @@
 "use client";
 
+import { ifcTypeLabel } from "@/configs/capability-labels";
 import { ChevronLeft } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -30,7 +31,7 @@ import { useEditorPreview } from "../../use-editor-preview";
 import { kindAvailability, type GeometryState } from "../../v1/availability";
 import { findRuntime, parseRubricCatalog, parseRuntimeCatalog } from "../../v1/catalog";
 import type { ObjectKind } from "../../v1/contract";
-import { parseGeometry } from "../../v1/geometry";
+import { parseGeometry, type GeometryInfo } from "../../v1/geometry";
 import { targetOf } from "../../v1/issues";
 import { applyMatrix, glbToLocal, localToGlb, round3, isUnitQuaternion } from "../../v1/matrix";
 import { setFieldsCommand } from "../../v1/commands";
@@ -342,7 +343,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
         </div>
         <div className="se-viewport-foot">
           {modelSummary && <span data-testid="model-info">{modelSummary}</span>}
-          {pick && <span className="se-pick">Phần tử: {pick.name}</span>}
+          {pick && <span className="se-pick" data-node={pick.name}>Đang chọn: {pickLabel(geometry, pick.name)}</span>}
         </div>
       </section>
       <aside className="se-panel se-right" aria-label="Thuộc tính">
@@ -385,4 +386,10 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
       <p className="ops-field-hint">Bấm “Lưu” (hoặc Ctrl/Cmd+S) trước khi rời trang để giữ lại thay đổi.</p>
     </Modal>
   </div>;
+}
+
+/** What the author clicked on the model, as a kind of building part ("Cửa", "Tường") rather than the node or IFC id. */
+function pickLabel(geometry: GeometryInfo | null, node: string): string {
+  const entry = geometry?.semantic.find((item) => item.nodeId === node);
+  return entry ? ifcTypeLabel(entry.semanticType).toLowerCase() : "một phần của mô hình";
 }

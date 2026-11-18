@@ -120,7 +120,7 @@ export function LibraryBrowser() {
         items={[{ value: "all", label: "Tất cả", "data-testid": "filter-kind-all" }, ...LIBRARY_KINDS.map((value) => ({ value, label: kindLabel[value], count: kind === value && list.data ? list.data.total : undefined, "data-testid": `filter-kind-${value}` }))]} />
       <div className="org-lib-filters" role="search" aria-label="Lọc thư viện">
         <TableSearch value={searchText} onChange={setSearchText} label="Tìm mẫu" placeholder="Tìm theo mã hoặc tên mẫu" />
-        <Combobox aria-label="Yêu cầu" className="org-lib-cap" value={capability} onChange={(value) => setParams({ cap: value })} options={capabilityOptions} placeholder="Năng lực: Tất cả" searchPlaceholder="Tìm năng lực…" data-testid="filter-capability" />
+        <Combobox aria-label="Yêu cầu" className="org-lib-cap" value={capability} onChange={(value) => setParams({ cap: value })} options={capabilityOptions} placeholder="Khả năng: Tất cả" searchPlaceholder="Tìm khả năng…" data-testid="filter-capability" />
         {narrowed && <Button variant="quiet" onClick={() => { setSearchText(""); setParams({ q: null, cap: null }); }}>Xóa bộ lọc</Button>}
       </div>
     </div>

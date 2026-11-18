@@ -18,15 +18,15 @@ const Code = ({ value }: { value: string }) => <small className="rt-code adm-mon
 export function RuntimeDetailModal({ entry, onClose }: { entry: RuntimeCatalogEntry; onClose: () => void }) {
   return <Modal open onOpenChange={(open) => { if (!open) onClose(); }} size="lg" data-testid="runtime-detail"
     eyebrow={<StatusBadge tone={entry.isActive ? "success" : "neutral"}>{entry.isActive ? "Đang dùng" : "Tắt"}</StatusBadge>}
-    title={`Phiên bản ${entry.runtimeVersion}`} description="Phiên bản đã đăng ký không sửa được. Năng lực dưới đây là những gì ứng dụng trên điện thoại hỗ trợ ở phiên bản này.">
+    title={`Phiên bản ${entry.runtimeVersion}`} description="Phiên bản đã đăng ký không sửa được. Khả năng dưới đây là những gì ứng dụng trên điện thoại hỗ trợ ở phiên bản này.">
     <div className="ops-stack">
       <DetailList columns={3} items={[
         { label: "Giao thức kết nối", value: entry.protocolVersion || "—" },
         { label: "Định dạng gói bài", value: entry.manifestSchemaVersion || "—" },
         { label: "Ngày đăng ký", value: formatDateTime(entry.createdAt) },
       ]} />
-      <h3 className="rt-heading">{entry.capabilities.length} năng lực</h3>
-      {entry.capabilities.length === 0 && <p className="adm-note">Phiên bản này không khai báo năng lực nào.</p>}
+      <h3 className="rt-heading">{entry.capabilities.length} khả năng</h3>
+      {entry.capabilities.length === 0 && <p className="adm-note">Phiên bản này không khai báo khả năng nào.</p>}
       <ul className="rt-caps">
         {entry.capabilities.map((id) => {
           const contract = entry.capabilityContracts[id];

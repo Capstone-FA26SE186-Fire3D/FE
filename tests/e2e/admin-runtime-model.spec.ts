@@ -86,9 +86,9 @@ test.describe("errors", () => {
     }), file.capabilities);
     expect(view.kind).toBe("invalid");
     expect(view.issues).toEqual([
-      { field: "Năng lực “Nút báo cháy” · Sự kiện", message: "Chỉ số chấm điểm này trùng với một chỉ số đã có của hệ thống hoặc của năng lực khác." },
-      { field: "Năng lực “Di chuyển của người chơi” · Loại đối tượng 1", message: "Bắt buộc phải có." },
-      { field: "Mô tả năng lực", message: "Mô tả này thuộc một năng lực không có trong danh sách năng lực." },
+      { field: "Khả năng “Nút báo cháy” · Sự kiện", message: "Chỉ số chấm điểm này trùng với một chỉ số đã có của hệ thống hoặc của khả năng khác." },
+      { field: "Khả năng “Di chuyển của người chơi” · Loại đối tượng 1", message: "Bắt buộc phải có." },
+      { field: "Mô tả khả năng", message: "Mô tả này thuộc một khả năng không có trong danh sách khả năng." },
     ]);
   });
 
@@ -100,8 +100,8 @@ test.describe("errors", () => {
 
   test("field labels", () => {
     expect(runtimeFieldLabel("$.runtimeVersion")).toBe("Số phiên bản");
-    expect(runtimeFieldLabel("$.capabilities[2]")).toBe("Danh sách năng lực 3");
-    expect(runtimeFieldLabel("$.capabilityContracts.custom.thing.events[1].metric", file.capabilities)).toBe("Năng lực “custom.thing” · Sự kiện 2 · Chỉ số chấm điểm");
+    expect(runtimeFieldLabel("$.capabilities[2]")).toBe("Danh sách khả năng 3");
+    expect(runtimeFieldLabel("$.capabilityContracts.custom.thing.events[1].metric", file.capabilities)).toBe("Khả năng “custom.thing” · Sự kiện 2 · Chỉ số chấm điểm");
   });
 
   test("network failure and 404", () => {
