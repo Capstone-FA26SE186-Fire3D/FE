@@ -59,7 +59,7 @@ export function RegisterRuntimeModal({ accessToken, onClose, onRegistered }: { a
       {summary && <div className="rt-summary" data-testid="runtime-summary">
         <DetailList columns={3} items={[
           { label: "Phiên bản", value: <strong>{summary.runtimeVersion}</strong> },
-          { label: "Số năng lực", value: `${summary.capabilityCount} (${summary.contractCount} có mô tả sự kiện/thao tác)` },
+          { label: "Số khả năng", value: `${summary.capabilityCount} (${summary.contractCount} có mô tả sự kiện/thao tác)` },
           { label: "Giao thức kết nối", value: summary.protocolVersion },
           { label: "Định dạng gói bài", value: summary.manifestSchemaVersion },
           { label: "Sau khi đăng ký", value: activate ? "Đang dùng ngay" : "Tắt (bật sau)" },

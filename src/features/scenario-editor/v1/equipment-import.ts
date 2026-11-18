@@ -32,15 +32,15 @@ export type ImportPlan = {
 };
 
 export const SKIP_LABEL: Record<ImportSkip, string> = {
-  "not-decided": "Chưa có quyết định (gợi ý từ bản IFC trước không được tự áp dụng)",
+  "not-decided": "Chưa được xác nhận (gợi ý từ bản vẽ trước không tự áp dụng)",
   rejected: "Đã loại bỏ",
-  present: "Đã có trong bản nháp (cùng cấu kiện neo)",
-  duplicate: "Trùng cấu kiện với thiết bị khác trong danh sách",
-  building: "Có sẵn trong game từ bản vẽ IFC của tòa nhà, không cần thêm vào kịch bản",
+  present: "Đã có trong bản nháp (gắn cùng bộ phận)",
+  duplicate: "Trùng bộ phận với thiết bị khác trong danh sách",
+  building: "Có sẵn trong game từ bản vẽ tòa nhà, không cần thêm vào kịch bản",
   "capability-missing": "Phiên bản ứng dụng của bản nháp không có khả năng này cho Thiết bị",
-  "anchor-missing": "Mô hình 3D không có cấu kiện này",
+  "anchor-missing": "Mô hình 3D không có bộ phận này",
   "floor-missing": "Không xác định được tầng",
-  "floor-mismatch": "Tầng của thiết bị khác tầng của cấu kiện trong mô hình 3D",
+  "floor-mismatch": "Tầng của thiết bị khác tầng của bộ phận trong mô hình 3D",
   "position-invalid": "Tọa độ không hợp lệ",
   limit: `Bản nháp đã đạt tối đa ${LIMITS.objectsMax} đối tượng`,
 };

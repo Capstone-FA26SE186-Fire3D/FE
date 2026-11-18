@@ -307,8 +307,8 @@ export function completenessIssues(draft: JsonObject, context: ReferenceContext)
       if (!geometry.floors.some((floor) => floor.id === object.floorId)) out.push(issue("FLOOR_NOT_FOUND", `${base}.placement.floorId`, "Tầng không có trong mô hình 3D đã gắn."));
       if (object.anchorId) {
         const entry = geometry.semantic.find((item) => item.ifcGlobalId === object.anchorId);
-        if (!entry) out.push(issue("ANCHOR_NOT_FOUND", `${base}.anchorId`, "Cấu kiện neo không có trong mô hình 3D."));
-        else if (entry.floorId !== object.floorId) out.push(issue("ANCHOR_FLOOR_MISMATCH", `${base}.anchorId`, "Cấu kiện neo nằm ở tầng khác."));
+        if (!entry) out.push(issue("ANCHOR_NOT_FOUND", `${base}.anchorId`, "Bộ phận được gắn không còn trong mô hình 3D; chọn lại."));
+        else if (entry.floorId !== object.floorId) out.push(issue("ANCHOR_FLOOR_MISMATCH", `${base}.anchorId`, "Bộ phận được gắn nằm ở tầng khác với đối tượng; chọn lại."));
       }
     }
     if (object.capability && isBuildingOnly(object.capability.id)) {
