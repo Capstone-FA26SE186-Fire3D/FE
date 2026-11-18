@@ -50,11 +50,11 @@ export function VersionContent({ version }: { version: ScenarioVersionDetail }) 
     <Panel
       title="Tiêu chí chấm điểm"
       description="Chỉ đọc. Muốn đổi, sửa bản nháp rồi tạo phiên bản mới."
-      actions={rubric ? <StatusBadge tone="neutral">Ngưỡng đạt {rubric.pass_threshold ?? "—"}</StatusBadge> : undefined}
+      actions={rubric ? <StatusBadge tone="neutral">Điểm đạt tối thiểu {rubric.pass_threshold ?? "—"}</StatusBadge> : undefined}
     >
       {criteria.length
         ? <Table caption="Tiêu chí chấm điểm">
-          <thead><tr><th>Tiêu chí</th><th>Đo bằng</th><th>Điều kiện</th><th>Trọng số</th><th>Bắt buộc</th></tr></thead>
+          <thead><tr><th>Tiêu chí</th><th>Đo bằng</th><th>Điều kiện</th><th>Mức quan trọng</th><th>Bắt buộc</th></tr></thead>
           <tbody>{criteria.map((criterion) => <tr key={criterion.id}>
             <td className="ops-cell-primary">{criterion.id}</td>
             <td>{metricName(criterion.metric)}</td>

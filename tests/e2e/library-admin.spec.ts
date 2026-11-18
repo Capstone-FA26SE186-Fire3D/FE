@@ -17,6 +17,8 @@ async function setup(page: Page, seed: (backend: LibraryBackend) => void = () =>
 }
 
 const RUBRIC = { schema_version: "1", pass_threshold: 0.7, criteria: [{ id: "reached-exit", metric: "reached_exit", mandatory: true, weight: 1, threshold: 1, operator: "eq" }] };
+// A criterion added in the form gets its id from the system ("tieu-chi-1"), not typed by hand.
+const FORM_RUBRIC = { ...RUBRIC, criteria: [{ ...RUBRIC.criteria[0], id: "tieu-chi-1" }] };
 const TEMPLATE_STATE = { schemaVersion: "fet3d.editor/1", name: "Sơ tán văn phòng", timeLimitSeconds: 600, learningObjectives: ["Rời khỏi tòa nhà an toàn"], learnerInstructions: "Đi theo lối thoát gần nhất.", modePolicy: { allowedModes: ["Learn"] }, rubric: RUBRIC };
 
 const seedRubricDraft = (backend: LibraryBackend) => {
@@ -168,15 +170,15 @@ test.describe("rubric sample lifecycle", () => {
     await expect(page.getByTestId("version-name")).toHaveValue("");
     await page.getByTestId("version-name").fill("Rubric cơ bản");
     await page.getByTestId("add-rubric").click();
-    await expect(page.getByTestId("rubric-schema")).toHaveValue("1");
+    await expect(page.getByTestId("rubric-schema")).toHaveCount(0); // the supported kind is preset, so the field stays hidden
     await expect(page.getByTestId("rubric-threshold")).toHaveValue("");
     await page.getByTestId("rubric-threshold").fill("0.7");
     await page.getByTestId("add-criterion").click();
-    await page.getByTestId("criterion-0-id").fill("reached-exit");
+    await expect(page.getByTestId("criterion-0-id")).toHaveCount(0);
     await page.getByTestId("criterion-0-metric").selectOption("reached_exit");
     await expect(page.getByTestId("criterion-0")).toContainText("Bằng 1 khi học viên ra tới lối thoát");
     await expect(page.getByTestId("criterion-0")).not.toContainText("when the trainee reached");
-    await expect(page.getByTestId("criterion-0-operator").locator("option[value=eq]")).toHaveText("= (đúng bằng ngưỡng)");
+    await expect(page.getByTestId("criterion-0-operator").locator("option[value=eq]")).toHaveText("= (đúng bằng giá trị)");
     await page.getByTestId("criterion-0-operator").selectOption("eq");
     await page.getByTestId("criterion-0-threshold").fill("1");
     await page.getByTestId("criterion-0-weight").fill("1");
@@ -185,11 +187,11 @@ test.describe("rubric sample lifecycle", () => {
     await expect(page).toHaveURL(/version=[0-9a-f-]{36}/);
     const draft = backend.versions[0];
     expect(draft.status).toBe("Draft");
-    expect(draft.payload).toEqual({ rubric: RUBRIC });
+    expect(draft.payload).toEqual({ rubric: FORM_RUBRIC });
     const versionCalls = backend.callsTo("POST", /\/versions$/);
     expect(versionCalls).toHaveLength(1);
     expect(versionCalls[0].headers["idempotency-key"]).toBeTruthy();
-    expect(versionCalls[0].body).toEqual({ name: "Rubric cơ bản", payload: { rubric: RUBRIC }, requiredCapabilities: [] });
+    expect(versionCalls[0].body).toEqual({ name: "Rubric cơ bản", payload: { rubric: FORM_RUBRIC }, requiredCapabilities: [] });
     await backToItem(page);
     await expect(page).not.toHaveURL(/version=/);
     await expect(page.getByTestId("version-row-1")).toContainText("Bản nháp");
@@ -234,7 +236,7 @@ test.describe("rubric sample lifecycle", () => {
     // a Published version is immutable: read-only view, no save, only "new version from this one"
     await expect(page.getByTestId("save-version")).toHaveCount(0);
     await expect(page.getByTestId("version-name")).toHaveCount(0);
-    await expect(page.getByTestId("rubric-view")).toContainText("reached-exit");
+    await expect(page.getByTestId("rubric-view")).toContainText("tieu-chi-1");
     await expect(page.getByText("Phiên bản đã xuất bản không sửa được")).toBeVisible();
     await backToItem(page);
     await expect(page.getByText("Bản tổ chức đang thấy")).toBeVisible();
@@ -325,7 +327,7 @@ test.describe("rubric sample lifecycle", () => {
     const backend = await setup(page, (b) => { seedRubricDraft(b); });
     await openItem(page, "RUBRIC-CO-BAN");
     await page.getByRole("button", { name: "Mở phiên bản 1" }).click();
-    await expect(page.getByTestId("rubric-schema")).toHaveValue("1");
+    await expect(page.getByTestId("rubric-schema")).toHaveCount(0); // the supported kind is preset, so the field stays hidden
     backend.failNext("PUT", /\/versions\//, { status: 422, json: { status: 422, code: "CONTENT_INVALID", title: "Content does not satisfy its schema.", issues: [{ code: "RUBRIC_SCHEMA_VERSION_UNSUPPORTED", path: "$.payload.rubric.schema_version", message: "Unsupported." }] }, headers: { "content-type": "application/problem+json" } });
     await page.getByTestId("version-name").fill("Tên đang sửa");
     await page.getByTestId("save-version").click();
@@ -364,7 +366,7 @@ test.describe("rubric sample lifecycle", () => {
     const backend = await setup(page, (b) => { b.seedItem("RubricSample", "RUBRIC-TRONG"); b.rubricCatalog = { ...RUBRIC_CATALOG, metrics: [] }; });
     await openItem(page, "RUBRIC-TRONG");
     await page.getByTestId("new-version").click();
-    await expect(page.getByTestId("rubric-catalog-empty")).toContainText("Quản trị FET3D cần cấu hình danh mục rubric");
+    await expect(page.getByTestId("rubric-catalog-empty")).toContainText("Quản trị FET3D cần bổ sung danh sách chỉ số chấm điểm");
     await page.getByTestId("add-rubric").click();
     await page.getByTestId("add-criterion").click();
     await expect(page.getByTestId("criterion-0-metric").locator("option")).toHaveCount(1); // only "Chọn…"
@@ -373,7 +375,7 @@ test.describe("rubric sample lifecycle", () => {
     await page.getByTestId("version-editor").getByRole("button", { name: "Đóng" }).first().click();
     await expect(page).not.toHaveURL(/version=/);
     await page.getByTestId("new-version").click();
-    await expect(page.getByRole("alert").filter({ hasText: "Không tải được danh mục rubric" })).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: "Không tải được danh sách chỉ số chấm điểm" })).toBeVisible();
     backend.rubricCatalog = RUBRIC_CATALOG;
     await page.getByRole("button", { name: "Thử lại" }).click();
     await expect(page.getByTestId("add-rubric")).toBeVisible();
@@ -508,7 +510,7 @@ for (const width of [1440, 375]) {
       await noOverflow(page);
       await shot("item");
       await page.getByRole("button", { name: "Mở phiên bản 1" }).click();
-      await expect(page.getByTestId("rubric-schema")).toHaveValue("1");
+      await expect(page.getByTestId("rubric-schema")).toHaveCount(0); // the supported kind is preset, so the field stays hidden
       await noOverflow(page);
       await shot("version-rubric");
       await page.goto(`/admin/library?item=${backend.item("TEMPLATE-VAN-PHONG").id}&version=${backend.versionsOf(backend.item("TEMPLATE-VAN-PHONG").id)[0].id}`);

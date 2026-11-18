@@ -60,10 +60,10 @@ function Rubric({ value }: { value: unknown }) {
   if (!isRecord(value) || !criteria || !criteria.every(isRecord)) return <JsonSummary value={value} label="Tiêu chí chấm điểm" />;
   const threshold = value.pass_threshold;
   return <>
-    {threshold !== undefined && <p className="rev-note">Ngưỡng đạt: <strong>{String(threshold)}</strong></p>}
+    {threshold !== undefined && <p className="rev-note">Điểm đạt tối thiểu: <strong>{String(threshold)}</strong></p>}
     {criteria.length
       ? <Table caption="Tiêu chí chấm điểm đã khóa">
-        <thead><tr><th>Tiêu chí</th><th>Điều kiện</th><th>Trọng số</th><th>Bắt buộc</th></tr></thead>
+        <thead><tr><th>Tiêu chí</th><th>Điều kiện</th><th>Mức quan trọng</th><th>Bắt buộc</th></tr></thead>
         <tbody>{(criteria as Record<string, unknown>[]).map((criterion, index) => <tr key={`${String(criterion.id ?? index)}-${index}`}>
           <td className="ops-cell-primary">{criterion.metric !== undefined ? metricName(String(criterion.metric)) : "—"}<SupportCode code={criterion.id !== undefined ? String(criterion.id) : undefined} /></td>
           <td>{criterion.operator !== undefined ? `${operatorLabel[String(criterion.operator)] ?? String(criterion.operator)} ${String(criterion.threshold ?? "")}` : "—"}</td>

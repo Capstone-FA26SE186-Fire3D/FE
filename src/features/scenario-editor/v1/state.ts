@@ -188,8 +188,8 @@ function libraryRefsShape(refs: Json, out: Issue[]) {
 function rubricShape(rubric: Json, out: Issue[]) {
   if (!isObject(rubric)) { out.push(issue("TYPE_INVALID", "$.rubric", "Phải là một đối tượng.")); return; }
   unknownKeys(rubric, new Set(["schema_version", "pass_threshold", "criteria"]), "$.rubric", out);
-  if (rubric.schema_version !== undefined && rubric.schema_version !== "1") out.push(issue("RUBRIC_SCHEMA_VERSION_UNSUPPORTED", "$.rubric.schema_version", "Phiên bản định dạng rubric chưa được hỗ trợ."));
-  if (!finite(rubric.pass_threshold)) out.push(issue(rubric.pass_threshold === undefined ? "FIELD_REQUIRED" : "NUMBER_INVALID", "$.rubric.pass_threshold", "Cần ngưỡng đạt (số)."));
+  if (rubric.schema_version !== undefined && rubric.schema_version !== "1") out.push(issue("RUBRIC_SCHEMA_VERSION_UNSUPPORTED", "$.rubric.schema_version", "Kiểu bảng chấm điểm này chưa được hỗ trợ; chọn lại trong danh sách."));
+  if (!finite(rubric.pass_threshold)) out.push(issue(rubric.pass_threshold === undefined ? "FIELD_REQUIRED" : "NUMBER_INVALID", "$.rubric.pass_threshold", "Nhập điểm đạt tối thiểu (số từ 0 đến 1)."));
   if (!Array.isArray(rubric.criteria)) { out.push(issue(rubric.criteria === undefined ? "FIELD_REQUIRED" : "TYPE_INVALID", "$.rubric.criteria", "Cần danh sách tiêu chí.")); return; }
   if (rubric.criteria.length > LIMITS.criteriaMax) { out.push(issue("ARRAY_TOO_LARGE", "$.rubric.criteria", `Tối đa ${LIMITS.criteriaMax} tiêu chí.`)); return; }
   const ids = new Set<string>();
@@ -197,13 +197,13 @@ function rubricShape(rubric: Json, out: Issue[]) {
     const path = `$.rubric.criteria[${index}]`;
     if (!isObject(criterion)) { out.push(issue("TYPE_INVALID", path, "Phải là một đối tượng.")); return; }
     unknownKeys(criterion, CRITERION_KEYS, path, out);
-    if (typeof criterion.id !== "string" || !ID_PATTERN.test(criterion.id)) out.push(issue(criterion.id === undefined ? "FIELD_REQUIRED" : "STRING_FORMAT_INVALID", `${path}.id`, "Mã tiêu chí gồm chữ, số và _ . : - (tối đa 128 ký tự)."));
-    else if (ids.has(criterion.id)) out.push(issue("ID_DUPLICATE", `${path}.id`, "Mã tiêu chí phải duy nhất."));
+    if (typeof criterion.id !== "string" || !ID_PATTERN.test(criterion.id)) out.push(issue(criterion.id === undefined ? "FIELD_REQUIRED" : "STRING_FORMAT_INVALID", `${path}.id`, "Tên ngắn của tiêu chí gồm chữ không dấu, số và _ . : - (tối đa 128 ký tự)."));
+    else if (ids.has(criterion.id)) out.push(issue("ID_DUPLICATE", `${path}.id`, "Hai tiêu chí đang trùng tên ngắn; đổi một tên."));
     else ids.add(criterion.id);
     if (typeof criterion.metric !== "string" || !ID_PATTERN.test(criterion.metric)) out.push(issue(criterion.metric === undefined ? "FIELD_REQUIRED" : "STRING_FORMAT_INVALID", `${path}.metric`, "Chọn một chỉ số do máy chủ tính."));
     if (typeof criterion.mandatory !== "boolean") out.push(issue(criterion.mandatory === undefined ? "FIELD_REQUIRED" : "TYPE_INVALID", `${path}.mandatory`, "Cần cờ bắt buộc đúng/sai."));
-    if (!finite(criterion.weight) || criterion.weight < 0) out.push(issue(criterion.weight === undefined ? "FIELD_REQUIRED" : "NUMBER_OUT_OF_RANGE", `${path}.weight`, "Trọng số là số không âm."));
-    if (!finite(criterion.threshold)) out.push(issue(criterion.threshold === undefined ? "FIELD_REQUIRED" : "NUMBER_INVALID", `${path}.threshold`, "Ngưỡng là một số."));
+    if (!finite(criterion.weight) || criterion.weight < 0) out.push(issue(criterion.weight === undefined ? "FIELD_REQUIRED" : "NUMBER_OUT_OF_RANGE", `${path}.weight`, "Mức quan trọng là số không âm."));
+    if (!finite(criterion.threshold)) out.push(issue(criterion.threshold === undefined ? "FIELD_REQUIRED" : "NUMBER_INVALID", `${path}.threshold`, "Nhập giá trị so sánh (một số)."));
     if (typeof criterion.operator !== "string" || !(RUBRIC_OPERATORS as readonly string[]).includes(criterion.operator)) out.push(issue(criterion.operator === undefined ? "FIELD_REQUIRED" : "VALUE_UNSUPPORTED", `${path}.operator`, "Chọn phép so sánh ≥, ≤ hoặc =."));
     if (criterion.description !== undefined && !printable(criterion.description, LIMITS.criterionDescriptionMax)) out.push(issue("STRING_INVALID", `${path}.description`, `Mô tả dùng 1–${LIMITS.criterionDescriptionMax} ký tự.`));
   });

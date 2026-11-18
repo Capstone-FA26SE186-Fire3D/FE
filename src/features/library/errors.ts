@@ -51,11 +51,11 @@ const issueMessages: Record<string, string> = {
 };
 
 /** A backend validation issue as the form shows it: the Vietnamese explanation only (the code stays out of the sentence). */
-/** Plain field names for a server/client issue path (`$.payload.state.rubric.criteria[1].weight` → "Tiêu chí 2 · Trọng số"). */
+/** Plain field names for a server/client issue path (`$.payload.state.rubric.criteria[1].weight` → "Tiêu chí 2 · Mức quan trọng"). */
 const FIELD_NAMES: Record<string, string> = {
   name: "Tên", code: "Mã mục", description: "Mô tả", learningObjectives: "Mục tiêu học tập", learnerInstructions: "Hướng dẫn cho người học",
   timeLimitSeconds: "Thời gian tối đa", modePolicy: "Chế độ huấn luyện", rubric: "Tiêu chí chấm điểm", schema_version: "Phiên bản tiêu chí",
-  pass_threshold: "Ngưỡng đạt", id: "Mã tiêu chí", metric: "Chỉ số", operator: "Phép so sánh", threshold: "Ngưỡng", weight: "Trọng số",
+  pass_threshold: "Điểm đạt tối thiểu", id: "Tên ngắn của tiêu chí", metric: "Chỉ số", operator: "Điều kiện", threshold: "Giá trị so sánh", weight: "Mức quan trọng",
   mandatory: "Bắt buộc", requiredCapabilities: "Yêu cầu", properties: "Thuộc tính", state: "Kịch bản mẫu", payload: "Nội dung",
 };
 
@@ -69,7 +69,7 @@ export function issueFieldLabel(path: string): string {
     if (name === "criteria") parts.push(index !== undefined ? `Tiêu chí ${Number(index) + 1}` : "Danh sách tiêu chí");
     else if (FIELD_NAMES[name]) parts.push(index !== undefined ? `${FIELD_NAMES[name]} ${Number(index) + 1}` : FIELD_NAMES[name]);
   }
-  // Keep the most specific two names: "Tiêu chí 2 · Trọng số" rather than the whole path.
+  // Keep the most specific two names: "Tiêu chí 2 · Mức quan trọng" rather than the whole path.
   const shown = parts.filter((part) => part !== "Nội dung" && part !== "Kịch bản mẫu").slice(-2);
   return shown.length ? shown.join(" · ") : "Nội dung";
 }

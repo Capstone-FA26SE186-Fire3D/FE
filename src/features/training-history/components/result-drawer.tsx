@@ -42,7 +42,7 @@ function CriteriaTable({ criteria }: { criteria: CriterionResult[] }) {
           {criterion.description && <span className="ops-muted th-table-desc">{criterion.description}</span>}
         </td>
         <td data-label="Số đo">{formatMetricValue(criterion.metric, criterion.value)}</td>
-        <td data-label="Yêu cầu">{threshold}{criterion.weight === null ? null : <small>Trọng số {criterion.weight.toLocaleString("vi-VN")}</small>}</td>
+        <td data-label="Yêu cầu">{threshold}{criterion.weight === null ? null : <small>Mức quan trọng {criterion.weight.toLocaleString("vi-VN")}</small>}</td>
         <td data-label="Bắt buộc">{criterion.mandatory ? "Bắt buộc" : "Không"}</td>
         <td data-label="Kết quả">
           <StatusBadge tone={unavailable ? "warning" : criterion.passed ? "success" : "danger"}>{unavailable ? "Chưa chấm" : criterion.passed ? "Đạt" : "Chưa đạt"}</StatusBadge>
@@ -64,7 +64,7 @@ function ResultFacts({ result }: { result: TrainingResult }) {
     <div data-testid="result-score" className="th-scoreline">
       <span>Điểm</span>
       <strong className="th-score" data-empty={result.scorePercent === null}>{formatScore(result.scorePercent)}</strong>
-      {assessment && <p data-testid="result-threshold">Ngưỡng đạt: {formatScore(result.passThresholdPercent)} (chỉ có ở chế độ Đánh giá)</p>}
+      {assessment && <p data-testid="result-threshold">Điểm cần đạt: {formatScore(result.passThresholdPercent)} (chỉ có ở chế độ Đánh giá)</p>}
     </div>
   </>;
 }

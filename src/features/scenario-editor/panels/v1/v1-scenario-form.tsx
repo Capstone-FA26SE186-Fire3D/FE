@@ -86,6 +86,14 @@ export function V1ScenarioForm({ draft, issues, actions, catalog, rubricCatalog 
 }
 
 /** What the rubric form needs from its host: the editor passes its command-backed actions, the Library admin form plain state writes. */
+/** First free "tieu-chi-N", so a new criterion needs no hand-typed id (ids stay unique within the rubric). */
+export function nextCriterionId(criteria: unknown[]): string {
+  const used = new Set(criteria.map((item) => (isObject(item) && typeof item.id === "string" ? item.id : "")));
+  let n = criteria.length + 1;
+  while (used.has(`tieu-chi-${n}`)) n += 1;
+  return `tieu-chi-${n}`;
+}
+
 export type RubricActions = Pick<V1Actions, "setField" | "addItem" | "removeItem">;
 
 /**
@@ -98,26 +106,27 @@ export function RubricGroup({ draft, issues, actions, catalog, pathPrefix = "$" 
   const criteria = rubric && Array.isArray(rubric.criteria) ? rubric.criteria : [];
   const view = catalog.view;
 
-  return <Group title="Rubric chấm điểm" description="Chỉ số lấy từ danh mục của hệ thống (hệ thống tính từ dữ liệu người học). Hệ thống không đặt sẵn ngưỡng đạt, trọng số hay tiêu chí." testId="group-rubric">
+  return <Group title="Chấm điểm" description="Mỗi tiêu chí kiểm tra một việc học viên làm khi chơi. Điểm = tổng mức quan trọng của các tiêu chí đạt ÷ tổng mức quan trọng của mọi tiêu chí. Hệ thống không đặt sẵn điểm đạt, mức quan trọng hay tiêu chí." testId="group-rubric">
     {catalog.loading && <Skeleton style={{ height: 42 }} />}
-    {!catalog.loading && catalog.error && <Alert tone="danger" title="Không tải được danh mục rubric" action={<Button type="button" size="sm" variant="secondary" onClick={catalog.reload}>Thử lại</Button>}>Cần danh mục để chọn chỉ số đúng; hiện chưa thêm được tiêu chí.</Alert>}
-    {!catalog.loading && !catalog.error && view && view.metrics.length === 0 && <Alert tone="warning" title="Danh mục rubric chưa có chỉ số nào"><span data-testid="rubric-catalog-empty">Hệ thống chưa công bố chỉ số nào nên chưa thể chọn chỉ số cho tiêu chí. Quản trị FET3D cần cấu hình danh mục rubric; giao diện không tự tạo chỉ số.</span></Alert>}
+    {!catalog.loading && catalog.error && <Alert tone="danger" title="Không tải được danh sách chỉ số chấm điểm" action={<Button type="button" size="sm" variant="secondary" onClick={catalog.reload}>Thử lại</Button>}>Cần danh sách này để chọn điều được đo; hiện chưa thêm được tiêu chí.</Alert>}
+    {!catalog.loading && !catalog.error && view && view.metrics.length === 0 && <Alert tone="warning" title="Chưa có chỉ số chấm điểm nào"><span data-testid="rubric-catalog-empty">Hệ thống chưa công bố chỉ số nào nên chưa thể tạo tiêu chí. Quản trị FET3D cần bổ sung danh sách chỉ số chấm điểm.</span></Alert>}
     {at("$.rubric") && <span className="ops-field-error" role="alert">{at("$.rubric")}</span>}
-    {!rubric && view && <div><Button type="button" variant="secondary" size="sm" data-testid="add-rubric" onClick={() => actions.setField(["rubric"], { schema_version: view.defaultSchemaVersion, criteria: [] }, "Thêm rubric", false)}><Plus size={14} aria-hidden="true" /> Thêm rubric</Button></div>}
+    {!rubric && view && <div><Button type="button" variant="secondary" size="sm" data-testid="add-rubric" onClick={() => actions.setField(["rubric"], { schema_version: view.defaultSchemaVersion, criteria: [] }, "Thêm phần chấm điểm", false)}><Plus size={14} aria-hidden="true" /> Thêm phần chấm điểm</Button></div>}
     {rubric && <>
       <div className="se-coord-grid">
-        <Field label="Phiên bản định dạng rubric" required error={at("$.rubric.schema_version")} hint="Chọn đúng giá trị trong danh sách; không nhập cách viết khác.">
+        {(at("$.rubric.schema_version") || !(view?.supportedSchemaVersions ?? []).includes(typeof rubric.schema_version === "string" ? rubric.schema_version : "")) && <>
+        <Field label="Kiểu bảng chấm điểm" required error={at("$.rubric.schema_version")} hint="Chọn đúng giá trị trong danh sách; không nhập cách viết khác.">
           {(props) => {
             const current = typeof rubric.schema_version === "string" ? rubric.schema_version : "";
             const supported = view?.supportedSchemaVersions ?? [];
-            return <Select {...props} data-testid="rubric-schema" value={current} onChange={(event) => actions.setField(["rubric", "schema_version"], event.target.value || undefined, "Chọn phiên bản định dạng rubric", false)}>
+            return <Select {...props} data-testid="rubric-schema" value={current} onChange={(event) => actions.setField(["rubric", "schema_version"], event.target.value || undefined, "Chọn kiểu bảng chấm điểm", false)}>
               <option value="">Chọn…</option>
               {current && !supported.includes(current) && <option value={current}>{current} (không được hỗ trợ)</option>}
               {supported.map((version) => <option key={version} value={version}>{version}</option>)}
             </Select>;
           }}
-        </Field>
-        <NumberField label="Ngưỡng đạt" required data-testid="rubric-threshold" value={typeof rubric.pass_threshold === "number" ? rubric.pass_threshold : undefined} error={at("$.rubric.pass_threshold")} onCommit={(value) => actions.setField(["rubric", "pass_threshold"], value, "Sửa ngưỡng đạt")} />
+        </Field></>}
+        <NumberField label="Điểm đạt tối thiểu" required hint="Số từ 0 đến 1. Ví dụ 0.7: học viên cần đạt 70% tổng mức quan trọng." data-testid="rubric-threshold" value={typeof rubric.pass_threshold === "number" ? rubric.pass_threshold : undefined} error={at("$.rubric.pass_threshold")} onCommit={(value) => actions.setField(["rubric", "pass_threshold"], value, "Sửa điểm đạt tối thiểu")} />
       </div>
       <ol className="se-criteria">
         {criteria.map((criterion, index) => {
@@ -130,7 +139,7 @@ export function RubricGroup({ draft, issues, actions, catalog, pathPrefix = "$" 
               <Button type="button" variant="ghost" size="icon" aria-label={`Xóa tiêu chí ${index + 1}`} onClick={() => actions.removeItem(["rubric", "criteria"], index, "Xóa tiêu chí")}><Trash2 size={16} aria-hidden="true" /></Button></div>
             {at(path) && <span className="ops-field-error" role="alert">{at(path)}</span>}
             <div className="se-coord-grid">
-              <TextField label="Mã tiêu chí" required value={typeof c.id === "string" ? c.id : ""} maxLength={view?.idMaxLength} error={at(`${path}.id`)} data-testid={`criterion-${index}-id`} onCommit={(value) => actions.setField(["rubric", "criteria", index, "id"], value, "Sửa mã tiêu chí")} />
+              {(at(`${path}.id`) || typeof c.id !== "string" || c.id === "") && <TextField label="Tên ngắn của tiêu chí" required hint="Hệ thống tự đặt khi thêm tiêu chí; chỉ sửa khi báo lỗi. Gồm chữ không dấu, số, _ . : -" value={typeof c.id === "string" ? c.id : ""} maxLength={view?.idMaxLength} error={at(`${path}.id`)} data-testid={`criterion-${index}-id`} onCommit={(value) => actions.setField(["rubric", "criteria", index, "id"], value, "Sửa tên ngắn của tiêu chí")} />}
               <Field label="Chỉ số chấm điểm" required error={at(`${path}.metric`)} hint={metric ? metricHint(metric) : undefined}>
                 {(props) => <Select {...props} data-testid={`criterion-${index}-metric`} value={metric} onChange={(event) => actions.setField(["rubric", "criteria", index, "metric"], event.target.value || undefined, "Chọn chỉ số", false)}>
                   <option value="">Chọn…</option>
@@ -138,23 +147,23 @@ export function RubricGroup({ draft, issues, actions, catalog, pathPrefix = "$" 
                   {view?.metrics.map((item) => <option key={item.id} value={item.id}>{metricName(item.id)}</option>)}
                 </Select>}
               </Field>
-              <Field label="Toán tử" required error={at(`${path}.operator`)}>
-                {(props) => <Select {...props} data-testid={`criterion-${index}-operator`} value={typeof c.operator === "string" ? c.operator : ""} onChange={(event) => actions.setField(["rubric", "criteria", index, "operator"], event.target.value || undefined, "Sửa toán tử", false)}>
+              <Field label="Điều kiện" required error={at(`${path}.operator`)}>
+                {(props) => <Select {...props} data-testid={`criterion-${index}-operator`} value={typeof c.operator === "string" ? c.operator : ""} onChange={(event) => actions.setField(["rubric", "criteria", index, "operator"], event.target.value || undefined, "Sửa điều kiện", false)}>
                   <option value="">Chọn…</option>
                   {(view?.operators.length ? view.operators : [...RUBRIC_OPERATORS]).map((operator) => <option key={operator} value={operator}>{operatorLabel(operator)}</option>)}
                 </Select>}
               </Field>
-              <NumberField label="Ngưỡng" required data-testid={`criterion-${index}-threshold`} value={typeof c.threshold === "number" ? c.threshold : undefined} error={at(`${path}.threshold`)} onCommit={(value) => actions.setField(["rubric", "criteria", index, "threshold"], value, "Sửa ngưỡng")} />
-              <NumberField label="Trọng số" required hint="Không âm." data-testid={`criterion-${index}-weight`} value={typeof c.weight === "number" ? c.weight : undefined} error={at(`${path}.weight`)} onCommit={(value) => actions.setField(["rubric", "criteria", index, "weight"], value, "Sửa trọng số")} />
-              <label className="se-check"><input type="checkbox" checked={c.mandatory === true} onChange={(event) => actions.setField(["rubric", "criteria", index, "mandatory"], event.target.checked, "Đổi cờ bắt buộc", false)} /> Tiêu chí bắt buộc</label>
+              <NumberField label="Giá trị so sánh" required hint="Ví dụ: điều kiện ≤ và giá trị 1 nghĩa là không quá 1 lần." data-testid={`criterion-${index}-threshold`} value={typeof c.threshold === "number" ? c.threshold : undefined} error={at(`${path}.threshold`)} onCommit={(value) => actions.setField(["rubric", "criteria", index, "threshold"], value, "Sửa giá trị so sánh")} />
+              <NumberField label="Mức quan trọng" required hint="Số không âm. Tiêu chí quan trọng gấp đôi thì cho 2." data-testid={`criterion-${index}-weight`} value={typeof c.weight === "number" ? c.weight : undefined} error={at(`${path}.weight`)} onCommit={(value) => actions.setField(["rubric", "criteria", index, "weight"], value, "Sửa mức quan trọng")} />
+              <label className="se-check"><input type="checkbox" checked={c.mandatory === true} onChange={(event) => actions.setField(["rubric", "criteria", index, "mandatory"], event.target.checked, "Đổi cờ bắt buộc", false)} /> Tiêu chí bắt buộc (trượt tiêu chí này là trượt cả bài)</label>
             </div>
             <TextField label="Mô tả (tùy chọn)" maxLength={view?.descriptionMaxLength} value={typeof c.description === "string" ? c.description : ""} error={at(`${path}.description`)} onCommit={(value) => actions.setField(["rubric", "criteria", index, "description"], value === "" ? undefined : value, "Sửa mô tả tiêu chí")} />
           </li>;
         })}
       </ol>
       <div className="ops-actions">
-        <Button type="button" variant="quiet" size="sm" data-testid="add-criterion" disabled={!view || criteria.length >= (view?.maxCriteria ?? 100)} onClick={() => actions.addItem(["rubric", "criteria"], { id: "", metric: "", mandatory: false }, "Thêm tiêu chí")}><Plus size={14} aria-hidden="true" /> Thêm tiêu chí</Button>
-        <Button type="button" variant="quiet" size="sm" onClick={() => actions.setField(["rubric"], undefined, "Xóa rubric", false)}><Trash2 size={14} aria-hidden="true" /> Xóa rubric</Button>
+        <Button type="button" variant="quiet" size="sm" data-testid="add-criterion" disabled={!view || criteria.length >= (view?.maxCriteria ?? 100)} onClick={() => actions.addItem(["rubric", "criteria"], { id: nextCriterionId(criteria), metric: "", mandatory: false }, "Thêm tiêu chí")}><Plus size={14} aria-hidden="true" /> Thêm tiêu chí</Button>
+        <Button type="button" variant="quiet" size="sm" onClick={() => actions.setField(["rubric"], undefined, "Xóa phần chấm điểm", false)}><Trash2 size={14} aria-hidden="true" /> Xóa phần chấm điểm</Button>
       </div>
     </>}
   </Group>;
