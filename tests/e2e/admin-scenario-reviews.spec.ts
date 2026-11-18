@@ -312,7 +312,7 @@ test.describe("detail", () => {
     await expect(rubric.getByRole("row")).toHaveCount(3);
     await expect(rubric).toContainText("evac_time");
     await expect(rubric).toContainText("≤ 180");
-    await expect(dialog.getByText("Ngưỡng đạt:")).toBeVisible();
+    await expect(dialog.getByText("Điểm đạt tối thiểu:")).toBeVisible();
 
     const readiness = dialog.getByTestId("readiness-block");
     await expect(readiness.getByTestId("technical-ready")).toHaveText("Sẵn sàng kỹ thuật");

@@ -21,7 +21,7 @@ export function carryOverCandidates(legacy: JsonObject): CarryItem[] {
   if (Array.isArray(legacy.learningObjectives) && legacy.learningObjectives.length > 0) add("learningObjectives", "Mục tiêu học tập", `${legacy.learningObjectives.length} mục`, legacy.learningObjectives);
   if (typeof legacy.learnerInstructions === "string") add("learnerInstructions", "Hướng dẫn cho người học", `${legacy.learnerInstructions.length} ký tự`, legacy.learnerInstructions);
   // Only a rubric that already uses the registered schema_version "1" can be copied; an older version must be re-entered.
-  if (isObject(legacy.rubric) && legacy.rubric.schema_version === "1") add("rubric", "Rubric chấm điểm", `${Array.isArray(legacy.rubric.criteria) ? legacy.rubric.criteria.length : 0} tiêu chí`, legacy.rubric);
+  if (isObject(legacy.rubric) && legacy.rubric.schema_version === "1") add("rubric", "Tiêu chí chấm điểm", `${Array.isArray(legacy.rubric.criteria) ? legacy.rubric.criteria.length : 0} tiêu chí`, legacy.rubric);
   const seconds = isObject(legacy.scoringConfig) ? legacy.scoringConfig.timeLimitSeconds : undefined;
   if (typeof seconds === "number") add("timeLimitSeconds", "Thời gian tối đa", `${seconds} giây`, seconds);
   if (typeof legacy.randomSeed === "number") add("randomSeed", "Biến thể đám cháy", String(legacy.randomSeed), legacy.randomSeed);

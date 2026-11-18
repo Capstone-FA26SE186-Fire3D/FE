@@ -36,7 +36,7 @@ function validateRubric(rubric: unknown, out: Issue[]) {
     const ok = c !== null && text(c.id) && text(c.metric) && typeof c.mandatory === "boolean" && finite(c.weight) && c.weight >= 0
       && finite(c.threshold) && (c.operator === "gte" || c.operator === "lte" || c.operator === "eq") && !ids.has(c.id as string);
     if (c && text(c.id)) ids.add(c.id);
-    if (!ok) out.push(issue("RUBRIC_CRITERION_INVALID", `$.rubric.criteria[${index}]`, "Mỗi tiêu chí cần mã riêng, chỉ số đo, cho biết có bắt buộc không, trọng số ≥ 0, phép so sánh và ngưỡng là số."));
+    if (!ok) out.push(issue("RUBRIC_CRITERION_INVALID", `$.rubric.criteria[${index}]`, "Mỗi tiêu chí cần tên ngắn riêng, điều được đo, cho biết có bắt buộc không, mức quan trọng ≥ 0, điều kiện và giá trị so sánh là số."));
   });
 }
 

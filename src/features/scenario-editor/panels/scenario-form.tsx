@@ -13,7 +13,7 @@ import type { RuntimeCatalogEntry } from "../api";
 import type { EditorActions } from "./actions";
 import { NumberField, StringList, TextField } from "./fields";
 
-const OPERATORS = [{ value: "gte", label: "≥ (từ ngưỡng trở lên)" }, { value: "lte", label: "≤ (từ ngưỡng trở xuống)" }, { value: "eq", label: "= (đúng bằng ngưỡng)" }];
+const OPERATORS = [{ value: "gte", label: "≥ (ít nhất bằng giá trị)" }, { value: "lte", label: "≤ (không quá giá trị)" }, { value: "eq", label: "= (đúng bằng giá trị)" }];
 
 function Group({ title, description, children, testId }: { title: string; description?: string; children: React.ReactNode; testId?: string }) {
   return <fieldset className="ops-fieldset se-group" data-testid={testId}>
@@ -50,13 +50,13 @@ export function ScenarioForm({ draft, issues, actions, catalog }: {
         onCommit={(value) => actions.setField(["learnerInstructions"], value, "Sửa hướng dẫn")} />
     </Group>
 
-    <Group title="Rubric chấm điểm" description="Nhập đúng tiêu chí của tổ chức. Hệ thống không đặt sẵn ngưỡng đạt hay trọng số; chính sách chấm chưa được chốt." testId="group-rubric">
+    <Group title="Chấm điểm" description="Nhập đúng tiêu chí của tổ chức. Hệ thống không đặt sẵn điểm đạt tối thiểu hay mức quan trọng." testId="group-rubric">
       {listIssue("$.rubric") && <span className="ops-field-error" role="alert">{listIssue("$.rubric")}</span>}
       <div className="se-coord-grid">
-        <TextField label="Phiên bản định dạng rubric" value={typeof rubric?.schema_version === "string" ? rubric.schema_version : ""} data-testid="rubric-schema"
-          onCommit={(value) => actions.setField(["rubric", "schema_version"], value, "Sửa phiên bản định dạng rubric")} />
-        <NumberField label="Ngưỡng đạt" data-testid="rubric-threshold" value={typeof rubric?.pass_threshold === "number" ? rubric.pass_threshold : undefined}
-          onCommit={(value) => actions.setField(["rubric", "pass_threshold"], value, "Sửa ngưỡng đạt")} />
+        <TextField label="Kiểu bảng chấm điểm" value={typeof rubric?.schema_version === "string" ? rubric.schema_version : ""} data-testid="rubric-schema"
+          onCommit={(value) => actions.setField(["rubric", "schema_version"], value, "Sửa kiểu bảng chấm điểm")} />
+        <NumberField label="Điểm đạt tối thiểu" hint="Số từ 0 đến 1. Ví dụ 0.7 là 70%." data-testid="rubric-threshold" value={typeof rubric?.pass_threshold === "number" ? rubric.pass_threshold : undefined}
+          onCommit={(value) => actions.setField(["rubric", "pass_threshold"], value, "Sửa điểm đạt tối thiểu")} />
       </div>
       <ol className="se-criteria">
         {criteria.map((criterion, index) => {
@@ -68,17 +68,17 @@ export function ScenarioForm({ draft, issues, actions, catalog }: {
               <Button type="button" variant="ghost" size="icon" aria-label={`Xóa tiêu chí ${index + 1}`} onClick={() => actions.removeItem(["rubric", "criteria"], index, "Xóa tiêu chí")}><Trash2 size={16} aria-hidden="true" /></Button></div>
             {issue && <span className="ops-field-error" role="alert">{issue}</span>}
             <div className="se-coord-grid">
-              <TextField label="Mã tiêu chí" value={typeof c.id === "string" ? c.id : ""} onCommit={(value) => actions.setField(["rubric", "criteria", index, "id"], value, "Sửa mã tiêu chí")} />
+              <TextField label="Tên ngắn của tiêu chí" value={typeof c.id === "string" ? c.id : ""} onCommit={(value) => actions.setField(["rubric", "criteria", index, "id"], value, "Sửa tên ngắn của tiêu chí")} />
               <TextField label="Chỉ số đo" value={typeof c.metric === "string" ? c.metric : ""} onCommit={(value) => actions.setField(["rubric", "criteria", index, "metric"], value, "Sửa chỉ số")} />
-              <Field label="Toán tử">
-                {(props) => <Select {...props} value={typeof c.operator === "string" ? c.operator : ""} onChange={(event) => actions.setField(["rubric", "criteria", index, "operator"], event.target.value || undefined, "Sửa toán tử", false)}>
+              <Field label="Điều kiện">
+                {(props) => <Select {...props} value={typeof c.operator === "string" ? c.operator : ""} onChange={(event) => actions.setField(["rubric", "criteria", index, "operator"], event.target.value || undefined, "Sửa điều kiện", false)}>
                   <option value="">Chọn…</option>
                   {OPERATORS.map((operator) => <option key={operator.value} value={operator.value}>{operator.label}</option>)}
                 </Select>}
               </Field>
-              <NumberField label="Ngưỡng" value={typeof c.threshold === "number" ? c.threshold : undefined} onCommit={(value) => actions.setField(["rubric", "criteria", index, "threshold"], value, "Sửa ngưỡng")} />
-              <NumberField label="Trọng số" hint="Không âm." value={typeof c.weight === "number" ? c.weight : undefined} onCommit={(value) => actions.setField(["rubric", "criteria", index, "weight"], value, "Sửa trọng số")} />
-              <label className="se-check"><input type="checkbox" checked={c.mandatory === true} onChange={(event) => actions.setField(["rubric", "criteria", index, "mandatory"], event.target.checked, "Đổi cờ bắt buộc", false)} /> Tiêu chí bắt buộc</label>
+              <NumberField label="Giá trị so sánh" value={typeof c.threshold === "number" ? c.threshold : undefined} onCommit={(value) => actions.setField(["rubric", "criteria", index, "threshold"], value, "Sửa giá trị so sánh")} />
+              <NumberField label="Mức quan trọng" hint="Số không âm. Quan trọng gấp đôi thì cho 2." value={typeof c.weight === "number" ? c.weight : undefined} onCommit={(value) => actions.setField(["rubric", "criteria", index, "weight"], value, "Sửa mức quan trọng")} />
+              <label className="se-check"><input type="checkbox" checked={c.mandatory === true} onChange={(event) => actions.setField(["rubric", "criteria", index, "mandatory"], event.target.checked, "Đổi cờ bắt buộc", false)} /> Tiêu chí bắt buộc (trượt tiêu chí này là trượt cả bài)</label>
             </div>
           </li>;
         })}
