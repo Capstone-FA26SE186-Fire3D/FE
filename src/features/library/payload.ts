@@ -182,7 +182,7 @@ export function ignoredTemplateParts(state: JsonObject): string[] {
   if (state.geometry !== undefined) out.push("ghim mô hình");
   if (Array.isArray(state.objects) && state.objects.length > 0) out.push(`${state.objects.length} đối tượng đặt trong không gian`);
   if (state.runtimeVersion !== undefined) out.push("phiên bản ứng dụng");
-  if (state.randomSeed !== undefined) out.push("hạt giống ngẫu nhiên");
-  if (state.replanIntervalSeconds !== undefined) out.push("chu kỳ lập lại lộ trình");
+  if (state.randomSeed !== undefined) out.push("biến thể đám cháy");
+  if (state.replanIntervalSeconds !== undefined) out.push("tần suất tính lại đường thoát");
   return out;
 }

@@ -26,7 +26,7 @@ const FIELD_NAME: Record<string, string> = {
   learningObjectives: "Mục tiêu học tập", learnerInstructions: "Hướng dẫn người học", objectAnchors: "Neo đối tượng", requiredCapabilities: "Khả năng cần có của ứng dụng",
   runtimeVersion: "Phiên bản ứng dụng", goals: "Điểm đến", npcs: "NPC", blockedElements: "Vùng chặn", modePolicy: "Chính sách chế độ", safetyThresholds: "Ngưỡng an toàn",
   // fet3d.editor/1
-  schemaVersion: "Định dạng bản nháp", name: "Tên kịch bản", geometry: "Mô hình 3D đã gắn", objects: "Đối tượng", timeLimitSeconds: "Thời gian tối đa", randomSeed: "Hạt giống ngẫu nhiên", replanIntervalSeconds: "Chu kỳ lập kế hoạch lại", libraryRefs: "Mẫu đã dùng",
+  schemaVersion: "Định dạng bản nháp", name: "Tên kịch bản", geometry: "Mô hình 3D đã gắn", objects: "Đối tượng", timeLimitSeconds: "Thời gian tối đa", randomSeed: "Biến thể đám cháy", replanIntervalSeconds: "Tần suất tính lại đường thoát", libraryRefs: "Mẫu đã dùng",
 };
 
 /** Where a change sits, in words: "Nguy cơ › mục 2 › intensity" instead of `$.hazards[1].intensity`. */
