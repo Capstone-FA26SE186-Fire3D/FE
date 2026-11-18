@@ -59,8 +59,8 @@ export function V1ScenarioForm({ draft, issues, actions, catalog, rubricCatalog 
           </Field>}
       <div className="se-coord-grid">
         <NumberField label="Thời gian tối đa" unit="giây" required hint={`Số nguyên ${LIMITS.timeLimit.min}–${LIMITS.timeLimit.max}.`} data-testid="field-time-limit" value={readNumberField(draft, "timeLimitSeconds")} error={at("$.timeLimitSeconds")} onCommit={(value) => actions.setField(["timeLimitSeconds"], value, "Sửa thời gian tối đa")} />
-        <NumberField label="Hạt giống ngẫu nhiên" hint="Số nguyên; để trống nếu không cần." data-testid="field-seed" value={readNumberField(draft, "randomSeed")} error={at("$.randomSeed")} onCommit={(value) => actions.setField(["randomSeed"], value, "Sửa hạt giống")} />
-        <NumberField label="Chu kỳ lập lại kế hoạch" unit="giây" hint={`Số nguyên ${LIMITS.replanInterval.min}–${LIMITS.replanInterval.max}.`} data-testid="field-replan" value={readNumberField(draft, "replanIntervalSeconds")} error={at("$.replanIntervalSeconds")} onCommit={(value) => actions.setField(["replanIntervalSeconds"], value, "Sửa chu kỳ lập kế hoạch")} />
+        <NumberField label="Biến thể đám cháy" hint="Nhập một số bất kỳ, ví dụ 1, 2, 3. Cùng số thì lửa và khói lan giống nhau mỗi lần chơi; đổi số để có diễn biến khác. Để trống là biến thể 1." data-testid="field-seed" value={readNumberField(draft, "randomSeed")} error={at("$.randomSeed")} onCommit={(value) => actions.setField(["randomSeed"], value, "Sửa biến thể đám cháy")} />
+        <NumberField label="Tần suất tính lại đường thoát" unit="giây" hint={`Người trong tòa nhà và mũi tên chỉ đường cập nhật lối thoát sau mỗi khoảng này. Số nguyên ${LIMITS.replanInterval.min}–${LIMITS.replanInterval.max}.`} data-testid="field-replan" value={readNumberField(draft, "replanIntervalSeconds")} error={at("$.replanIntervalSeconds")} onCommit={(value) => actions.setField(["replanIntervalSeconds"], value, "Sửa tần suất tính lại đường thoát")} />
       </div>
     </Group>
 

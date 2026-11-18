@@ -24,8 +24,8 @@ export function carryOverCandidates(legacy: JsonObject): CarryItem[] {
   if (isObject(legacy.rubric) && legacy.rubric.schema_version === "1") add("rubric", "Rubric chấm điểm", `${Array.isArray(legacy.rubric.criteria) ? legacy.rubric.criteria.length : 0} tiêu chí`, legacy.rubric);
   const seconds = isObject(legacy.scoringConfig) ? legacy.scoringConfig.timeLimitSeconds : undefined;
   if (typeof seconds === "number") add("timeLimitSeconds", "Thời gian tối đa", `${seconds} giây`, seconds);
-  if (typeof legacy.randomSeed === "number") add("randomSeed", "Hạt giống ngẫu nhiên", String(legacy.randomSeed), legacy.randomSeed);
-  if (typeof legacy.replanIntervalSeconds === "number") add("replanIntervalSeconds", "Chu kỳ lập lại kế hoạch", `${legacy.replanIntervalSeconds} giây`, legacy.replanIntervalSeconds);
+  if (typeof legacy.randomSeed === "number") add("randomSeed", "Biến thể đám cháy", String(legacy.randomSeed), legacy.randomSeed);
+  if (typeof legacy.replanIntervalSeconds === "number") add("replanIntervalSeconds", "Tần suất tính lại đường thoát", `${legacy.replanIntervalSeconds} giây`, legacy.replanIntervalSeconds);
   if (typeof legacy.runtimeVersion === "string" && SEMVER_PATTERN.test(legacy.runtimeVersion)) add("runtimeVersion", "Phiên bản ứng dụng", legacy.runtimeVersion, legacy.runtimeVersion);
   return items;
 }

@@ -425,7 +425,7 @@ test.describe("equipment and template payloads", () => {
     await expect(page.getByTestId("scenario-form-v1")).toHaveCount(0);
     // Scoped to the version dialog: the admin sidebar has a "Phiên bản runtime" nav link, which is not a form control.
     const versionDialog = page.getByRole("dialog");
-    for (const label of ["Phiên bản runtime", "Hạt giống ngẫu nhiên", "Tầng", "Tọa độ"]) await expect(versionDialog.getByLabel(label)).toHaveCount(0);
+    for (const label of ["Phiên bản runtime", "Biến thể đám cháy", "Tầng", "Tọa độ"]) await expect(versionDialog.getByLabel(label)).toHaveCount(0);
 
     await page.getByTestId("tpl-name").fill("Sơ tán văn phòng (sửa)");
     await page.getByTestId("tpl-time-limit").fill("900");
