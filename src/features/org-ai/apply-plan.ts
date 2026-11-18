@@ -47,8 +47,8 @@ const FIELD_DEFS: Array<{ key: string; label: string; defaultOn: boolean; note?:
   { key: "modePolicy", label: "Chế độ huấn luyện cho phép", defaultOn: false, note: "Quyết định của tổ chức; chọn có chủ ý." },
   { key: "rubric", label: "Tiêu chí chấm điểm (rubric) và ngưỡng đạt", defaultOn: false, note: "Ngưỡng đạt do tổ chức quyết định; chỉ số được kiểm tra theo danh mục sau khi áp dụng." },
   { key: "runtimeVersion", label: "Phiên bản ứng dụng", defaultOn: false, note: "Đổi phiên bản ứng dụng làm thay đổi khả năng hợp lệ của đối tượng." },
-  { key: "randomSeed", label: "Hạt giống ngẫu nhiên", defaultOn: false },
-  { key: "replanIntervalSeconds", label: "Chu kỳ lập lại lộ trình (giây)", defaultOn: false },
+  { key: "randomSeed", label: "Biến thể đám cháy", defaultOn: false },
+  { key: "replanIntervalSeconds", label: "Tần suất tính lại đường thoát (giây)", defaultOn: false },
 ];
 
 const KNOWN_ROOT = new Set(["schemaVersion", "geometry", "objects", ...FIELD_DEFS.map((field) => field.key)]);
