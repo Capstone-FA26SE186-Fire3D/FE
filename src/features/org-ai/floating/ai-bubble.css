@@ -4,6 +4,8 @@
  */
 
 /* ───────── launcher ───────── */
+/* In the scenario editor the panel's own fields sit under the bubble: drop the text pill there, keep the round button. */
+body:has(.se-panel-scroll) .ai-launcher-pill { display: none; }
 .ai-launcher { position: fixed; right: 24px; bottom: 24px; z-index: 55; display: flex; align-items: center; gap: 12px; }
 .ai-launcher-pill { display: inline-flex; align-items: center; height: 36px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--surface-raised); color: var(--text); font: inherit; font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; box-shadow: var(--shadow-pop); animation: ops-fade 200ms ease-out; }
 .ai-launcher-button { display: inline-grid; place-items: center; width: 56px; height: 56px; border: 0; border-radius: 999px; background: var(--ember); color: var(--ember-foreground); cursor: pointer; box-shadow: 0 8px 24px rgba(238, 134, 84, .45); transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease; }

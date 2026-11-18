@@ -13,7 +13,8 @@ import { SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Table } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
-import { capabilityName } from "@/configs/capability-labels";
+import { capabilityName, ifcTypeLabel, parameterLabel } from "@/configs/capability-labels";
+import { SupportCode } from "@/components/ui/support-code";
 import { routes } from "@/configs/routes";
 import { buildingsApi } from "@/features/buildings/api";
 
@@ -67,7 +68,7 @@ export function V1EquipmentImport({ accessToken, buildingId, revisionId, draft, 
       const added = fresh ? fresh.rows.flatMap((row) => (row.status === "add" ? [row.object] : [])) : objects;
       return importEquipmentCommand(current, id, added, now, selection);
     });
-    toast.notify({ tone: "success", title: `Đã thêm ${toAdd.length} thiết bị vào bản nháp`, description: needParameters > 0 ? "Chưa lưu. Hãy điền tham số bắt buộc của từng thiết bị rồi bấm Lưu." : "Chưa lưu. Hoàn tác bằng nút Hoàn tác hoặc Ctrl+Z." });
+    toast.notify({ tone: "success", title: `Đã thêm ${toAdd.length} thiết bị vào bản nháp`, description: needParameters > 0 ? "Chưa lưu. Hãy điền các ô bắt buộc của từng thiết bị rồi bấm Lưu." : "Chưa lưu. Hoàn tác bằng nút Hoàn tác hoặc Ctrl+Z." });
     onClose();
   };
 
@@ -87,23 +88,23 @@ export function V1EquipmentImport({ accessToken, buildingId, revisionId, draft, 
           {data.items.length === 0 ? "IFC không có thiết bị nào." : skipped.length > 0 ? "Các thiết bị đã xác nhận đều đã có trong bản nháp hoặc không thêm được (xem lý do bên dưới)." : "Chưa có thiết bị nào được xác nhận hoặc đổi loại."}
           {" "}<Link href={decideHref}>Xác nhận thiết bị ở trang công trình</Link>.
         </Alert></div>}
-        {needParameters > 0 && <Alert tone="warning" title="Cần điền tham số bắt buộc">{needParameters} thiết bị có tham số bắt buộc (không có giá trị mặc định). Sau khi thêm, chọn từng thiết bị và điền tham số trước khi lưu.</Alert>}
+        {needParameters > 0 && <Alert tone="warning" title="Cần điền thêm thông tin">{needParameters} thiết bị còn ô bắt buộc chưa có giá trị. Sau khi thêm, chọn từng thiết bị và điền các ô đó trước khi lưu.</Alert>}
         {toAdd.length > 0 && <h3 className="se-import-title">Sẽ thêm {toAdd.length} thiết bị</h3>}
         {toAdd.length > 0 && <Table caption="Sẽ thêm vào bản nháp" data-testid="equipment-import-add">
-          <thead><tr><th>Khả năng</th><th>Cấu kiện IFC</th><th>Tầng · vị trí (m)</th><th>Tham số bắt buộc</th></tr></thead>
+          <thead><tr><th>Khả năng</th><th>Bộ phận tòa nhà</th><th>Tầng · vị trí (m)</th><th>Cần điền thêm</th></tr></thead>
           <tbody>{toAdd.map((row) => <tr key={row.candidate.id} data-testid="equipment-import-row">
-            <td>{capabilityName(row.catalogKey)} <code className="ops-mono">{row.catalogKey}</code>{row.candidate.decision?.decision === "Retyped" && <> <StatusBadge tone="info">Đã đổi loại</StatusBadge></>}</td>
-            <td><span className="ops-mono">{row.candidate.ifcGlobalId}</span>{row.candidate.ifcClass ? ` · ${row.candidate.ifcClass}` : ""}</td>
+            <td>{capabilityName(row.catalogKey)}<SupportCode code={row.catalogKey} />{row.candidate.decision?.decision === "Retyped" && <> <StatusBadge tone="info">Đã đổi loại</StatusBadge></>}</td>
+            <td>{ifcTypeLabel(row.candidate.ifcClass ?? "")}<SupportCode id={row.candidate.ifcGlobalId} /></td>
             <td>{where(row, geometry)}</td>
-            <td>{row.requiredParameters.length > 0 ? <StatusBadge tone="warning">Cần điền: {row.requiredParameters.join(", ")}</StatusBadge> : "—"}</td>
+            <td>{row.requiredParameters.length > 0 ? <StatusBadge tone="warning">{row.requiredParameters.map(parameterLabel).join(", ")}</StatusBadge> : "—"}</td>
           </tr>)}</tbody>
         </Table>}
         {skipped.length > 0 && <h3 className="se-import-title">Không thêm ({skipped.length})</h3>}
         {skipped.length > 0 && <Table caption="Không thêm" data-testid="equipment-import-skip">
-          <thead><tr><th>Khả năng</th><th>Cấu kiện IFC</th><th>Lý do</th></tr></thead>
+          <thead><tr><th>Khả năng</th><th>Bộ phận tòa nhà</th><th>Lý do</th></tr></thead>
           <tbody>{skipped.map((row) => <tr key={row.candidate.id} data-testid="equipment-import-skip-row">
-            <td>{capabilityName(row.catalogKey ?? row.candidate.catalogKey ?? "")} <code className="ops-mono">{row.catalogKey ?? row.candidate.catalogKey}</code></td>
-            <td className="ops-mono">{row.candidate.ifcGlobalId}</td>
+            <td>{capabilityName(row.catalogKey ?? row.candidate.catalogKey ?? "")}<SupportCode code={row.catalogKey ?? row.candidate.catalogKey ?? undefined} /></td>
+            <td>{ifcTypeLabel(row.candidate.ifcClass ?? "")}<SupportCode id={row.candidate.ifcGlobalId} /></td>
             <td>{row.status === "skip" ? SKIP_LABEL[row.reason] : ""}</td>
           </tr>)}</tbody>
         </Table>}

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field, Input, Select } from "@/components/ui/field";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { capabilityName } from "@/configs/capability-labels";
+import { capabilityDescription, capabilityName, ifcTypeLabel, parameterHint, parameterLabel, parameterOptionLabel } from "@/configs/capability-labels";
 
 import type { Issue } from "../../store/validation";
 import { capabilitiesForKind, findCapability, findRuntime, rangeMessage, type CapabilityOption, type ParameterField, type RuntimeOption } from "../../v1/catalog";
@@ -101,35 +101,46 @@ function AnchorField({ object, kind, geometry, error, actions, pick }: { object:
   const [filter, setFilter] = useState("");
   const required = kind === "BlockedElement";
   const candidates = useMemo(() => anchorsForFloor(geometry, object.floorId), [geometry, object.floorId]);
+  // "Cửa 3" instead of the IFC type and GlobalId: numbered per kind of part on this floor, in the list's order.
+  const names = useMemo(() => {
+    const count = new Map<string, number>();
+    return new Map(candidates.map((entry) => {
+      const label = ifcTypeLabel(entry.semanticType);
+      const n = (count.get(label) ?? 0) + 1;
+      count.set(label, n);
+      return [entry.ifcGlobalId, `${label} ${n}`] as const;
+    }));
+  }, [candidates]);
   const shown = useMemo(() => {
     const needle = filter.trim().toLowerCase();
-    const matches = needle ? candidates.filter((entry) => `${entry.semanticType} ${entry.nodeId} ${entry.ifcGlobalId}`.toLowerCase().includes(needle)) : candidates;
+    const matches = needle ? candidates.filter((entry) => `${names.get(entry.ifcGlobalId) ?? ""} ${entry.semanticType} ${entry.nodeId}`.toLowerCase().includes(needle)) : candidates;
     return matches.slice(0, MAX_ANCHOR_OPTIONS);
-  }, [candidates, filter]);
+  }, [candidates, filter, names]);
   const current = object.anchorId ? candidates.find((entry) => entry.ifcGlobalId === object.anchorId) : undefined;
   const picked = pick ? candidates.find((entry) => entry.nodeId === pick.name) : undefined;
   const pickedElsewhere = pick && !picked ? geometry?.semantic.find((entry) => entry.nodeId === pick.name) : undefined;
 
   return <fieldset className="ops-fieldset" data-testid="anchor-field">
-    <legend>Cấu kiện neo (IFC) {required && <StatusBadge tone="warning">Bắt buộc</StatusBadge>}</legend>
+    <legend>Gắn vào bộ phận tòa nhà {required && <StatusBadge tone="warning">Bắt buộc</StatusBadge>}</legend>
+    <p className="ops-field-hint">Gắn đối tượng vào một bộ phận có thật trong mô hình (cửa, cửa sổ, tường…), để ứng dụng biết đối tượng chính là bộ phận đó. Ví dụ: cửa bị chặn phải gắn vào đúng cái cửa.</p>
     {candidates.length === 0
-      ? <p className="ops-field-hint">{geometry ? "Tầng này chưa có cấu kiện nào dùng làm neo được." : "Cần mô hình 3D hợp lệ để chọn cấu kiện neo."}</p>
+      ? <p className="ops-field-hint">{geometry ? "Tầng này chưa có bộ phận nào gắn được." : "Cần mô hình 3D hợp lệ để chọn bộ phận."}</p>
       : <>
-        {candidates.length > 12 && <Field label="Lọc cấu kiện" hint={`${candidates.length} cấu kiện trên tầng này; hiển thị tối đa ${MAX_ANCHOR_OPTIONS}.`}>
+        {candidates.length > 12 && <Field label="Tìm bộ phận" hint={`Gõ “cửa”, “cửa sổ”… để thu gọn danh sách. Tầng này có ${candidates.length} bộ phận; danh sách hiện tối đa ${MAX_ANCHOR_OPTIONS}.`}>
           {(props) => <Input {...props} value={filter} onChange={(event) => setFilter(event.target.value)} autoComplete="off" spellCheck={false} />}
         </Field>}
-        <Field label="Cấu kiện" required={required} error={error} hint="Chọn cấu kiện trên đúng tầng của đối tượng.">
+        <Field label="Bộ phận" required={required} error={error} hint="Chỉ liệt kê bộ phận cùng tầng với đối tượng. Cũng có thể bấm vào bộ phận trên mô hình 3D.">
           {(props) => <Select {...props} data-testid="field-anchor" value={object.anchorId ?? ""} onChange={(event) => actions.setAnchor(object.index, event.target.value || undefined)}>
-            <option value="">{required ? "Chọn cấu kiện…" : "Không neo"}</option>
-            {object.anchorId && !current && !shown.some((entry) => entry.ifcGlobalId === object.anchorId) && <option value={object.anchorId}>{object.anchorId} (không thuộc tầng này)</option>}
-            {current && !shown.some((entry) => entry.ifcGlobalId === current.ifcGlobalId) && <option value={current.ifcGlobalId}>{current.semanticType} · {current.nodeId}</option>}
-            {shown.map((entry) => <option key={entry.ifcGlobalId} value={entry.ifcGlobalId}>{entry.semanticType} · {entry.nodeId}</option>)}
+            <option value="">{required ? "Chọn bộ phận…" : "Không gắn"}</option>
+            {object.anchorId && !current && !shown.some((entry) => entry.ifcGlobalId === object.anchorId) && <option value={object.anchorId}>Bộ phận ở tầng khác (chọn lại)</option>}
+            {current && !shown.some((entry) => entry.ifcGlobalId === current.ifcGlobalId) && <option value={current.ifcGlobalId}>{names.get(current.ifcGlobalId)}</option>}
+            {shown.map((entry) => <option key={entry.ifcGlobalId} value={entry.ifcGlobalId}>{names.get(entry.ifcGlobalId)}</option>)}
           </Select>}
         </Field>
-        {picked && picked.ifcGlobalId !== object.anchorId && <div><Button type="button" variant="secondary" size="sm" data-testid="use-picked-anchor" onClick={() => actions.setAnchor(object.index, picked.ifcGlobalId)}>Dùng phần tử đang chọn trên mô hình ({picked.nodeId})</Button></div>}
-        {pickedElsewhere && <p className="ops-field-hint">Phần tử đang chọn trên mô hình ({pickedElsewhere.nodeId}) thuộc tầng khác; neo phải cùng tầng với đối tượng.</p>}
+        {picked && picked.ifcGlobalId !== object.anchorId && <div><Button type="button" variant="secondary" size="sm" data-testid="use-picked-anchor" onClick={() => actions.setAnchor(object.index, picked.ifcGlobalId)}>Gắn vào {names.get(picked.ifcGlobalId)?.toLowerCase()} vừa bấm trên mô hình</Button></div>}
+        {pickedElsewhere && <p className="ops-field-hint">{ifcTypeLabel(pickedElsewhere.semanticType)} vừa bấm trên mô hình nằm ở tầng khác, nên không gắn được cho đối tượng ở tầng này.</p>}
       </>}
-    {!required && object.anchorId && <div><Button type="button" variant="quiet" size="sm" onClick={() => actions.setAnchor(object.index, undefined)}>Bỏ neo</Button></div>}
+    {!required && object.anchorId && <div><Button type="button" variant="quiet" size="sm" onClick={() => actions.setAnchor(object.index, undefined)}>Bỏ gắn</Button></div>}
   </fieldset>;
 }
 
@@ -146,13 +157,14 @@ function CapabilityField({ object, kind, catalog, runtimeVersion, issues, action
   else if (catalog.error) guidance = <Alert tone="danger" title="Không tải được danh sách khả năng của ứng dụng" action={<Button type="button" size="sm" variant="secondary" onClick={catalog.reload}>Thử lại</Button>} />;
   else if (catalog.runtimes.length === 0) guidance = <Alert tone="warning" title="Chưa có phiên bản ứng dụng nào" ><span data-testid="catalog-empty">Chưa có phiên bản ứng dụng nào được công bố. Quản trị FET3D cần cấu hình thêm; trình soạn không tự tạo khả năng. {required ? "Loại này bắt buộc chọn khả năng nên chưa hoàn thiện được." : ""}</span></Alert>;
   else if (!runtime) guidance = <p className="ops-field-hint">Chọn phiên bản ứng dụng ở tab Kịch bản để xem các khả năng. <Button type="button" variant="quiet" size="sm" onClick={onOpenScenario}>Mở tab Kịch bản</Button></p>;
+  else if (options.length === 0 && !required) guidance = <p className="ops-field-hint" data-testid="no-capability">Loại đối tượng này không cần chọn khả năng; ứng dụng tự xử lý.</p>;
   else if (options.length === 0) guidance = <Alert tone="warning" title={`Phiên bản ứng dụng ${runtime.runtimeVersion} chưa có khả năng cho ${KIND_META[kind].lower}`}><span data-testid="no-capability">Phiên bản này chưa hỗ trợ {KIND_META[kind].lower}. Chọn phiên bản khác hoặc nhờ quản trị FET3D bổ sung; trình soạn không tự tạo khả năng.</span></Alert>;
 
   return <fieldset className="ops-fieldset" data-testid="capability-field">
     <legend>Khả năng trong ứng dụng {required && <StatusBadge tone="warning">Bắt buộc</StatusBadge>}</legend>
     {guidance}
     {runtime && options.length > 0 && <Field label="Khả năng" required={required} error={error}
-      hint={selected?.description ?? "Đối tượng hoạt động thế nào trong ứng dụng là do khả năng này, không do loại đối tượng."}>
+      hint={(selected && capabilityDescription(selected.id)) ?? "Khả năng quyết định đối tượng hoạt động thế nào trong ứng dụng."}>
       {(props) => <Select {...props} data-testid="field-capability" value={object.capability?.id ?? ""}
         onChange={(event) => {
           const next = options.find((option) => option.id === event.target.value);
@@ -173,10 +185,8 @@ function CapabilityField({ object, kind, catalog, runtimeVersion, issues, action
   </fieldset>;
 }
 
-const optionLabel = (value: unknown) => (typeof value === "string" ? value : JSON.stringify(value));
-
 function ParameterFields({ capability, object, issues, actions }: { capability: CapabilityOption; object: ObjectView; issues: Issue[]; actions: V1Actions }) {
-  if (capability.fields.length === 0) return <p className="ops-field-hint" data-testid="no-parameters">Năng lực này không có tham số.</p>;
+  if (capability.fields.length === 0) return <p className="ops-field-hint" data-testid="no-parameters">Khả năng này không cần điền thêm gì.</p>;
   return <div className="se-form" data-testid="parameter-fields">
     {capability.fields.map((field) => <ParameterInput key={`${object.index}-${capability.id}-${field.name}`} field={field} object={object} issues={issues} actions={actions} />)}
   </div>;
@@ -184,7 +194,8 @@ function ParameterFields({ capability, object, issues, actions }: { capability: 
 
 function hintOf(field: ParameterField): string | undefined {
   const parts: string[] = [];
-  if (field.description) parts.push(field.description);
+  const plain = parameterHint(field.name);
+  if (plain) parts.push(plain);
   if (field.minimum !== undefined || field.maximum !== undefined) parts.push(rangeMessage(field));
   if (field.type === "integer") parts.push("Số nguyên.");
   return parts.join(" ") || undefined;
@@ -194,22 +205,22 @@ function ParameterInput({ field, object, issues, actions }: { field: ParameterFi
   const value = object.parameters[field.name];
   const error = messageAt(issues, `$.objects[${object.index}].parameters.${field.name}`);
   const set = (next: Parameters<V1Actions["setParameter"]>[2], typing: boolean) => actions.setParameter(object.index, field.name, next, typing);
-  const label = field.required ? field.name : `${field.name} (tùy chọn)`;
+  const label = field.required ? parameterLabel(field.name) : `${parameterLabel(field.name)} (tùy chọn)`;
 
   if (field.enum) {
     const index = field.enum.findIndex((option) => option === value);
     return <Field label={label} required={field.required} error={error} hint={hintOf(field)}>
       {(props) => <Select {...props} data-testid={`param-${field.name}`} value={index >= 0 ? String(index) : ""} onChange={(event) => set(event.target.value === "" ? undefined : field.enum?.[Number(event.target.value)], false)}>
-        <option value="">Chưa đặt</option>
-        {value !== undefined && index < 0 && <option value="" disabled>{optionLabel(value)} (không có trong danh sách)</option>}
-        {field.enum?.map((option, i) => <option key={i} value={String(i)}>{optionLabel(option)}</option>)}
+        <option value="">Chọn…</option>
+        {value !== undefined && index < 0 && <option value="" disabled>{parameterOptionLabel(value)} (không có trong danh sách)</option>}
+        {field.enum?.map((option, i) => <option key={i} value={String(i)}>{parameterOptionLabel(option)}</option>)}
       </Select>}
     </Field>;
   }
   if (field.type === "boolean") {
     return <Field label={label} required={field.required} error={error} hint={hintOf(field)}>
       {(props) => <Select {...props} data-testid={`param-${field.name}`} value={typeof value === "boolean" ? String(value) : ""} onChange={(event) => set(event.target.value === "" ? undefined : event.target.value === "true", false)}>
-        <option value="">Chưa đặt</option>
+        <option value="">Chọn…</option>
         <option value="true">Có</option>
         <option value="false">Không</option>
       </Select>}

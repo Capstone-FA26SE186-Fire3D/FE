@@ -127,7 +127,7 @@ export function validateParameters(capability: CapabilityOption | undefined, val
   for (const field of capability.fields) {
     const item = values[field.name];
     if (item === undefined) {
-      if (field.required) out.push({ code: "FIELD_REQUIRED", name: field.name, message: "Năng lực này yêu cầu tham số." });
+      if (field.required) out.push({ code: "FIELD_REQUIRED", name: field.name, message: "Cần điền ô này." });
       continue;
     }
     if (field.type === "number" || field.type === "integer") {

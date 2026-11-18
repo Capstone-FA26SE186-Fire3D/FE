@@ -81,13 +81,13 @@ test("previews decided equipment, adds it as ONE undoable step with anchor, capa
   await expect(dialog.getByTestId("equipment-import-row").nth(0)).toContainText("door.exit");
   await expect(dialog.getByTestId("equipment-import-row").nth(0)).toContainText("Đã đổi loại");
   await expect(dialog.getByTestId("equipment-import-row").nth(0)).toContainText("Tầng 1 · 12.5, 0, 1");
-  await expect(dialog.getByTestId("equipment-import-row").nth(1)).toContainText("Cần điền: state");
-  await expect(dialog).toContainText("Cần điền tham số bắt buộc");
+  await expect(dialog.getByTestId("equipment-import-row").nth(1)).toContainText("Tình trạng");
+  await expect(dialog).toContainText("Cần điền thêm thông tin");
   const skipped = dialog.getByTestId("equipment-import-skip-row");
   await expect(skipped).toHaveCount(4);
-  await expect(skipped.filter({ hasText: gid("5lift") })).toContainText("Có sẵn trong game từ bản vẽ IFC");
+  await expect(skipped.filter({ hasText: gid("5lift") })).toContainText("Có sẵn trong game từ bản vẽ tòa nhà");
   await expect(skipped.filter({ hasText: "extinguisher.portable" })).toContainText("Phiên bản ứng dụng của bản nháp không có khả năng này");
-  await expect(skipped.filter({ hasText: gid("8ghost") })).toContainText("Mô hình 3D không có cấu kiện này");
+  await expect(skipped.filter({ hasText: gid("8ghost") })).toContainText("Mô hình 3D không có bộ phận này");
   await expect(skipped.filter({ hasText: SPACE_L2 })).toContainText("Tầng của thiết bị khác tầng");
   // A suggestion from an earlier revision and a Rejected decision are never added.
   await expect(dialog.getByTestId("equipment-import-undecided")).toContainText("2 thiết bị chưa được xác nhận hoặc đã bị loại bỏ");
@@ -109,7 +109,7 @@ test("previews decided equipment, adds it as ONE undoable step with anchor, capa
   // The author fills the required parameter, then saves.
   await page.getByTestId("list-Equipment").getByRole("button").nth(2).click();
   await expect(page.getByTestId("field-capability")).toHaveValue("suppression.sprinkler");
-  await page.getByTestId("param-state").selectOption({ label: "Active" });
+  await page.getByTestId("param-state").selectOption({ label: "Hoạt động" });
   await page.getByTestId("save").click();
   await expect(page.getByTestId("save-status")).toHaveText("Đã lưu");
   const objects = (mock.puts[mock.puts.length - 1].body as { objects: unknown[] }).objects;

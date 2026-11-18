@@ -71,9 +71,9 @@ export function RuntimeAdmin() {
   };
 
   const columns: DataColumn<RuntimeCatalogEntry>[] = [
-    { key: "version", header: "Phiên bản", primary: true, render: (entry) => <CellTitle title={`Phiên bản ${entry.runtimeVersion}`} sub={`${entry.capabilities.length} năng lực`} /> },
+    { key: "version", header: "Phiên bản", primary: true, render: (entry) => <CellTitle title={`Phiên bản ${entry.runtimeVersion}`} sub={`${entry.capabilities.length} khả năng`} /> },
     { key: "status", header: "Trạng thái", width: 130, render: (entry) => <StatusBadge tone={entry.isActive ? "success" : "neutral"}>{entry.isActive ? "Đang dùng" : "Tắt"}</StatusBadge> },
-    { key: "capabilities", header: "Số năng lực", width: 120, hideBelow: 900, render: (entry) => entry.capabilities.length.toLocaleString("vi-VN") },
+    { key: "capabilities", header: "Số khả năng", width: 120, hideBelow: 900, render: (entry) => entry.capabilities.length.toLocaleString("vi-VN") },
     { key: "protocol", header: "Giao thức / định dạng gói", width: 190, hideBelow: 1100, render: (entry) => `${entry.protocolVersion || "—"} / ${entry.manifestSchemaVersion || "—"}` },
     { key: "created", header: "Ngày đăng ký", width: 160, hideBelow: 768, render: (entry) => formatDateTime(entry.createdAt) },
     { key: "toggle", header: "Bật / tắt", width: 120, align: "right", render: (entry) => <Button size="sm" variant={entry.isActive ? "secondary" : "primary"} data-testid={`runtime-toggle-${entry.runtimeVersion}`} onClick={() => { setToggleError(null); setToggling(entry); }}>{entry.isActive ? "Tắt" : "Bật"}</Button> },
@@ -81,7 +81,7 @@ export function RuntimeAdmin() {
 
   return <>
     <PageHeader eyebrow="Quản lý hệ thống" title="Phiên bản runtime"
-      description="Runtime là phiên bản chương trình mô phỏng trong ứng dụng FET3D trên điện thoại. Mỗi phiên bản ghi những năng lực (thiết bị, sự kiện, thao tác) mà ứng dụng hỗ trợ; chỉ phiên bản đang dùng mới được chọn khi soạn kịch bản, chạy thử và bắt đầu buổi huấn luyện."
+      description="Runtime là phiên bản chương trình mô phỏng trong ứng dụng FET3D trên điện thoại. Mỗi phiên bản ghi những khả năng (thiết bị, sự kiện, thao tác) mà ứng dụng hỗ trợ; chỉ phiên bản đang dùng mới được chọn khi soạn kịch bản, chạy thử và bắt đầu buổi huấn luyện."
       breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Phiên bản runtime" }]}
       actions={<Button onClick={() => setRegistering(true)} data-testid="runtime-register"><Plus size={16} aria-hidden="true" />Đăng ký phiên bản</Button>} />
     {list.error !== undefined && <Alert tone="danger" className="mb-4" title="Không tải được danh sách phiên bản" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{describeRuntimeError(list.error).message}</Alert>}
@@ -96,7 +96,7 @@ export function RuntimeAdmin() {
       rowTone={(entry) => (entry.isActive ? undefined : "muted")}
       empty={<EmptyState icon={Cpu} title="Chưa có phiên bản nào" description="Đăng ký phiên bản bằng tệp xuất từ dự án Unity để trình soạn và ứng dụng dùng được." />}
     />
-    <p className="ops-field-hint" style={{ margin: "10px 0 0" }}>Mới nhất ở trên. Bấm vào một hàng để xem năng lực của phiên bản. Phiên bản đã đăng ký không sửa được, chỉ bật hoặc tắt.</p>
+    <p className="ops-field-hint" style={{ margin: "10px 0 0" }}>Mới nhất ở trên. Bấm vào một hàng để xem khả năng của phiên bản. Phiên bản đã đăng ký không sửa được, chỉ bật hoặc tắt.</p>
 
     {opened && <RuntimeDetailModal entry={opened} onClose={() => setParams({ runtime: null })} />}
     {openId && list.data && !opened && <Alert tone="warning" className="mt-4" title="Không tìm thấy phiên bản" action={<Button size="sm" variant="secondary" className="mt-3" onClick={() => setParams({ runtime: null })}>Về danh sách</Button>}>Đường dẫn không trỏ tới phiên bản nào trong danh sách.</Alert>}
