@@ -234,7 +234,7 @@ async function setup(page: Page, mock: Mock) {
         return problem(route, fail.status, fail.code, fail.retryAfter ? { ...EXPOSED, "Retry-After": fail.retryAfter } : {});
       }
       if (mock.progress.length) { row.status = mock.progress[Math.min(mock.progressIndex, mock.progress.length - 1)]; mock.progressIndex += 1; }
-      if (row.status === "Completed") row.completion = row.completion ?? { result: "Passed", durationSeconds: 42, detail: { exits: 2 } };
+      if (row.status === "Completed") row.completion = row.completion ?? { lastEventSequence: 63, summary: { collapsed: false, elapsedMs: 167037, endReason: "Finished", reachedExit: true, lastEventSequence: 63 }, completedAt: "2026-10-12T01:20:00Z", completionHash: "d06f33ad054259b864dfcb4ee6f815dc8a879b8191585fb403444c50a1b1998f" };
       // An expired code is no longer open on the server either.
       if (row.openHandoffExpiresAt && Date.parse(row.openHandoffExpiresAt) <= Date.now()) { row.openHandoffExpiresAt = null; row.openHandoffId = null; }
       const body = statusBody(row);
@@ -362,8 +362,12 @@ test.describe("prepare and follow", () => {
     await expect(page.getByTestId("playtest-facts")).toContainText("12 sự kiện");
     await expect(statusBox(page)).toContainText("Đã hoàn tất", { timeout: 10_000 });
     const completion = page.getByTestId("playtest-completion");
-    await expect(completion).toContainText("Passed");
-    await expect(completion).toContainText("42");
+    // Plain words, not the raw summary (UAT 18/11/2026).
+    await expect(completion).toContainText("Đã thoát ra ngoài an toàn");
+    await expect(completion).toContainText("Hoàn thành bài");
+    await expect(completion).toContainText("2 phút 47 giây");
+    await expect(completion).not.toContainText("reachedExit");
+    await expect(completion).not.toContainText("d06f33ad");
     await expect(page.getByTestId("handoff-card")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Hủy chạy thử" })).toHaveCount(0);
     const settled = mock.getCalls;
@@ -662,7 +666,7 @@ test.describe("rejected events", () => {
     const mock = newMock({ playtest: newRow({ status: "Completed", rejectedEvents: rejected }) });
     await setup(page, mock);
     await openTab(page, `&playtest=${IDS.playtest}`);
-    await expect(page.getByTestId("playtest-completion")).toContainText("Passed");
+    await expect(page.getByTestId("playtest-completion")).toContainText("Đã thoát ra ngoài an toàn");
     const box = page.getByTestId("playtest-rejected");
     await expect(page.getByRole("status").filter({ hasText: "23 sự kiện từ điện thoại không được ghi nhận" })).toBeVisible();
     await expect(box.getByRole("listitem")).toHaveCount(2);
@@ -681,14 +685,14 @@ test.describe("rejected events", () => {
     const mock = newMock({ playtest: newRow({ status: "Completed" }) });
     await setup(page, mock);
     await openTab(page, `&playtest=${IDS.playtest}`);
-    await expect(page.getByTestId("playtest-completion")).toContainText("Passed");
+    await expect(page.getByTestId("playtest-completion")).toContainText("Đã thoát ra ngoài an toàn");
     await expect(page.getByTestId("playtest-rejected")).toHaveCount(0);
 
     const older = newMock({ playtest: newRow({ status: "Completed", rejectedEvents: null }) });
     await page.unrouteAll({ behavior: "ignoreErrors" });
     await setup(page, older);
     await openTab(page, `&playtest=${IDS.playtest}`);
-    await expect(page.getByTestId("playtest-completion")).toContainText("Passed");
+    await expect(page.getByTestId("playtest-completion")).toContainText("Đã thoát ra ngoài an toàn");
     await expect(page.getByTestId("playtest-rejected")).toHaveCount(0);
   });
 });
