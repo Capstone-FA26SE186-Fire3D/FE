@@ -92,9 +92,9 @@ export const metricHint = (metric: string): string | undefined => METRIC_HINTS[m
 
 /** Plain labels for the rubric comparison operators; the stored value stays `gte`/`lte`/`eq`. */
 const OPERATOR_LABELS: Record<string, string> = {
-  gte: "≥ (từ ngưỡng trở lên)",
-  lte: "≤ (tối đa bằng ngưỡng)",
-  eq: "= (đúng bằng ngưỡng)",
+  gte: "≥ (ít nhất bằng giá trị)",
+  lte: "≤ (không quá giá trị)",
+  eq: "= (đúng bằng giá trị)",
 };
 
 export const operatorLabel = (operator: string) => OPERATOR_LABELS[operator] ?? operator;

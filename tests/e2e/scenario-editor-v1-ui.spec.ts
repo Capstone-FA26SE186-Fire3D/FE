@@ -147,12 +147,12 @@ test("places all six kinds, fills capability/parameter forms from the catalog, s
   await page.getByTestId("add-criterion").click();
   await expect(status(page)).toHaveText("Chưa hợp lệ để lưu"); // the blank criterion row would be refused by the server
   await expect(page.getByTestId("save")).toBeDisabled();
-  await page.getByTestId("criterion-0-id").fill("reached-exit");
+  await expect(page.getByTestId("criterion-0-id")).toHaveCount(0); // id preset by the system
   await page.getByTestId("criterion-0-metric").selectOption("reached_exit");
   // The metric is explained in plain Vietnamese, never with the catalog's English text; operators read as words.
   await expect(page.getByTestId("criterion-0")).toContainText("Bằng 1 khi học viên ra tới lối thoát");
   await expect(page.getByTestId("criterion-0")).not.toContainText("when the trainee reached");
-  await expect(page.getByTestId("criterion-0-operator").locator("option[value=gte]")).toHaveText("≥ (từ ngưỡng trở lên)");
+  await expect(page.getByTestId("criterion-0-operator").locator("option[value=gte]")).toHaveText("≥ (ít nhất bằng giá trị)");
   await page.getByTestId("criterion-0-operator").selectOption("eq");
   await page.getByTestId("criterion-0-threshold").fill("1");
   await page.getByTestId("criterion-0-weight").fill("1");
@@ -189,7 +189,7 @@ test("places all six kinds, fills capability/parameter forms from the catalog, s
   const body = lastPut(mock);
   expect(Object.keys(body)).toEqual(["schemaVersion", "geometry", "name", "runtimeVersion", "timeLimitSeconds", "modePolicy", "learningObjectives", "learnerInstructions", "rubric", "objects"]);
   expect(body.modePolicy).toEqual({ allowedModes: ["Learn", "Assessment"] });
-  expect(body.rubric).toEqual({ schema_version: "1", pass_threshold: 0.7, criteria: [{ id: "reached-exit", metric: "reached_exit", mandatory: true, weight: 1, threshold: 1, operator: "eq" }] });
+  expect(body.rubric).toEqual({ schema_version: "1", pass_threshold: 0.7, criteria: [{ id: "tieu-chi-1", metric: "reached_exit", mandatory: true, weight: 1, threshold: 1, operator: "eq" }] });
   const identity = { x: 0, y: 0, z: 0, w: 1 };
   expect(body.objects).toEqual([
     { id: "spawn-1", kind: "Spawn", placement: { floorId: "L1", position: { x: expect.any(Number), y: expect.any(Number), z: expect.any(Number) }, rotation: identity } },

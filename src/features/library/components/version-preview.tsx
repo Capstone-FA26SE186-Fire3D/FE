@@ -18,11 +18,11 @@ function RubricTable({ rubric }: { rubric: unknown }) {
   return <div className="ops-stack" data-testid="rubric-view">
     <DetailList columns={3} items={[
       { label: "Phiên bản tiêu chí", value: typeof rubric.schema_version === "string" ? rubric.schema_version : "—" },
-      { label: "Ngưỡng đạt", value: typeof rubric.pass_threshold === "number" ? rubric.pass_threshold : "—" },
+      { label: "Điểm đạt tối thiểu", value: typeof rubric.pass_threshold === "number" ? rubric.pass_threshold : "—" },
       { label: "Số tiêu chí", value: criteria.length },
     ]} />
     {criteria.length > 0 && <Table caption="Tiêu chí chấm điểm">
-      <thead><tr><th>Tiêu chí</th><th>Điều kiện</th><th>Trọng số</th><th>Bắt buộc</th></tr></thead>
+      <thead><tr><th>Tiêu chí</th><th>Điều kiện</th><th>Mức quan trọng</th><th>Bắt buộc</th></tr></thead>
       <tbody>{criteria.map((item, index) => <tr key={`${String(item.id)}-${index}`}>
         <td className="ops-cell-primary">{metricName(String(item.metric ?? ""))}<SupportCode code={String(item.id ?? "") || undefined} /></td><td>{operatorSymbol(String(item.operator ?? ""))} {String(item.threshold ?? "")}</td><td>{String(item.weight ?? "")}</td><td>{item.mandatory === true ? "Có" : "Không"}</td>
       </tr>)}</tbody>

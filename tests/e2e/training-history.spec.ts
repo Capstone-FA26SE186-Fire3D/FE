@@ -317,7 +317,7 @@ test.describe("detail drawer: result", () => {
     await expect(criteria.nth(0)).toContainText("Đã tới lối ra");
     await expect(criteria.nth(0)).toContainText("= Có");
     await expect(criteria.nth(0)).toContainText("Bắt buộc");
-    await expect(criteria.nth(0)).toContainText("Trọng số 50");
+    await expect(criteria.nth(0)).toContainText("Mức quan trọng 50");
     await expect(criteria.nth(0)).toContainText("Đạt");
     await expect(criteria.nth(1)).toContainText("≤ 2 phút");
     await expect(criteria.nth(1)).toContainText("1 phút 36 giây");
