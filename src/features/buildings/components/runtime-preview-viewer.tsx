@@ -1,22 +1,29 @@
 "use client";
 
-import { RefreshCw, TriangleAlert } from "lucide-react";
+import { Play, RefreshCw, SkipForward, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { Button } from "@/components/ui/button";
 import { useTheme, type ResolvedTheme } from "@/features/theme/theme-scope";
+import { coreBounds, createParticleBuild, type ParticleBuild } from "../scene/particle-build";
 
 const MAX_PIXEL_RATIO = 1.5;
+/** Point budget of the build-from-particles intro (touch/small screens get fewer). */
+const PARTICLES_DESKTOP = 180_000;
+const PARTICLES_COMPACT = 70_000;
+
+function prefersReducedMotion() {
+  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+}
 
 const palette: Record<ResolvedTheme, { clear: number; gridMajor: number; gridMinor: number; ground: number; sky: number; sun: number }> = {
   dark: { clear: 0x191d1f, gridMajor: 0x4a5a5f, gridMinor: 0x2b363a, ground: 0x182022, sky: 0xe8f4f0, sun: 0xffd4bb },
   light: { clear: 0xf5f7f7, gridMajor: 0x8d9a9e, gridMinor: 0xc9d1d3, ground: 0xdfe5e6, sky: 0xffffff, sun: 0xfff1e6 },
 };
 
-function fitCamera(camera: THREE.PerspectiveCamera, controls: OrbitControls, target: THREE.Object3D) {
-  const bounds = new THREE.Box3().setFromObject(target);
+function fitCamera(camera: THREE.PerspectiveCamera, controls: OrbitControls, bounds: THREE.Box3) {
   if (bounds.isEmpty()) return;
   const center = bounds.getCenter(new THREE.Vector3());
   const distance = Math.max(bounds.getSize(new THREE.Vector3()).length() * 0.9, 8);
@@ -26,6 +33,17 @@ function fitCamera(camera: THREE.PerspectiveCamera, controls: OrbitControls, tar
   camera.far = Math.max(distance * 20, 100);
   camera.updateProjectionMatrix();
   controls.update();
+}
+
+/** The grid is built at the origin, but IFC models keep their project coordinates: move and scale it under the model. */
+export function placeGridUnder(grid: THREE.Object3D, bounds: THREE.Box3, gridSize = 80) {
+  if (bounds.isEmpty()) return;
+  const center = bounds.getCenter(new THREE.Vector3());
+  const size = bounds.getSize(new THREE.Vector3());
+  // A margin around the footprint, rounded to whole 10 m so cells stay readable (40 divisions per side).
+  const span = Math.max(Math.ceil((Math.max(size.x, size.z) * 1.3) / 10) * 10, 20);
+  grid.scale.setScalar(span / gridSize);
+  grid.position.set(center.x, bounds.min.y - 0.01, center.z);
 }
 
 function disposeModel(root: THREE.Object3D) {
@@ -41,7 +59,7 @@ function disposeModel(root: THREE.Object3D) {
 }
 
 type ViewerStatus = "loading" | "ready" | "error" | "context-lost";
-type Rig = { setTheme: (theme: ResolvedTheme) => void; setHighlight: (ids: string[]) => number };
+type Rig = { setTheme: (theme: ResolvedTheme) => void; setHighlight: (ids: string[]) => number; skipBuild: () => void; replayBuild: () => void };
 
 /** GlobalId → glTF node names from `semanticMapping` (`[{ ifcGlobalId, nodeId }]`); a node named after the GlobalId also counts. */
 export function nodeNamesFor(ids: string[], semanticMapping: unknown): Set<string> {
@@ -82,6 +100,7 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError, highlight, sema
   const errorRef = useRef(onLoadError);
   const [status, setStatus] = useState<ViewerStatus>("loading");
   const [attempt, setAttempt] = useState(0);
+  const [building, setBuilding] = useState(false);
 
   useEffect(() => {
     errorRef.current = onLoadError;
@@ -115,6 +134,7 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError, highlight, sema
     }
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.localClippingEnabled = true;
     host.append(renderer.domElement);
 
     const scene = new THREE.Scene();
@@ -130,9 +150,14 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError, highlight, sema
     controls.maxPolarAngle = Math.PI * 0.48;
 
     let frame = 0;
+    let build: ParticleBuild | null = null;
     const draw = () => {
       frame = 0;
-      if (!disposed) renderer.render(scene, camera);
+      if (disposed) return;
+      const running = build?.update(performance.now()) ?? false;
+      renderer.render(scene, camera);
+      if (running) requestRender();
+      else if (build) { build.dispose(); build = null; setBuilding(false); }
     };
     const requestRender = () => {
       if (!frame && !disposed) frame = requestAnimationFrame(draw);
@@ -153,9 +178,11 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError, highlight, sema
         attribute.setXYZ(index, color.r, color.g, color.b);
       }
       attribute.needsUpdate = true;
+      build?.setTheme(theme);
       requestRender();
     };
     let model: THREE.Object3D | null = null;
+    let framing = new THREE.Box3();
     // Original materials of highlighted meshes, restored when the highlight changes.
     const originals = new Map<THREE.Mesh, THREE.Material | THREE.Material[]>();
     const setHighlight = (ids: string[]) => {
@@ -195,7 +222,23 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError, highlight, sema
       requestRender();
       return roots.length;
     };
-    rig.current = { setTheme: applyTheme, setHighlight };
+    const startBuild = () => {
+      if (!model) return;
+      build?.dispose();
+      const compact = window.matchMedia?.("(pointer: coarse)").matches || host.clientWidth < 640;
+      fitCamera(camera, controls, framing); // the fly-in ends on the framed view, also on a replay
+      build = createParticleBuild(scene, model, camera, controls, { maxPoints: compact ? PARTICLES_COMPACT : PARTICLES_DESKTOP, theme: themeRef.current });
+      if (!build) return;
+      build.setViewport(renderer.domElement.height, camera.aspect);
+      setBuilding(true);
+      requestRender();
+    };
+    const skipBuild = () => {
+      if (!build) return;
+      build.finish();
+      requestRender();
+    };
+    rig.current = { setTheme: applyTheme, setHighlight, skipBuild, replayBuild: startBuild };
     applyTheme(themeRef.current);
 
     controls.addEventListener("change", requestRender);
@@ -206,6 +249,7 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError, highlight, sema
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
+      build?.setViewport(renderer.domElement.height, camera.aspect);
       requestRender();
     };
     const observer = new ResizeObserver(resize);
@@ -223,6 +267,14 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError, highlight, sema
     };
     canvas.addEventListener("webglcontextlost", onLost);
     canvas.addEventListener("webglcontextrestored", onRestored);
+    const onPointerMove = (event: PointerEvent) => {
+      if (!build) return;
+      const rect = canvas.getBoundingClientRect();
+      build.setPointer(new THREE.Vector2(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1));
+    };
+    const onPointerLeave = () => build?.setPointer(null);
+    canvas.addEventListener("pointermove", onPointerMove);
+    canvas.addEventListener("pointerleave", onPointerLeave);
 
     new GLTFLoader().load(
       downloadUrl,
@@ -233,10 +285,14 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError, highlight, sema
         }
         model = gltf.scene;
         scene.add(model);
-        fitCamera(camera, controls, model);
+        framing = coreBounds(model);
+        placeGridUnder(grid, framing);
+        fitCamera(camera, controls, framing);
         setStatus("ready");
         const count = setHighlight(highlightRef.current);
         setFound(highlightRef.current.length ? count : null);
+        // Intro only on a plain open: a highlight request or reduced motion goes straight to the model.
+        if (!highlightRef.current.length && !prefersReducedMotion()) startBuild();
         requestRender();
       },
       undefined,
@@ -254,6 +310,10 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError, highlight, sema
       observer.disconnect();
       canvas.removeEventListener("webglcontextlost", onLost);
       canvas.removeEventListener("webglcontextrestored", onRestored);
+      canvas.removeEventListener("pointermove", onPointerMove);
+      canvas.removeEventListener("pointerleave", onPointerLeave);
+      build?.dispose();
+      build = null;
       controls.removeEventListener("change", requestRender);
       controls.dispose();
       for (const [mesh, material] of originals) {
@@ -272,6 +332,11 @@ export function RuntimePreviewViewer({ downloadUrl, onLoadError, highlight, sema
   return <div className="ops-preview">
     <div ref={hostRef} role="img" aria-label="Mô hình 3D dựng từ tệp IFC" style={{ position: "absolute", inset: 0 }} />
     {status === "loading" && <div className="ops-preview-overlay" role="status"><p className="ops-muted">Đang tải mô hình 3D…</p></div>}
+    {status === "ready" && <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 6 }}>
+      {building
+        ? <Button size="sm" variant="secondary" onClick={() => rig.current?.skipBuild()} data-testid="preview-build-skip"><SkipForward size={14} aria-hidden="true" />Bỏ qua</Button>
+        : <Button size="sm" variant="secondary" onClick={() => rig.current?.replayBuild()} data-testid="preview-build-replay" title="Xem lại cảnh mô hình được dựng lên từ các điểm sáng"><Play size={14} aria-hidden="true" />Dựng lại</Button>}
+    </div>}
     {status === "ready" && found !== null && <p className="ops-preview-note" role="status" data-testid="preview-highlight" style={{ position: "absolute", left: 8, bottom: 8, margin: 0, padding: "4px 8px", borderRadius: 6, background: "var(--surface)", fontSize: 12 }}>
       {found > 0 ? `Đang đánh dấu ${found} cấu kiện (màu cam).` : "Không tìm thấy cấu kiện này trong mô hình xem trước."}
     </p>}
