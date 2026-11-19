@@ -5,6 +5,9 @@ import { classifyUploadError, IfcPutError, uploadIfcRevision } from "../../src/f
 import { deriveQaVerdict } from "../../src/features/buildings/pipeline";
 import { ApiError } from "../../src/api/types/common";
 import { postLoginRoute, safeNext } from "../../src/features/auth/redirect";
+import * as THREE from "three";
+import { coreBounds } from "../../src/features/buildings/scene/particle-build";
+import { placeGridUnder } from "../../src/features/buildings/components/runtime-preview-viewer";
 
 // All network here is mocked with Playwright routes: evidence for UI behaviour, not for BE integration.
 
@@ -338,6 +341,25 @@ test.describe("processing, QA and polling", () => {
 });
 
 test.describe("preview", () => {
+  test("framing ignores a stray far-away object and puts the grid under the building", () => {
+    const root = new THREE.Group();
+    const building = new THREE.Mesh(new THREE.BoxGeometry(40, 10, 20));
+    building.position.set(500, 5, -300); // IFC project coordinates, far from the origin
+    const stray = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5));
+    stray.position.set(-200, 0, 0);
+    root.add(building, stray);
+    let seed = 1;
+    const random = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const box = coreBounds(root, 5000, random);
+    expect(box.min.x).toBeGreaterThan(470);
+    expect(box.max.x).toBeLessThan(530);
+    const grid = new THREE.Object3D();
+    placeGridUnder(grid, box);
+    expect(grid.position.x).toBeCloseTo(500, -1);
+    expect(grid.position.z).toBeCloseTo(-300, -1);
+    expect(grid.scale.x * 80).toBeGreaterThanOrEqual(50);
+  });
+
   test("NotReady is an explained empty state, not an error", async ({ page }) => {
     await signIn(page);
     await mockBuilding(page);
@@ -357,7 +379,58 @@ test.describe("preview", () => {
     await expect.poll(() => previews).toBeGreaterThanOrEqual(1);
     await expect(page.getByRole("button", { name: "Thử lại" }).first()).toBeVisible();
   });
+
+  test("a loaded model builds up from particles, can be skipped and replayed", async ({ page, baseURL }) => {
+    await signIn(page);
+    await mockBuilding(page);
+    await page.route("**/api/buildings/building-1/editor-preview?*", (route) => route.fulfill({ json: { buildingId: "building-1", revisionId: "rev-2", revisionStatus: "ReadyForScenario", status: "Ready", artifactId: "art-1", attemptId: "att-1", sha256Hash: "b".repeat(64), downloadUrl: `${baseURL}/mock-storage/frame.glb`, expiresAt: "2099-01-01T00:00:00Z", coordinateTransform: null, floors: null, semanticMapping: null } }));
+    await page.route("**/mock-storage/frame.glb", (route) => route.fulfill({ contentType: "model/gltf+json", body: JSON.stringify(frameGltf()) }));
+    await page.goto("/workspace/buildings/building-1?tab=ifc&sub=preview");
+    await page.getByTestId("preview-build-skip").click({ timeout: 15000 });
+    await expect(page.getByTestId("preview-build-replay")).toBeVisible();
+    await page.getByTestId("preview-build-replay").click();
+    await expect(page.getByTestId("preview-build-skip")).toBeVisible();
+    // Left alone, the intro ends by itself and hands the orbit view back.
+    await expect(page.getByTestId("preview-build-replay")).toBeVisible({ timeout: 15000 });
+  });
+
+  test("reduced motion opens the model without the particle intro", async ({ page, baseURL }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await signIn(page);
+    await mockBuilding(page);
+    await page.route("**/api/buildings/building-1/editor-preview?*", (route) => route.fulfill({ json: { buildingId: "building-1", revisionId: "rev-2", revisionStatus: "ReadyForScenario", status: "Ready", artifactId: "art-1", attemptId: "att-1", sha256Hash: "b".repeat(64), downloadUrl: `${baseURL}/mock-storage/frame.glb`, expiresAt: "2099-01-01T00:00:00Z", coordinateTransform: null, floors: null, semanticMapping: null } }));
+    await page.route("**/mock-storage/frame.glb", (route) => route.fulfill({ contentType: "model/gltf+json", body: JSON.stringify(frameGltf()) }));
+    await page.goto("/workspace/buildings/building-1?tab=ifc&sub=preview");
+    await expect(page.getByTestId("preview-build-replay")).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId("preview-build-skip")).toHaveCount(0);
+  });
 });
+
+/** Tiny three-storey column/slab frame as an embedded glTF: one unit cube mesh, placed and scaled per node. */
+function frameGltf() {
+  const v = [-.5, -.5, -.5, .5, -.5, -.5, .5, .5, -.5, -.5, .5, -.5, -.5, -.5, .5, .5, -.5, .5, .5, .5, .5, -.5, .5, .5];
+  const idx = [0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4, 3, 7, 6, 3, 6, 2, 0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6, 5];
+  const buffer = Buffer.concat([Buffer.from(new Float32Array(v).buffer), Buffer.from(new Uint16Array(idx).buffer)]);
+  const nodes: Array<{ mesh: number; translation: number[]; scale: number[] }> = [];
+  for (let floor = 0; floor < 3; floor++) {
+    nodes.push({ mesh: 0, translation: [6, floor * 3.6 + 3.5, 4], scale: [12.4, 0.2, 8.4] });
+    for (const x of [0, 4, 8, 12]) for (const z of [0, 8]) nodes.push({ mesh: 0, translation: [x, floor * 3.6 + 1.7, z], scale: [0.4, 3.4, 0.4] });
+  }
+  return {
+    asset: { version: "2.0" },
+    scene: 0,
+    scenes: [{ nodes: nodes.map((_, index) => index) }],
+    nodes,
+    meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1, material: 0 }] }],
+    materials: [{ pbrMetallicRoughness: { baseColorFactor: [0.7, 0.7, 0.68, 1], metallicFactor: 0, roughnessFactor: 0.9 } }],
+    buffers: [{ byteLength: buffer.length, uri: `data:application/octet-stream;base64,${buffer.toString("base64")}` }],
+    bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 96, target: 34962 }, { buffer: 0, byteOffset: 96, byteLength: 72, target: 34963 }],
+    accessors: [
+      { bufferView: 0, componentType: 5126, count: 8, type: "VEC3", min: [-.5, -.5, -.5], max: [.5, .5, .5] },
+      { bufferView: 1, componentType: 5123, count: 36, type: "SCALAR" },
+    ],
+  };
+}
 
 test.describe("annotations", () => {
   const item = { id: "11111111-1111-4111-8111-111111111111", ifcGlobalId: "shared-anchor", label: "Revision A", note: null };
