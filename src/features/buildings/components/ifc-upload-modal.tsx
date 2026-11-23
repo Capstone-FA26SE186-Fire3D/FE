@@ -26,9 +26,12 @@ function Stepper({ completed, running, failedStep }: { completed: number; runnin
   </ol>;
 }
 
-/** The public "is this file good enough" list, filled in by the in-browser check. */
-function Criteria({ items }: { items: IfcCriterion[] }) {
-  return <ul className="ifc-criteria" aria-label="Kết quả kiểm tra tệp" data-testid="ifc-criteria">
+/**
+ * The public "is this file good enough" list: filled in by the in-browser check before upload, and by the server's
+ * check of the processed model afterwards (`qaCriteria`).
+ */
+export function IfcCriteriaList({ items, label = "Kết quả kiểm tra tệp", testId = "ifc-criteria" }: { items: Array<Pick<IfcCriterion, "label" | "passed" | "blocking" | "detail"> & { id: string }>; label?: string; testId?: string }) {
+  return <ul className="ifc-criteria" aria-label={label} data-testid={testId}>
     {items.map((item) => {
       const state = item.passed ? "pass" : item.blocking ? "fail" : "warn";
       return <li key={item.id} data-state={state}>
@@ -126,7 +129,7 @@ export function IfcUploadModal({ open, onOpenChange, accessToken, buildingId, on
         <progress id={`${progressId}-check`} max={100} value={Math.round(precheck.fraction * 100)} />
         <span aria-hidden="true">{Math.round(precheck.fraction * 100)}%</span>
       </div>}
-      {criteria && !locked && <Criteria items={criteria} />}
+      {criteria && !locked && <IfcCriteriaList items={criteria} />}
       {contentBlocked && !locked && <Alert tone="danger" title="Tệp chưa đủ điều kiện để tải lên">Mô hình thiếu các mục đánh dấu không đạt ở trên. Hãy sửa trong phần mềm thiết kế, xuất lại IFC rồi chọn tệp mới. Tệp này chưa được gửi đi.</Alert>}
 
       <Field label="Tên bản IFC" required error={labelTooLong ? "Tên bản IFC tối đa 100 ký tự." : undefined}>

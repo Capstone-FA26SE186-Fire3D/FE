@@ -338,7 +338,7 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
               <EquipmentPanel key={revision.id} accessToken={accessToken} revisionId={revision.id} onChanged={() => { revisions.reload(); pipelineState.refresh(); }} onHighlight={(ids) => showInPreview(revision.id, ids)} />
             </SubTabsContent>
             <SubTabsContent value="technical">
-              <RevisionDetailsPanel accessToken={accessToken} revisionId={revision.id} issues={{ data: issues.data?.items, error: issues.error, loading: issues.loading, reload: issues.reload }} reloadKey={reloadKey} onHighlight={(ids) => showInPreview(revision.id, ids)} onIssueAction={runAction} tab={detailsTab} onTabChange={setDetailsTab} />
+              <RevisionDetailsPanel accessToken={accessToken} revisionId={revision.id} processed={revision.status === "NeedsFix" || revision.status === "ReadyForScenario" || revision.status === "ConfirmedForTraining"} issues={{ data: issues.data?.items, error: issues.error, loading: issues.loading, reload: issues.reload }} reloadKey={reloadKey} onHighlight={(ids) => showInPreview(revision.id, ids)} onIssueAction={runAction} tab={detailsTab} onTabChange={setDetailsTab} />
             </SubTabsContent>
             <SubTabsContent value="annotations">
               <AnnotationsPanel accessToken={accessToken} revisionId={revision.id} />

@@ -17,7 +17,8 @@ import { buildingsApi } from "../api";
 import { entityLabel, propertyLabel, qualityFlagCodes, qualityFlagLabel, sortFacts } from "../bim-facts";
 import { describeApiError, formatDateTime } from "../format";
 import { countBySeverity, processingStepLabel, severityLabel, severityOrder, severityRank } from "../pipeline";
-import { issueGlobalIds, qaGuide, type QaAction } from "../qa-codes";
+import { issueGlobalIds, qaCriteria, qaGuide, type QaAction } from "../qa-codes";
+import { IfcCriteriaList } from "./ifc-upload-modal";
 import type { RevisionIssue } from "../types";
 
 type IssueState = { data: RevisionIssue[] | undefined; error: unknown; loading: boolean; reload: () => void };
@@ -50,10 +51,11 @@ function IssueAction({ action, onAction }: { action: QaAction; onAction: (action
   return <Button type="button" size="sm" variant="secondary" onClick={() => onAction(action)} data-testid="issue-action" data-action={action}><Icon size={14} aria-hidden="true" />{label}</Button>;
 }
 
-function IssuesTab({ issues, onHighlight, onAction }: { issues: IssueState; onHighlight?: (ids: string[]) => void; onAction?: (action: QaAction) => void }) {
+function IssuesTab({ issues, processed, onHighlight, onAction }: { issues: IssueState; processed?: boolean; onHighlight?: (ids: string[]) => void; onAction?: (action: QaAction) => void }) {
   const [severity, setSeverity] = useState("all");
   const [currentOnly, setCurrentOnly] = useState(true);
   const all = useMemo(() => issues.data ?? [], [issues.data]);
+  const criteria = useMemo(() => (processed && issues.data ? qaCriteria(issues.data) : null), [processed, issues.data]);
   const scoped = useMemo(() => (currentOnly ? all.filter((issue) => issue.isCurrentAttempt) : all), [all, currentOnly]);
   const rows = useMemo(
     () => scoped.filter((issue) => severity === "all" || issue.severity === severity).sort((a, b) => severityRank(a.severity) - severityRank(b.severity)),
@@ -61,6 +63,10 @@ function IssuesTab({ issues, onHighlight, onAction }: { issues: IssueState; onHi
   );
 
   return <div className="ops-stack">
+    {criteria && <div>
+      <p className="ops-cell-sub" style={{ margin: "0 0 6px" }}>Tiêu chí mô hình sau khi xử lý</p>
+      <IfcCriteriaList items={criteria} label="Tiêu chí mô hình sau khi xử lý" testId="qa-criteria" />
+    </div>}
     <div className="ops-toolbar" style={{ marginBottom: 0 }}>
       <span className="ops-toolbar-grow" />
       <Select aria-label="Lọc theo mức độ" style={{ width: 190 }} value={severity} onChange={(event) => setSeverity(event.target.value)}>
@@ -179,10 +185,12 @@ function FactsTab({ accessToken, revisionId, reloadKey }: { accessToken: string;
  * Figma "IFC · Kỹ thuật": one card, third-level navigation as chip tabs (Issue · Nhật ký · Artifact · BIM facts) instead
  * of a nested tab bar. Issues of the validator, worker logs, artifacts and BIM facts of the selected revision.
  */
-export function RevisionDetailsPanel({ accessToken, revisionId, issues, reloadKey, onHighlight, onIssueAction, tab, onTabChange }: {
+export function RevisionDetailsPanel({ accessToken, revisionId, issues, processed, reloadKey, onHighlight, onIssueAction, tab, onTabChange }: {
   accessToken: string;
   revisionId: string;
   issues: IssueState;
+  /** The server has finished checking this revision: the issue list can be read as a pass/fail criteria list. */
+  processed?: boolean;
   reloadKey: string;
   onHighlight?: (ids: string[]) => void;
   /** Per-issue next step from the QA guide (equipment, re-upload, editor). */
@@ -203,7 +211,7 @@ export function RevisionDetailsPanel({ accessToken, revisionId, issues, reloadKe
       {tab === "issues" && <span className="ops-actions" style={{ gap: 6 }}>{severityOrder.map((level) => { const label = severityLabel(level); return <StatusBadge key={level} tone={counts[level] ? label.tone : "neutral"}>{label.label} {counts[level] ?? 0}</StatusBadge>; })}</span>}
     </div>
     <div className="org-card">
-      {tab === "issues" && <IssuesTab issues={issues} onHighlight={onHighlight} onAction={onIssueAction} />}
+      {tab === "issues" && <IssuesTab issues={issues} processed={processed} onHighlight={onHighlight} onAction={onIssueAction} />}
       {tab === "logs" && <LogsTab accessToken={accessToken} revisionId={revisionId} reloadKey={reloadKey} />}
       {tab === "artifacts" && <ArtifactsTab accessToken={accessToken} revisionId={revisionId} reloadKey={reloadKey} />}
       {tab === "facts" && <FactsTab accessToken={accessToken} revisionId={revisionId} reloadKey={reloadKey} />}
