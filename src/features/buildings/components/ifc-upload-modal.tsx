@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleCheck, FileUp, RotateCcw, Upload, X } from "lucide-react";
+import { CircleCheck, FileUp, RotateCcw, TriangleAlert, Upload, X } from "lucide-react";
 import { useId, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { useNow } from "@/api/use-now";
 import { Alert } from "@/components/ui/alert";
@@ -10,7 +10,8 @@ import { Field, Input } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/utils/cn";
 import { formatBytes } from "../format";
-import { validateIfcFile } from "../ifc-upload";
+import type { IfcCriterion } from "../ifc-precheck";
+import { useIfcPrecheck } from "../use-ifc-precheck";
 import { uploadSteps, useIfcUploadFlow } from "../use-ifc-upload-flow";
 
 function Stepper({ completed, running, failedStep }: { completed: number; running: boolean; failedStep: number | null }) {
@@ -23,6 +24,19 @@ function Stepper({ completed, running, failedStep }: { completed: number; runnin
       </li>;
     })}
   </ol>;
+}
+
+/** The public "is this file good enough" list, filled in by the in-browser check. */
+function Criteria({ items }: { items: IfcCriterion[] }) {
+  return <ul className="ifc-criteria" aria-label="Kết quả kiểm tra tệp" data-testid="ifc-criteria">
+    {items.map((item) => {
+      const state = item.passed ? "pass" : item.blocking ? "fail" : "warn";
+      return <li key={item.id} data-state={state}>
+        <span aria-hidden="true">{state === "pass" ? <CircleCheck size={14} /> : state === "fail" ? <X size={14} /> : <TriangleAlert size={14} />}</span>
+        <span><strong>{item.label}</strong><span className="ops-sr-only">{state === "pass" ? " (đạt)" : state === "fail" ? " (không đạt)" : " (cần lưu ý)"}</span> · {item.detail}</span>
+      </li>;
+    })}
+  </ul>;
 }
 
 function runningText(completed: number) {
@@ -52,9 +66,15 @@ export function IfcUploadModal({ open, onOpenChange, accessToken, buildingId, on
   const now = useNow(Boolean(error?.retryAt));
   const waitSeconds = error?.retryAt ? Math.max(0, Math.ceil((error.retryAt - now) / 1000)) : 0;
 
-  const fileProblem = file ? validateIfcFile(file) : null;
+  // Checked in the browser before anything is sent: first the file kind and IFC version, then the model's content.
+  const precheck = useIfcPrecheck(file);
+  const checked = precheck.phase === "done" ? precheck.result : null;
+  const fileProblem = checked?.stage === "header" ? checked.problem : null;
+  const criteria = checked?.stage === "content" ? checked.criteria : null;
+  const contentBlocked = checked?.stage === "content" && checked.status === "blocked";
+  const fileReady = precheck.phase === "unreadable" || checked?.status === "passed";
   const labelTooLong = versionLabel.trim().length > 100;
-  const canStart = Boolean(accessToken && file && !fileProblem && versionLabel.trim() && !labelTooLong);
+  const canStart = Boolean(accessToken && file && fileReady && versionLabel.trim() && !labelTooLong);
   const locked = running || status === "done";
   const blockedRetry = status === "error" && Boolean(error) && ((error?.retryAt ? waitSeconds > 0 : false) || (!error?.retryable && !error?.restart));
 
@@ -87,7 +107,7 @@ export function IfcUploadModal({ open, onOpenChange, accessToken, buildingId, on
         </Button>}
     </>}>
     <form id="ifc-upload-form" onSubmit={submit} className="ops-stack" noValidate>
-      <div className={cn("ifc-dropzone", dragging && "is-dragging", file && !fileProblem && "has-file")} data-disabled={locked || undefined} onDragOver={(event) => { event.preventDefault(); if (!locked) setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
+      <div className={cn("ifc-dropzone", dragging && "is-dragging", file && fileReady && "has-file")} data-disabled={locked || undefined} onDragOver={(event) => { event.preventDefault(); if (!locked) setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
         <input ref={fileInput} type="file" accept=".ifc" className="ops-sr-only" disabled={locked} data-focus-target aria-label="Chọn tệp IFC" onChange={(event) => flow.setFile(event.target.files?.[0] ?? null)} />
         <span className="ifc-dropzone-icon" aria-hidden="true"><Upload size={18} /></span>
         {file && !fileProblem ? <>
@@ -99,6 +119,15 @@ export function IfcUploadModal({ open, onOpenChange, accessToken, buildingId, on
         </>}
         {fileProblem && <span className="ops-field-error" role="alert">{fileProblem}</span>}
       </div>
+
+      {!file && <p className="ops-muted" data-testid="ifc-requirements">Tệp hợp lệ: mô hình kiến trúc IFC2x3, IFC4 hoặc IFC4x3, có tầng, phòng, cửa, tường hoặc sàn. Tệp được kiểm tra ngay trên máy bạn; tệp không đạt sẽ không được tải lên.</p>}
+      {precheck.phase === "checking" && <div className="ops-progress-row" role="status">
+        <label htmlFor={`${progressId}-check`}>Đang kiểm tra nội dung tệp</label>
+        <progress id={`${progressId}-check`} max={100} value={Math.round(precheck.fraction * 100)} />
+        <span aria-hidden="true">{Math.round(precheck.fraction * 100)}%</span>
+      </div>}
+      {criteria && !locked && <Criteria items={criteria} />}
+      {contentBlocked && !locked && <Alert tone="danger" title="Tệp chưa đủ điều kiện để tải lên">Mô hình thiếu các mục đánh dấu không đạt ở trên. Hãy sửa trong phần mềm thiết kế, xuất lại IFC rồi chọn tệp mới. Tệp này chưa được gửi đi.</Alert>}
 
       <Field label="Tên bản IFC" required error={labelTooLong ? "Tên bản IFC tối đa 100 ký tự." : undefined}>
         {(p) => <Input {...p} maxLength={120} value={versionLabel} disabled={locked} placeholder="VD: Bản IFC tháng 10 — tối đa 100 ký tự" onChange={(event) => flow.setVersionLabel(event.target.value)} />}

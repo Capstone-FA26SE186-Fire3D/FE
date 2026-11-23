@@ -49,6 +49,8 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
     await page.goto("/workspace/buildings");
     await page.getByRole("button", { name: "Thêm công trình", exact: true }).click();
     await createDialog(page).getByLabel("Tên công trình", { exact: true }).fill("Công trình mới");
+    await createDialog(page).getByRole("combobox", { name: "Loại công trình" }).click();
+    await page.getByRole("option", { name: "Trường học" }).click();
     await createDialog(page).getByRole("button", { name: "Tạo công trình", exact: true }).click();
     await expect(createDialog(page).getByText(/Nội dung bạn nhập vẫn được giữ lại/)).toBeVisible();
     await createDialog(page).getByRole("button", { name: "Tạo công trình", exact: true }).click();
@@ -72,6 +74,8 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
     await page.getByRole("button", { name: "Thêm công trình", exact: true }).click();
     const dialog = createDialog(page);
     await dialog.getByLabel("Tên công trình", { exact: true }).fill("Công trình A");
+    await dialog.getByRole("combobox", { name: "Loại công trình" }).click();
+    await page.getByRole("option", { name: "Trường học" }).click();
     await dialog.getByRole("button", { name: "Tạo công trình", exact: true }).click();
     await expect(dialog.getByText(/Nội dung bạn nhập vẫn được giữ lại/)).toBeVisible();
     await dialog.getByLabel("Tên công trình", { exact: true }).fill("Công trình B");
