@@ -38,8 +38,12 @@ test("list-first workspace searches, opens the create modal and creates a buildi
   await page.getByRole("button", { name: "Thêm công trình", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Tạo công trình" });
   await dialog.getByLabel("Tên công trình", { exact: true }).fill("Công trình mới");
-  // "Loại công trình" is a searchable combobox over suggested types (any typed value is also accepted).
+  // The type is required and only the two supported kinds are offered (apartment building, school).
+  await dialog.getByRole("button", { name: "Tạo công trình", exact: true }).click();
+  await expect(dialog.getByText("Chọn loại công trình.")).toBeVisible();
+  expect(input).toBeFalsy(); // nothing was posted
   await dialog.getByRole("combobox", { name: "Loại công trình" }).click();
+  await expect(page.getByRole("option")).toHaveText(["Chung cư", "Trường học"]);
   await page.getByRole("option", { name: "Trường học" }).click();
   await dialog.getByLabel("Số tầng").fill("3");
   await dialog.getByRole("button", { name: "Tạo công trình", exact: true }).click();

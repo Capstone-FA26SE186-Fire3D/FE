@@ -47,3 +47,9 @@
 .ifc-steps li[data-state="active"] .ifc-step-dot, .ifc-steps li[data-state="current"] .ifc-step-dot { border-color: var(--ember); color: var(--ember); background: var(--ember-soft); }
 .ifc-steps li[data-state="error"] { color: var(--danger); }
 .ifc-steps li[data-state="error"] .ifc-step-dot { border-color: var(--danger); color: var(--danger); background: var(--danger-soft); }
+.ifc-criteria { display: grid; gap: 6px; margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; list-style: none; font-size: 13px; }
+.ifc-criteria li { display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: start; color: var(--text); }
+.ifc-criteria li > span:first-child { display: inline-grid; place-items: center; height: 20px; }
+.ifc-criteria li[data-state="pass"] > span:first-child { color: var(--success); }
+.ifc-criteria li[data-state="fail"] > span:first-child { color: var(--danger); }
+.ifc-criteria li[data-state="warn"] > span:first-child { color: var(--warning); }
