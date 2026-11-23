@@ -1,5 +1,15 @@
 # Context — FE
 
+## Định hướng 23/11/2026 — Flow 1 theo Mẫu PC06 (thiết kế đích, chưa triển khai)
+
+- Nguồn: góp ý của giảng viên hướng dẫn. Contract: `Docs/phap-ly-pccc.md` (căn cứ đã đối chiếu Công báo), Flow 1 trong `Docs/phan_tich_khoang_cach_va_quyet_dinh_nghiep_vu.md`, nhóm FR-PLAN trong `Docs/fire_evacuation_requirements.md`.
+- Phạm vi công trình: chỉ nhà chung cư và trường học (tiểu học trở lên).
+- Flow 1: tạo Building + phiếu thông tin cơ sở PC06 → upload IFC theo tiêu chí công khai → dựng Hạ tầng → Chuyên viên PCCC thẩm định, đạt thì khóa → tạo Tình huống (đối tượng, giả định, trong giờ/ngoài giờ) → Chuyên viên PCCC thẩm định → Organization gửi Admin báo giá → phát hành → nhật ký luyện tập theo tình huống.
+- Từ ngữ: người đứng đầu cơ sở phê duyệt phương án PC06 (Điều 15 Nghị định 105/2025/NĐ-CP). Hệ thống và Chuyên viên PCCC chỉ "thẩm định"; mô phỏng không thay buổi thực tập phương án. Không viết "phê duyệt phương án" trong UI, thông báo hay tài liệu cho hành động của hệ thống.
+- BE chỉ nhận issue: BE#211 (vai trò FireSafetyExpert), #212 (BuildingType + nhóm nguy cơ), #213 (lớp hạ tầng khóa), #214 (upload IFC), #215 (đối tượng, giả định, hồ sơ phương án), #216 (step_count, route_efficiency), #217 (điều kiện báo giá), #218 (nhật ký luyện tập). Thiết kế BE: `BE/docs/flow1-pc06-target-design.md`.
+- Việc FE làm được ngay, không cần BE: kiểm tra tệp IFC trên máy trước khi tải (`src/features/buildings/ifc-upload.ts`: đuôi, dung lượng, `ISO-10303-21;`, `FILE_SCHEMA`) với thông báo riêng từng loại tệp sai; loại công trình chỉ còn Chung cư, Trường học (`data/building-types.ts`, bỏ `allowCustom` ở `building-form.tsx`); danh sách tiêu chí IFC đạt/không đạt từ mã QA có sẵn; bảng nhật ký luyện tập từ `analytics/training?groupBy=scenario` (hiện tối đa 90 ngày).
+- Việc FE chờ BE: editor tách bước Hạ tầng và Tình huống (#213), màn Chuyên viên PCCC (#211), hồ sơ phương án trực quan (#212, #215), form đối tượng và giả định (#215), nhật ký đủ một năm (#218). Theo quy tắc chỉ vẽ trường BE có.
+
 ## Contract sản phẩm hiện hành — Docs v7
 
 Nguồn chuẩn: [v7 contract](../../Docs/schema_v7_contract.md) và [requirements](../../Docs/fire_evacuation_requirements.md). Các đoạn contract cũ bên dưới đã được hiệu chỉnh theo v7; đây là thiết kế đích, không phải bằng chứng implementation hoặc deployment đã đạt.
