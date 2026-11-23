@@ -2,6 +2,7 @@ import { EXPOSED } from "./api-headers";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { sha256OfFile } from "../../src/features/buildings/sha256";
 import { classifyUploadError, IfcPutError, uploadIfcRevision } from "../../src/features/buildings/ifc-upload";
+import { checkIfcHeader, ifcCriteria, precheckIfcFile, scanIfcContent } from "../../src/features/buildings/ifc-precheck";
 import { deriveQaVerdict } from "../../src/features/buildings/pipeline";
 import { ApiError } from "../../src/api/types/common";
 import { postLoginRoute, safeNext } from "../../src/features/auth/redirect";
@@ -10,6 +11,10 @@ import { coreBounds } from "../../src/features/buildings/scene/particle-build";
 import { placeGridUnder } from "../../src/features/buildings/components/runtime-preview-viewer";
 
 // All network here is mocked with Playwright routes: evidence for UI behaviour, not for BE integration.
+
+const IFC_HEADER = "ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION(('ViewDefinition [ReferenceView]'),'2;1');\nFILE_NAME('school.ifc','2026-11-23',(''),(''),'','','');\nFILE_SCHEMA(('IFC4'));\nENDSEC;\nDATA;\n";
+/** Smallest text the in-browser pre-check accepts: a storey, a room, a door and a wall. */
+const VALID_IFC = `${IFC_HEADER}#1=IFCBUILDINGSTOREY('s');\n#2=IFCSPACE('r');\n#3=IFCDOOR('d');\n#4=IFCWALL('w');\nENDSEC;\nEND-ISO-10303-21;\n`;
 
 const owner = { id: "owner", email: "owner@fire3d.test", fullName: "Nguyễn Văn A", username: "nguyen.van.a", role: 1, organizationId: "org-1", profileRevision: 1 };
 const admin = { id: "admin", email: "admin@fire3d.test", fullName: "Platform Admin", role: 0, organizationId: null, profileRevision: 1 };
@@ -160,7 +165,7 @@ test.describe("IFC upload stepper", () => {
     return log;
   }
 
-  const ifc = (name = "school.ifc", body = "ISO-10303-21;") => ({ name, mimeType: "application/octet-stream", buffer: Buffer.from(body) });
+  const ifc = (name = "school.ifc", body = VALID_IFC) => ({ name, mimeType: "application/octet-stream", buffer: Buffer.from(body) });
 
   test("sends Idempotency-Key + SHA-256, PUTs to the signed URL without JWT, then completes and processes", async ({ page, baseURL }) => {
     const log = await setup(page, baseURL!);
@@ -171,10 +176,10 @@ test.describe("IFC upload stepper", () => {
     await expect(page.getByText("Đã gửi xử lý IFC")).toBeVisible();
     expect(log.initiates).toHaveLength(1);
     expect(log.initiates[0].key).toBeTruthy();
-    expect(log.initiates[0].body).toMatchObject({ fileSizeBytes: 13, originalFilename: "school.ifc", versionLabel: "IFC rev. 03" });
+    expect(log.initiates[0].body).toMatchObject({ fileSizeBytes: VALID_IFC.length, originalFilename: "school.ifc", versionLabel: "IFC rev. 03" });
     expect(String(log.initiates[0].body.sha256Hash)).toMatch(/^[0-9a-f]{64}$/);
-    expect(log.puts).toEqual([{ auth: undefined, type: "application/octet-stream", size: 13 }]);
-    expect(log.complete).toEqual([{ objectKey: "staging/key", fileSizeBytes: 13, mimeType: "application/octet-stream", sha256Hash: log.initiates[0].body.sha256Hash, originalFilename: "school.ifc" }]);
+    expect(log.puts).toEqual([{ auth: undefined, type: "application/octet-stream", size: VALID_IFC.length }]);
+    expect(log.complete).toEqual([{ objectKey: "staging/key", fileSizeBytes: VALID_IFC.length, mimeType: "application/octet-stream", sha256Hash: log.initiates[0].body.sha256Hash, originalFilename: "school.ifc" }]);
     expect(log.process).toHaveLength(1);
     expect(log.process[0]).toBeTruthy();
     await expect(page.getByRole("list", { name: "Các bước tải IFC" }).getByRole("listitem").filter({ hasText: "Xử lý" })).toHaveAttribute("data-state", "done");
@@ -195,7 +200,7 @@ test.describe("IFC upload stepper", () => {
 
     await page.getByRole("button", { name: "Tải IFC khác" }).click();
     await page.getByLabel("Tên bản IFC").fill("IFC rev. 04");
-    await page.getByLabel("Chọn tệp IFC").setInputFiles(ifc("other.ifc", "different content"));
+    await page.getByLabel("Chọn tệp IFC").setInputFiles(ifc("other.ifc", `${VALID_IFC}#90=IFCDOOR('d2');\n`));
     await page.getByRole("button", { name: "Tải lên và xử lý" }).click();
     await expect.poll(() => log.initiates.length).toBe(3);
     expect(log.initiates[2].key).not.toBe(log.initiates[0].key);
@@ -242,9 +247,82 @@ test.describe("IFC upload stepper", () => {
     const log = await setup(page, baseURL!);
     await page.getByLabel("Tên bản IFC").fill("IFC rev. 03");
     await page.getByLabel("Chọn tệp IFC").setInputFiles({ name: "model.txt", mimeType: "text/plain", buffer: Buffer.from("x") });
-    await expect(page.getByText("Hãy chọn một tệp IFC (.ifc) không rỗng.")).toBeVisible();
+    await expect(page.getByText("Chỉ nhận tệp mô hình IFC có đuôi .ifc.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Tải lên và xử lý" })).toBeDisabled();
     expect(log.initiates).toHaveLength(0);
+  });
+
+  test("names a Word file renamed to .ifc and sends nothing", async ({ page, baseURL }) => {
+    const log = await setup(page, baseURL!);
+    await page.getByLabel("Tên bản IFC").fill("IFC rev. 03");
+    await page.getByLabel("Chọn tệp IFC").setInputFiles({ name: "bao-cao.ifc", mimeType: "application/octet-stream", buffer: Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x14, 0, 6, 0]) });
+    await expect(page.getByText(/tệp nén ZIP hoặc tài liệu Office.*không phải mô hình IFC/)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Tải lên và xử lý" })).toBeDisabled();
+    expect(log.initiates).toHaveLength(0);
+  });
+
+  test("an IFC model without storeys or rooms is listed as not good enough and is never uploaded", async ({ page, baseURL }) => {
+    const log = await setup(page, baseURL!);
+    await page.getByLabel("Tên bản IFC").fill("IFC rev. 03");
+    await page.getByLabel("Chọn tệp IFC").setInputFiles(ifc("ket-cau.ifc", `${IFC_HEADER}#1=IFCWALL('w');\n#2=IFCDOOR('d');\nENDSEC;\n`));
+    const criteria = page.getByTestId("ifc-criteria").getByRole("listitem");
+    await expect(criteria.filter({ hasText: "Có khai báo tầng" })).toHaveAttribute("data-state", "fail");
+    await expect(criteria.filter({ hasText: "Có phòng, không gian" })).toHaveAttribute("data-state", "fail");
+    await expect(criteria.filter({ hasText: "Có cửa" })).toHaveAttribute("data-state", "pass");
+    await expect(page.getByText("Tệp chưa đủ điều kiện để tải lên")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Tải lên và xử lý" })).toBeDisabled();
+    expect(log.initiates).toHaveLength(0);
+
+    // Choosing a good model clears the block.
+    await page.getByLabel("Chọn tệp IFC").setInputFiles(ifc());
+    await expect(criteria.filter({ hasText: "Có khai báo tầng" })).toHaveAttribute("data-state", "pass");
+    await expect(page.getByRole("button", { name: "Tải lên và xử lý" })).toBeEnabled();
+  });
+});
+
+test.describe("IFC pre-check (in the browser, before upload)", () => {
+  const file = (name: string, body: string | Uint8Array<ArrayBuffer>) => new File([body], name);
+
+  test("header: file kind, size and IFC schema", async () => {
+    expect(await checkIfcHeader(file("a.ifc", VALID_IFC))).toEqual({ ok: true, schema: "IFC4" });
+    expect(await checkIfcHeader(file("a.ifc", VALID_IFC.replace("IFC4", "IFC2X3")))).toEqual({ ok: true, schema: "IFC2X3" });
+    expect(await checkIfcHeader(file("a.ifc", VALID_IFC.replace("IFC4", "IFC4X3_ADD2")))).toEqual({ ok: true, schema: "IFC4X3_ADD2" });
+    const problem = async (name: string, body: string | Uint8Array<ArrayBuffer>, maxBytes?: number) => {
+      const result = await checkIfcHeader(file(name, body), maxBytes);
+      return result.ok ? "" : result.problem;
+    };
+    expect(await problem("a.ifc", "")).toMatch(/rỗng/);
+    expect(await problem("ke-hoach.docx", new Uint8Array([0x50, 0x4b, 0x03, 0x04]))).toMatch(/tệp Word, không phải mô hình IFC/);
+    expect(await problem("a.ifc", new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]))).toMatch(/tệp PDF/);
+    expect(await problem("a.ifc", new Uint8Array([0x89, 0x50, 0x4e, 0x47]))).toMatch(/tệp ảnh/);
+    expect(await problem("a.ifc", "just text")).toMatch(/không phải mô hình IFC/);
+    expect(await problem("a.ifc", VALID_IFC.replace("IFC4", "AUTOMOTIVE_DESIGN"))).toMatch(/AUTOMOTIVE_DESIGN.*không phải IFC/);
+    expect(await problem("a.ifc", "ISO-10303-21;\nHEADER;\nENDSEC;\n")).toMatch(/không ghi phiên bản IFC/);
+    expect(await problem("a.ifc", VALID_IFC, 10)).toMatch(/vượt mức tối đa/);
+    expect(await problem("a.step", VALID_IFC)).toMatch(/đuôi \.ifc/);
+  });
+
+  test("content: counts entities across chunk boundaries and ignores names inside strings and other entities", async () => {
+    const lines = Array.from({ length: 4000 }, (_, index) => `#${index + 10}= IFCWALLSTANDARDCASE('w${index}',$,'IFCSPACE in a name');`).join("\n");
+    const body = `${IFC_HEADER}#1=IFCBUILDINGSTOREY('s1');\n#2 = IFCBUILDINGSTOREY ('s2');\n#3=IFCSPACE('r');\n#4=IFCDOOR('d');\n#5=IFCDOORSTYLE('x');\n#6=IFCSTAIRFLIGHT('f');\n${lines}\nENDSEC;\n`;
+    const fractions: number[] = [];
+    const counts = await scanIfcContent(file("a.ifc", body), { onProgress: (value) => fractions.push(value) });
+    expect(counts).toEqual({ storeys: 2, spaces: 1, doors: 1, walls: 4000, slabs: 0, stairs: 1 });
+    expect(fractions.at(-1)).toBe(1);
+    // The same text as one line (no line breaks) gives the same counts.
+    expect(await scanIfcContent(file("a.ifc", body.replaceAll("\n", "")))).toEqual(counts);
+  });
+
+  test("criteria: storeys, rooms, doors and a shell block; a missing stair only warns", async () => {
+    const criteria = ifcCriteria({ storeys: 3, spaces: 10, doors: 4, walls: 20, slabs: 3, stairs: 0 });
+    expect(criteria.filter((item) => !item.passed).map((item) => [item.id, item.blocking])).toEqual([["stair", false]]);
+    expect((await precheckIfcFile(file("a.ifc", VALID_IFC))).status).toBe("passed");
+    const blocked = await precheckIfcFile(file("a.ifc", `${IFC_HEADER}#1=IFCBEAM('b');\nENDSEC;\n`));
+    expect(blocked).toMatchObject({ status: "blocked", stage: "content" });
+    expect(blocked.stage === "content" && blocked.criteria.filter((item) => item.blocking && !item.passed).map((item) => item.id)).toEqual(["storey", "space", "door", "shell"]);
+    const aborted = new AbortController();
+    aborted.abort();
+    await expect(scanIfcContent(file("a.ifc", VALID_IFC), { signal: aborted.signal })).rejects.toThrow();
   });
 });
 
@@ -736,6 +814,8 @@ test.describe("PlatformAdmin by organization", () => {
     await page.getByRole("button", { name: "Tạo công trình", exact: true }).click();
     const createDialog = page.getByRole("dialog", { name: "Tạo công trình" });
     await createDialog.getByLabel("Tên công trình", { exact: true }).fill("Công trình của tổ chức");
+    await createDialog.getByRole("combobox", { name: "Loại công trình" }).click();
+    await page.getByRole("option", { name: "Trường học" }).click();
     await createDialog.getByRole("button", { name: "Tạo công trình", exact: true }).click();
     await expect.poll(() => requests.some((request) => request.method === "POST")).toBe(true);
     expect(requests.find((request) => request.method === "POST")?.body).toMatchObject({ name: "Công trình của tổ chức", organizationId: "org-1" });

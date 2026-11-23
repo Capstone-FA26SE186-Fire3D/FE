@@ -6,7 +6,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { Field, Input } from "@/components/ui/field";
-import { buildingTypes } from "../data/building-types";
+import { buildingTypes, isSupportedBuildingType } from "../data/building-types";
 import { districtsOf, provinceNames } from "../data/vn-provinces";
 import { formatDateTime } from "../format";
 
@@ -30,6 +30,8 @@ export function validateBuildingForm(form: FormState) {
   const floors = Number(form.totalFloors);
   if (!name) errors.name = "Nhập tên công trình.";
   else if (name.length > 200) errors.name = "Tên công trình tối đa 200 ký tự.";
+  if (!form.buildingType.trim()) errors.buildingType = "Chọn loại công trình.";
+  else if (!isSupportedBuildingType(form.buildingType)) errors.buildingType = "Hệ thống hiện chỉ hỗ trợ Chung cư và Trường học. Hãy chọn lại loại công trình.";
   if (!Number.isInteger(floors) || floors < 1) errors.totalFloors = "Số tầng phải là số nguyên từ 1 trở lên.";
   return errors;
 }
@@ -61,15 +63,15 @@ const cityOptions = provinceNames.map((name) => ({ value: name, label: name }));
 
 /**
  * Figma "Modal / Create building": name · type (combobox) + floors · province (combobox) + district (combobox that
- * depends on the province) · street address. Type/city/district are suggestions only — BE stores plain strings, so the
- * comboboxes accept any typed value ("Khác…").
+ * depends on the province) · street address. The type is one of the two supported kinds; city/district are suggestions
+ * only (BE stores plain strings, so those comboboxes accept any typed value).
  */
 export function BuildingForm({ form, errors, onChange, autoFocus }: { form: FormState; errors: ReturnType<typeof validateBuildingForm>; onChange: (patch: Partial<FormState>) => void; autoFocus?: boolean }) {
   const districtOptions = useMemo(() => districtsOf(form.city).map((district) => ({ value: district, label: district })), [form.city]);
   return <div className="ops-stack" data-testid="building-form">
     <Field label="Tên công trình" required error={errors.name}>{(p) => <Input {...p} required maxLength={200} value={form.name} autoFocus={autoFocus} placeholder="Trường Tiểu học Hòa Bình" onChange={(event) => onChange({ name: event.target.value })} />}</Field>
     <div className="ops-form-grid">
-      <Field label="Loại công trình">{(p) => <Combobox {...p} value={form.buildingType} options={typeOptions} placeholder="Chọn loại công trình" searchPlaceholder="Tìm loại công trình…" allowCustom clearable aria-label="Loại công trình" onChange={(value) => onChange({ buildingType: value })} />}</Field>
+      <Field label="Loại công trình" required error={errors.buildingType} hint="Trường học: từ tiểu học trở lên.">{(p) => <Combobox {...p} value={form.buildingType} options={typeOptions} placeholder="Chọn loại công trình" searchPlaceholder="Tìm loại công trình…" aria-label="Loại công trình" onChange={(value) => onChange({ buildingType: value })} />}</Field>
       <Field label="Số tầng" required error={errors.totalFloors}>{(p) => <Input {...p} required min="1" inputMode="numeric" type="number" value={form.totalFloors} onChange={(event) => onChange({ totalFloors: event.target.value })} />}</Field>
     </div>
     <div className="ops-form-grid">
