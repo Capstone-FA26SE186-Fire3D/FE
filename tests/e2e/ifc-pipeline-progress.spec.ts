@@ -99,6 +99,11 @@ test.describe("IFC progress view", () => {
     await next(page).getByRole("button", { name: "Tải lên IFC mới" }).click();
     await expect(uploadModal(page)).toBeVisible();
     await expect(uploadModal(page).getByLabel("Chọn tệp IFC")).toBeAttached();
+    await page.keyboard.press("Escape");
+    // Not processed: no issues does not mean every criterion passed, so the list is not drawn.
+    await page.getByTestId("ifc-sub-technical").click();
+    await expect(page.getByTestId("details-tab-issues")).toBeVisible();
+    await expect(page.getByTestId("qa-criteria")).toHaveCount(0);
   });
 
   test("NeedsFix with IFC_EXIT_UNKNOWN: QA done, the exit step blocks and its action goes to the exit door choice", async ({ page }) => {
@@ -123,6 +128,12 @@ test.describe("IFC progress view", () => {
     // Per-issue next step from the QA guide (Issue chip of the "Kỹ thuật" sub-tab).
     await page.getByTestId("ifc-sub-technical").click();
     await expect(page.getByTestId("details-tab-issues")).toHaveAttribute("aria-pressed", "true");
+    // Pass/fail criteria of the processed model, read from the same issues: the exit blocks, missing equipment is a note.
+    const criteria = page.getByTestId("qa-criteria").getByRole("listitem");
+    await expect(criteria).toHaveCount(9);
+    await expect(criteria.filter({ hasText: "Xác định được cửa thoát ra ngoài" })).toHaveAttribute("data-state", "fail");
+    await expect(criteria.filter({ hasText: "Có thiết bị báo cháy, chữa cháy" })).toHaveAttribute("data-state", "warn");
+    await expect(criteria.filter({ hasText: "Có phòng" }).first()).toHaveAttribute("data-state", "pass");
     const exitRow = page.locator('[data-testid="issue-row"][data-code="IFC_EXIT_UNKNOWN"]');
     await expect(exitRow.getByTestId("issue-action")).toHaveAttribute("data-action", "equipment");
     const editorRow = page.locator('[data-testid="issue-row"][data-code="IFC_NO_FIRE_EQUIPMENT"]');
