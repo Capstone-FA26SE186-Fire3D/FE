@@ -27,6 +27,39 @@ export function qaGuide(code: string): QaGuide | null {
   return CODES[code] ?? null;
 }
 
+export type QaCriterion = { id: string; label: string; passed: boolean; blocking: boolean; detail: string };
+
+/** What the server checks on the processed model, as pass/fail rows; each row is the absence of its issue codes. */
+const CRITERIA: Array<{ id: string; label: string; codes: string[] }> = [
+  { id: "architectural", label: "Là mô hình kiến trúc", codes: ["IFC_NOT_ARCHITECTURAL", "IFC_UNSUPPORTED_FORMAT"] },
+  { id: "spaces", label: "Có phòng", codes: ["IFC_NO_SPACES"] },
+  { id: "body", label: "Tường, sàn, cửa, cầu thang có hình khối 3D", codes: ["IFC_NO_BODY_GEOMETRY"] },
+  { id: "exit", label: "Xác định được cửa thoát ra ngoài", codes: ["IFC_EXIT_UNKNOWN"] },
+  { id: "floors", label: "Phòng có sàn bên dưới", codes: ["IFC_NO_FLOOR_UNDER_SPACE"] },
+  { id: "openings", label: "Cắt được lỗ cửa trên tường", codes: ["IFC_EXCESSIVE_VOIDS"] },
+  { id: "names", label: "Phòng có tên", codes: ["IFC_SPACE_UNNAMED"] },
+  { id: "weight", label: "Mô hình đủ nhẹ cho điện thoại", codes: ["IFC_TRIANGLE_BUDGET_EXCEEDED"] },
+  { id: "equipment", label: "Có thiết bị báo cháy, chữa cháy", codes: ["IFC_NO_FIRE_EQUIPMENT"] },
+];
+// The exit stays a blocker while reported as a warning: the model cannot be used until a door is chosen as the exit.
+const ALWAYS_BLOCKING = new Set(["IFC_EXIT_UNKNOWN"]);
+
+/**
+ * Pass/fail list of a processed model from the issues of its latest processing attempt. A failed row blocks when the
+ * server reported it as an error (or it is the exit door); otherwise it is a note. Only meaningful once processing has
+ * finished: before that an empty issue list does not mean "passed".
+ */
+export function qaCriteria(issues: Array<{ issueCode: string; severity: string; status?: string; isCurrentAttempt: boolean }>): QaCriterion[] {
+  const open = issues.filter((issue) => issue.isCurrentAttempt && issue.status !== "Resolved" && issue.status !== "Superseded");
+  return CRITERIA.map(({ id, label, codes }) => {
+    const hits = open.filter((issue) => codes.includes(issue.issueCode));
+    if (hits.length === 0) return { id, label, passed: true, blocking: false, detail: "Đạt" };
+    const blocking = hits.some((issue) => issue.severity === "Error" || issue.severity === "Critical" || ALWAYS_BLOCKING.has(issue.issueCode));
+    const guide = qaGuide(hits[0].issueCode);
+    return { id, label, passed: false, blocking, detail: guide?.guidance ?? guide?.title ?? "Xem mục Vấn đề bên dưới." };
+  });
+}
+
 /** IFC GlobalIds the worker named for an issue: `ifcGlobalIds`, or `evidence.ifcGlobalIds` for older responses. */
 export function issueGlobalIds(issue: { ifcGlobalIds?: string[] | null; evidence?: unknown }): string[] {
   if (Array.isArray(issue.ifcGlobalIds)) return issue.ifcGlobalIds.filter((id): id is string => typeof id === "string" && id.length > 0);
