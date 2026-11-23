@@ -30,9 +30,9 @@ export const withDefaultGroup = (filters: TrainingFilters): TrainingFilters => (
  * Building / scenario / grouping chips of the training report (rendered inside the report's chip row). Options come from the tenant's own lists (buildings, then the
  * scenarios of the chosen building); the server re-checks both ids inside the tenant.
  */
-export function TrainingFilterBar({ accessToken, filters, onChange }: { accessToken: string | null; filters: TrainingFilters; onChange: (patch: Record<string, string | null>) => void }) {
+export function TrainingFilterBar({ accessToken, filters, buildingOnly, onChange }: { accessToken: string | null; filters: TrainingFilters; /** Practice log: one row per scenario already, so only the building narrows it. */ buildingOnly?: boolean; onChange: (patch: Record<string, string | null>) => void }) {
   const buildings = useAsyncData("analytics:filter-buildings", (signal) => buildingsApi.list(accessToken as string, { page: 1, pageSize: 100 }, signal), Boolean(accessToken));
-  const scenarios = useAsyncData(`analytics:filter-scenarios:${filters.buildingId}`, (signal) => buildingsApi.listScenarios(accessToken as string, filters.buildingId as string, 1, 100, signal), Boolean(accessToken && filters.buildingId), { keepPrevious: false });
+  const scenarios = useAsyncData(`analytics:filter-scenarios:${filters.buildingId}`, (signal) => buildingsApi.listScenarios(accessToken as string, filters.buildingId as string, 1, 100, signal), Boolean(accessToken && filters.buildingId && !buildingOnly), { keepPrevious: false });
   const buildingItems = buildings.data?.items ?? [];
   const scenarioItems = scenarios.data?.items ?? [];
   const hasOption = (items: Array<{ id: string }>, id?: string) => !id || items.some((item) => item.id === id);
@@ -45,8 +45,8 @@ export function TrainingFilterBar({ accessToken, filters, onChange }: { accessTo
 
   return <>
     <FilterChip label="Công trình" value={filters.buildingId ?? ""} options={buildingOptions} onChange={(value) => onChange({ building: value || null, scenario: null })} />
-    <FilterChip label="Kịch bản" value={filters.scenarioId ?? ""} options={scenarioOptions} disabled={!filters.buildingId} hint={filters.buildingId ? undefined : "Chọn công trình trước"} onChange={(value) => onChange({ scenario: value || null })} />
-    <FilterChip label="Nhóm theo" allLabel={GROUP_LABELS[DEFAULT_GROUP_BY]} value={filters.groupBy ?? ""} options={GROUP_BY.filter((key) => key !== DEFAULT_GROUP_BY).map((key) => ({ value: key, label: GROUP_LABELS[key] }))} hint="Trục thời gian của biểu đồ và bảng nhóm số liệu; cũng áp dụng cho CSV." onChange={(value) => onChange({ groupBy: value || null })} />
+    {!buildingOnly && <><FilterChip label="Kịch bản" value={filters.scenarioId ?? ""} options={scenarioOptions} disabled={!filters.buildingId} hint={filters.buildingId ? undefined : "Chọn công trình trước"} onChange={(value) => onChange({ scenario: value || null })} />
+    <FilterChip label="Nhóm theo" allLabel={GROUP_LABELS[DEFAULT_GROUP_BY]} value={filters.groupBy ?? ""} options={GROUP_BY.filter((key) => key !== DEFAULT_GROUP_BY).map((key) => ({ value: key, label: GROUP_LABELS[key] }))} hint="Trục thời gian của biểu đồ và bảng nhóm số liệu; cũng áp dụng cho CSV." onChange={(value) => onChange({ groupBy: value || null })} /></>}
     {errors.length > 0 && <p className={styles.filterError} role="alert">{errors.join(" ")}</p>}
   </>;
 }
