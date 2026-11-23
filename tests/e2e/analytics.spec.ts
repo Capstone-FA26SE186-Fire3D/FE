@@ -212,6 +212,56 @@ test.describe("organization analytics", () => {
     await expectChipValue(filters, "Nhóm theo", "week");
   });
 
+  test("practice log tab lists scenarios, keeps only the building filter and exports with the simulation note once", async ({ page }) => {
+    const note = "Số liệu luyện tập trên mô phỏng, mang tính hỗ trợ, không thay buổi thực tập phương án.";
+    const reports: URLSearchParams[] = [];
+    const exports: URLSearchParams[] = [];
+    let csv = "groupBy,key,label,plays\nscenario,sc-1,Thoát hiểm tầng 3,25\n";
+    await signIn(page, owner);
+    await page.route("**/api/buildings*", (route) => route.fulfill({ json: { items: [{ id: "b-1", name: "Tòa nhà A", buildingType: null, totalFloors: 5, isActive: true, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" }], totalCount: 1, page: 1, pageSize: 100 } }));
+    await page.route("**/api/organizations/me/analytics/training/export*", (route) => { exports.push(new URL(route.request().url()).searchParams); return route.fulfill({ body: csv, contentType: "text/csv" }); });
+    await page.route("**/api/organizations/me/analytics/training?*", (route) => {
+      const query = new URL(route.request().url()).searchParams;
+      reports.push(query);
+      return route.fulfill({ json: training({ filters: { groupBy: "scenario" }, cohorts: query.has("buildingId") ? [] : [
+        { key: "sc-1", label: "Thoát hiểm tầng 3", plays: 25, uniqueTrainees: 9, completed: 20, abandoned: 2, awaitingSync: 0, assessed: 12, passed: 9, passRate: 0.75, averageDurationSeconds: 185 },
+        { key: "sc-2", label: "Hành lang có khói", plays: 3, uniqueTrainees: 2, completed: 1, abandoned: 2, awaitingSync: 0, assessed: 0, passed: 0, passRate: null, averageDurationSeconds: null },
+      ] }) });
+    });
+    await page.goto("/workspace/analytics?tab=log&from=2026-09-01&to=2026-09-30");
+    await expect(page.getByRole("tab", { name: "Nhật ký luyện tập" })).toHaveAttribute("aria-selected", "true");
+    const card = page.getByTestId("card-practice-log");
+    const table = card.getByRole("table", { name: "Nhật ký luyện tập theo kịch bản" });
+    await expect(table.getByRole("row", { name: /Thoát hiểm tầng 3\s*25\s*9\s*9 \/ 12\s*75%/ })).toBeVisible();
+    await expect(table.getByRole("row", { name: /Hành lang có khói\s*3\s*2\s*0 \/ 0\s*—\s*—/ })).toBeVisible();
+    await expect(card.getByText(note)).toBeVisible();
+    expect(reports.at(-1)?.get("groupBy")).toBe("scenario");
+
+    // Only the building narrows the log; the scenario and grouping chips belong to the training report.
+    const filters = page.getByRole("group", { name: "Bộ lọc báo cáo" });
+    await expect(chip(filters, "Kịch bản")).toHaveCount(0);
+    await expect(chip(filters, "Nhóm theo")).toHaveCount(0);
+
+    const read = async () => {
+      const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Xuất CSV" }).click()]);
+      expect(download.suggestedFilename()).toBe("nhat-ky-luyen-tap.csv");
+      const stream = await download.createReadStream();
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) chunks.push(chunk as Buffer);
+      return Buffer.concat(chunks).toString("utf8").replace(/^﻿/, "");
+    };
+    expect(await read()).toBe(`${note}\n${csv}`);
+    expect(Object.fromEntries(exports[0])).toMatchObject({ groupBy: "scenario" });
+    // When the server writes the note itself, the file still has it once.
+    csv = `${note}\n${csv}`;
+    expect(await read()).toBe(csv);
+
+    await pick(filters, "Công trình", { value: "b-1" });
+    await expect(card.getByText("Chưa có lượt luyện tập nào trong kỳ này.")).toBeVisible();
+    expect(reports.at(-1)?.get("buildingId")).toBe("b-1");
+    await expect(card.getByText(note)).toBeVisible();
+  });
+
   test("every chart has a legend with counts and a table with the same numbers", async ({ page }) => {
     await signIn(page, owner);
     await page.route("**/api/organizations/me/analytics/training*", (route) => route.fulfill({ json: training() }));

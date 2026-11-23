@@ -14,6 +14,7 @@ import { analyticsApi } from "../api";
 import type { AnalyticsScope, OperationsReport } from "../types";
 import { readTrainingFilters, TrainingFilterBar, withDefaultGroup } from "./filters";
 import { OperationsReportView } from "./operations-report";
+import { PracticeLogView, withPracticeLogNote } from "./practice-log";
 import { PeriodMeta, RangeBar, RangeError, useAnalyticsRange } from "./range";
 import { ReportShell } from "./report-shell";
 import { RevenueReportView } from "./revenue-report";
@@ -22,14 +23,14 @@ import styles from "./analytics.module.css";
 import { LoadingBlock } from "@/components/ui/spinner";
 
 export type AnalyticsVariant = "organization" | "platform" | "admin-organization";
-type TabKey = "training" | "operations" | "revenue";
+type TabKey = "training" | "operations" | "revenue" | "log";
 
 const TABS: Record<AnalyticsVariant, TabKey[]> = {
-  organization: ["training", "operations"],
+  organization: ["training", "operations", "log"],
   "admin-organization": ["training", "operations"],
   platform: ["operations", "training", "revenue"],
 };
-const TAB_LABELS: Record<TabKey, string> = { training: "Huấn luyện", operations: "Vận hành", revenue: "Doanh thu" };
+const TAB_LABELS: Record<TabKey, string> = { training: "Huấn luyện", operations: "Vận hành", revenue: "Doanh thu", log: "Nhật ký luyện tập" };
 const ROLE: Record<AnalyticsVariant, 0 | 1> = { organization: 1, platform: 0, "admin-organization": 0 };
 
 /**
@@ -59,6 +60,10 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
   const activity = useAsyncData(`activity:${key}`, (signal) => analyticsApi.training(accessToken as string, scope, range, signal, { groupBy: "day" }), enabled && tab === "operations", { keepWhenDenied: true });
   const revenue = useAsyncData(`revenue:${key}`, (signal) => analyticsApi.revenue(accessToken as string, range, signal), enabled && tab === "revenue" && variant === "platform", { keepWhenDenied: true });
 
+  // Practice log (Docs FR-PLAN-11): the same report grouped by scenario, narrowed by building only.
+  const logFilters = useMemo(() => ({ buildingId: filters.buildingId, groupBy: "scenario" as const }), [filters.buildingId]);
+  const log = useAsyncData(`log:${key}:${logFilters.buildingId ?? ""}`, (signal) => analyticsApi.training(accessToken as string, scope, range, signal, logFilters), enabled && tab === "log", { keepWhenDenied: true });
+
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const exportCsv = async () => {
@@ -66,11 +71,12 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
     setExporting(true);
     setExportError(null);
     try {
-      const text = await analyticsApi.exportTraining(accessToken, scope, range, undefined, requestFilters);
-      const url = URL.createObjectURL(new Blob(["﻿", text], { type: "text/csv;charset=utf-8" }));
+      const raw = await analyticsApi.exportTraining(accessToken, scope, range, undefined, tab === "log" ? logFilters : requestFilters);
+      const text = tab === "log" ? withPracticeLogNote(raw) : raw;
+      const url = URL.createObjectURL(new Blob(["﻿", text.replace(/^﻿/, "")], { type: "text/csv;charset=utf-8" }));
       const link = document.createElement("a");
       link.href = url;
-      link.download = variant === "organization" ? "bao-cao-huan-luyen.csv" : variant === "platform" ? "bao-cao-huan-luyen-toan-he-thong.csv" : "bao-cao-huan-luyen-to-chuc.csv";
+      link.download = tab === "log" ? "nhat-ky-luyen-tap.csv" : variant === "organization" ? "bao-cao-huan-luyen.csv" : variant === "platform" ? "bao-cao-huan-luyen-toan-he-thong.csv" : "bao-cao-huan-luyen-to-chuc.csv";
       link.click();
       URL.revokeObjectURL(url);
     } catch (cause) {
@@ -86,7 +92,7 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (user?.role !== ROLE[variant]) return <Alert tone="danger" title="Không có quyền truy cập">{variant === "organization" ? "Báo cáo này dành cho tài khoản tổ chức." : "Chỉ quản trị FET3D xem được báo cáo này."}</Alert>;
 
-  const active = tab === "training" ? training : tab === "operations" ? operations : revenue;
+  const active = tab === "training" ? training : tab === "operations" ? operations : tab === "log" ? log : revenue;
   const meta = active.data;
   const identity = variant === "admin-organization" ? (training.data?.organization ?? operations.data?.organization ?? null) : null;
 
@@ -95,11 +101,11 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
   const org = variant === "organization" && !sectionHeading;
   // CSV export exists for the training report only (`{training route}/export`, one route per scope: own organization,
   // whole platform, one organization seen by an Admin); the operations and revenue tabs have no export endpoint.
-  const exportButton = tab === "training" ? <Button variant="secondary" onClick={() => void exportCsv()} disabled={exporting || Boolean(rangeError)}><Download size={16} aria-hidden="true" />{exporting ? "Đang xuất…" : "Xuất CSV"}</Button> : null;
+  const exportButton = tab === "training" || tab === "log" ? <Button variant="secondary" onClick={() => void exportCsv()} disabled={exporting || Boolean(rangeError)}><Download size={16} aria-hidden="true" />{exporting ? "Đang xuất…" : "Xuất CSV"}</Button> : null;
 
   const toolbar = <div className={styles.toolbar}>
     <FilterChips label="Bộ lọc báo cáo">
-      {filterable && tab === "training" && <TrainingFilterBar accessToken={accessToken} filters={filters} onChange={(patch) => setParams(patch)} />}
+      {filterable && (tab === "training" || tab === "log") && <TrainingFilterBar accessToken={accessToken} filters={filters} buildingOnly={tab === "log"} onChange={(patch) => setParams(patch)} />}
       <RangeBar key={`${urlFrom}|${urlTo}`} urlFrom={urlFrom} urlTo={urlTo} onApply={apply} />
     </FilterChips>
     <PeriodMeta data={meta} hasRange={hasRange} urlFrom={urlFrom} urlTo={urlTo} />
@@ -118,6 +124,7 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
       <RangeError message={rangeError} />
       <TabsContent value="training">{!rangeError && <ReportShell query={training} title="báo cáo huấn luyện">{(data) => <TrainingReportView data={data} groupBy={requestFilters.groupBy} showOrganizationLinks={variant === "platform"} />}</ReportShell>}</TabsContent>
       <TabsContent value="operations">{!rangeError && <ReportShell query={operations} title="báo cáo vận hành">{(data) => <OperationsReportView data={data} scope={variant === "organization" ? "organization" : variant === "platform" ? "platform" : "admin-organization"} organizationId={organizationId} activity={{ report: activity.data, loading: activity.loading && !activity.data, failed: activity.error !== undefined && !activity.data }} />}</ReportShell>}</TabsContent>
+      {variant === "organization" && <TabsContent value="log">{!rangeError && <ReportShell query={log} title="nhật ký luyện tập">{(data) => <PracticeLogView data={data} />}</ReportShell>}</TabsContent>}
       {variant === "platform" && <TabsContent value="revenue">{!rangeError && <ReportShell query={revenue} title="báo cáo doanh thu">{(data) => <RevenueReportView data={data} />}</ReportShell>}</TabsContent>}
     </Tabs>
   </div>;
