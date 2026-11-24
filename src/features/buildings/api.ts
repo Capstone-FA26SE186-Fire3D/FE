@@ -1,4 +1,4 @@
-import { apiClient } from "@/api/client";
+import { apiClient, buildUrl } from "@/api/client";
 import { ApiError, type PageResponse } from "@/api/types/common";
 import type { ScenarioSummary } from "@/features/scenarios/types";
 
@@ -71,6 +71,27 @@ export const buildingsApi = {
   async getVersioned(accessToken: string, id: string, signal?: AbortSignal): Promise<VersionedBuilding> {
     const response = await apiClient.requestWithMeta<Building>(`/api/buildings/${id}`, { headers: headers(accessToken), signal });
     return { data: response.data, etag: response.headers.get("etag") };
+  },
+  /** Server limits for an IFC upload (BE#214): the size the browser check must use instead of its own constant. */
+  ifcUploadLimits(accessToken: string, signal?: AbortSignal) {
+    return apiClient.request<{ enabled: boolean; maxBytes: number; acceptedExtensions: string[]; acceptedSchemas: string[] }>("/api/ifc/upload-limits", { headers: headers(accessToken), signal });
+  },
+  /** Signed PC06 plan (BE#212): intent → PUT the PDF to `uploadUrl` with `headers` → complete. Answers 200, not 201. */
+  signedPlanIntent(accessToken: string, id: string, input: { fileName: string; contentType: "application/pdf"; sizeBytes: number }, idempotencyKey: string) {
+    return apiClient.request<{ uploadId: string; uploadUrl: string; headers?: Record<string, string>; expiresAt: string }>(`/api/buildings/${id}/signed-plan/upload-intent`, { headers: headers(accessToken), json: input, idempotencyKey });
+  },
+  signedPlanComplete(accessToken: string, id: string, uploadId: string) {
+    return apiClient.request<{ id: string; fileName: string; sizeBytes: number; storedAt: string }>(`/api/buildings/${id}/signed-plan/uploads/${uploadId}/complete`, { headers: headers(accessToken), method: "POST" });
+  },
+  /**
+   * The API answers 302 to a signed storage URL (10 minutes). The request needs the Bearer token, so a plain link cannot
+   * be used: the redirect is followed here and the final URL returned; the body is not downloaded.
+   */
+  async signedPlanUrl(accessToken: string, id: string): Promise<string> {
+    const response = await fetch(buildUrl(`/api/buildings/${id}/signed-plan`), { headers: headers(accessToken), cache: "no-store" });
+    void response.body?.cancel();
+    if (!response.ok) throw new ApiError(response.statusText, response.status);
+    return response.url;
   },
   /** If-Match is mandatory: missing → 428, changed since read → 412 with `current` + new ETag (see `buildingConflict`). */
   async update(accessToken: string, id: string, input: BuildingInput, etag: string, organizationId?: string): Promise<VersionedBuilding> {
@@ -280,7 +301,7 @@ export const buildingsApi = {
  * Used when the first read had no readable ETag: the ETag fetched at save time only applies to the data fetched with it.
  */
 export function sameBuildingVersion(a: Building, b: Building): boolean {
-  const pick = (x: Building) => JSON.stringify([x.name, x.buildingType ?? null, x.totalFloors, x.location ?? null, x.contact ?? null]);
+  const pick = (x: Building) => JSON.stringify([x.name, x.buildingType ?? null, x.totalFloors, x.location ?? null, x.contact ?? null, x.floorAreaSquareMeters ?? null, x.facilityHeadName ?? null, x.facilityHeadPhone ?? null, x.onSiteForce ?? null, x.emergencyContacts ?? []]);
   const at = (x: Building) => Date.parse(x.updatedAt);
   return a.id === b.id && at(a) === at(b) && pick(a) === pick(b);
 }

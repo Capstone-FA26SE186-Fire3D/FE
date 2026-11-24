@@ -84,6 +84,25 @@ export const ERROR_TEXT: Record<string, string> = {
   IFC_STORAGE_UNAVAILABLE: "Kho lưu trữ đang bận. Hãy thử lại.",
   PREVIEW_STORAGE_UNAVAILABLE: "Chưa tải được hình 3D. Hãy thử lại sau.",
   EDITOR_SCHEMA_INVALID: "Bản nháp có chỗ chưa hợp lệ. Xem danh sách vấn đề rồi sửa.",
+  IFC_UNSUPPORTED_SCHEMA: "Tệp IFC dùng phiên bản hệ thống chưa nhận. Hãy xuất lại ở IFC2x3, IFC4 hoặc IFC4x3.",
+  IFC_UPLOAD_INTENT_NOT_FOUND: "Lượt tải này đã bị hủy vì tệp không hợp lệ. Hãy chọn tệp khác và tải lại.",
+  // fire infrastructure and expert review (BE#211, BE#213)
+  FIRE_INFRASTRUCTURE_OPEN_VERSION_EXISTS: "Bản IFC này đang có một phiên bản hạ tầng chưa thẩm định xong. Hãy mở phiên bản đó.",
+  FIRE_INFRASTRUCTURE_LOCKED: "Phiên bản hạ tầng này đã đạt thẩm định và bị khoá. Muốn sửa, hãy tạo phiên bản mới.",
+  FIRE_INFRASTRUCTURE_NOT_DRAFT: "Phiên bản hạ tầng này đã gửi thẩm định nên không sửa được nữa.",
+  FIRE_INFRASTRUCTURE_INVALID: "Hạ tầng PCCC còn chỗ chưa hợp lệ. Xem danh sách vấn đề rồi sửa.",
+  FIRE_INFRASTRUCTURE_NOT_APPROVED: "Hạ tầng PCCC của bản IFC này chưa đạt thẩm định nên chưa tạo được tình huống.",
+  FIRE_INFRASTRUCTURE_REVISION_MISMATCH: "Hạ tầng PCCC đã chọn thuộc một bản IFC khác. Hãy chọn lại.",
+  FIRE_INFRASTRUCTURE_NOT_PENDING: "Phiên bản hạ tầng này đã có kết quả thẩm định.",
+  SCENARIO_CONTAINS_INFRASTRUCTURE: "Tình huống đang chứa lối thoát hoặc thiết bị cố định. Các mục này thuộc Hạ tầng PCCC đã khoá; hãy xóa khỏi tình huống.",
+  CONTENT_REVIEW_NOT_PENDING: "Nội dung này đã có kết quả thẩm định.",
+  CONTENT_HASH_MISMATCH: "Nội dung đã thay đổi so với bản đang xem. Hãy tải lại rồi xem lại.",
+  // signed PC06 plan (BE#212)
+  SIGNED_PLAN_NOT_PDF: "Tệp phải là PDF.",
+  SIGNED_PLAN_UPLOAD_MISSING: "Chưa nhận được tệp. Hãy tải lại.",
+  SIGNED_PLAN_UPLOAD_CHANGED: "Tệp đã thay đổi trong lúc tải. Hãy tải lại.",
+  SIGNED_PLAN_UPLOAD_EXPIRED: "Lượt tải đã hết hạn. Hãy chọn tệp và tải lại.",
+  SIGNED_PLAN_STORAGE_UNAVAILABLE: "Kho lưu trữ đang bận. Hãy thử lại.",
 };
 
 /** Field errors: the API names the field, so the sentence can say which one without echoing English. */

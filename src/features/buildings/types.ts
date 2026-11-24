@@ -17,8 +17,20 @@ export type BuildingContactInput = {
   isPrimary: boolean;
 };
 
-export type BuildingInput = {
+/** Facility sheet of Mẫu PC06 part II (BE#212). */
+export type OnSiteForce = { teamSize: number; leaderName: string | null; leaderPhone: string | null; availableInHours: boolean; availableOffHours: boolean };
+export type EmergencyContact = { name: string; phone: string; role: string | null };
+export type BuildingFacility = {
+  floorAreaSquareMeters?: number | null;
+  facilityHeadName?: string | null;
+  facilityHeadPhone?: string | null;
+  onSiteForce?: OnSiteForce | null;
+  emergencyContacts?: EmergencyContact[];
+};
+
+export type BuildingInput = BuildingFacility & {
   name: string;
+  /** `Apartment` | `School` (exact case); anything else is refused with 400. */
   buildingType: string | null;
   totalFloors: number;
   location: BuildingLocationInput | null;
@@ -33,10 +45,14 @@ export type BuildingSummary = {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  /** `Group1` | `Group2` | `BelowThreshold`, computed by the API; null without a type. Absent on older responses. */
+  riskGroup?: string | null;
 };
 
-export type Building = BuildingSummary & {
+export type Building = BuildingSummary & BuildingFacility & {
   organizationId: string;
+  /** Set once a signed PC06 plan (PDF) has been uploaded. */
+  signedPlanDocumentId?: string | null;
   location: (BuildingLocationInput & { id: string }) | null;
   contact: (BuildingContactInput & { id: string }) | null;
 };

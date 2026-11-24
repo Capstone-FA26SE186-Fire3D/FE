@@ -133,7 +133,7 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
   const status = release?.status.toLowerCase();
 
   return <div className="ops-stack">
-    <Panel title={release ? "Bản phát hành của phiên bản này" : "Tạo bản phát hành"} description={release ? "Học viên chỉ dùng được sau khi bạn bấm Phát hành." : "Dùng nội dung đã duyệt và gói đã chốt; không cần nhập gì."} actions={release ? <StatusBadge tone={gate.tone}>{gate.label}</StatusBadge> : undefined} bodyClassName="ops-stack">
+    <Panel title={release ? "Bản phát hành của phiên bản này" : "Tạo bản phát hành"} description={release ? "Học viên chỉ dùng được sau khi bạn bấm Phát hành." : "Dùng nội dung đã đạt thẩm định và gói đã chốt; không cần nhập gì."} actions={release ? <StatusBadge tone={gate.tone}>{gate.label}</StatusBadge> : undefined} bodyClassName="ops-stack">
       {view.loading && !release && <SkeletonRows rows={2} label="Đang tải bản phát hành…" />}
       {view.error !== undefined && <Alert tone="danger" title="Không tải được bản phát hành" action={<Button size="sm" variant="secondary" className="mt-3" onClick={view.reload}>Thử lại</Button>}>{describeError(view.error).message}</Alert>}
 
@@ -164,7 +164,7 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
         </details>
 
         {status === "built" && <Alert tone="info" title="Đã tạo, chưa phát hành">
-          Gói đã được dựng và chốt, nhưng học viên chưa dùng được cho tới khi phát hành. Khi bạn bấm Phát hành, hệ thống kiểm tra lại: nội dung đã duyệt đúng phiên bản này, mô hình đã được xác nhận dùng cho huấn luyện, gói tương thích với ứng dụng và công trình còn dịch vụ trả phí hiệu lực.
+          Gói đã được dựng và chốt, nhưng học viên chưa dùng được cho tới khi phát hành. Khi bạn bấm Phát hành, hệ thống kiểm tra lại: nội dung đã đạt thẩm định đúng phiên bản này, mô hình đã được xác nhận dùng cho huấn luyện, gói tương thích với ứng dụng và công trình còn dịch vụ trả phí hiệu lực.
         </Alert>}
         {publishError && (publishError.status === 503 || publishError.status === 409 ? <PublishBlocked error={publishError} /> : <Alert tone="danger" title={publishError.message}><SupportCode code={publishError.code} /></Alert>)}
         <div className="ver-actions-row">
@@ -174,17 +174,17 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
       </>}
 
       {!release && !view.loading && view.error === undefined && <>
-        <p className="ver-note">Phiên bản này chưa có bản phát hành. Cần nội dung đã được quản trị FET3D duyệt và gói đã chốt; hệ thống kiểm tra lại khi tạo.</p>
+        <p className="ver-note">Phiên bản này chưa có bản phát hành. Cần nội dung đã được Chuyên viên PCCC thẩm định đạt và gói đã chốt; hệ thống kiểm tra lại khi tạo.</p>
         <form className="ops-stack" onSubmit={build} noValidate>
           <dl className="ver-meta">
             <div><dt>Gói đã chốt</dt><dd>{confirmationId ? "Đã chốt" : "Chưa chốt (tab Kiểm tra)"}<span className="ver-sr" data-testid="release-confirmation">{confirmationId ?? "Chưa có"}</span></dd></div>
             <div><dt>Gói phát hành</dt><dd>{artifactId ? "Đã dựng, kiểm tra đạt" : "Chưa có gói kiểm tra đạt"}<span className="ver-sr" data-testid="release-artifact">{artifactId ?? "Chưa có"}</span></dd></div>
-            <div><dt>Duyệt nội dung</dt><dd>{approvalGate(version.reviewStatus, version.rejectReason).label}</dd></div>
+            <div><dt>Thẩm định nội dung</dt><dd>{approvalGate(version.reviewStatus, version.rejectReason).label}</dd></div>
             <div><dt>Phiên bản</dt><dd>v{version.versionNumber}</dd></div>
           </dl>
           {readiness.error !== undefined && !state && <Alert tone="danger" title="Không đọc được điều kiện phát hành" action={<Button type="button" size="sm" variant="secondary" className="mt-3" onClick={readiness.reload}>Thử lại</Button>}>{describeError(readiness.error).message}</Alert>}
           {state && state.missing.length > 0 && <ul className="ver-list" data-testid="release-missing">{state.missing.map((code) => <li key={code} data-code={code}>{missingText(code)}</li>)}</ul>}
-          {!approved && version.reviewStatus && <p className="ver-note">Phiên bản chưa được duyệt nội dung nên chưa tạo được bản phát hành.</p>}
+          {!approved && version.reviewStatus && <p className="ver-note">Phiên bản chưa đạt thẩm định nội dung nên chưa tạo được bản phát hành.</p>}
           {error && <Alert tone="danger" title={error.message} action={<Button size="sm" variant="secondary" type="submit" className="mt-3" disabled={!canBuild}>Thử lại</Button>}>
             Bấm thử lại an toàn: hệ thống không tạo bản trùng.<SupportCode code={error.code} />
           </Alert>}
@@ -196,7 +196,7 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
       </>}
     </Panel>
 
-    <Panel title="Bài huấn luyện của công trình" description="Chỉ xem. Chỉ gồm bài huấn luyện đã gắn với nội dung được duyệt." bodyClassName="ops-stack">
+    <Panel title="Bài huấn luyện của công trình" description="Chỉ xem. Chỉ gồm bài huấn luyện đã gắn với nội dung đạt thẩm định." bodyClassName="ops-stack">
       {trainings.error !== undefined && <Alert tone="danger" title="Không tải được danh sách bài huấn luyện" action={<Button size="sm" variant="secondary" className="mt-3" onClick={trainings.reload}>Thử lại</Button>}>{describeError(trainings.error).message}</Alert>}
       <Table caption="Bài huấn luyện của công trình">
         <thead><tr><th>Tên</th><th>Trạng thái</th><th>Bản phát hành</th><th>Phiên bản</th></tr></thead>
@@ -208,7 +208,7 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
             <td>{training.releaseStatus ? RELEASE_STATUS[training.releaseStatus.toLowerCase()] ?? "Khác" : "Đã tạo"}<SupportCode id={training.releaseId} /></td>
             <td>{training.scenarioVersionId === version.id ? "Phiên bản này" : "Phiên bản khác"}</td>
           </tr>)}
-          {trainings.data && trainings.data.length === 0 && <TableMessage colSpan={4}><EmptyState icon={Package} title="Chưa có bài huấn luyện" description="Bài huấn luyện xuất hiện khi bản phát hành được tạo và gắn với nội dung đã duyệt." /></TableMessage>}
+          {trainings.data && trainings.data.length === 0 && <TableMessage colSpan={4}><EmptyState icon={Package} title="Chưa có bài huấn luyện" description="Bài huấn luyện xuất hiện khi bản phát hành được tạo và gắn với nội dung đã đạt thẩm định." /></TableMessage>}
         </tbody>
       </Table>
     </Panel>

@@ -10,7 +10,7 @@ import { isQrToken, issuedQrContent, qrLandingUrl } from "../../src/features/qr-
 
 const owner = { id: "owner", email: "owner@fire3d.test", fullName: "Nguyễn Văn A", username: "nguyen.van.a", role: 1, organizationId: "org-1", profileRevision: 1 };
 const trainee = { id: "trainee-1", email: "trainee@fire3d.test", fullName: "Học viên", username: "hoc.vien", role: 2, organizationId: null, profileRevision: 1 };
-const building = { id: "building-1", name: "Trường Tiểu học Hòa Bình", buildingType: "Trường học", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: { id: "loc-1", address: "1 Test Street", city: "Hà Nội", district: "Cầu Giấy", latitude: null, longitude: null, geojson: null }, contact: null };
+const building = { id: "building-1", name: "Trường Tiểu học Hòa Bình", buildingType: "School", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: { id: "loc-1", address: "1 Test Street", city: "Hà Nội", district: "Cầu Giấy", latitude: null, longitude: null, geojson: null }, contact: null };
 const page1 = <T,>(items: T[]) => ({ items, totalCount: items.length, page: 1, pageSize: 20 });
 
 /** 43 characters of base64url, like the 32 random bytes the BE issues. */

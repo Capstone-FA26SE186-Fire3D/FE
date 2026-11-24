@@ -12,7 +12,7 @@ import { CallLog, delay, page1, tokenSession } from "./regression-helpers";
 const orgUser = { id: "u-org", email: "org@fire3d.test", fullName: "Chủ tổ chức", role: 1, organizationId: "org-1", profileRevision: 1 };
 const adminUser = { id: "u-adm", email: "adm@fire3d.test", fullName: "Quản trị", role: 0, organizationId: null, profileRevision: 1 };
 
-const building = (id: string, name: string, isActive = true) => ({ id, name, buildingType: "Trường học", totalFloors: 2, isActive, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: { id: `l-${id}`, address: "1 Test", city: null, district: null, latitude: null, longitude: null, geojson: null }, contact: null });
+const building = (id: string, name: string, isActive = true) => ({ id, name, buildingType: "School", totalFloors: 2, isActive, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: { id: `l-${id}`, address: "1 Test", city: null, district: null, latitude: null, longitude: null, geojson: null }, contact: null });
 const ACTIVE = [building("b1", "Tòa đang hoạt động 1"), building("b2", "Tòa đang hoạt động 2")];
 const ARCHIVED = [building("b9", "Tòa đã lưu trữ", false)];
 

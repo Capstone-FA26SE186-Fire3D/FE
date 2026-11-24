@@ -916,7 +916,7 @@ const journeyCases: JourneyCase[] = [
     name: "version without package job: build package is next",
     patch: { readiness: { packageJob: null, outcome: null, blockerCount: 0, confirmationReviewId: null, technicalReady: false, missing: ["PACKAGE_VALIDATION_REQUIRED"] }, jobs: [] },
     next: "package",
-    steps: { snapshot: { state: "done", text: /Đã có v1/ }, package: { state: "todo", text: /Chưa dựng gói/ }, readiness: { state: "todo", text: /Chưa có kết quả kiểm tra/ }, review: { state: "todo", text: /Chưa gửi duyệt/ }, release: { state: "todo", text: /Chưa có bản phát hành/ } },
+    steps: { snapshot: { state: "done", text: /Đã có v1/ }, package: { state: "todo", text: /Chưa dựng gói/ }, readiness: { state: "todo", text: /Chưa có kết quả kiểm tra/ }, review: { state: "todo", text: /Chưa gửi thẩm định/ }, release: { state: "todo", text: /Chưa có bản phát hành/ } },
   },
   {
     name: "job running: package is active and still next",
@@ -946,19 +946,19 @@ const journeyCases: JourneyCase[] = [
     name: "technically ready and not submitted: review is next",
     patch: { readiness: { packageJob: { jobId: IDS.job, status: "Succeeded", currentAttemptId: "att-1" }, outcome: "Passed", blockerCount: 0, confirmationReviewId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", technicalReady: true, missing: [] } },
     next: "review",
-    steps: { readiness: { state: "done", text: /Đã chốt gói/ }, review: { state: "todo", text: /Chưa gửi duyệt/ } },
+    steps: { readiness: { state: "done", text: /Đã chốt gói/ }, review: { state: "todo", text: /Chưa gửi thẩm định/ } },
   },
   {
     name: "submitted: review is active; approval stays independent of technical state",
     patch: { reviewStatus: "Submitted" },
     next: "readiness",
-    steps: { readiness: { state: "active", text: /chờ chốt/ }, review: { state: "active", text: /Chờ duyệt/ } },
+    steps: { readiness: { state: "active", text: /chờ chốt/ }, review: { state: "active", text: /Chờ thẩm định/ } },
   },
   {
     name: "approved and ready, no release: create release is next",
     patch: { reviewStatus: "Approved", readiness: { packageJob: { jobId: IDS.job, status: "Succeeded", currentAttemptId: "att-1" }, outcome: "Passed", blockerCount: 0, confirmationReviewId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", technicalReady: true, missing: [] } },
     next: "release",
-    steps: { review: { state: "done", text: /Đã duyệt/ }, release: { state: "todo", text: /Chưa có bản phát hành/ }, publish: { state: "todo", text: /Chưa phát hành/ } },
+    steps: { review: { state: "done", text: /Đạt thẩm định/ }, release: { state: "todo", text: /Chưa có bản phát hành/ }, publish: { state: "todo", text: /Chưa phát hành/ } },
   },
   {
     name: "Built release: publish is next, Built is not Published",
@@ -982,7 +982,7 @@ const journeyCases: JourneyCase[] = [
     name: "readiness unreadable: its steps say so and review is still read from the version",
     patch: { readiness: "error", reviewStatus: "Rejected" },
     next: "package",
-    steps: { package: { state: "unknown", text: /Chưa có dữ liệu/ }, readiness: { state: "unknown", text: /Chưa có dữ liệu/ }, review: { state: "blocked", text: /Bị từ chối/ } },
+    steps: { package: { state: "unknown", text: /Chưa có dữ liệu/ }, readiness: { state: "unknown", text: /Chưa có dữ liệu/ }, review: { state: "blocked", text: /Chưa đạt thẩm định/ } },
   },
   {
     name: "releases unreadable: release steps say so",

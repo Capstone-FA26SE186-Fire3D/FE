@@ -28,7 +28,7 @@ import { LoadingBlock } from "@/components/ui/spinner";
 
 const PAGE_SIZE = 20;
 const STATUSES: ReviewStatus[] = ["Submitted", "Approved", "Rejected"];
-const chipLabel: Record<ReviewStatus, string> = { Submitted: "Chờ duyệt", Approved: "Đã duyệt", Rejected: "Từ chối" };
+const chipLabel: Record<ReviewStatus, string> = { Submitted: "Chờ thẩm định", Approved: "Đạt thẩm định", Rejected: "Chưa đạt" };
 
 /** "23/10 10:50": the queue column is narrow; the full timestamp is the cell's title. */
 const shortDateTime = (iso: string) => new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
@@ -53,7 +53,7 @@ function QueueKpi({ label, value, loading, hint, testId }: { label: string; valu
 }
 
 /**
- * `/admin/reviews` (Figma "Admin v2 · Duyệt kịch bản"): totals per status, the queue as a DataTable, and a 720px drawer
+ * `/admin/reviews` (Figma "Admin v2 · Theo dõi thẩm định"): totals per status, the queue as a DataTable, and a 720px drawer
  * with the frozen content, hashes, readiness and the decision. Status, organization, page and the open review live in
  * the URL. The API filters by status and organizationId only (no search, no sort): the search box narrows the page on
  * the client and says so.
@@ -92,7 +92,7 @@ export function ReviewsModule() {
   const visible = useMemo(() => (needle ? items.filter((item) => stripAccents(`${item.scenarioName} ${item.organizationName} ${item.buildingName}`).includes(needle)) : items), [items, needle]);
 
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
-  if (user?.role !== 0) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ quản trị FET3D duyệt được kịch bản.</Alert>;
+  if (user?.role !== 0) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ quản trị FET3D xem được danh sách thẩm định.</Alert>;
 
   const totalCount = list.data?.totalCount ?? 0;
   const filtering = statusFilter !== "Submitted" || Boolean(organizationId);
@@ -112,29 +112,29 @@ export function ReviewsModule() {
     ? <EmptyState icon={Search} title="Không có hàng nào khớp trên trang này" description="Ô tìm chỉ lọc trang đang xem. Xóa từ khóa hoặc đổi trạng thái / tổ chức để tìm trong toàn bộ hàng chờ." action={<Button variant="secondary" onClick={() => setSearch("")}>Xóa từ khóa</Button>} />
     : <EmptyState
       icon={filtering ? Search : ClipboardCheck}
-      title={page > 1 && totalCount > 0 ? "Trang này không còn bản duyệt." : filtering ? "Không có bản duyệt phù hợp." : "Chưa có kịch bản nào chờ duyệt"}
-      description={page > 1 && totalCount > 0 ? "Hàng chờ đã thay đổi kể từ lần tải trước." : filtering ? "Thử đổi trạng thái hoặc tổ chức, hoặc về bộ lọc mặc định." : "Khi một tổ chức gửi duyệt phiên bản kịch bản, bản đó sẽ xuất hiện ở đây."}
+      title={page > 1 && totalCount > 0 ? "Trang này không còn mục nào." : filtering ? "Không có mục nào phù hợp." : "Chưa có tình huống nào chờ thẩm định"}
+      description={page > 1 && totalCount > 0 ? "Hàng chờ đã thay đổi kể từ lần tải trước." : filtering ? "Thử đổi trạng thái hoặc tổ chức, hoặc về bộ lọc mặc định." : "Khi một tổ chức gửi thẩm định phiên bản kịch bản, bản đó sẽ xuất hiện ở đây."}
       action={page > 1 && totalCount > 0 ? <Button variant="secondary" onClick={() => setPage(1)}>Về trang 1</Button> : undefined}
     />;
 
   return <>
     <PageHeader
       eyebrow="Xử lý công việc"
-      title="Duyệt kịch bản"
-      description="Bấm một hàng để xem nội dung đã khóa và điều kiện kỹ thuật rồi duyệt hoặc từ chối."
-      breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Duyệt kịch bản" }]}
+      title="Theo dõi thẩm định"
+      description="Chuyên viên PCCC thẩm định tình huống; quản trị FET3D theo dõi ở đây. Bấm một hàng để xem nội dung đã khóa và kết quả."
+      breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Theo dõi thẩm định" }]}
       actions={<Button variant="quiet" onClick={reloadAll} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />{list.loading ? "Đang tải…" : "Tải lại"}</Button>}
     />
 
     <div className="adm-okpis adm-okpis--3" role="group" aria-label="Tổng theo trạng thái">
-      <QueueKpi testId="kpi-submitted" label="Chờ duyệt" value={submitted.value} loading={submitted.loading} hint="Đã gửi, chưa quyết định" />
-      <QueueKpi testId="kpi-approved" label="Đã duyệt" value={approved.value} loading={approved.loading} hint="Tổng mọi thời điểm" />
-      <QueueKpi testId="kpi-rejected" label="Từ chối" value={rejected.value} loading={rejected.loading} hint="Kèm lý do bắt buộc" />
+      <QueueKpi testId="kpi-submitted" label="Chờ thẩm định" value={submitted.value} loading={submitted.loading} hint="Đã gửi, chưa quyết định" />
+      <QueueKpi testId="kpi-approved" label="Đạt thẩm định" value={approved.value} loading={approved.loading} hint="Tổng mọi thời điểm" />
+      <QueueKpi testId="kpi-rejected" label="Chưa đạt" value={rejected.value} loading={rejected.loading} hint="Kèm lý do bắt buộc" />
     </div>
 
     <DataTable
       data-testid="review-table"
-      caption="Hàng chờ duyệt kịch bản"
+      caption="Danh sách thẩm định tình huống"
       columns={columns}
       rows={visible}
       rowKey={(row) => row.reviewId}
@@ -170,7 +170,7 @@ export function ReviewsModule() {
             clearable
           />
         </FilterChips>
-        {filtering && <Button size="sm" variant="quiet" onClick={() => setParams({ status: null, organizationId: null, page: 1 })}>Về mặc định (chờ duyệt)</Button>}
+        {filtering && <Button size="sm" variant="quiet" onClick={() => setParams({ status: null, organizationId: null, page: 1 })}>Về mặc định (chờ thẩm định)</Button>}
       </>}
       pagination={totalCount > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount, onPageChange: setPage } : undefined}
     />
@@ -183,7 +183,7 @@ export function ReviewsModule() {
       reviewId={reviewId}
       accessToken={accessToken}
       summary={items.find((item) => item.reviewId === reviewId)}
-      onChanged={reloadAll}
+
       onClose={close}
     />
   </>;

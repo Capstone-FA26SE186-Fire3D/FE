@@ -425,14 +425,18 @@ export type AiUsageEntry = {
 
 export type OrganizationNotification = {
   id: string;
-  /** `BuildingServiceExpiring`. */
+  /** `BuildingServiceExpiring`, or a thẩm định result: `ContentReviewApproved|Rejected`, `FireInfrastructureApproved|Rejected` (BE#211, BE#213). */
   type: string;
   title: string;
   body: string;
   buildingId: string;
   buildingName: string | null;
-  entitlementId: string;
-  referenceEndsAt: string;
+  /** Set for expiry reminders only; null for thẩm định results. */
+  entitlementId: string | null;
+  referenceEndsAt: string | null;
+  contentReviewId?: string | null;
+  scenarioVersionId?: string | null;
+  fireInfrastructureId?: string | null;
   createdAt: string;
   readAt: string | null;
   /** False once the Building was renewed or the period ended; the history stays. */

@@ -78,7 +78,22 @@ export type MockState = {
   /** `currentDraftId` reported on the scenario detail (BE#53). */
   currentDraftId: string | null;
   draftListCalls: number;
+  /** Fire infrastructure versions of the revision (BE#213). Default: one Approved version, so a draft can be created. */
+  infrastructures: Array<Record<string, unknown>>;
+  /** `infrastructureId` the draft reports: null is a draft created before BE#213 (the default, so older tests keep the full palette). */
+  draftInfrastructureId: string | null;
 };
+
+export const INFRASTRUCTURE_ID = "77777777-7777-4777-8777-777777777777";
+
+/** An Approved (locked) version: one exit and one extinguisher, so the scenario editor has something read-only to show. */
+export function lockedInfrastructure(patch: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: INFRASTRUCTURE_ID, revisionId: REVISION_ID, buildingId: BUILDING_ID, buildingName: "Nhà A", organizationId: "org-1", version: 1, status: "Approved", revision: 3,
+    geometry: null, runtimeVersion: "1.0.0", items: [], contentHash: null, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z",
+    submittedByName: null, submittedAt: null, decidedByName: null, decidedAt: "2026-10-01T00:00:00Z", decisionReason: null, scenarioDraftCount: 0, ...patch,
+  };
+}
 
 export function newMock(overrides: Partial<MockState> = {}): MockState {
   return {
@@ -86,7 +101,7 @@ export function newMock(overrides: Partial<MockState> = {}): MockState {
     validate: { isValid: true, issues: [] }, validateCalls: 0, validateState: { issues: [] }, validateStateCalls: [], createDraftCalls: [], stripEtagOnPut: false, expireFirstPreview: false, createDraftStatus: [],
     createdDraftId: DRAFT_ID, newDraft: null, floorsStatus: "Ready", floorsCalls: 0,
     catalog: [{ runtimeVersion: "1.0.0", protocolVersion: "1", manifestSchemaVersion: "1", capabilities: { fire: true } }], catalogCalls: 0, rubricCatalog: RUBRIC_CATALOG,
-    drafts: [], currentDraftId: null, draftListCalls: 0, ...overrides,
+    drafts: [], currentDraftId: null, draftListCalls: 0, infrastructures: [lockedInfrastructure()], draftInfrastructureId: null, ...overrides,
   };
 }
 
@@ -157,7 +172,7 @@ export async function installEditorMocks(page: Page, mock: MockState, options: {
       return;
     }
     mock.getCount += 1;
-    await route.fulfill({ json: draftBody(id, target), headers: { ETag: `"${target.version}"` } });
+    await route.fulfill({ json: { ...draftBody(id, target), infrastructureId: mock.draftInfrastructureId }, headers: { ETag: `"${target.version}"` } });
   });
   await page.route(`**/api/scenario-drafts/${DRAFT_ID}/validate`, (route) => {
     mock.validateCalls += 1;
@@ -199,6 +214,11 @@ export async function installEditorMocks(page: Page, mock: MockState, options: {
     return route.fulfill({ status: 200, headers: { ...cors, "Content-Type": "model/gltf-binary" }, body: glb });
   });
   await page.route(`**/api/buildings/${BUILDING_ID}/revisions*`, (route) => route.fulfill({ json: { items: [{ id: REVISION_ID, buildingId: BUILDING_ID, versionLabel: "IFC rev. 01", status: "ReadyForScenario", createdAt: "2026-10-01T00:00:00Z", sourceDocument: null }], totalCount: 1, page: 1, pageSize: 50 } }));
+  await page.route(`**/api/revisions/${REVISION_ID}/fire-infrastructures`, (route) => route.fulfill({ json: { revisionId: REVISION_ID, items: mock.infrastructures } }));
+  await page.route(/\/api\/fire-infrastructures\/[0-9a-f-]{36}$/, (route) => {
+    const found = mock.infrastructures.find((item) => route.request().url().endsWith(String(item.id)));
+    return found ? route.fulfill({ json: found, headers: { ETag: `"${String(found.revision)}"` } }) : problem(route, 404, { title: "Not found." });
+  });
   await page.route(`**/api/scenarios/${SCENARIO_ID}/draft`, async (route) => {
     const key = route.request().headers()["idempotency-key"];
     mock.createDraftCalls.push({ key, body: route.request().postDataJSON() });

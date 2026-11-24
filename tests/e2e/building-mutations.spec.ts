@@ -5,7 +5,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 // ETag of the latest read. All network is mocked with Playwright routes: evidence for UI behaviour, not for BE integration.
 
 const owner = { id: "owner", email: "owner@fire3d.test", fullName: "Nguyễn Văn A", username: "nguyen.van.a", role: 1, organizationId: "org-1", profileRevision: 1 };
-const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "Trường học", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: null, contact: null };
+const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "School", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: null, contact: null };
 const summary = { id: building.id, name: building.name, buildingType: building.buildingType, totalFloors: building.totalFloors, isActive: true, createdAt: building.createdAt, updatedAt: building.updatedAt };
 const newer = { ...building, name: "Trường Tiểu học (đã đổi tên)", totalFloors: 4, updatedAt: "2026-10-06T08:00:00Z" };
 

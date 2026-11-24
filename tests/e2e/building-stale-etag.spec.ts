@@ -7,7 +7,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 
 const owner = { id: "owner", email: "owner@fire3d.test", fullName: "Nguyễn Văn A", username: "nguyen.van.a", role: 1, organizationId: "org-1", profileRevision: 1 };
 const location = (lat: number) => ({ id: "loc-1", address: "1 Lê Lợi", city: "Hồ Chí Minh", district: "Quận 1", latitude: lat, longitude: lat, geojson: null });
-const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "Trường học", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: location(1), contact: null };
+const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "School", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: location(1), contact: null };
 const moved = { ...building, updatedAt: "2026-10-06T08:00:00Z", location: location(10) };
 const summary = { id: building.id, name: building.name, buildingType: building.buildingType, totalFloors: building.totalFloors, isActive: true, createdAt: building.createdAt, updatedAt: building.updatedAt };
 

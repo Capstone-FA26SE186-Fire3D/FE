@@ -34,6 +34,8 @@ export type DraftResponse = {
   createdAt: string;
   updatedAt: string;
   version: number;
+  /** Locked fire infrastructure the draft builds on (BE#213); null or absent for drafts created before it. */
+  infrastructureId?: string | null;
 };
 
 export type LoadedDraft = { draft: DraftResponse; etag: string };
@@ -116,9 +118,9 @@ export const scenarioEditorApi = {
   validate(accessToken: string, draftId: string, signal?: AbortSignal) {
     return apiClient.request<ValidateResponse>(`/api/scenario-drafts/${draftId}/validate`, { headers: auth(accessToken), method: "POST", signal });
   },
-  createDraft(accessToken: string, scenarioId: string, revisionId: string, idempotencyKey: string) {
+  createDraft(accessToken: string, scenarioId: string, revisionId: string, infrastructureId: string, idempotencyKey: string) {
     return apiClient.request<{ id: string }>(`/api/scenarios/${scenarioId}/draft`, {
-      headers: auth(accessToken), json: { revisionId }, idempotencyKey,
+      headers: auth(accessToken), json: { revisionId, infrastructureId }, idempotencyKey,
     });
   },
   catalog(accessToken: string, signal?: AbortSignal) {

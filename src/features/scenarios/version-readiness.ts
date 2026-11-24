@@ -90,22 +90,22 @@ export function technicalGate(input: { job?: ProcessingJobDetail; verdict?: QaVe
 /** Content approval gate from the state the server reports on the version (`reviewStatus`, `rejectReason`). */
 export function approvalGate(reviewStatus?: ReviewStatus | string | null, rejectReason?: string | null): GateState {
   if (!reviewStatus) {
-    return { label: NO_DATA_TEXT, tone: "pending", known: false, detail: "Chưa đọc được trạng thái duyệt. Tải lại trang; nếu vẫn thiếu, liên hệ hỗ trợ." };
+    return { label: NO_DATA_TEXT, tone: "pending", known: false, detail: "Chưa đọc được trạng thái thẩm định. Tải lại trang; nếu vẫn thiếu, liên hệ hỗ trợ." };
   }
   const status = reviewStatus.toLowerCase();
-  if (status === "notsubmitted") return { label: "Chưa gửi duyệt", tone: "neutral", known: true, detail: "Gửi để quản trị FET3D duyệt nội dung và tiêu chí chấm của phiên bản này." };
-  if (status === "approved") return { label: "Đã duyệt", tone: "success", known: true, detail: "Quản trị FET3D đã duyệt nội dung và tiêu chí chấm của phiên bản này." };
-  if (status === "rejected") return { label: "Bị từ chối", tone: "danger", known: true, detail: rejectReason ? `Lý do: ${rejectReason}. Sửa nội dung sẽ tạo phiên bản mới và phải gửi duyệt lại.` : "Sửa nội dung sẽ tạo phiên bản mới và phải gửi duyệt lại." };
-  if (status === "submitted") return { label: "Đã gửi, chờ duyệt", tone: "info", known: true, detail: "Đang chờ quản trị FET3D duyệt." };
-  return { label: reviewStatus, tone: "neutral", known: true, detail: "Trạng thái duyệt do hệ thống báo." };
+  if (status === "notsubmitted") return { label: "Chưa gửi thẩm định", tone: "neutral", known: true, detail: "Gửi để Chuyên viên PCCC thẩm định nội dung và tiêu chí chấm của phiên bản này." };
+  if (status === "approved") return { label: "Đạt thẩm định", tone: "success", known: true, detail: "Chuyên viên PCCC đã thẩm định đạt nội dung và tiêu chí chấm của phiên bản này." };
+  if (status === "rejected") return { label: "Chưa đạt thẩm định", tone: "danger", known: true, detail: rejectReason ? `Lý do: ${rejectReason}. Sửa nội dung sẽ tạo phiên bản mới và phải gửi thẩm định lại.` : "Sửa nội dung sẽ tạo phiên bản mới và phải gửi thẩm định lại." };
+  if (status === "submitted") return { label: "Đã gửi, chờ thẩm định", tone: "info", known: true, detail: "Đang chờ Chuyên viên PCCC thẩm định." };
+  return { label: reviewStatus, tone: "neutral", known: true, detail: "Trạng thái thẩm định do hệ thống báo." };
 }
 
 export function releaseGate(release?: Release | null): GateState {
-  if (!release) return { label: "Chưa có bản phát hành", tone: "neutral", known: true, detail: "Tạo được khi nội dung đã duyệt và gói đã chốt." };
+  if (!release) return { label: "Chưa có bản phát hành", tone: "neutral", known: true, detail: "Tạo được khi nội dung đã đạt thẩm định và gói đã chốt." };
   const status = release.status.toLowerCase();
   if (status === "published") return { label: "Đã phát hành", tone: "success", known: true, detail: "Học viên đã dùng được." };
   if (status === "revoked") return { label: "Đã thu hồi", tone: "danger", known: true, detail: release.revokedReason ? `Lý do: ${release.revokedReason}` : "Bản phát hành đã bị thu hồi." };
-  return { label: "Đã tạo, chưa phát hành", tone: "warning", known: true, detail: "Học viên chưa dùng được. Bấm Phát hành; hệ thống kiểm tra lại duyệt, gói và dịch vụ của công trình." };
+  return { label: "Đã tạo, chưa phát hành", tone: "warning", known: true, detail: "Học viên chưa dùng được. Bấm Phát hành; hệ thống kiểm tra lại kết quả thẩm định, gói và dịch vụ của công trình." };
 }
 
 // ---- Error messages by code ----
@@ -123,8 +123,8 @@ const codeMessages: Record<string, string> = {
   READINESS_PROVENANCE_MISMATCH: "Kết quả kiểm tra không còn khớp với gói mới nhất (có thể vừa dựng lại). Tải lại trang rồi chốt lại.",
   READINESS_BLOCKED: "Kiểm tra chưa đạt hoặc còn lỗi chặn nên chưa chốt được gói.",
   CONFIRMATION_ALREADY_EXISTS: "Phiên bản này đã chốt một gói khác.",
-  CONTENT_REVIEW_ALREADY_EXISTS: "Phiên bản này đã được gửi duyệt. Mỗi phiên bản chỉ gửi một lần; sửa nội dung sẽ tạo phiên bản mới.",
-  CONTENT_APPROVAL_REQUIRED: "Cần quản trị FET3D duyệt nội dung của phiên bản này trước.",
+  CONTENT_REVIEW_ALREADY_EXISTS: "Phiên bản này đã được gửi thẩm định. Mỗi phiên bản chỉ gửi một lần; sửa nội dung sẽ tạo phiên bản mới.",
+  CONTENT_APPROVAL_REQUIRED: "Cần Chuyên viên PCCC thẩm định đạt nội dung của phiên bản này trước.",
   RELEASE_PROVENANCE_MISMATCH: "Gói đã chốt không còn khớp với kết quả kiểm tra mới nhất. Tải lại trang, chốt lại gói rồi thử lại.",
   PACKAGE_METADATA_MISMATCH: "Gói không tương thích với phiên bản ứng dụng hiện tại. Hãy dựng lại gói.",
   RELEASE_ALREADY_EXISTS: "Phiên bản này đã có bản phát hành.",

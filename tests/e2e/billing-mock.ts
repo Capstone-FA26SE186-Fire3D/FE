@@ -134,7 +134,7 @@ export function seedCheckout(mock: Mock, checkout: Rec = {}, payment: Rec = {}) 
   mock.payment = paymentFixture(payment);
 }
 
-export const building = (id = "b-1") => ({ id, name: id === "b-1" ? "Công trình 1" : `Công trình ${id}`, buildingType: "Trường học", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: { id: "loc", address: "1 Test Street, Hà Nội", city: null, district: null, latitude: null, longitude: null, geojson: null }, contact: null });
+export const building = (id = "b-1") => ({ id, name: id === "b-1" ? "Công trình 1" : `Công trình ${id}`, buildingType: "School", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: { id: "loc", address: "1 Test Street, Hà Nội", city: null, district: null, latitude: null, longitude: null, geojson: null }, contact: null });
 
 const page_ = <T,>(items: T[], pageNo = 1, pageSize = 20) => ({ items: items.slice((pageNo - 1) * pageSize, pageNo * pageSize), total: items.length, page: pageNo, pageSize });
 

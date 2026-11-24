@@ -24,6 +24,7 @@ export const routes = {
   adminSupport: "/admin/support",
   adminAi: "/admin/ai",
   adminRuntime: "/admin/runtime",
+  expertReviews: "/expert/reviews",
   workspaceBuildings: "/workspace/buildings",
   workspaceAnalytics: "/workspace/analytics",
   workspaceLibrary: "/workspace/library",

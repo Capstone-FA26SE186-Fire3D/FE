@@ -150,6 +150,15 @@ export function classifyUploadError(stage: IfcUploadStage, cause: unknown): IfcU
     if (cause.status === 410 || cause.code === "IFC_UPLOAD_EXPIRED") {
       return new IfcUploadError(stage, "Phiên tải lên đã hết hạn. Hãy bắt đầu lại để tạo phiên tải lên mới.", { ...base, restart: true });
     }
+    if (cause.code === "IFC_UNSUPPORTED_SCHEMA") {
+      // 422 at upload-complete: the bytes are STEP but declare a schema the server does not accept. The Draft revision is deleted, so only a new upload helps.
+      const declared = cause.payload?.errors && !Array.isArray(cause.payload.errors) ? (cause.payload.errors as Record<string, unknown>).fileSchema : undefined;
+      const schema = Array.isArray(declared) && typeof declared[0] === "string" ? ` (tệp ghi “${declared[0]}”)` : "";
+      return new IfcUploadError(stage, `Tệp IFC dùng phiên bản hệ thống chưa nhận${schema}. Hãy xuất lại mô hình ở IFC2x3, IFC4 hoặc IFC4x3 rồi tải lên lại.`, { ...base, restart: true });
+    }
+    if (cause.code === "IFC_UPLOAD_INTENT_NOT_FOUND") {
+      return new IfcUploadError(stage, "Lượt tải này đã bị hủy vì tệp không hợp lệ. Hãy chọn tệp khác rồi bắt đầu lại.", { ...base, restart: true });
+    }
     if (cause.code === "IFC_UNSUPPORTED_FORMAT") {
       // 400 at initiate (name is not .ifc) or 422 at upload-complete (bytes do not start with ISO-10303-21;): not an IFC file.
       return new IfcUploadError(stage, "Tệp không phải IFC (ví dụ tệp .rvt đổi tên hoặc tệp nén). Hãy xuất IFC (IFC2X3, IFC4 hoặc IFC4X3) từ phần mềm thiết kế rồi tải lên lại.", { ...base, restart: true });

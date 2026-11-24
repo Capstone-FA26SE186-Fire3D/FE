@@ -51,9 +51,9 @@ export function ReviewPanel({ accessToken, version, review, canSubmit, onSubmitt
       done();
       setConfirming(false);
       onSubmitted(submission);
-      toast.notify({ tone: "success", title: "Đã gửi duyệt", description: "Nội dung và tiêu chí chấm của phiên bản này đã gửi cho quản trị FET3D." });
+      toast.notify({ tone: "success", title: "Đã gửi thẩm định", description: "Nội dung và tiêu chí chấm của phiên bản này đã gửi cho quản trị FET3D." });
     } catch (cause) {
-      const described = describeError(cause, "Không gửi duyệt được.");
+      const described = describeError(cause, "Không gửi thẩm định được.");
       setError(described);
       // Another tab/machine already submitted it: show what the server holds instead of leaving a stale "not submitted".
       if (described.code === "CONTENT_REVIEW_ALREADY_EXISTS") onSubmitted();
@@ -65,18 +65,18 @@ export function ReviewPanel({ accessToken, version, review, canSubmit, onSubmitt
   const status = version.reviewStatus?.toLowerCase();
   const steps: Array<{ title: string; when: string; state: "done" | "current" | "failed" | "todo" }> = [
     { title: "Phiên bản đã đóng băng", when: formatDateTime(version.createdAt), state: "done" },
-    { title: "Đã gửi duyệt", when: submitted ? (frozen ? formatDateTime(frozen.submittedAt) : "Đã gửi") : "Chưa gửi", state: submitted ? "done" : "todo" },
-    status === "approved" ? { title: "Đã duyệt", when: frozen?.decidedAt ? formatDateTime(frozen.decidedAt) : "Quản trị FET3D", state: "done" }
-      : status === "rejected" ? { title: "Bị từ chối", when: frozen?.decidedAt ? formatDateTime(frozen.decidedAt) : "Quản trị FET3D", state: "failed" }
-      : { title: "Quản trị FET3D duyệt", when: submitted ? "Đang chờ" : "Sau khi gửi", state: submitted ? "current" : "todo" },
+    { title: "Đã gửi thẩm định", when: submitted ? (frozen ? formatDateTime(frozen.submittedAt) : "Đã gửi") : "Chưa gửi", state: submitted ? "done" : "todo" },
+    status === "approved" ? { title: "Đạt thẩm định", when: frozen?.decidedAt ? formatDateTime(frozen.decidedAt) : "Quản trị FET3D", state: "done" }
+      : status === "rejected" ? { title: "Chưa đạt thẩm định", when: frozen?.decidedAt ? formatDateTime(frozen.decidedAt) : "Quản trị FET3D", state: "failed" }
+      : { title: "Chuyên viên PCCC thẩm định", when: submitted ? "Đang chờ" : "Sau khi gửi", state: submitted ? "current" : "todo" },
   ];
 
   return <div className="ops-stack">
     <section className="ver-card" aria-labelledby="ver-review-title">
       <div className="ver-card-head">
         <div>
-          <h2 id="ver-review-title" className="ver-card-title">Duyệt nội dung bởi quản trị FET3D</h2>
-          <p className="ver-card-sub">Việc duyệt không phụ thuộc dựng gói: có thể gửi duyệt trước khi dựng gói xong.</p>
+          <h2 id="ver-review-title" className="ver-card-title">Thẩm định nội dung bởi Chuyên viên PCCC</h2>
+          <p className="ver-card-sub">Việc thẩm định không phụ thuộc dựng gói: có thể gửi thẩm định trước khi dựng gói xong.</p>
         </div>
         <StatusBadge tone={gate.tone}>{gate.label}</StatusBadge>
       </div>
@@ -87,16 +87,16 @@ export function ReviewPanel({ accessToken, version, review, canSubmit, onSubmitt
           <span>{step.when}</span>
         </li>)}
       </ol>
-      <p className="ver-note">Mỗi phiên bản chỉ gửi duyệt một lần. Sửa nội dung sẽ tạo <strong>phiên bản mới</strong> và phiên bản đó <strong>phải được duyệt lại</strong>. Việc duyệt nội dung không phụ thuộc phần dựng và kiểm tra gói.</p>
+      <p className="ver-note">Mỗi phiên bản chỉ gửi thẩm định một lần. Sửa nội dung sẽ tạo <strong>phiên bản mới</strong> và phiên bản đó <strong>phải được thẩm định lại</strong>. Việc thẩm định nội dung không phụ thuộc phần dựng và kiểm tra gói.</p>
       <div className="ver-card-foot">
         {error && !confirming && !alreadySubmitted && <Alert tone="danger" title={error.message} action={<Button size="sm" variant="secondary" className="mt-3" onClick={() => void submit()} disabled={busy}>Thử lại</Button>}>
           Bấm thử lại an toàn: hệ thống không gửi trùng.<SupportCode code={error.code} />
         </Alert>}
         {alreadySubmitted && !confirming && <Alert tone="warning" title={error?.message}>Phiên bản này đã được gửi trước đó (có thể từ phiên làm việc hoặc máy khác). Trạng thái hiện tại được tải lại từ máy chủ.</Alert>}
         <div className="ver-actions-row">
-          <Button onClick={() => setConfirming(true)} disabled={!canSubmit || submitted || busy}><Send size={16} aria-hidden="true" />Gửi duyệt</Button>
-          {!canSubmit && <span className="ver-note">Chỉ tài khoản tổ chức gửi duyệt được.</span>}
-          {canSubmit && submitted && <span className="ver-note">v{version.versionNumber} đã được gửi duyệt nên không gửi lại. Tạo phiên bản mới để gửi nội dung khác.</span>}
+          <Button onClick={() => setConfirming(true)} disabled={!canSubmit || submitted || busy}><Send size={16} aria-hidden="true" />Gửi thẩm định</Button>
+          {!canSubmit && <span className="ver-note">Chỉ tài khoản tổ chức gửi thẩm định được.</span>}
+          {canSubmit && submitted && <span className="ver-note">v{version.versionNumber} đã được gửi thẩm định nên không gửi lại. Tạo phiên bản mới để gửi nội dung khác.</span>}
         </div>
       </div>
     </section>
@@ -105,11 +105,11 @@ export function ReviewPanel({ accessToken, version, review, canSubmit, onSubmitt
       <section className="ver-card" aria-labelledby="ver-frozen-title">
         <div>
           <h2 id="ver-frozen-title" className="ver-card-title">Nội dung đã đóng băng</h2>
-          <p className="ver-card-sub">Quản trị FET3D duyệt đúng nội dung có các mã này.</p>
+          <p className="ver-card-sub">Chuyên viên PCCC thẩm định đúng nội dung có các mã này.</p>
         </div>
         <dl className="ver-hash-list">
           <div><dt>Nội dung (mục tiêu, hướng dẫn, đối tượng)</dt><dd className="ver-hash">{frozen?.contentHash ?? version.scenarioHash}{frozen && (frozen.contentHash === version.scenarioHash ? " · khớp phiên bản" : " · khác phiên bản đang xem")}</dd></div>
-          <div><dt>Tiêu chí chấm</dt><dd className="ver-hash">{frozen?.rubricHash ?? "Có mã khi gửi duyệt"}</dd></div>
+          <div><dt>Tiêu chí chấm</dt><dd className="ver-hash">{frozen?.rubricHash ?? "Có mã khi gửi thẩm định"}</dd></div>
         </dl>
       </section>
 
@@ -118,31 +118,31 @@ export function ReviewPanel({ accessToken, version, review, canSubmit, onSubmitt
           <h2 id="ver-decision-title" className="ver-card-title">Quyết định</h2>
           <p className="ver-card-sub">Do máy chủ ghi nhận; tải lại trang vẫn giữ nguyên.</p>
         </div>
-        {submitted && review.loading && !review.data && <SkeletonRows rows={2} label="Đang tải chi tiết gửi duyệt…" />}
-        {submitted && review.error !== undefined && <Alert tone="danger" title="Không tải được chi tiết gửi duyệt" action={<Button size="sm" variant="secondary" className="mt-3" onClick={review.reload}>Thử lại</Button>}>{describeError(review.error).message}</Alert>}
+        {submitted && review.loading && !review.data && <SkeletonRows rows={2} label="Đang tải chi tiết gửi thẩm định…" />}
+        {submitted && review.error !== undefined && <Alert tone="danger" title="Không tải được chi tiết gửi thẩm định" action={<Button size="sm" variant="secondary" className="mt-3" onClick={review.reload}>Thử lại</Button>}>{describeError(review.error).message}</Alert>}
         {frozen && <dl className="ver-meta ver-meta--3">
           <div><dt>Trạng thái</dt><dd>{gate.label}<span className="ver-sr" data-testid="review-status">{frozen.status}</span></dd></div>
           <div><dt>Gửi lúc</dt><dd>{formatDateTime(frozen.submittedAt)}</dd></div>
           <div><dt>Quyết định lúc</dt><dd>{frozen.decidedAt ? formatDateTime(frozen.decidedAt) : "Chưa có"}</dd></div>
           
         </dl>}
-        {frozen && <details className="support-code"><summary>Thông tin cho bộ phận hỗ trợ</summary><span>Mã duyệt: <code className="ver-hash" data-testid="review-id">{frozen.reviewId}</code></span></details>}
-        {frozen?.reason && <div className="ver-reason"><p>Lý do từ chối</p><p data-testid="review-reason">{frozen.reason}</p></div>}
-        {status === "approved" && <Alert tone="success" title="Nội dung đã được duyệt">Cổng duyệt đạt. Phát hành vẫn cần kết quả kỹ thuật và dịch vụ đang hiệu lực.</Alert>}
-        {!submitted && <p className="ver-note">Phiên bản này chưa được gửi duyệt.</p>}
-        <p className="ver-note"><Snowflake size={14} aria-hidden="true" style={{ display: "inline", marginRight: 4 }} />Chỉ tạo được bản phát hành khi quản trị FET3D đã duyệt đúng nội dung đã gửi.</p>
+        {frozen && <details className="support-code"><summary>Thông tin cho bộ phận hỗ trợ</summary><span>Mã lượt thẩm định: <code className="ver-hash" data-testid="review-id">{frozen.reviewId}</code></span></details>}
+        {frozen?.reason && <div className="ver-reason"><p>Lý do chưa đạt</p><p data-testid="review-reason">{frozen.reason}</p></div>}
+        {status === "approved" && <Alert tone="success" title="Nội dung đã đạt thẩm định">Điều kiện thẩm định đã đạt. Phát hành vẫn cần kết quả kỹ thuật và dịch vụ đang hiệu lực.</Alert>}
+        {!submitted && <p className="ver-note">Phiên bản này chưa được gửi thẩm định.</p>}
+        <p className="ver-note"><Snowflake size={14} aria-hidden="true" style={{ display: "inline", marginRight: 4 }} />Chỉ tạo được bản phát hành khi Chuyên viên PCCC đã thẩm định đạt đúng nội dung đã gửi.</p>
       </section>
     </div>
 
     <Modal
       open={confirming}
       onOpenChange={(open) => { if (!busy) setConfirming(open); }}
-      title="Gửi phiên bản này để duyệt?"
+      title="Gửi phiên bản này để thẩm định?"
       description={`v${version.versionNumber} · ${version.name}`}
-      footer={<><Button variant="quiet" onClick={() => setConfirming(false)} disabled={busy}>Hủy</Button><Button onClick={() => void submit()} disabled={busy}>{busy ? "Đang gửi…" : "Gửi duyệt"}</Button></>}
+      footer={<><Button variant="quiet" onClick={() => setConfirming(false)} disabled={busy}>Hủy</Button><Button onClick={() => void submit()} disabled={busy}>{busy ? "Đang gửi…" : "Gửi thẩm định"}</Button></>}
     >
       <div className="ops-stack">
-        <p className="ver-note">Nội dung và tiêu chí chấm sẽ được gửi nguyên trạng. Muốn sửa sau khi gửi, bạn cần tạo phiên bản mới và gửi duyệt lại.</p>
+        <p className="ver-note">Nội dung và tiêu chí chấm sẽ được gửi nguyên trạng. Muốn sửa sau khi gửi, bạn cần tạo phiên bản mới và gửi thẩm định lại.</p>
         {error && <Alert tone="danger" title={error.message}><SupportCode code={error.code} /></Alert>}
       </div>
     </Modal>

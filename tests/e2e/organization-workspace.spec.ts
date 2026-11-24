@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { storedSession } from "./session";
 import { safeNext, postLoginRoute } from "../../src/features/auth/redirect";
 
-const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "Trường học", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: null, contact: null };
+const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "School", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: null, contact: null };
 const owner = { id: "owner", email: "owner@fire3d.test", fullName: "Nguyễn Văn A", username: "nguyen.van.a", role: 1, organizationId: "org-1", profileRevision: 1 };
 async function session(page: Page, role = 1) {
   await page.addInitScript(() => {
@@ -47,7 +47,7 @@ test("list-first workspace searches, opens the create modal and creates a buildi
   await page.getByRole("option", { name: "Trường học" }).click();
   await dialog.getByLabel("Số tầng").fill("3");
   await dialog.getByRole("button", { name: "Tạo công trình", exact: true }).click();
-  await expect.poll(() => input).toEqual({ name: "Công trình mới", buildingType: "Trường học", totalFloors: 3, location: null, contact: null });
+  await expect.poll(() => input).toMatchObject({ name: "Công trình mới", buildingType: "School", totalFloors: 3, location: null, contact: null, onSiteForce: null, emergencyContacts: [] });
   await expect(page).toHaveURL(/\/workspace\/buildings\/building-1\?tab=ifc$/); // straight to the IFC tab after creating
   await expect(page.getByRole("navigation", { name: "Quản lý tổ chức" }).getByRole("link", { name: "Công trình", exact: true })).toHaveAttribute("aria-current", "page");
 });

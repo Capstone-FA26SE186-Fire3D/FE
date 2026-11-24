@@ -23,7 +23,7 @@ import { formatCount } from "../format";
 
 const sum = (items: Array<{ count: number }>) => items.reduce((total, item) => total + item.count, 0);
 /** Role order of the "Tài khoản" hint (Figma "Học viên 61 · Tổ chức 22 · Admin 1"). */
-const roleOrder: Array<[role: string, label: string]> = [["Trainee", "Học viên"], ["OrganizationUser", "Tổ chức"], ["PlatformAdmin", "Quản trị FET3D"]];
+const roleOrder: Array<[role: string, label: string]> = [["Trainee", "Học viên"], ["OrganizationUser", "Tổ chức"], ["FireSafetyExpert", "Chuyên viên PCCC"], ["PlatformAdmin", "Quản trị FET3D"]];
 
 /** One server total read with page size 1 (only `total`/`totalCount` is used). Null while unknown or when the read failed. */
 function useTotal(key: string, load: (signal: AbortSignal) => Promise<number>, enabled: boolean) {
@@ -143,7 +143,7 @@ export function AdminOverview() {
     />
 
     <div className="adm-tiles" role="group" aria-label="Việc cần xử lý">
-      <ActionTile testId="tile-reviews" href={routes.adminReviews} icon={ClipboardCheck} tone="warning" label="Duyệt kịch bản" value={reviews.value} loading={reviews.loading} hint="chờ duyệt" />
+      <ActionTile testId="tile-reviews" href={routes.adminReviews} icon={ClipboardCheck} tone="warning" label="Theo dõi thẩm định" value={reviews.value} loading={reviews.loading} hint="chờ thẩm định" />
       <ActionTile testId="tile-support" href={routes.adminSupport} icon={LifeBuoy} tone="danger" label="Hỗ trợ" value={tickets.value} loading={tickets.loading} hint={urgent.value === null ? "yêu cầu đang mở" : `yêu cầu đang mở · ${formatCount(urgent.value)} khẩn`} />
       <ActionTile testId="tile-payments" href={`${routes.adminCommerce}?tab=payments`} icon={CreditCard} tone="success" label="Đối soát thanh toán" value={reconcile.value} loading={reconcile.loading} hint="cần đối soát" />
       <ActionTile testId="tile-learn" href={routes.adminLearn} icon={BookOpen} tone="info" label="Bài học chưa xuất bản" value={unpublished.value} loading={unpublished.loading} hint="bài nháp" />

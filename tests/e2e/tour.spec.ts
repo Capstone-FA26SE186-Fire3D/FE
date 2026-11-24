@@ -5,7 +5,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const owner = { id: "owner", email: "owner@fire3d.test", fullName: "Nguyễn Văn A", username: "nguyen.van.a", role: 1, organizationId: "org-1", profileRevision: 1 };
 const admin = { id: "admin", email: "admin@fire3d.test", fullName: "Platform Admin", role: 0, organizationId: null, profileRevision: 1 };
-const buildings = [{ id: "b-1", name: "Trường Học GOT", buildingType: "Trường học", totalFloors: 3, isActive: true, createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z" }];
+const buildings = [{ id: "b-1", name: "Trường Học GOT", buildingType: "School", totalFloors: 3, isActive: true, createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z" }];
 
 async function signIn(page: Page, user: typeof owner | typeof admin = owner, tour?: "done" | "skipped") {
   await page.addInitScript(({ tourValue }) => {

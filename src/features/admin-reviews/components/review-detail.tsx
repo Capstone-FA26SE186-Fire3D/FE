@@ -1,20 +1,16 @@
 "use client";
 
-import { CircleCheck, CircleX, RefreshCw } from "lucide-react";
-import { useState } from "react";
-import { useIdempotencyKey } from "@/api/idempotency";
-import { invalidateAsyncData, useAsyncData } from "@/api/use-async-data";
+import { RefreshCw } from "lucide-react";
+import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Drawer } from "@/components/ui/dialog";
 import { SkeletonDetail } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { useToast } from "@/components/ui/toast";
 import { formatDateTime } from "@/utils/date-range";
-import { describeReadError, REVIEW_QUEUE_TAG, reviewsApi, type DecisionFailure } from "../api";
+import { describeReadError, reviewsApi } from "../api";
 import { shortId, statusLabel, statusTone } from "../format";
-import type { ContentReviewDecision, ReviewAction, ReviewSummary } from "../types";
-import { DecisionDialog } from "./decision-dialog";
+import type { ReviewSummary } from "../types";
 import { ReviewContent } from "./review-content";
 import { GateSeparation, HashValue, ReadinessBlock, ReadinessStrip } from "./review-parts";
 
@@ -24,142 +20,84 @@ function AccountRef({ id, role, name }: { id: string | null; role: string; name?
   return <span title={id}>{name ? `${name} · ${role}` : role}</span>;
 }
 
-type Notice = { tone: "success" | "warning"; title: string; text: string };
-
 /**
- * Review drawer (Figma "Duyệt · chi tiết (drawer 720)"): status and version chips, the scenario name, the frozen
- * content with hashes and readiness, and the decision in the footer. The decision always uses the version id and hashes
- * of THIS detail response; after any decision (or any 409/401/403/404) the detail is reloaded so the drawer shows the
- * server's current state. Mounted per review id (the caller keys it), so state never leaks between reviews.
+ * Review drawer for PlatformAdmin: status and version chips, the scenario name, the frozen content with hashes and
+ * readiness, and the result once there is one. Read-only since BE#211: a Chuyên viên PCCC thẩm định in the expert area,
+ * and PlatformAdmin never decides in their place. Mounted per review id (the caller keys it).
  */
-export function ReviewDrawer({ open, reviewId, accessToken, summary, onChanged, onClose }: {
+export function ReviewDrawer({ open, reviewId, accessToken, summary, onClose }: {
   open: boolean;
   reviewId: string;
   accessToken: string | null;
   /** Row of the current page, if the review is on it: names the drawer before the detail arrives. */
   summary?: ReviewSummary;
-  onChanged: () => void;
   onClose: () => void;
 }) {
-  const toast = useToast();
-  const idempotency = useIdempotencyKey();
   const detail = useAsyncData(`review:${reviewId}`, (signal) => reviewsApi.detail(accessToken as string, reviewId, signal), open && Boolean(reviewId) && Boolean(accessToken));
-  const [action, setAction] = useState<ReviewAction | null>(null);
-  const [reason, setReason] = useState("");
-  const [notice, setNotice] = useState<Notice | null>(null);
-  const [decidedHere, setDecidedHere] = useState(false);
 
   const data = detail.data;
   const review = data?.review ?? summary ?? null;
   const readFailure = !data && detail.error !== undefined ? describeReadError(detail.error, "detail") : null;
   const staleReadFailure = data && detail.error !== undefined ? describeReadError(detail.error, "detail") : null;
   const pending = data?.review.status === "Submitted";
-  const canDecide = Boolean(data) && pending && !decidedHere && !detail.loading && detail.error === undefined;
 
-  const handleDecided = (result: ContentReviewDecision) => {
-    setAction(null);
-    setDecidedHere(true);
-    setNotice(null);
-    if (data) toast.notify({ tone: "success", title: result.status === "Approved" ? "Đã duyệt nội dung" : "Đã từ chối phiên bản", description: `${data.review.scenarioName} · v${data.review.versionNumber}` });
-    detail.reload();
-    onChanged();
-    invalidateAsyncData(REVIEW_QUEUE_TAG);
-  };
-
-  const handleStale = (failure: DecisionFailure) => {
-    setAction(null);
-    setNotice({ tone: "warning", title: "Quyết định chưa được ghi", text: failure.message });
-    detail.reload();
-    onChanged();
-    invalidateAsyncData(REVIEW_QUEUE_TAG);
-  };
-
-  const title = review ? review.scenarioName : readFailure ? readFailure.title : "Đang tải bản duyệt…";
+  const title = review ? review.scenarioName : readFailure ? readFailure.title : "Đang tải…";
   const description = review ? `${review.organizationName} · ${review.buildingName}` : undefined;
   const eyebrow = review ? <><StatusBadge tone={statusTone(review.status)}>{statusLabel(review.status)}</StatusBadge><StatusBadge tone="neutral">v{review.versionNumber}</StatusBadge></> : undefined;
 
-  const footer = data
-    ? pending && !decidedHere
-      ? <>
-        <Button variant="secondary" className="rev-btn-danger" onClick={() => setAction("reject")} disabled={!canDecide}><CircleX size={16} aria-hidden="true" />Từ chối</Button>
-        <Button onClick={() => setAction("approve")} disabled={!canDecide}><CircleCheck size={16} aria-hidden="true" />Duyệt nội dung</Button>
-      </>
-      : <>
-        <p className="rev-note rev-foot-note">Quyết định đã được ghi và không đổi được.</p>
-        <Button variant="secondary" onClick={onClose}>Đóng</Button>
-      </>
-    : undefined;
-
   return <Drawer
     open={open}
-    onOpenChange={(next) => { if (!next && !action) onClose(); }}
+    onOpenChange={(next) => { if (!next) onClose(); }}
     side="right"
     size="xl"
     className="rev-drawer"
     title={title}
     description={description}
     eyebrow={eyebrow}
-    footer={footer}
+    footer={data ? <><p className="rev-note rev-foot-note" data-testid="review-readonly">Chuyên viên PCCC thẩm định nội dung này. Quản trị FET3D chỉ theo dõi.</p><Button variant="secondary" onClick={onClose}>Đóng</Button></> : undefined}
     headerExtra={<Button size="icon" variant="ghost" onClick={detail.reload} disabled={detail.loading} aria-label="Làm mới chi tiết"><RefreshCw size={16} aria-hidden="true" className={detail.loading ? "rev-spin" : undefined} /></Button>}
     data-testid="review-drawer"
   >
     {readFailure
-      ? <Alert tone="danger" title={readFailure.title} action={readFailure.denied ? <Button size="sm" variant="secondary" className="mt-3" onClick={onClose}>Về hàng chờ</Button> : <Button size="sm" variant="secondary" className="mt-3" onClick={detail.reload}>Thử lại</Button>}>{readFailure.message}</Alert>
+      ? <Alert tone="danger" title={readFailure.title} action={readFailure.denied ? <Button size="sm" variant="secondary" className="mt-3" onClick={onClose}>Về danh sách</Button> : <Button size="sm" variant="secondary" className="mt-3" onClick={detail.reload}>Thử lại</Button>}>{readFailure.message}</Alert>
       : !data
-        ? <div role="status" aria-live="polite"><span className="ops-sr-only">Đang tải chi tiết bản duyệt…</span><SkeletonDetail rows={6} /></div>
+        ? <div role="status" aria-live="polite"><span className="ops-sr-only">Đang tải chi tiết…</span><SkeletonDetail rows={6} /></div>
         : <div className="ops-stack rev-body" data-testid="review-detail" data-review-status={data.review.status}>
-          {notice && <Alert tone={notice.tone} title={notice.title}>{notice.text}</Alert>}
-          {decidedHere && !notice && <Alert tone="success" title="Quyết định đã được ghi">{detail.loading ? "Đang cập nhật trạng thái từ máy chủ…" : "Trạng thái lấy lại từ máy chủ. Quyết định không đổi được."}</Alert>}
-          {staleReadFailure && <Alert tone="warning" title="Dữ liệu có thể đã cũ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={detail.reload}>Thử lại</Button>}>{staleReadFailure.message} Các nút quyết định bị khóa cho tới khi tải lại được.</Alert>}
+          {staleReadFailure && <Alert tone="warning" title="Dữ liệu có thể đã cũ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={detail.reload}>Thử lại</Button>}>{staleReadFailure.message}</Alert>}
 
-          <section aria-label="Thông tin bản duyệt">
+          <section aria-label="Thông tin bản gửi thẩm định">
             <dl className="rev-dl">
               <dt>Người gửi</dt><dd><AccountRef id={data.review.submittedBy} role="Tài khoản tổ chức" name={data.review.submittedByName} /></dd>
               <dt>Gửi lúc</dt><dd>{formatDateTime(data.review.submittedAt)}</dd>
             </dl>
-            {/* The exact hashes the decision pins, and the ids, are for support: folded so the reviewer reads content, not codes. */}
+            {/* The exact hashes the decision pins, and the ids, are for support: folded so the reader sees content, not codes. */}
             <details className="support-code" data-testid="review-support">
               <summary>Thông tin cho bộ phận hỗ trợ</summary>
               <dl className="rev-dl">
                 <dt>Mã nội dung kịch bản</dt><dd><HashValue value={data.review.contentHash} label="Mã nội dung kịch bản" /></dd>
                 <dt>Mã nội dung tiêu chí chấm</dt><dd><HashValue value={data.review.rubricHash} label="Mã nội dung tiêu chí chấm (rubric)" /></dd>
                 <dt>Mã phiên bản</dt><dd className="rev-hash" title={data.review.scenarioVersionId}>{shortId(data.review.scenarioVersionId)}</dd>
-                <dt>Mã bản duyệt</dt><dd className="rev-hash" title={data.review.reviewId}>{shortId(data.review.reviewId)}</dd>
+                <dt>Mã bản gửi</dt><dd className="rev-hash" title={data.review.reviewId}>{shortId(data.review.reviewId)}</dd>
                 <dt>Tài khoản gửi</dt><dd className="rev-hash">{data.review.submittedBy ?? "—"}</dd>
-                {data.review.decidedBy && <><dt>Tài khoản quyết định</dt><dd className="rev-hash">{data.review.decidedBy}</dd></>}
+                {data.review.decidedBy && <><dt>Tài khoản thẩm định</dt><dd className="rev-hash">{data.review.decidedBy}</dd></>}
               </dl>
             </details>
           </section>
 
           <ReadinessStrip readiness={data.readiness} />
-          {pending && !decidedHere && <p className="rev-note">Quyết định áp dụng cho đúng nội dung có mã ở trên. Duyệt hoặc từ chối đều <strong>không đổi được</strong>; sửa nội dung luôn tạo phiên bản mới.</p>}
-
           <GateSeparation summary={data.review} readiness={data.readiness} />
           <ReviewContent detail={data} />
           <ReadinessBlock readiness={data.readiness} />
 
-          {(!pending || decidedHere) && <section className="rev-decision" aria-label="Quyết định nội dung">
-            <h3>Quyết định</h3>
-            <p className="rev-note" data-testid="decision-result">{data.review.status === "Approved" ? "Nội dung và tiêu chí chấm điểm của phiên bản này đã được duyệt." : data.review.status === "Rejected" ? "Phiên bản này đã bị từ chối. Tổ chức cần sửa và gửi phiên bản mới." : "Đang cập nhật trạng thái từ máy chủ…"} Quyết định không đổi được nữa.</p>
+          {!pending && <section className="rev-decision" aria-label="Kết quả thẩm định">
+            <h3>Kết quả thẩm định</h3>
+            <p className="rev-note" data-testid="decision-result">{data.review.status === "Approved" ? "Nội dung và tiêu chí chấm điểm của phiên bản này đã đạt thẩm định." : data.review.status === "Rejected" ? "Phiên bản này chưa đạt thẩm định. Tổ chức cần sửa và gửi phiên bản mới." : "Đang cập nhật trạng thái từ máy chủ…"} Kết quả không đổi được nữa.</p>
             {data.review.decidedAt && <dl className="rev-dl" style={{ marginTop: 10 }}>
-              <dt>Người quyết định</dt><dd><AccountRef id={data.review.decidedBy} role="Quản trị FET3D" name={data.review.decidedByName} /></dd>
-              <dt>Thời điểm quyết định</dt><dd>{formatDateTime(data.review.decidedAt)}</dd>
+              <dt>Người thẩm định</dt><dd><AccountRef id={data.review.decidedBy} role="Chuyên viên PCCC" name={data.review.decidedByName} /></dd>
+              <dt>Thời điểm</dt><dd>{formatDateTime(data.review.decidedAt)}</dd>
             </dl>}
-            {data.review.status === "Rejected" && <div className="rev-reason" style={{ marginTop: 10 }} data-testid="reject-reason"><strong>Lý do từ chối</strong><p>{data.review.reason || "Không có lý do được lưu."}</p></div>}
+            {data.review.status === "Rejected" && <div className="rev-reason" style={{ marginTop: 10 }} data-testid="reject-reason"><strong>Lý do chưa đạt</strong><p>{data.review.reason || "Không có lý do được lưu."}</p></div>}
           </section>}
-
-          {action && <DecisionDialog
-            key={action}
-            action={action}
-            detail={data}
-            accessToken={accessToken as string}
-            idempotency={idempotency}
-            reason={reason}
-            onReasonChange={setReason}
-            onClose={() => setAction(null)}
-            onDecided={handleDecided}
-            onStale={handleStale}
-          />}
         </div>}
   </Drawer>;
 }

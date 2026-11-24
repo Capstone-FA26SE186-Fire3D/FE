@@ -55,7 +55,7 @@ function Objectives({ value }: { value: unknown }) {
 }
 
 function Rubric({ value }: { value: unknown }) {
-  if (value == null) return <p className="rev-note">Phiên bản này không có tiêu chí chấm điểm (bản cũ chưa lưu). Không có gì để duyệt ở phần này.</p>;
+  if (value == null) return <p className="rev-note">Phiên bản này không có tiêu chí chấm điểm (bản cũ chưa lưu). Không có gì để thẩm định ở phần này.</p>;
   const criteria = isRecord(value) && Array.isArray(value.criteria) ? value.criteria : null;
   if (!isRecord(value) || !criteria || !criteria.every(isRecord)) return <JsonSummary value={value} label="Tiêu chí chấm điểm" />;
   const threshold = value.pass_threshold;
@@ -77,10 +77,10 @@ function Rubric({ value }: { value: unknown }) {
 }
 
 /** Frozen content under review. Read-only: the decision applies to exactly these bytes (contentHash/rubricHash). */
-export function ReviewContent({ detail }: { detail: ReviewDetail }) {
+export function ReviewContent({ detail }: { detail: Pick<ReviewDetail, "content" | "rubric" | "learningObjectives" | "learnerInstructions"> }) {
   return <div className="ops-stack">
     <Alert tone="info" title="Nội dung đã khóa">
-      <Lock size={12} aria-hidden="true" style={{ display: "inline", marginRight: 4 }} />Đây là nội dung của đúng phiên bản được gửi và không thay đổi được. Nếu bị từ chối, tổ chức sửa bản nháp và tạo phiên bản mới để gửi duyệt lại.
+      <Lock size={12} aria-hidden="true" style={{ display: "inline", marginRight: 4 }} />Đây là nội dung của đúng phiên bản được gửi và không thay đổi được. Nếu chưa đạt, tổ chức sửa bản nháp và tạo phiên bản mới để gửi thẩm định lại.
     </Alert>
     <Panel title="Mục tiêu học tập" bodyClassName="ops-stack"><Objectives value={detail.learningObjectives} /></Panel>
     <Panel title="Hướng dẫn cho người học">

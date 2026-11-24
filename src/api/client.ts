@@ -3,7 +3,7 @@ import { env } from "@/configs/env";
 import { parseErrorCode, parseErrorMessage, parseFieldErrors, parseRetryAfter } from "./errors";
 import { ApiError, type ApiErrorPayload, type ApiQueryParams, type ApiRequestOptions, type ApiResponse } from "./types/common";
 
-function buildUrl(path: string, query?: ApiQueryParams): string {
+export function buildUrl(path: string, query?: ApiQueryParams): string {
   const baseUrl = env.apiBaseUrl.replace(/\/+$/, "");
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   const [pathname, existingQuery = ""] = `${baseUrl}${normalizedPath}`.split("?", 2);

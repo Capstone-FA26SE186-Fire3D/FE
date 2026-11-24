@@ -1,20 +1,15 @@
 import { apiClient } from "@/api/client";
 import { ApiError } from "@/api/types/common";
+import { normalizeRole } from "./roles";
 import type { ForgotPasswordAccepted, GoogleExchangeResponse, GoogleLinkInput, GoogleLinkResult, GoogleLoginResult, GoogleOnboardingInput, SetLocalPasswordInput } from "./types";
 import type { AuthUser, AvatarResponse, AvatarUploadIntent, RegisterInput, RegistrationOtpVerification, TokenResponse, UpdateProfileInput } from "./types";
 
-type ApiUserRole = AuthUser["role"] | "PlatformAdmin" | "OrganizationUser" | "Trainee";
+type ApiUserRole = AuthUser["role"] | "PlatformAdmin" | "OrganizationUser" | "Trainee" | "FireSafetyExpert";
 type ApiUserGender = AuthUser["gender"] | "Male" | "Female" | "Other" | "PreferNotToSay";
 type ApiAuthUser = Omit<AuthUser, "role" | "gender"> & { role: ApiUserRole; gender?: ApiUserGender };
 type ApiTokenResponse = Omit<TokenResponse, "user"> & { user: ApiAuthUser };
 
 type FirebaseLoginResponse = GoogleExchangeResponse<ApiTokenResponse>;
-
-const roleByApiName = {
-  OrganizationUser: 1,
-  PlatformAdmin: 0,
-  Trainee: 2,
-} as const;
 
 const genderByApiName = {
   Male: 0,
@@ -24,8 +19,7 @@ const genderByApiName = {
 } as const;
 
 function normalizeUser(user: ApiAuthUser): AuthUser {
-  const role = typeof user.role === "number" ? user.role : roleByApiName[user.role];
-  if (role !== 0 && role !== 1 && role !== 2) throw new Error("Máy chủ trả về vai trò tài khoản không hợp lệ.");
+  const role = normalizeRole(user.role);
   const gender = typeof user.gender === "string" ? genderByApiName[user.gender] : user.gender;
   if (gender !== undefined && gender !== null && gender !== 0 && gender !== 1 && gender !== 2 && gender !== 3) throw new Error("Máy chủ trả về giới tính không hợp lệ.");
   return { ...user, role, gender };

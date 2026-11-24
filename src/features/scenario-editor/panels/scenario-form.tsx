@@ -40,7 +40,7 @@ export function ScenarioForm({ draft, issues, actions, catalog }: {
   const listIssue = (path: string) => issueMessage(issues, path);
 
   return <div className="se-form" data-testid="scenario-form">
-    <Group title="Mục tiêu và hướng dẫn" description="Nội dung này hiển thị cho người học; đây là phần mục tiêu RAG của kịch bản đã duyệt." testId="group-objectives">
+    <Group title="Mục tiêu và hướng dẫn" description="Nội dung này hiển thị cho người học; đây là phần mục tiêu RAG của kịch bản đã đạt thẩm định." testId="group-objectives">
       <StringList label="Mục tiêu học tập" items={objectives} maxLength={1000} placeholder="Ví dụ: Nhận biết lối thoát gần nhất" addLabel="Thêm mục tiêu" error={listIssue("$.learningObjectives")}
         onChange={(index, value) => actions.setField(["learningObjectives", index], value, "Sửa mục tiêu")}
         onAdd={() => actions.addItem(["learningObjectives"], "", "Thêm mục tiêu")}

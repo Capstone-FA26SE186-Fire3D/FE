@@ -2,13 +2,16 @@
 
 import { CircleCheck, FileUp, RotateCcw, TriangleAlert, Upload, X } from "lucide-react";
 import { useId, useRef, useState, type DragEvent, type FormEvent } from "react";
+import { useAsyncData } from "@/api/use-async-data";
 import { useNow } from "@/api/use-now";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/dialog";
 import { Field, Input } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
+import { SupportCode } from "@/components/ui/support-code";
 import { cn } from "@/utils/cn";
+import { buildingsApi } from "../api";
 import { formatBytes } from "../format";
 import type { IfcCriterion } from "../ifc-precheck";
 import { useIfcPrecheck } from "../use-ifc-precheck";
@@ -70,7 +73,9 @@ export function IfcUploadModal({ open, onOpenChange, accessToken, buildingId, on
   const waitSeconds = error?.retryAt ? Math.max(0, Math.ceil((error.retryAt - now) / 1000)) : 0;
 
   // Checked in the browser before anything is sent: first the file kind and IFC version, then the model's content.
-  const precheck = useIfcPrecheck(file);
+  // The size limit is the server's; while it is unknown (or unreadable) the browser check falls back to its own ceiling.
+  const limits = useAsyncData("ifc-upload-limits", (signal) => buildingsApi.ifcUploadLimits(accessToken as string, signal), open && Boolean(accessToken));
+  const precheck = useIfcPrecheck(file, limits.data?.maxBytes);
   const checked = precheck.phase === "done" ? precheck.result : null;
   const fileProblem = checked?.stage === "header" ? checked.problem : null;
   const criteria = checked?.stage === "content" ? checked.criteria : null;
@@ -149,6 +154,7 @@ export function IfcUploadModal({ open, onOpenChange, accessToken, buildingId, on
         {error.message}
         {error.retryable && !error.restart && !error.fileStored && " Nội dung bạn đã chọn được giữ nguyên; thử lại sẽ tiếp tục đúng yêu cầu cũ, không tạo bản trùng."}
         {waitSeconds > 0 && ` Hệ thống yêu cầu chờ ${waitSeconds} giây trước khi thử lại.`}
+        <SupportCode code={error.code} />
       </Alert>}
       {notice && <Alert tone="info">{notice}</Alert>}
       {status === "done" && <Alert tone="success" title="Đã gửi xử lý IFC">Hệ thống đã nhận yêu cầu, nhưng mô hình chưa xử lý xong. Tiến trình và kết quả kiểm tra tự động hiển thị ở mục Tiến trình và tự cập nhật.</Alert>}

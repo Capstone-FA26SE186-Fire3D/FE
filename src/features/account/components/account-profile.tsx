@@ -24,7 +24,7 @@ import { organizationsApi } from "@/features/organizations/api";
 import type { OrganizationProfile } from "@/features/organizations/types";
 import { keepEdits } from "@/utils/keep-edits";
 
-const roleNames = ["Quản trị FET3D", "Tài khoản tổ chức", "Học viên"];
+const roleNames = ["Quản trị FET3D", "Tài khoản tổ chức", "Học viên", "Chuyên viên PCCC"];
 const supportedAvatarTypes = ["image/jpeg", "image/png", "image/webp"];
 const maxAvatarBytes = 5 * 1024 * 1024;
 

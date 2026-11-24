@@ -76,7 +76,7 @@ export function buildJourney(input: JourneyInput): JourneyStepModel[] {
       detail: hasVersion(input) ? `Mới nhất v${scenario?.versionNumber}` : "Tạo phiên bản cố định từ bản nháp",
     },
     {
-      key: "release", title: "Chuẩn bị phát hành", done: isPublished(input), lockReason: isApproved(input) ? undefined : "Cần nội dung được duyệt",
+      key: "release", title: "Chuẩn bị phát hành", done: isPublished(input), lockReason: isApproved(input) ? undefined : "Cần nội dung đạt thẩm định",
       detail: isPublished(input) ? "Đã phát hành" : input.releaseStatus?.toLowerCase() === "revoked" ? "Bản phát hành đã bị thu hồi" : input.releaseStatus ? "Đã tạo bản phát hành, chưa phát hành" : "Tạo bản phát hành rồi phát hành",
     },
     {
@@ -109,12 +109,12 @@ export function journeyConditions(input: JourneyInput): JourneyCondition[] {
   const review = input.scenario?.reviewStatus?.toLowerCase();
   const v = input.scenario?.versionNumber;
   const content: JourneyCondition = review === "approved"
-    ? { key: "content", title: "Duyệt nội dung", description: "Quản trị FET3D đã duyệt đúng phiên bản này. Nếu sửa, hệ thống tạo phiên bản mới và cần duyệt lại.", label: `Đã duyệt v${v}`, tone: "success" }
+    ? { key: "content", title: "Thẩm định nội dung", description: "Chuyên viên PCCC đã thẩm định đạt đúng phiên bản này. Nếu sửa, hệ thống tạo phiên bản mới và cần thẩm định lại.", label: `Đạt thẩm định v${v}`, tone: "success" }
     : review === "submitted"
-      ? { key: "content", title: "Duyệt nội dung", description: "Đã gửi duyệt phiên bản; đang chờ quản trị FET3D.", label: `Chờ duyệt v${v}`, tone: "warning" }
+      ? { key: "content", title: "Thẩm định nội dung", description: "Đã gửi thẩm định phiên bản; đang chờ Chuyên viên PCCC.", label: `Chờ thẩm định v${v}`, tone: "warning" }
       : review === "rejected"
-        ? { key: "content", title: "Duyệt nội dung", description: input.scenario?.rejectReason ? `Lý do: ${input.scenario.rejectReason}` : "Sửa nội dung sẽ tạo phiên bản mới.", label: "Bị từ chối", tone: "danger" }
-        : { key: "content", title: "Duyệt nội dung", description: "Gửi duyệt một phiên bản cố định; nếu sửa, hệ thống tạo phiên bản mới và cần duyệt lại.", label: v != null ? "Chưa gửi duyệt" : "Chưa có phiên bản", tone: "neutral" };
+        ? { key: "content", title: "Thẩm định nội dung", description: input.scenario?.rejectReason ? `Lý do: ${input.scenario.rejectReason}` : "Sửa nội dung sẽ tạo phiên bản mới.", label: "Chưa đạt thẩm định", tone: "danger" }
+        : { key: "content", title: "Thẩm định nội dung", description: "Gửi thẩm định một phiên bản cố định; nếu sửa, hệ thống tạo phiên bản mới và cần thẩm định lại.", label: v != null ? "Chưa gửi thẩm định" : "Chưa có phiên bản", tone: "neutral" };
 
   const serviceTone: Record<ServiceState, { label: string; tone: Tone }> = {
     effective: { label: "Đang hoạt động", tone: "success" },
@@ -137,7 +137,7 @@ export function journeyChecklist(input: JourneyInput): ChecklistItem[] {
     { key: "upload", label: "Tải lên tệp IFC", done: Boolean(input.revision), tab: "ifc" },
     { key: "qa", label: "Xác nhận mô hình dùng được cho huấn luyện", done: status === "ConfirmedForTraining", tab: "ifc" },
     { key: "scenario", label: "Soạn kịch bản đầu tiên", done: hasDraft(input), tab: "scenarios" },
-    { key: "submit", label: "Gửi duyệt nội dung", done: review === "submitted" || review === "approved" },
+    { key: "submit", label: "Gửi thẩm định nội dung", done: review === "submitted" || review === "approved" },
     { key: "publish", label: "Phát hành và tạo mã QR", done: isPublished(input) },
   ];
   let blocked = false;
