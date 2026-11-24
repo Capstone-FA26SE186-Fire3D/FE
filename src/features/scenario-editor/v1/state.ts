@@ -347,7 +347,7 @@ function scopedIssues(out: Issue[], objects: ObjectView[], scope: EditorScope): 
   const kept = out.filter((item) => item.code !== "GOAL_REQUIRED");
   for (const object of objects) {
     if (object.kind === "Equipment" && !object.capability) continue;
-    if (isInfrastructureObject(object.kind, object.capability?.id)) kept.push(issue("SCENARIO_CONTAINS_INFRASTRUCTURE", `$.objects[${object.index}]`, "Lối thoát và thiết bị cố định thuộc Hạ tầng PCCC đã khoá, không đặt trong tình huống. Hãy xóa đối tượng này."));
+    if (isInfrastructureObject(object.kind, object.capability?.id)) kept.push(issue("SCENARIO_CONTAINS_INFRASTRUCTURE", `$.objects[${object.index}]`, "Lối thoát và thiết bị cố định thuộc Hạ tầng PCCC đã khoá, không đặt trong tình huống. Hãy xóa đối tượng này. Trong tình huống bạn vẫn chọn được cửa bị khoá, cửa chống cháy bị chèn, khăn và đồ đạc cá nhân."));
   }
   return kept;
 }

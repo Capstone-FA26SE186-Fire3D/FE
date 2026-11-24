@@ -31,6 +31,6 @@ export function LockedInfrastructureNote({ state, buildingId, revisionId }: { st
     </Alert></div>;
   }
   return <div data-testid="infrastructure-locked"><Alert tone="success" title={`Dùng Hạ tầng PCCC phiên bản ${state.locked.version} (đã khoá)`}>
-    Lối thoát, điểm tập kết và thiết bị cố định lấy từ hạ tầng này; trong tình huống bạn đặt điểm xuất phát, nguy cơ, nhân vật và vật cản.
+    Lối thoát, điểm tập kết và thiết bị cố định lấy từ hạ tầng này; trong tình huống bạn đặt điểm xuất phát, nguy cơ, nhân vật, vật cản, và chọn cửa nào đang bị khoá hoặc bị chèn mở.
   </Alert></div>;
 }

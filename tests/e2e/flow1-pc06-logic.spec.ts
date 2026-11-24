@@ -43,7 +43,7 @@ test.describe("infrastructure and scenario scopes (BE#213)", () => {
     expect(scopeKinds("scenario")).toContain("Goal");
   });
 
-  test("towel and belongings are scenario items; every other equipment and every goal is infrastructure", () => {
+  test("loose items and door states are scenario items; every other equipment and every goal is infrastructure", () => {
     expect(isInfrastructureObject("Goal", undefined)).toBe(true);
     expect(isInfrastructureObject("Equipment", "extinguisher.portable")).toBe(true);
     expect(isInfrastructureObject("Equipment", "item.towel")).toBe(false);
@@ -53,6 +53,13 @@ test.describe("infrastructure and scenario scopes (BE#213)", () => {
     expect(capabilityAllowed("scenario-on-infrastructure", "Equipment", "bait.belongings")).toBe(true);
     expect(capabilityAllowed("scenario-on-infrastructure", "Equipment", "gas.valve")).toBe(false);
     expect(capabilityAllowed("scenario", "Equipment", "gas.valve")).toBe(true);
+    // Which door is padlocked or wedged open is the scenario's decision; the door itself stays part of the building (BE#224).
+    for (const state of ["door.exit_locked", "door.fire_wedged"]) {
+      expect(isInfrastructureObject("Equipment", state)).toBe(false);
+      expect(capabilityAllowed("scenario-on-infrastructure", "Equipment", state)).toBe(true);
+      expect(capabilityAllowed("infrastructure", "Equipment", state)).toBe(false);
+    }
+    expect(capabilityAllowed("infrastructure", "Equipment", "door.exit")).toBe(true);
   });
 
   test("the category follows from the object, the way the server seeds it", () => {
