@@ -25,6 +25,9 @@ const CODES: Record<string, QaGuide> = {
   IFC_NO_STOREYS: { title: "Mô hình không có tầng", guidance: "Khai báo tầng trong phần mềm thiết kế rồi xuất lại IFC.", action: "reupload" },
   IFC_NO_STAIRS_MULTISTOREY: { title: "Nhà nhiều tầng nhưng không có cầu thang", guidance: "Thêm cầu thang nối các tầng trong mô hình rồi xuất lại IFC.", action: "reupload" },
   IFC_UNIT_NOT_METRE: { title: "Đơn vị đo không phải mét", guidance: "Hệ thống đã tự quy đổi sang mét; kiểm tra kích thước ở bản xem trước 3D." },
+  // BE#219: reported only by the server's quick scan at upload (`errors.qaCodes`).
+  IFC_NO_DOORS: { title: "Mô hình không có cửa", guidance: "Xuất cửa cùng mô hình kiến trúc rồi tải lại IFC.", action: "reupload" },
+  IFC_NO_WALLS_OR_SLABS: { title: "Mô hình không có tường và sàn", guidance: "Xuất mô hình kiến trúc đầy đủ, không phải tệp của riêng một bộ môn, rồi tải lại IFC.", action: "reupload" },
 };
 
 export function qaGuide(code: string): QaGuide | null {
