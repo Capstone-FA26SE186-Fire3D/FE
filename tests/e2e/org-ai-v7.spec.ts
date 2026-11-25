@@ -61,6 +61,20 @@ test.describe("Organization AI v7 details", () => {
     await expect(notes).toContainText("Không xét nhà xưởng");
   });
 
+  test("a draft on a fire infrastructure says so, and its missing-field note uses the form's words (BE#231)", async ({ page }) => {
+    const mock = newAiMock();
+    const draft = seedRequest(mock, {
+      operation: "ScenarioDraft",
+      input: { text: "Cháy bếp tầng 1", inputHash: "f".repeat(64), buildingId: "b1", buildingName: "Trường A", revisionId: "rev-1", infrastructureId: "infra-2", requestedSources: [], context: null },
+      result: { status: "NeedsUserEdit", draft: { state: mock.draftState, notes: null }, limitations: ["Bản nháp chưa có audience, workingHours, assumption.time: cần điền trước khi lưu (đối tượng, trong/ngoài giờ, giả định)."] },
+    });
+    await open(page, mock, `/workspace/ai?tab=history&request=${draft.requestId}`);
+    await expect(page.getByTestId("ai-input-infrastructure")).toHaveText("Bản đạt thẩm định dùng lúc gửi yêu cầu");
+    const notes = page.getByTestId("ai-notes");
+    await expect(notes).toContainText("Bản nháp còn thiếu: đối tượng luyện tập, thời gian xảy ra (trong giờ hoặc ngoài giờ), thời điểm.");
+    await expect(notes).not.toContainText("workingHours");
+  });
+
   test("a scenario draft from the bubble sends the Building and no revisionId: the server pins the newest draft-ready revision", async ({ page }) => {
     const mock = newAiMock({ pendingPolls: 0 });
     mock.revisions = [

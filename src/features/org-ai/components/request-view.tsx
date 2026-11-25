@@ -15,7 +15,7 @@ import { formatDateTime, formatNumber, formatQuota } from "@/features/billing/fo
 import { isObject, type JsonObject } from "@/features/scenario-editor/store/json";
 import { KIND_META, type ObjectKind } from "@/features/scenario-editor/v1/contract";
 
-import { confidenceLabel, failureText, hasResultType, isInFlight, isSuccessfulDraft, operationLabel, sourceKindLabel, statusLabel, statusTone } from "../labels";
+import { confidenceLabel, failureText, hasResultType, isInFlight, isSuccessfulDraft, operationLabel, plainLimitation, sourceKindLabel, statusLabel, statusTone } from "../labels";
 import { readProposalNotes, readProposalState } from "../apply-plan";
 import type { AiCitation, AiRequest, AiSourceLink } from "../types";
 import styles from "../org-ai.module.css";
@@ -85,7 +85,7 @@ export function ResultNotes({ request }: { request: AiRequest }) {
   return <section className={styles.section} aria-label="Độ tin cậy và giới hạn" data-testid="ai-notes">
     {result?.confidence && <p><strong>Độ tin cậy AI tự đánh giá:</strong> {confidenceLabel(result.confidence)}</p>}
     {assumptions.length > 0 && <div><strong>Giả định</strong><ul className={styles.list}>{assumptions.map((item, index) => <li key={index}>{item}</li>)}</ul></div>}
-    {limitations.length > 0 && <div><strong>Giới hạn</strong><ul className={styles.list}>{limitations.map((item, index) => <li key={index}>{item}</li>)}</ul></div>}
+    {limitations.length > 0 && <div><strong>Giới hạn</strong><ul className={styles.list}>{limitations.map((item, index) => <li key={index}>{plainLimitation(item)}</li>)}</ul></div>}
   </section>;
 }
 
@@ -159,6 +159,7 @@ export function RequestView({ request, admin, trainee, onApply, extra }: { reque
       {request.completedAt && <><dt>Hoàn tất lúc</dt><dd>{formatDateTime(request.completedAt)}</dd></>}
       {request.input?.buildingName && <><dt>Công trình</dt><dd>{request.input.buildingName}</dd></>}
       {request.input?.revisionId && <><dt>Bản IFC</dt><dd title={request.input.revisionId}>Bản đang dùng lúc gửi yêu cầu</dd></>}
+      {request.input?.infrastructureId && <><dt>Hạ tầng PCCC</dt><dd title={request.input.infrastructureId} data-testid="ai-input-infrastructure">Bản đạt thẩm định dùng lúc gửi yêu cầu</dd></>}
     </dl>
     {request.input?.text && <section className={styles.section} aria-label="Nội dung đã gửi" data-testid="ai-input">
       <h3>{request.operation === "ScenarioDraft" ? "Yêu cầu đã gửi" : "Câu hỏi đã gửi"}</h3>

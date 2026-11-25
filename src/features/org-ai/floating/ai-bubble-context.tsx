@@ -5,8 +5,9 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState, type
 import { useAuthSession } from "@/features/auth/auth-session";
 
 import { orgAiApi, traineeAiApi } from "../api";
+import { scenarioDraftBody, type DraftScope } from "../scenario-draft-body";
 import { traineeBlock, type TraineeTarget } from "../trainee";
-import type { AiAudience, AiOperation, AnswerInput, ScenarioDraftInput, TraineeAiContext, TraineeAnswerInput } from "../types";
+import type { AiAudience, AiOperation, AnswerInput, TraineeAiContext, TraineeAnswerInput } from "../types";
 import { useAiSubmit, type SubmitAdapter, type SubmitPhase } from "../use-ai-submit";
 
 /**
@@ -39,6 +40,8 @@ export type AiBubbleApi = {
   ask: (question: string) => void;
   /** Sends a scenario-draft prompt for a Building. */
   draft: (prompt: string, buildingId: string) => void;
+  /** The situation editor names the fire infrastructure of the open situation (null when it closes); `draft` sends it along. */
+  setDraftScope: (scope: DraftScope | null) => void;
   /** Trainee: sends a question with at most one context (an article, a Training or one of their results). */
   askTrainee: (question: string, context?: TraineeAiContext) => void;
   /** Trainee: what the next question is about; set by a page link, cleared by "Hỏi chung". */
@@ -112,11 +115,15 @@ export function AiBubbleProvider({ children, audience = "organization" }: { chil
     void submit({ operation: "Answer", ...body }, (key, signal) => orgAiApi.submitAnswer(token, body, key, signal));
   }, [submit, token]);
 
+  // A ref, not state: it only matters at the moment a draft is sent, and the editor sets it without re-rendering the bubble.
+  const draftScope = useRef<DraftScope | null>(null);
+  const setDraftScope = useCallback((scope: DraftScope | null) => { draftScope.current = scope; }, []);
+
   const draft = useCallback((prompt: string, buildingId: string) => {
     const text = prompt.trim();
     if (!text || !buildingId || !token) return;
     sending.current = "ScenarioDraft";
-    const body: ScenarioDraftInput = { buildingId, prompt: text };
+    const body = scenarioDraftBody(buildingId, text, draftScope.current);
     setMessages((current) => [...current, { id: nextId(), role: "user", operation: "ScenarioDraft", text, at: Date.now() }]);
     void submit({ operation: "ScenarioDraft", ...body }, (key, signal) => orgAiApi.submitScenarioDraft(token, body, key, signal));
   }, [submit, token]);
@@ -151,8 +158,8 @@ export function AiBubbleProvider({ children, audience = "organization" }: { chil
 
   const value = useMemo<AiBubbleApi>(() => ({
     audience, enabled, accessToken: token, open, expanded, openPanel, closePanel, togglePanel, setExpanded, mode, setMode: changeMode, messages, phase, working,
-    ask, draft, askTrainee, traineeTarget, setTraineeTarget, openWith, composerDraft, consumeDraft, retry: () => void retry(), lookRecent: () => void lookRecent(), track, dismissPhase: reset, settledCount, noteSettled, clear, focusToken, requestFocus, consumeFocus,
-  }), [audience, enabled, token, open, expanded, openPanel, closePanel, togglePanel, setExpanded, mode, changeMode, messages, phase, working, ask, draft, askTrainee, traineeTarget, openWith, composerDraft, consumeDraft, retry, lookRecent, track, reset, settledCount, noteSettled, clear, focusToken, requestFocus, consumeFocus]);
+    ask, draft, setDraftScope, askTrainee, traineeTarget, setTraineeTarget, openWith, composerDraft, consumeDraft, retry: () => void retry(), lookRecent: () => void lookRecent(), track, dismissPhase: reset, settledCount, noteSettled, clear, focusToken, requestFocus, consumeFocus,
+  }), [audience, enabled, token, open, expanded, openPanel, closePanel, togglePanel, setExpanded, mode, changeMode, messages, phase, working, ask, draft, setDraftScope, askTrainee, traineeTarget, openWith, composerDraft, consumeDraft, retry, lookRecent, track, reset, settledCount, noteSettled, clear, focusToken, requestFocus, consumeFocus]);
 
   return <AiBubbleContext.Provider value={value}>{children}</AiBubbleContext.Provider>;
 }
