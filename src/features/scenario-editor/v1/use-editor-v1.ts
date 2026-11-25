@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 
 import { ApiError } from "@/api/types/common";
 
-import { scenarioEditorApi, type LoadedDraft } from "../api";
+import { scenarioEditorApi, type LoadedDraft, type ValidateStateResponse } from "../api";
 import { describeSaveError } from "../use-scenario-editor";
 import type { ConflictState } from "../use-scenario-editor";
 import { normalizeEtag } from "../store/etag";
@@ -37,6 +37,24 @@ export type SaveResultV1 =
 
 export type DraftMetaV1 = { id: string; scenarioId: string; revisionId: string; buildingId: string; draftNumber: number; source: string; updatedAt: string };
 
+/**
+ * Where the document is stored. A scenario draft uses the draft endpoints (the default); a fire infrastructure version uses
+ * its own (`features/fire-infrastructure`). `validate` answers for exactly the body it was given.
+ */
+export type EditorBackend = {
+  get(accessToken: string, signal?: AbortSignal): Promise<LoadedDraft>;
+  put(accessToken: string, body: JsonObject, etag: string, signal?: AbortSignal): Promise<{ etag: string | null }>;
+  validate(accessToken: string, body: JsonObject, signal?: AbortSignal): Promise<ValidateStateResponse>;
+};
+
+export function draftBackend(draftId: string): EditorBackend {
+  return {
+    get: (accessToken, signal) => scenarioEditorApi.getDraft(accessToken, draftId, signal),
+    put: (accessToken, body, etag, signal) => scenarioEditorApi.putDraft(accessToken, draftId, body, etag, signal),
+    validate: (accessToken, body, signal) => scenarioEditorApi.validateState(accessToken, draftId, body, signal),
+  };
+}
+
 function init(initial: LoadedDraft): V1EditorState {
   const draft = isObject(initial.draft.state) ? initial.draft.state : {};
   return { ...initialV1State, draft, baseline: draft, etag: initial.etag, version: initial.draft.version };
@@ -58,7 +76,8 @@ export function describeV1Failure(error: unknown): { message: string; conflict: 
   return { ...describeSaveError(error), issues: [] };
 }
 
-export function useEditorV1({ accessToken, draftId, initial, context }: { accessToken: string; draftId: string; initial: LoadedDraft; context: ReferenceContext }) {
+export function useEditorV1({ accessToken, draftId, initial, context, backend: givenBackend }: { accessToken: string; draftId: string; initial: LoadedDraft; context: ReferenceContext; backend?: EditorBackend }) {
+  const backend = useMemo(() => givenBackend ?? draftBackend(draftId), [givenBackend, draftId]);
   const [state, dispatch] = useReducer(v1Reducer, initial, init);
   const [report, setReport] = useState<ServerReport | null>(null);
   const [validating, setValidating] = useState(false);
@@ -107,12 +126,12 @@ export function useEditorV1({ accessToken, draftId, initial, context }: { access
     const payload = current.draft;
     dispatch({ type: "save-start" });
     try {
-      const { etag } = await scenarioEditorApi.putDraft(accessToken, draftId, payload, current.etag, controller.signal);
+      const { etag } = await backend.put(accessToken, payload, current.etag, controller.signal);
       let next = etag;
       let snapshot: JsonObject = payload;
       if (!next) {
         // 204 without a readable ETag (proxy stripped it): the revision must come from the server, never be guessed.
-        const loaded = await scenarioEditorApi.getDraft(accessToken, draftId, controller.signal);
+        const loaded = await backend.get(accessToken, controller.signal);
         next = loaded.etag;
         snapshot = isObject(loaded.draft.state) ? loaded.draft.state : payload;
       }
@@ -128,7 +147,7 @@ export function useEditorV1({ accessToken, draftId, initial, context }: { access
     } finally {
       if (!controller.signal.aborted) savingRef.current = false;
     }
-  }, [accessToken, draftId]);
+  }, [accessToken, backend]);
 
   /**
    * Dry run of the CURRENT unsaved document (`validate-state`, same body as PUT). Nothing is stored and the ETag does not
@@ -144,7 +163,7 @@ export function useEditorV1({ accessToken, draftId, initial, context }: { access
     const sent = stateRef.current.draft;
     const expected = stateHash(sent);
     try {
-      const result = await scenarioEditorApi.validateState(accessToken, draftId, sent, controller.signal);
+      const result = await backend.validate(accessToken, sent, controller.signal);
       if (controller.signal.aborted) return;
       if (result.draftId !== draftId) {
         setValidateError("Kết quả kiểm tra thuộc bản nháp khác nên không được áp dụng.");
@@ -165,7 +184,7 @@ export function useEditorV1({ accessToken, draftId, initial, context }: { access
         setValidating(false);
       }
     }
-  }, [accessToken, draftId]);
+  }, [accessToken, backend, draftId]);
 
   const currentHash = useMemo(() => (report ? stateHash(state.draft) : null), [report, state.draft]);
   const reportStale = report !== null && currentHash !== report.hash;
@@ -177,14 +196,14 @@ export function useEditorV1({ accessToken, draftId, initial, context }: { access
   const loadConflict = useCallback(async () => {
     setConflict({ loading: true, error: null, theirs: null, units: [] });
     try {
-      const { draft, etag } = await scenarioEditorApi.getDraft(accessToken, draftId);
+      const { draft, etag } = await backend.get(accessToken);
       const theirs = isObject(draft.state) ? draft.state : {};
       const current = stateRef.current;
       setConflict({ loading: false, error: null, theirs: { state: theirs, etag, version: draft.version }, units: compareDrafts(current.draft, theirs, current.baseline) });
     } catch (cause) {
       setConflict({ loading: false, error: message(cause, "Không tải được bản mới từ máy chủ."), theirs: null, units: [] });
     }
-  }, [accessToken, draftId]);
+  }, [accessToken, backend]);
 
   /** Adopts the server revision (new ETag) and the author's chosen fields; the result stays UNSAVED until the author saves. */
   const applyMerge = useCallback((choices: Record<string, MergeChoice>) => {

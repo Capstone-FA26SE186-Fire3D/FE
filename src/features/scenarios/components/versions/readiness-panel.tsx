@@ -161,7 +161,7 @@ export function ReadinessPanel({ accessToken, version, jobs, readiness, canAct, 
             {state.blockerCount > 0 && <span className="ver-note">{state.blockerCount} lỗi chặn</span>}
           </div>
           {state.missing.length > 0 && <ul className="ver-list" data-testid="readiness-missing">{state.missing.map((code) => <li key={code} data-code={code}>{missingText(code)}</li>)}</ul>}
-          {state.missing.length === 0 && <p className="ver-note">Phần kỹ thuật đã đủ. Còn duyệt nội dung và phát hành ở các tab sau.</p>}
+          {state.missing.length === 0 && <p className="ver-note">Phần kỹ thuật đã đủ. Còn thẩm định nội dung và phát hành ở các tab sau.</p>}
           {state.blockers.length > 0 && <Table caption="Lỗi đang chặn">
             <thead><tr><th>Mức độ</th><th>Nội dung</th></tr></thead>
             <tbody>{state.blockers.map((blocker, index) => <tr key={blocker.issueCode + "-" + index}>
@@ -172,7 +172,7 @@ export function ReadinessPanel({ accessToken, version, jobs, readiness, canAct, 
         </>}
       </Panel>
 
-      <Panel title="Xác nhận gói để phát hành" description="Bạn xác nhận dùng đúng gói vừa kiểm tra đạt này khi tạo bản phát hành. Đây không phải duyệt nội dung: phần đó do quản trị FET3D làm ở tab Gửi duyệt." bodyClassName="ops-stack">
+      <Panel title="Xác nhận gói để phát hành" description="Bạn xác nhận dùng đúng gói vừa kiểm tra đạt này khi tạo bản phát hành. Đây không phải thẩm định nội dung: phần đó do Chuyên viên PCCC làm, gửi ở tab Gửi thẩm định." bodyClassName="ops-stack">
         {confirmedId && <Alert tone="success" title="Đã chốt gói">
           Tab Phát hành sẽ dùng đúng gói này. Muốn đổi gói, hãy tạo phiên bản mới và dựng lại.
           <details className="support-code"><summary>Thông tin cho bộ phận hỗ trợ</summary><span>Mã chốt: <code className="ver-hash" data-testid="confirm-review-id">{confirmedId}</code></span></details>

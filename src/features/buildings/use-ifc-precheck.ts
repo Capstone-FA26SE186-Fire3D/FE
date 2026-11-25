@@ -11,7 +11,7 @@ export type IfcPrecheckState =
   | { phase: "unreadable" };
 
 /** Runs the in-browser IFC check each time another file is chosen; an older run is aborted. */
-export function useIfcPrecheck(file: File | null): IfcPrecheckState {
+export function useIfcPrecheck(file: File | null, maxBytes?: number): IfcPrecheckState {
   const [state, setState] = useState<{ file: File | null; value: IfcPrecheckState }>({ file: null, value: { phase: "idle" } });
 
   useEffect(() => {
@@ -19,6 +19,7 @@ export function useIfcPrecheck(file: File | null): IfcPrecheckState {
     const abort = new AbortController();
     let lastShown = 0;
     precheckIfcFile(file, {
+      maxBytes,
       signal: abort.signal,
       onProgress: (fraction) => {
         // A large file reports thousands of chunks; repaint at most every 2 %.
@@ -31,7 +32,7 @@ export function useIfcPrecheck(file: File | null): IfcPrecheckState {
       () => { if (!abort.signal.aborted) setState({ file, value: { phase: "unreadable" } }); },
     );
     return () => abort.abort();
-  }, [file]);
+  }, [file, maxBytes]);
 
   if (!file) return { phase: "idle" };
   // Until the first report for this file arrives the check is running; an older file's result is never shown.

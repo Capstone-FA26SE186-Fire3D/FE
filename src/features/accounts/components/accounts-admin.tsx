@@ -34,12 +34,13 @@ const roles: Array<{ value: UserRole; label: string }> = [
   { value: 0, label: "Quản trị FET3D" },
   { value: 1, label: "Tài khoản tổ chức" },
   { value: 2, label: "Học viên" },
+  { value: 3, label: "Chuyên viên PCCC" },
 ];
 /** PlatformAdmin is granted outside this screen (Figma: "Không thể gán PlatformAdmin ở đây"), so the create form does not offer it. */
 const creatableRoles = roles.filter((item) => item.value !== 0);
 const roleOptions: ComboboxOption[] = creatableRoles.map((item) => ({ value: String(item.value), label: item.label }));
 const roleLabel = (role: UserRole) => roles.find((item) => item.value === role)?.label ?? "Không xác định";
-const roleTone = (role: UserRole): Tone => (role === 0 ? "ember" : role === 1 ? "info" : "neutral");
+const roleTone = (role: UserRole): Tone => (role === 0 ? "ember" : role === 1 ? "info" : role === 3 ? "success" : "neutral");
 const formatDate = (value: string | null | undefined) => (value ? new Date(value).toLocaleString("vi-VN") : "Chưa có");
 const statusChip = (account: Pick<ManagedAccount, "isActive">) => <StatusBadge tone={account.isActive ? "success" : "danger"}>{account.isActive ? "Hoạt động" : "Đã khóa"}</StatusBadge>;
 
@@ -249,7 +250,7 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
         <Field label="Email" required error={fieldErrors.email}>{(p) => <Input {...p} type="email" autoComplete="off" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />}</Field>
         <Field label="Mật khẩu" required hint="Từ 12 đến 128 ký tự." error={fieldErrors.password}>{(p) => <Input {...p} type="password" autoComplete="new-password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />}</Field>
         <Field label="Họ và tên">{(p) => <Input {...p} maxLength={200} autoComplete="off" value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} />}</Field>
-        <Field label="Vai trò" hint="Quyền quản trị FET3D được cấp riêng, không chọn ở đây.">{(p) => <Combobox {...p} value={String(form.role)} onChange={(value) => setForm({ ...form, role: Number(value) as UserRole })} options={roleOptions} groupLabel="Vai trò" />}</Field>
+        <Field label="Vai trò" hint={form.role === 3 ? "Chuyên viên PCCC không thuộc tổ chức nào; tài khoản chỉ vào được hàng chờ thẩm định." : "Quyền quản trị FET3D được cấp riêng, không chọn ở đây."}>{(p) => <Combobox {...p} value={String(form.role)} onChange={(value) => setForm({ ...form, role: Number(value) as UserRole })} options={roleOptions} groupLabel="Vai trò" />}</Field>
         {form.role === 1 && <Field label="Tổ chức" required error={fieldErrors.organizationId}>{(p) => <Combobox {...p} value={form.organizationId} onChange={(value) => setForm({ ...form, organizationId: value })} options={orgOptions} placeholder="Chọn tổ chức" searchPlaceholder="Tìm theo tên tổ chức…" groupLabel="Tổ chức đang hoạt động" emptyText="Không có tổ chức phù hợp" loading={organizations.loading && !organizations.data} />}</Field>}
         {formError && <Alert tone="danger">{formError}</Alert>}
       </form>

@@ -529,7 +529,7 @@ test("no ?draft=: a draft is created with a stable Idempotency-Key across a retr
   expect(mock.createDraftCalls).toHaveLength(2);
   expect(mock.createDraftCalls[0].key).toBeTruthy();
   expect(mock.createDraftCalls[1].key).toBe(mock.createDraftCalls[0].key);
-  expect(mock.createDraftCalls[0].body).toEqual({ revisionId: "44444444-4444-4444-8444-444444444444" });
+  expect(mock.createDraftCalls[0].body).toEqual({ revisionId: "44444444-4444-4444-8444-444444444444", infrastructureId: "77777777-7777-4777-8777-777777777777" });
   await expect(page.getByTestId("scenario-editor")).toBeVisible();
 });
 

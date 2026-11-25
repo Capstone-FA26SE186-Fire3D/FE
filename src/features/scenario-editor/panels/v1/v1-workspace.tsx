@@ -1,7 +1,7 @@
 "use client";
 
-import { ifcTypeLabel } from "@/configs/capability-labels";
-import { ChevronLeft } from "lucide-react";
+import { capabilityLabel, ifcTypeLabel } from "@/configs/capability-labels";
+import { ChevronLeft, Lock } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -23,6 +23,8 @@ import { AI_PROPOSAL_PARAM } from "@/features/org-ai/proposal-param";
 import { LIBRARY_USE_PARAM, parseLibraryUse } from "@/features/library/use-param";
 import { revisionLabel } from "@/features/buildings/pipeline";
 
+import { fireInfrastructureApi } from "@/features/fire-infrastructure/api";
+
 import { scenarioEditorApi, type LoadedDraft } from "../../api";
 import type { FloorInfo } from "../../scene/preview-model";
 import type { MarkerInput, MarkerRef, Point3, TransformResult } from "../../scene/scene-controller";
@@ -35,8 +37,9 @@ import { parseGeometry, type GeometryInfo } from "../../v1/geometry";
 import { targetOf } from "../../v1/issues";
 import { applyMatrix, glbToLocal, localToGlb, round3, isUnitQuaternion } from "../../v1/matrix";
 import { setFieldsCommand } from "../../v1/commands";
+import { itemsToObjects, scopeKinds, type EditorScope } from "../../v1/scope";
 import { readGeometryPin, readObjects, readString, type ReferenceContext } from "../../v1/state";
-import { useEditorV1 } from "../../v1/use-editor-v1";
+import { useEditorV1, type EditorBackend } from "../../v1/use-editor-v1";
 import type { Issue } from "../../store/validation";
 import { ConflictDialog } from "../conflict-dialog";
 import { ifcTabHref, ReprocessGuide } from "../geometry-status";
@@ -63,8 +66,14 @@ type MobileTab = "model" | "objects" | "props";
 
 const ORIGIN = { x: 0, y: 0, z: 0 };
 
-export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, initial }: { accessToken: string; buildingId: string; scenarioId: string; draftId: string; initial: LoadedDraft }) {
+/** Set when the workspace edits a fire infrastructure version instead of a scenario draft: where it is stored and where "back" leads. */
+export type InfrastructureSession = { backend: EditorBackend; backHref: string };
+
+export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, initial, infrastructure }: { accessToken: string; buildingId: string; scenarioId: string; draftId: string; initial: LoadedDraft; infrastructure?: InfrastructureSession }) {
   const toast = useToast();
+  const lockedId = infrastructure ? null : initial.draft.infrastructureId ?? null;
+  const scope: EditorScope = infrastructure ? "infrastructure" : lockedId ? "scenario-on-infrastructure" : "scenario";
+  const kinds = scopeKinds(scope);
   const viewportRef = useRef<ViewportHandle>(null);
   const gesture = useRef(0);
   const revisionId = initial.draft.revisionId;
@@ -91,18 +100,20 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const isDesktop = useMediaQuery("(min-width: 1100px)");
 
   const preview = useEditorPreview(accessToken, buildingId, revisionId);
-  const scenario = useAsyncData(`scenario:${scenarioId}`, (signal) => scenarioEditorApi.getScenario(accessToken, scenarioId, signal));
+  const scenario = useAsyncData(`scenario:${scenarioId}`, (signal) => scenarioEditorApi.getScenario(accessToken, scenarioId, signal), !infrastructure);
+  // Exits and fixed equipment of the locked infrastructure: shown on the model, never editable from a scenario.
+  const locked = useAsyncData(`fire-infrastructure:${lockedId}`, (signal) => fireInfrastructureApi.get(accessToken, lockedId as string, signal), Boolean(lockedId));
   const catalogQuery = useAsyncData("runtime-catalog", (signal) => scenarioEditorApi.catalog(accessToken, signal));
-  const rubricQuery = useAsyncData("rubric-catalog", (signal) => scenarioEditorApi.rubricCatalog(accessToken, signal));
+  const rubricQuery = useAsyncData("rubric-catalog", (signal) => scenarioEditorApi.rubricCatalog(accessToken, signal), !infrastructure);
 
   const runtimes = useMemo(() => (catalogQuery.data ? parseRuntimeCatalog(catalogQuery.data) : null), [catalogQuery.data]);
   const rubricView = useMemo(() => (rubricQuery.data ? parseRubricCatalog(rubricQuery.data) : null), [rubricQuery.data]);
   const reading = useMemo(() => parseGeometry(preview.preview), [preview.preview]);
   const geometry = reading.kind === "valid" ? reading.info : null;
   const metrics = useMemo(() => (rubricView ? new Set(rubricView.metrics.map((metric) => metric.id)) : null), [rubricView]);
-  const context = useMemo<ReferenceContext>(() => ({ geometry, runtimes, metrics }), [geometry, runtimes, metrics]);
+  const context = useMemo<ReferenceContext>(() => ({ geometry, runtimes, metrics, scope }), [geometry, runtimes, metrics, scope]);
 
-  const editor = useEditorV1({ accessToken, draftId, initial, context });
+  const editor = useEditorV1({ accessToken, draftId, initial, context, backend: infrastructure?.backend });
   const { state, dispatch, edit, dirty, status, meta, issues } = editor;
   const guard = useLeaveGuard(dirty);
 
@@ -143,6 +154,13 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
     if (!floor || !object.kind) return [];
     return [{ kind: "object", index: object.index, variant: object.kind, layer: object.kind, position: localToGlb(floor.transform, object.position), quaternion: isUnitQuaternion(object.rotation, 0.5) ? object.rotation : undefined }];
   }), [objects, geometry]);
+  const lockedObjects = useMemo(() => (locked.data ? readObjects({ objects: itemsToObjects(locked.data.infrastructure.items) }) : []), [locked.data]);
+  // Kind "locked" is never a selection (`onSelect` and `onTransform` act on kind "object" only), so these cannot be moved or deleted here.
+  const sceneMarkers = useMemo<MarkerInput[]>(() => [...markers, ...lockedObjects.flatMap((object): MarkerInput[] => {
+    const floor = geometry?.floors.find((item) => item.id === object.floorId);
+    if (!floor || !object.kind) return [];
+    return [{ kind: "locked", index: object.index, variant: object.kind, layer: object.kind, position: localToGlb(floor.transform, object.position), quaternion: isUnitQuaternion(object.rotation, 0.5) ? object.rotation : undefined }];
+  })], [markers, lockedObjects, geometry]);
 
   const layerSource = useMemo(() => {
     const byType: Record<string, string[]> = {};
@@ -188,8 +206,10 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const onValidate = useCallback(async () => {
     setPanelTab("issues");
     if (isMobile) setMobileTab("props");
+    // The infrastructure API checks what is stored, so unsaved edits are saved first; a refused save shows its own issues.
+    if (infrastructure && dirty && (await editor.save()).status !== "saved") return;
     await editor.validate();
-  }, [editor, isMobile]);
+  }, [editor, isMobile, infrastructure, dirty]);
 
   const selectObject = useCallback((index: number | null) => {
     dispatch({ type: "select", selection: index === null ? null : { kind: "object", index } });
@@ -222,7 +242,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
 
   const onTransform = useCallback((ref: MarkerRef, next: TransformResult | null, phase: "start" | "change" | "end") => {
     if (phase === "start") { gesture.current += 1; return; }
-    if (phase === "end" || !next) return;
+    if (phase === "end" || !next || ref.kind !== "object") return;
     const object = objects[ref.index];
     const floor = geometry?.floors.find((item) => item.id === object?.floorId);
     if (!object || !floor) return;
@@ -236,9 +256,9 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
     if (target.section === "object") selectObject(target.index);
     else if (target.section === "geometry") setPanelTab("geometry");
     else if (target.section === "objects") setPanelTab("issues");
-    else setPanelTab("scenario");
+    else setPanelTab(infrastructure ? "issues" : "scenario");
     if (isMobile) setMobileTab("props");
-  }, [selectObject, isMobile]);
+  }, [selectObject, isMobile, infrastructure]);
 
   // Keyboard: Ctrl/Cmd+S saves anywhere; the rest only when the focus is not in a text control.
   const handlers = useRef({ onSave, state, actions });
@@ -273,13 +293,36 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const saveBlockedReason = editor.shapeProblems.length > 0 ? `Chưa thể lưu: ${editor.shapeProblems[0].message}` : null;
   const issueCount = issues.length;
 
+  // A new infrastructure version carries no Geometry pin (and, without confirmed equipment, no runtime): both follow from the
+  // revision, so they are filled in once known instead of asking the author for values they cannot choose.
+  const newestRuntime = useMemo(() => [...(runtimes ?? [])].sort((a, b) => b.runtimeVersion.localeCompare(a.runtimeVersion, undefined, { numeric: true }))[0]?.runtimeVersion, [runtimes]);
+  useEffect(() => {
+    if (!infrastructure) return;
+    if (geometry && !pin) actions.pinGeometry({ artifactId: geometry.artifactId, sha256Hash: geometry.sha256Hash });
+    else if (!runtimeVersion && newestRuntime) actions.setField(["runtimeVersion"], newestRuntime, "Chọn phiên bản ứng dụng", false);
+  }, [infrastructure, geometry, pin, runtimeVersion, newestRuntime, actions]);
+
+  const lockedFooter = lockedId
+    ? <section aria-labelledby="se-locked-title" data-testid="locked-infrastructure">
+      <h3 id="se-locked-title"><Lock size={14} aria-hidden="true" /> Hạ tầng PCCC đã khoá <StatusBadge>{lockedObjects.length}</StatusBadge></h3>
+      <p className="se-note">Lối thoát, điểm tập kết và thiết bị cố định dùng chung cho mọi tình huống của bản IFC này. Chỉ sửa được ở tab Hạ tầng PCCC của công trình.</p>
+      {locked.error !== undefined && !locked.data && <p className="se-note" role="status">Chưa tải được danh sách hạ tầng. <Button type="button" variant="quiet" size="sm" onClick={locked.reload}>Thử lại</Button></p>}
+      <ul className="se-objects">
+        {lockedObjects.map((object) => <li key={object.index}><span className="se-object" aria-disabled="true">
+          <Lock size={16} aria-hidden="true" /><span>{object.label || (object.capability ? capabilityLabel(object.capability.id) : object.kind === "Goal" ? "Lối thoát" : "Thiết bị")}</span>
+          <small>{geometry?.floors.find((floor) => floor.id === object.floorId)?.name ?? ""}</small>
+        </span></li>)}
+      </ul>
+    </section>
+    : null;
+
   const tree = <V1Tree floors={geometry?.floors ?? []} geometryNote={reading.kind === "reprocess" ? "Cần xử lý lại IFC; chưa có dữ liệu tầng." : reading.kind === "invalid" ? reading.reason : null}
     activeFloor={activeFloor} onFloor={setFloorChoice} objects={objects} selected={selectedIndex} issues={issues}
     onSelect={(index) => { selectObject(index); setTreeOpen(false); if (isMobile) setMobileTab("props"); }}
-    onAdd={(kind) => { addAtCentre(kind); setTreeOpen(false); }} kindStatus={kindStatus} addDisabledReason={placeDisabledReason}
+    onAdd={(kind) => { addAtCentre(kind); setTreeOpen(false); }} kindStatus={kindStatus} addDisabledReason={placeDisabledReason} kinds={kinds}
     modelLayers={modelLayers} layerVisibility={layerVisibility} onLayer={(key, visible) => setLayerVisibility((current) => ({ ...current, [key]: visible }))}
     modelVisible={modelVisible} onModelVisible={setModelVisible} hasModel={modelStatus.phase === "loaded"}
-    onImportEquipment={() => { setImportOpen(true); setTreeOpen(false); }} />;
+    onImportEquipment={scope === "scenario-on-infrastructure" ? undefined : () => { setImportOpen(true); setTreeOpen(false); }} footer={lockedFooter} />;
 
   const previewBanner = preview.phase === "reprocess"
     ? <ReprocessGuide buildingId={buildingId} revisionId={revisionId} />
@@ -305,14 +348,19 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const viewportTool = state.tool;
 
   return <div className="se-root" data-mobile-tab={mobileTab} data-testid="scenario-editor" data-draft-mode="v1">
-    <Breadcrumbs items={[{ label: "Công trình", href: routes.workspaceBuildings }, { label: "Chi tiết", href: `${routes.workspaceBuildings}/${buildingId}` }, { label: "Kịch bản", href: listHref }, { label: `Bản nháp #${meta.draftNumber}` }]} />
+    <Breadcrumbs items={infrastructure
+      ? [{ label: "Công trình", href: routes.workspaceBuildings }, { label: "Chi tiết", href: `${routes.workspaceBuildings}/${buildingId}` }, { label: "Hạ tầng PCCC", href: infrastructure.backHref }, { label: `Phiên bản ${meta.draftNumber}` }]
+      : [{ label: "Công trình", href: routes.workspaceBuildings }, { label: "Chi tiết", href: `${routes.workspaceBuildings}/${buildingId}` }, { label: "Kịch bản", href: listHref }, { label: `Bản nháp #${meta.draftNumber}` }]} />
     <header className="se-header se-topbar">
-      <Button asChild variant="secondary" size="sm"><Link href={listHref} aria-label="Về danh sách kịch bản"><ChevronLeft size={16} aria-hidden="true" />Kịch bản</Link></Button>
+      {infrastructure
+        ? <Button asChild variant="secondary" size="sm"><Link href={infrastructure.backHref} aria-label="Về danh sách phiên bản hạ tầng"><ChevronLeft size={16} aria-hidden="true" />Hạ tầng PCCC</Link></Button>
+        : <Button asChild variant="secondary" size="sm"><Link href={listHref} aria-label="Về danh sách kịch bản"><ChevronLeft size={16} aria-hidden="true" />Kịch bản</Link></Button>}
       <div className="se-title">
-        <h1>{readString(state.draft, "name") || scenario.data?.name || "Soạn kịch bản"}</h1>
-        <p>Bản nháp #{meta.draftNumber} · <StatusBadge tone="info" data-testid="schema-badge">Soạn trên mô hình 3D</StatusBadge>{activeFloorV1 ? <> · <span data-testid="active-floor">Tầng đang soạn: {activeFloorV1.name}</span></> : null}</p>
+        <h1>{infrastructure ? "Hạ tầng PCCC" : readString(state.draft, "name") || scenario.data?.name || "Soạn kịch bản"}</h1>
+        <p>{infrastructure ? `Phiên bản ${meta.draftNumber}` : `Bản nháp #${meta.draftNumber}`} · <StatusBadge tone="info" data-testid="schema-badge">Soạn trên mô hình 3D</StatusBadge>{activeFloorV1 ? <> · <span data-testid="active-floor">Tầng đang soạn: {activeFloorV1.name}</span></> : null}</p>
       </div>
-      <V1Actions status={status} saveBlockedReason={saveBlockedReason} onSave={() => void onSave()} onValidate={() => void onValidate()} validating={editor.validating} versionsHref={versionsHref} />
+      <V1Actions status={status} saveBlockedReason={saveBlockedReason} onSave={() => void onSave()} onValidate={() => void onValidate()} validating={editor.validating} versionsHref={versionsHref}
+        exit={infrastructure ? { href: infrastructure.backHref, label: "Xong, về danh sách", title: "Lưu trước, rồi gửi thẩm định ở danh sách phiên bản" } : undefined} />
     </header>
 
     {(previewBanner || saveBanner || pinBanner) && <div className="se-banners">{saveBanner}{pinBanner}{previewBanner}</div>}
@@ -327,12 +375,12 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
       <aside className="se-panel se-left" aria-label="Tầng và đối tượng">{isDesktop || isMobile ? tree : null}</aside>
       <section className="se-center" aria-label="Khung nhìn 3D">
         <div className="se-stage">
-        <EditorViewport ref={viewportRef} markers={markers} selection={state.selection} tool={viewportTool} placeKind={state.placeKind} gizmoEnabled={gizmoEnabled}
+        <EditorViewport ref={viewportRef} markers={sceneMarkers} selection={state.selection} tool={viewportTool} placeKind={state.placeKind} gizmoEnabled={gizmoEnabled}
           model={model} floors={sceneFloors} activeFloor={activeFloor} showModel={modelVisible} layerVisibility={layerVisibility}
           onSelect={(ref) => selectObject(ref && ref.kind === "object" ? ref.index : null)} onPlace={(kind, point) => placeAt(kind as ObjectKind, point)}
           onTransform={onTransform} onModelPick={setPick} onModelStatus={setModelStatus} onUrlExpired={preview.refresh} onSelectionScreen={setSelectionScreen} />
         <V1ToolFloat tool={state.tool} onTool={(tool) => dispatch({ type: "tool", tool })} gizmoEnabled={gizmoEnabled} onOpenTree={() => setTreeOpen(true)} hasTree={!isDesktop && !isMobile} />
-        <V1PlaceFloat tool={state.tool} placeKind={state.placeKind} onPlace={(kind) => dispatch({ type: "tool", tool: "place", placeKind: kind })} kindStatus={kindStatus} placeDisabledReason={placeDisabledReason} />
+        <V1PlaceFloat tool={state.tool} placeKind={state.placeKind} onPlace={(kind) => dispatch({ type: "tool", tool: "place", placeKind: kind })} kindStatus={kindStatus} placeDisabledReason={placeDisabledReason} kinds={kinds} />
         <ViewportPill canUndo={state.history.past.length > 0} canRedo={state.history.future.length > 0} undoLabel={lastPast?.label} redoLabel={nextFuture?.label}
           onUndo={() => dispatch({ type: "undo" })} onRedo={() => dispatch({ type: "redo" })} onValidate={() => void onValidate()} validating={editor.validating} />
         <ViewportRail canFit={modelStatus.phase === "loaded"} hasModel={modelStatus.phase === "loaded"} locked={viewLocked} modelVisible={modelVisible}
@@ -350,15 +398,15 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
         <Tabs value={panelTab} onValueChange={(value) => setPanelTab(value as PanelTab)}>
           <TabsList aria-label="Nhóm thuộc tính">
             <TabsTrigger value="object">Đối tượng</TabsTrigger>
-            <TabsTrigger value="scenario">Kịch bản</TabsTrigger>
-            <TabsTrigger value="library" data-testid="tab-library">Thư viện</TabsTrigger>
+            {!infrastructure && <TabsTrigger value="scenario">Kịch bản</TabsTrigger>}
+            {!infrastructure && <TabsTrigger value="library" data-testid="tab-library">Thư viện</TabsTrigger>}
             <TabsTrigger value="issues" data-testid="tab-issues">Kiểm tra{issueCount > 0 ? ` (${issueCount})` : ""}</TabsTrigger>
             <TabsTrigger value="geometry" data-testid="tab-geometry">Mô hình</TabsTrigger>
             <TabsTrigger value="kinds" data-testid="tab-kinds">Khả dụng</TabsTrigger>
           </TabsList>
           <div className="se-panel-scroll">
-            <TabsContent value="object"><V1ObjectForm object={selectedObject} issues={issues} actions={actions} geometry={geometry} catalog={catalogView} runtimeVersion={runtimeVersion} pick={pick} onOpenScenario={() => setPanelTab("scenario")} /></TabsContent>
-            <TabsContent value="scenario"><V1ScenarioForm draft={state.draft} issues={issues} actions={actions} catalog={catalogView} rubricCatalog={rubricState} /></TabsContent>
+            <TabsContent value="object"><V1ObjectForm object={selectedObject} issues={issues} actions={actions} geometry={geometry} catalog={catalogView} runtimeVersion={runtimeVersion} pick={pick} onOpenScenario={() => setPanelTab("scenario")} scope={scope} /></TabsContent>
+            <TabsContent value="scenario"><V1ScenarioForm draft={state.draft} issues={issues} actions={actions} catalog={catalogView} rubricCatalog={rubricState} situation={scope === "scenario-on-infrastructure"} /></TabsContent>
             <TabsContent value="library"><V1LibraryPanel accessToken={accessToken} ui={libraryUi} onUi={setLibraryUi} draft={state.draft} selectedObject={selectedObject} runtimeVersion={runtimeVersion} runtimes={runtimes} rubric={rubricView} applied={applied} canUndoLast={(label) => lastPast?.label === label} onUndo={() => dispatch({ type: "undo" })} onApply={onApplySample} /></TabsContent>
             <TabsContent value="issues"><V1IssuesPanel issues={issues} shapeProblems={editor.shapeProblems} report={editor.report} reportStale={editor.reportStale} validating={editor.validating} validateError={editor.validateError} dirty={dirty} onValidate={() => void onValidate()} onJump={onJump} /></TabsContent>
             <TabsContent value="geometry"><V1GeometryPanel reading={reading} preview={preview} pin={pin} buildingId={buildingId} revisionId={revisionId} onRepin={actions.pinGeometry} modelSummary={modelSummary} /></TabsContent>
@@ -378,7 +426,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
     {importOpen && <V1EquipmentImport accessToken={accessToken} buildingId={buildingId} revisionId={revisionId} draft={state.draft} runtime={findRuntime(runtimes ?? [], runtimeVersion)}
       runtimeVersion={runtimeVersion} geometry={geometry} onApply={edit} onClose={() => setImportOpen(false)} />}
 
-    {aiRequestId && !aiDismissed && <AiProposalApply key={aiRequestId} accessToken={accessToken} requestId={aiRequestId} draft={state.draft} floorIds={aiFloorIds} onApply={edit} onClose={closeAiProposal} />}
+    {aiRequestId && !aiDismissed && !infrastructure && <AiProposalApply key={aiRequestId} accessToken={accessToken} requestId={aiRequestId} draft={state.draft} floorIds={aiFloorIds} scope={scope} onApply={edit} onClose={closeAiProposal} />}
 
     <Modal open={guard.pending} onOpenChange={(open) => { if (!open) guard.stay(); }} title="Rời khỏi trình soạn thảo?"
       description="Bạn có thay đổi chưa lưu. Nếu rời đi bây giờ, các thay đổi này sẽ mất."

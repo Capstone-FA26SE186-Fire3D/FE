@@ -25,7 +25,7 @@ import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { organizationsApi } from "@/features/organizations/api";
 import { buildingConflict, buildingsApi, sameBuildingVersion } from "../api";
-import { buildingTypes } from "../data/building-types";
+import { buildingTypeLabel, buildingTypes, riskGroupInfo } from "../data/building-types";
 import { describeApiError, describeBuildingWriteError, formatDateTime } from "../format";
 
 const shortDate = new Intl.DateTimeFormat("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
@@ -42,7 +42,7 @@ const statusOptions: Array<{ value: StatusFilter; label: string }> = [
   { value: "archived", label: "Đã lưu trữ" },
   { value: "all", label: "Tất cả" },
 ];
-const typeOptions = buildingTypes.map((type) => ({ value: type, label: type }));
+const typeOptions = buildingTypes.map((type) => ({ value: type.value, label: type.label }));
 
 const loadError = "Không thể tải danh sách công trình. Hãy thử lại sau.";
 
@@ -138,7 +138,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
 
   // The type filter is client-side: BE has no type query and the list is one page of ≤20 anyway.
   const allItems = data?.items ?? [];
-  const items = typeFilter ? allItems.filter((building) => (building.buildingType ?? "").localeCompare(typeFilter, "vi", { sensitivity: "base" }) === 0) : allItems;
+  const items = typeFilter ? allItems.filter((building) => building.buildingType === typeFilter) : allItems;
   const totalCount = data?.totalCount ?? 0;
   const filtering = Boolean(urlSearch) || status !== "active" || Boolean(typeFilter);
 
@@ -293,7 +293,7 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
 
   const columns: DataColumn<BuildingSummary>[] = [
     { key: "name", header: "Công trình", primary: true, width: "34%", render: (building) => <CellTitle title={<span id={`building-name-${building.id}`}>{building.name}</span>} sub={building.buildingType ? undefined : "Chưa phân loại"} /> },
-    { key: "type", header: "Loại", width: 130, render: (building) => building.buildingType || <span className="ops-muted">—</span> },
+    { key: "type", header: "Loại", width: 130, render: (building) => { const risk = riskGroupInfo(building.riskGroup); return buildingTypeLabel(building.buildingType) ? <>{buildingTypeLabel(building.buildingType)}{risk && <> <StatusBadge tone={risk.tone} title="Nhóm nguy cơ cháy">{risk.label}</StatusBadge></>}</> : <span className="ops-muted">—</span>; } },
     { key: "floors", header: "Tầng", width: 70, align: "center", hideBelow: 900, render: (building) => building.totalFloors },
     ...(isAdmin
       ? [{ key: "status", header: "Trạng thái", width: 150, render: (building: BuildingSummary) => <StatusBadge tone={building.isActive ? "success" : "neutral"}>{building.isActive ? "Hoạt động" : "Đã lưu trữ"}</StatusBadge> }]

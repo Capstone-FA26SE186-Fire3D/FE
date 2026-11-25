@@ -11,7 +11,7 @@ const owner = { id: "owner", email: "owner@fire3d.test", fullName: "Nguyễn Th�
 const admin = { id: "admin", email: "admin@fire3d.test", fullName: "Platform Admin", role: 0, organizationId: null, profileRevision: 1 };
 const LONG_NAME = "Trường Trung học Phổ thông Chuyên Nguyễn Thị Minh Khai - Khối Nhà Hiệu Bộ và Thư viện Trung tâm";
 const buildings = [
-  { id: "b-1", name: LONG_NAME, buildingType: "Trường học", totalFloors: 5, isActive: true, createdAt: "2026-10-05T00:00:00Z" },
+  { id: "b-1", name: LONG_NAME, buildingType: "School", totalFloors: 5, isActive: true, createdAt: "2026-10-05T00:00:00Z" },
   { id: "b-2", name: "Nhà xưởng B", buildingType: "Nhà xưởng", totalFloors: 2, isActive: true, createdAt: "2026-10-05T00:00:00Z" },
   { id: "b-3", name: "Văn phòng C", buildingType: "", totalFloors: 12, isActive: false, createdAt: "2026-10-05T00:00:00Z" },
 ];

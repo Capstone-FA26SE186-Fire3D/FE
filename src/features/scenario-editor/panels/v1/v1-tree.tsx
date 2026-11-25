@@ -2,6 +2,8 @@
 
 import { Ban, ChevronDown, Eye, EyeOff, Flag, Flame, Layers, ListPlus, MapPinPlus, Plus, UserRound, Wrench } from "lucide-react";
 
+import type { ReactNode } from "react";
+
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 
@@ -33,7 +35,7 @@ function labelIfcLayers(layers: LayerInfo[]) {
   return named.map((item) => (seen.get(item.label)! > 1 ? { ...item, label: `${item.label} (${item.raw.replace(/^Ifc/, "")})` } : item));
 }
 
-export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, selected, issues, onSelect, onAdd, kindStatus, addDisabledReason, modelLayers, layerVisibility, onLayer, modelVisible, onModelVisible, hasModel, onImportEquipment }: {
+export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, selected, issues, onSelect, onAdd, kindStatus, addDisabledReason, modelLayers, layerVisibility, onLayer, modelVisible, onModelVisible, hasModel, onImportEquipment, kinds = OBJECT_KINDS, footer }: {
   floors: FloorV1[];
   geometryNote: string | null;
   activeFloor: string | null;
@@ -53,6 +55,9 @@ export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, se
   hasModel: boolean;
   /** Opens the "Thêm thiết bị đã xác nhận" preview (IFC equipment decisions); absent hides the action. */
   onImportEquipment?: () => void;
+  /** Kinds this session may place; the others are not listed. */
+  kinds?: readonly ObjectKind[];
+  footer?: ReactNode;
 }) {
   const layerToggle = (key: string, label: string, raw?: string) => {
     const visible = layerVisibility[key] !== false;
@@ -63,7 +68,7 @@ export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, se
     </li>;
   };
   const ifcLayers = labelIfcLayers(modelLayers);
-  const hiddenCount = [...OBJECT_KINDS, ...modelLayers.map((layer) => layer.key)].filter((key) => layerVisibility[key] === false).length + (hasModel && !modelVisible ? 1 : 0);
+  const hiddenCount = [...kinds, ...modelLayers.map((layer) => layer.key)].filter((key) => layerVisibility[key] === false).length + (hasModel && !modelVisible ? 1 : 0);
   const floorName = (id: string) => floors.find((floor) => floor.id === id)?.name ?? id;
 
   return <div className="se-tree" data-testid="v1-tree">
@@ -91,7 +96,7 @@ export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, se
       </summary>
       <p className="se-layers-group">Đối tượng kịch bản</p>
       <ul className="se-layer-chips">
-        {OBJECT_KINDS.map((kind) => layerToggle(kind, KIND_META[kind].plural))}
+        {kinds.map((kind) => layerToggle(kind, KIND_META[kind].plural))}
       </ul>
       <p className="se-layers-group">Mô hình IFC</p>
       <ul className="se-layer-chips">
@@ -104,7 +109,7 @@ export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, se
       </ul>
     </details>
 
-    {OBJECT_KINDS.map((kind) => {
+    {kinds.map((kind) => {
       const list = objects.filter((object) => object.kind === kind);
       const Icon = KIND_ICON[kind];
       const blocked = addDisabledReason !== null || placementBlocked(kindStatus[kind]);
@@ -127,5 +132,6 @@ export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, se
         </Button>}
       </section>;
     })}
+    {footer}
   </div>;
 }

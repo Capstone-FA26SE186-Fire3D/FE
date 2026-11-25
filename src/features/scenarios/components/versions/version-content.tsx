@@ -63,7 +63,7 @@ export function VersionContent({ version }: { version: ScenarioVersionDetail }) 
             <td>{criterion.mandatory ? "Có" : "Không"}</td>
           </tr>)}</tbody>
         </Table>
-        : <p className="ver-note">Phiên bản này chưa có tiêu chí chấm nên không gửi duyệt được.</p>}
+        : <p className="ver-note">Phiên bản này chưa có tiêu chí chấm nên không gửi thẩm định được.</p>}
     </Panel>
     <Panel title="Cấu hình mô phỏng (cho kỹ thuật)" description="Dữ liệu gốc của phiên bản, chỉ đọc. Thường không cần xem." bodyClassName="ops-stack">
       {configuration.map(([key, value]) => <JsonBlock key={key} title={key} value={value} />)}

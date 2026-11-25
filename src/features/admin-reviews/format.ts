@@ -3,9 +3,9 @@ import { reviewStatuses, type ReviewStatus } from "./types";
 
 /** Review lifecycle (content approval). This is NOT technical readiness and NOT publication. */
 export function statusLabel(status: string): string {
-  if (status === "Submitted") return "Chờ duyệt";
-  if (status === "Approved") return "Đã duyệt nội dung";
-  if (status === "Rejected") return "Đã từ chối";
+  if (status === "Submitted") return "Chờ thẩm định";
+  if (status === "Approved") return "Đạt thẩm định";
+  if (status === "Rejected") return "Chưa đạt thẩm định";
   return "Không rõ";
 }
 

@@ -9,7 +9,8 @@ import { useAsyncData } from "@/api/use-async-data";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { buildingsApi } from "@/features/buildings/api";
 import { usePortalContainer } from "@/features/theme/theme-scope";
-import { adminArea, organizationArea, type NavItem } from "@/layouts/nav-config";
+import { buildingTypeLabel } from "@/features/buildings/data/building-types";
+import { adminArea, expertArea, organizationArea, type NavItem } from "@/layouts/nav-config";
 import { stripAccents } from "@/utils/strip-accents";
 import { useRecentBuildings } from "./recent-buildings";
 
@@ -48,7 +49,7 @@ export function PaletteDialog({ onClose }: { onClose: () => void }) {
   const canSearch = Boolean(accessToken) && user?.role === 1 && search.length >= SEARCH_MIN;
   const results = useAsyncData(`palette:buildings:${search}`, (signal) => buildingsApi.list(accessToken ?? "", { search, pageSize: 8 }, signal), canSearch, { keepPrevious: false });
 
-  const area = pathname.startsWith("/admin") ? adminArea : organizationArea;
+  const area = pathname.startsWith("/admin") ? adminArea : pathname.startsWith("/expert") ? expertArea : organizationArea;
   const openBuildingId = BUILDING_ROUTE.exec(pathname)?.[1];
 
   const go = useCallback((href: string) => {
@@ -98,7 +99,7 @@ export function PaletteDialog({ onClose }: { onClose: () => void }) {
           {(found.length > 0 || searching) && <Command.Group heading="Công trình" className="ops-palette-group">
             {searching && found.length === 0 && <div className="ops-palette-status" role="status">Đang tìm…</div>}
             {found.map((item) => <Command.Item key={item.id} value={`building:${item.id}`} className="ops-palette-item" onSelect={() => go(`/workspace/buildings/${item.id}`)}>
-              <Building2 size={16} aria-hidden="true" /><span className="ops-palette-item-label">{item.name}</span><small>{item.buildingType ? `${item.buildingType} · ` : ""}{item.totalFloors} tầng</small>
+              <Building2 size={16} aria-hidden="true" /><span className="ops-palette-item-label">{item.name}</span><small>{buildingTypeLabel(item.buildingType) ? `${buildingTypeLabel(item.buildingType)} · ` : ""}{item.totalFloors} tầng</small>
             </Command.Item>)}
           </Command.Group>}
 

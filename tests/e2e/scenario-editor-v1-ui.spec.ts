@@ -94,7 +94,7 @@ test("new draft from the entry screen: stable Idempotency-Key across a retry, fi
   await expect(page.getByTestId("scenario-editor")).toHaveAttribute("data-draft-mode", "v1");
   expect(mock.createDraftCalls).toHaveLength(2);
   expect(mock.createDraftCalls[1].key).toBe(mock.createDraftCalls[0].key);
-  expect(mock.createDraftCalls[0].body).toEqual({ revisionId: REVISION_ID });
+  expect(mock.createDraftCalls[0].body).toEqual({ revisionId: REVISION_ID, infrastructureId: "77777777-7777-4777-8777-777777777777" });
   // PUT: only the document that declares schemaVersion + the pinned Geometry; ETag of the fresh draft.
   expect(mock.puts).toHaveLength(1);
   expect(mock.puts[0]).toMatchObject({ draftId: NEW_DRAFT_ID, ifMatch: '"1"' });

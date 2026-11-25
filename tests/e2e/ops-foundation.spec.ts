@@ -13,7 +13,7 @@ async function signIn(page: Page, user: typeof owner | typeof admin) {
   await page.route("**/api/auth/me", (route) => route.fulfill({ json: user, headers: { ...EXPOSED, ETag: '"1"' } }));
 }
 
-const buildings = Array.from({ length: 3 }, (_, index) => ({ id: `b-${index}`, name: `Công trình ${index + 1}`, buildingType: "Trường học", totalFloors: 3, isActive: true, createdAt: "2026-10-05T00:00:00Z" }));
+const buildings = Array.from({ length: 3 }, (_, index) => ({ id: `b-${index}`, name: `Công trình ${index + 1}`, buildingType: "School", totalFloors: 3, isActive: true, createdAt: "2026-10-05T00:00:00Z" }));
 
 async function mockBuildings(page: Page) {
   await page.route("**/api/buildings?*", (route) => route.fulfill({ json: { items: buildings, totalCount: 3, page: 1, pageSize: 20 } }));

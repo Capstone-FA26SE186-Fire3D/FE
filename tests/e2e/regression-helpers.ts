@@ -53,7 +53,7 @@ export type Tenant = {
 };
 
 const buildingJson = (tenant: Tenant, item: { id: string; name: string }) => ({
-  id: item.id, name: item.name, buildingType: "Trường học", totalFloors: 3, isActive: true, organizationId: tenant.user.organizationId,
+  id: item.id, name: item.name, buildingType: "School", totalFloors: 3, isActive: true, organizationId: tenant.user.organizationId,
   createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z",
   location: { id: `loc-${item.id}`, address: "1 Test Street", city: "Hà Nội", district: "Cầu Giấy", latitude: null, longitude: null, geojson: null }, contact: null,
 });

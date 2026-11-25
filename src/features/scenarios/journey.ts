@@ -67,7 +67,7 @@ function playtestBranch(input: JourneyInput): JourneyStep {
   if (!input.version || !state || state.kind === "loading" || state.kind === "error") {
     return make("unknown", NO_DATA_TEXT, "Chưa đọc được trạng thái gói chạy thử. Chạy thử trên điện thoại là tùy chọn.");
   }
-  if (state.kind === "succeeded" && state.qa === "passed") return make("done", "Gói chạy thử sẵn sàng", "Có thể mở chạy thử trên điện thoại. Việc này không thay kiểm tra hay duyệt nội dung.");
+  if (state.kind === "succeeded" && state.qa === "passed") return make("done", "Gói chạy thử sẵn sàng", "Có thể mở chạy thử trên điện thoại. Việc này không thay kiểm tra hay thẩm định nội dung.");
   const missing = packageMissing(state);
   if (state.kind === "none") return make("todo", "Chưa dựng gói chạy thử", missing[0] ?? "Dựng loại gói chạy thử ở tab Dựng gói.");
   if (state.kind === "building" || (state.kind === "succeeded" && (state.qa === "checking" || state.qa === "none"))) return make("active", "Đang chờ gói", missing[0] ?? "Đang chờ gói chạy thử.");
@@ -122,15 +122,15 @@ export function buildJourney(input: JourneyInput): JourneyStep[] {
   // 6. Content review: the version's own reviewStatus.
   const reviewTarget: JourneyTarget = { kind: "tab", tab: "review" };
   let review: JourneyStep;
-  if (!version) review = needsVersion("review", "Gửi duyệt", reviewTarget, "Mở Gửi duyệt", input);
-  else if (!version.reviewStatus) review = unknown("review", "Gửi duyệt", reviewTarget, "Mở Gửi duyệt");
+  if (!version) review = needsVersion("review", "Gửi thẩm định", reviewTarget, "Mở Gửi thẩm định", input);
+  else if (!version.reviewStatus) review = unknown("review", "Gửi thẩm định", reviewTarget, "Mở Gửi thẩm định");
   else {
     const status = version.reviewStatus.toLowerCase();
-    if (status === "approved") review = step("review", "Gửi duyệt", reviewTarget, "Xem duyệt", "done", "Đã duyệt", "Quản trị FET3D đã duyệt nội dung và tiêu chí chấm.");
-    else if (status === "submitted") review = step("review", "Gửi duyệt", reviewTarget, "Xem duyệt", "active", "Chờ duyệt", "Đã gửi, đang chờ quản trị FET3D.");
-    else if (status === "rejected") review = step("review", "Gửi duyệt", reviewTarget, "Xem lý do", "blocked", "Bị từ chối", version.rejectReason ? `Lý do: ${version.rejectReason}` : "Sửa nội dung sẽ tạo phiên bản mới.");
-    else if (status === "notsubmitted") review = step("review", "Gửi duyệt", reviewTarget, "Mở Gửi duyệt", "todo", "Chưa gửi duyệt", "Gửi để quản trị FET3D duyệt nội dung và tiêu chí chấm.");
-    else review = step("review", "Gửi duyệt", reviewTarget, "Mở Gửi duyệt", "active", version.reviewStatus, "Trạng thái duyệt do hệ thống báo.");
+    if (status === "approved") review = step("review", "Gửi thẩm định", reviewTarget, "Xem thẩm định", "done", "Đạt thẩm định", "Chuyên viên PCCC đã thẩm định đạt nội dung và tiêu chí chấm.");
+    else if (status === "submitted") review = step("review", "Gửi thẩm định", reviewTarget, "Xem thẩm định", "active", "Chờ thẩm định", "Đã gửi, đang chờ Chuyên viên PCCC.");
+    else if (status === "rejected") review = step("review", "Gửi thẩm định", reviewTarget, "Xem lý do", "blocked", "Chưa đạt thẩm định", version.rejectReason ? `Lý do: ${version.rejectReason}` : "Sửa nội dung sẽ tạo phiên bản mới.");
+    else if (status === "notsubmitted") review = step("review", "Gửi thẩm định", reviewTarget, "Mở Gửi thẩm định", "todo", "Chưa gửi thẩm định", "Gửi để Chuyên viên PCCC thẩm định nội dung và tiêu chí chấm.");
+    else review = step("review", "Gửi thẩm định", reviewTarget, "Mở Gửi thẩm định", "active", version.reviewStatus, "Trạng thái thẩm định do hệ thống báo.");
   }
 
   // 7 and 8. Release: the release the server lists/returns for this version.
@@ -145,13 +145,13 @@ export function buildJourney(input: JourneyInput): JourneyStep[] {
     create = unknown("release", "Tạo bản phát hành", releaseTarget, "Mở Phát hành");
     publish = unknown("publish", "Phát hành", releaseTarget, "Mở Phát hành");
   } else if (!input.release) {
-    create = step("release", "Tạo bản phát hành", releaseTarget, "Mở Phát hành", "todo", "Chưa có bản phát hành", "Cần nội dung đã duyệt và gói đã chốt.");
+    create = step("release", "Tạo bản phát hành", releaseTarget, "Mở Phát hành", "todo", "Chưa có bản phát hành", "Cần nội dung đã đạt thẩm định và gói đã chốt.");
     publish = step("publish", "Phát hành", releaseTarget, "Mở Phát hành", "todo", "Chưa phát hành", "Phát hành sau khi đã tạo bản phát hành.");
   } else {
     create = step("release", "Tạo bản phát hành", releaseTarget, "Mở Phát hành", "done", "Đã tạo", "Đã có bản phát hành cho phiên bản này.");
     if (releaseStatus === "published") publish = step("publish", "Phát hành", releaseTarget, "Mở Phát hành", "done", "Đã phát hành", "Học viên đã dùng được.");
     else if (releaseStatus === "revoked") publish = step("publish", "Phát hành", releaseTarget, "Mở Phát hành", "blocked", "Đã thu hồi", input.release.revokedReason ? `Lý do: ${input.release.revokedReason}` : "Bản phát hành đã bị thu hồi.");
-    else publish = step("publish", "Phát hành", releaseTarget, "Mở Phát hành", "todo", "Đã tạo, chưa phát hành", "Học viên chưa dùng được. Bấm Phát hành; hệ thống kiểm tra lại duyệt, gói và dịch vụ của công trình.");
+    else publish = step("publish", "Phát hành", releaseTarget, "Mở Phát hành", "todo", "Đã tạo, chưa phát hành", "Học viên chưa dùng được. Bấm Phát hành; hệ thống kiểm tra lại kết quả thẩm định, gói và dịch vụ của công trình.");
   }
 
   return [draft, validate, snapshot, pkg, playtestBranch(input), ready, review, create, publish].sort((a, b) => order(a) - order(b));

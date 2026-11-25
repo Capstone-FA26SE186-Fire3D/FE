@@ -10,7 +10,7 @@ const settled = (page: Page) => page.waitForFunction(() => document.getAnimation
 // The floating "Trợ lý AI" on every /workspace page (Figma 43:197 / 43:255 / 43:304 / 57:731). Route mocks that follow the
 // BE OpenAPI: evidence for FE behaviour, not for the real API.
 
-const building = { id: BUILDING_ID, name: "Tòa nhà A", buildingType: "Trường học", totalFloors: 2, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: null, contact: null };
+const building = { id: BUILDING_ID, name: "Tòa nhà A", buildingType: "School", totalFloors: 2, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: null, contact: null };
 const scenario = { id: SCENARIO_ID, buildingId: BUILDING_ID, organizationId: "org-1", name: "Thoát hiểm tầng một", createdAt: "2026-10-06T00:00:00Z", currentDraft: null };
 
 /**

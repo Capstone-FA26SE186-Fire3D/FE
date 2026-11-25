@@ -32,13 +32,15 @@ const TOOLS: Array<{ tool: V1Tool; label: string; icon: typeof MousePointer2; gi
 ];
 
 /** Save state and the page-level actions, in the editor's top bar. */
-export function V1Actions({ status, saveBlockedReason, onSave, onValidate, validating, versionsHref }: {
+export function V1Actions({ status, saveBlockedReason, onSave, onValidate, validating, versionsHref, exit }: {
   status: V1Status;
   saveBlockedReason: string | null;
   onSave: () => void;
   onValidate: () => void;
   validating: boolean;
   versionsHref: string;
+  /** Replaces the scenario-only links (playtest, versions) when the workspace edits something else. */
+  exit?: { href: string; label: string; title: string };
 }) {
   const st = STATUS[status];
   const saveDisabled = status === "saving" || status === "saved" || status === "invalid";
@@ -46,8 +48,12 @@ export function V1Actions({ status, saveBlockedReason, onSave, onValidate, valid
     <StatusBadge tone={st.tone} data-testid="save-status" role="status" aria-live="polite">{st.label}</StatusBadge>
     <Button type="button" variant="secondary" size="sm" disabled={validating} onClick={onValidate} data-testid="validate" title="Kiểm tra nội dung đang sửa với máy chủ, không lưu"><ShieldCheck size={16} aria-hidden="true" /><span className="se-label">{validating ? "Đang kiểm tra…" : "Kiểm tra"}</span></Button>
     <Button type="button" variant="secondary" size="sm" disabled={saveDisabled} onClick={onSave} data-testid="save" title={status === "invalid" ? (saveBlockedReason ?? "Chưa hợp lệ để lưu") : "Lưu (Ctrl/Cmd+S)"}><Save size={16} aria-hidden="true" /><span className="se-label se-keep">{status === "saving" ? "Đang lưu…" : "Lưu"}</span></Button>
-    <Button asChild variant="secondary" size="sm"><Link href={`${versionsHref}?tab=playtest`} data-testid="playtest" title="Chạy thử dùng phiên bản đã dựng gói: mở tab Chạy thử ở trang phiên bản"><Play size={16} aria-hidden="true" /><span className="se-label">Chạy thử</span></Link></Button>
-    <Button asChild size="sm"><Link href={versionsHref} data-testid="versions-link" aria-label="Phiên bản" title="Tạo phiên bản cố định từ bản nháp đã lưu, rồi dựng gói và gửi duyệt"><History size={16} aria-hidden="true" /><span className="se-label se-keep">Phiên bản</span></Link></Button>
+    {exit
+      ? <Button asChild size="sm"><Link href={exit.href} data-testid="editor-exit" title={exit.title}><span className="se-label se-keep">{exit.label}</span></Link></Button>
+      : <>
+        <Button asChild variant="secondary" size="sm"><Link href={`${versionsHref}?tab=playtest`} data-testid="playtest" title="Chạy thử dùng phiên bản đã dựng gói: mở tab Chạy thử ở trang phiên bản"><Play size={16} aria-hidden="true" /><span className="se-label">Chạy thử</span></Link></Button>
+        <Button asChild size="sm"><Link href={versionsHref} data-testid="versions-link" aria-label="Phiên bản" title="Tạo phiên bản cố định từ bản nháp đã lưu, rồi dựng gói và gửi thẩm định"><History size={16} aria-hidden="true" /><span className="se-label se-keep">Phiên bản</span></Link></Button>
+      </>}
   </div>;
 }
 
@@ -72,16 +78,17 @@ export function V1ToolFloat({ tool, onTool, gizmoEnabled, onOpenTree, hasTree }:
 }
 
 /** Floating "thêm đối tượng" bar at the bottom of the viewport: arm a kind, then click on the model to place it. */
-export function V1PlaceFloat({ tool, placeKind, onPlace, kindStatus, placeDisabledReason }: {
+export function V1PlaceFloat({ tool, placeKind, onPlace, kindStatus, placeDisabledReason, kinds = OBJECT_KINDS }: {
   tool: V1Tool;
   placeKind: ObjectKind;
   onPlace: (kind: ObjectKind) => void;
   kindStatus: Record<ObjectKind, KindStatus>;
   /** Why placing is impossible at all (no valid Geometry, no floor selected), or null. */
   placeDisabledReason: string | null;
+  kinds?: readonly ObjectKind[];
 }) {
   return <div className="se-float se-float-place" role="group" aria-label="Đặt đối tượng">
-    {OBJECT_KINDS.map((kind) => {
+    {kinds.map((kind) => {
       const Icon = KIND_ICON[kind];
       const blocked = placeDisabledReason !== null || placementBlocked(kindStatus[kind]);
       const active = tool === "place" && placeKind === kind;

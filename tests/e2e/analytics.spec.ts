@@ -224,18 +224,25 @@ test.describe("organization analytics", () => {
       const query = new URL(route.request().url()).searchParams;
       reports.push(query);
       return route.fulfill({ json: training({ filters: { groupBy: "scenario" }, cohorts: query.has("buildingId") ? [] : [
-        { key: "sc-1", label: "Thoát hiểm tầng 3", plays: 25, uniqueTrainees: 9, completed: 20, abandoned: 2, awaitingSync: 0, assessed: 12, passed: 9, passRate: 0.75, averageDurationSeconds: 185 },
+        { key: "sc-1", label: "Thoát hiểm tầng 3", plays: 25, uniqueTrainees: 9, completed: 20, abandoned: 2, awaitingSync: 0, assessed: 12, passed: 9, passRate: 0.75, averageDurationSeconds: 185, lastPlayedAt: "2026-09-20T03:00:00Z", audience: "Evacuee", workingHours: "InHours" },
         { key: "sc-2", label: "Hành lang có khói", plays: 3, uniqueTrainees: 2, completed: 1, abandoned: 2, awaitingSync: 0, assessed: 0, passed: 0, passRate: null, averageDurationSeconds: null },
+        // BE#218: a published situation nobody practised in the window is listed with 0 plays.
+        { key: "sc-3", label: "Cháy bếp ngoài giờ", plays: 0, uniqueTrainees: 0, completed: 0, abandoned: 0, awaitingSync: 0, assessed: 0, passed: 0, passRate: null, averageDurationSeconds: null, lastPlayedAt: null, audience: "FirstResponse", workingHours: "OffHours" },
       ] }) });
     });
     await page.goto("/workspace/analytics?tab=log&from=2026-09-01&to=2026-09-30");
     await expect(page.getByRole("tab", { name: "Nhật ký luyện tập" })).toHaveAttribute("aria-selected", "true");
     const card = page.getByTestId("card-practice-log");
-    const table = card.getByRole("table", { name: "Nhật ký luyện tập theo kịch bản" });
-    await expect(table.getByRole("row", { name: /Thoát hiểm tầng 3\s*25\s*9\s*9 \/ 12\s*75%/ })).toBeVisible();
-    await expect(table.getByRole("row", { name: /Hành lang có khói\s*3\s*2\s*0 \/ 0\s*—\s*—/ })).toBeVisible();
+    const table = card.getByRole("table", { name: "Nhật ký luyện tập theo tình huống" });
+    await expect(table.getByRole("row", { name: /Thoát hiểm tầng 3\s*Người thoát nạn\s*Trong giờ làm việc\s*20\/09\/2026\s*25\s*9\s*9 \/ 12\s*75%/ })).toBeVisible();
+    await expect(table.getByRole("row", { name: /Hành lang có khói\s*—\s*—\s*—\s*3\s*2\s*0 \/ 0\s*—\s*—/ })).toBeVisible();
+    await expect(table.getByRole("row", { name: /Cháy bếp ngoài giờ\s*Chữa cháy ban đầu\s*Ngoài giờ làm việc\s*Chưa luyện trong năm\s*0/ })).toBeVisible();
+    await expect(card.getByTestId("practice-log-idle")).toContainText("Có 1 tình huống chưa được luyện trong 12 tháng gần nhất");
     await expect(card.getByText(note)).toBeVisible();
     expect(reports.at(-1)?.get("groupBy")).toBe("scenario");
+    // BE#218: the log asks for the server's 12-month window, not the 90-day period of the other tabs.
+    expect(reports.at(-1)?.has("from")).toBe(false);
+    expect(reports.at(-1)?.has("to")).toBe(false);
 
     // Only the building narrows the log; the scenario and grouping chips belong to the training report.
     const filters = page.getByRole("group", { name: "Bộ lọc báo cáo" });
@@ -252,12 +259,12 @@ test.describe("organization analytics", () => {
     };
     expect(await read()).toBe(`${note}\n${csv}`);
     expect(Object.fromEntries(exports[0])).toMatchObject({ groupBy: "scenario" });
-    // When the server writes the note itself, the file still has it once.
-    csv = `${note}\n${csv}`;
+    // When the server writes the note itself (BE#218, quoted because it contains commas), the file still has it once.
+    csv = `"${note}"\n${csv}`;
     expect(await read()).toBe(csv);
 
     await pick(filters, "Công trình", { value: "b-1" });
-    await expect(card.getByText("Chưa có lượt luyện tập nào trong kỳ này.")).toBeVisible();
+    await expect(card.getByText("Chưa có tình huống nào được phát hành hoặc luyện tập trong 12 tháng gần nhất.")).toBeVisible();
     expect(reports.at(-1)?.get("buildingId")).toBe("b-1");
     await expect(card.getByText(note)).toBeVisible();
   });

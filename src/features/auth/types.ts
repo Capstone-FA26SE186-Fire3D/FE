@@ -1,4 +1,5 @@
-export type UserRole = 0 | 1 | 2;
+/** 0 PlatformAdmin, 1 OrganizationUser, 2 Trainee, 3 FireSafetyExpert. */
+export type UserRole = 0 | 1 | 2 | 3;
 export type UserGender = 0 | 1 | 2 | 3;
 
 export type AuthUser = {

@@ -11,6 +11,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { capabilityDescription, capabilityName, ifcTypeLabel, parameterHint, parameterLabel, parameterOptionLabel } from "@/configs/capability-labels";
 
 import type { Issue } from "../../store/validation";
+import { capabilityAllowed, type EditorScope } from "../../v1/scope";
 import { capabilitiesForKind, findCapability, findRuntime, rangeMessage, type CapabilityOption, type ParameterField, type RuntimeOption } from "../../v1/catalog";
 import { CAPABILITY_REQUIRED_KINDS, KIND_META, type ObjectKind } from "../../v1/contract";
 import { anchorsForFloor, floorOf, type GeometryInfo } from "../../v1/geometry";
@@ -24,13 +25,14 @@ const MAX_ANCHOR_OPTIONS = 200;
 
 export type CatalogView = { loading: boolean; error: boolean; reload: () => void; runtimes: RuntimeOption[] };
 
-export function V1ObjectForm({ object, issues, actions, geometry, catalog, runtimeVersion, pick, onOpenScenario }: {
+export function V1ObjectForm({ object, issues, actions, geometry, catalog, runtimeVersion, pick, onOpenScenario, scope = "scenario" }: {
   object: ObjectView | undefined;
   issues: Issue[];
   actions: V1Actions;
   geometry: GeometryInfo | null;
   catalog: CatalogView;
   runtimeVersion: string | undefined;
+  scope?: EditorScope;
   pick: { name: string } | null;
   onOpenScenario: () => void;
 }) {
@@ -93,7 +95,7 @@ export function V1ObjectForm({ object, issues, actions, geometry, catalog, runti
     </fieldset>
 
     {kind && <AnchorField object={object} kind={kind} geometry={geometry} error={messageAt(issues, `${base}.anchorId`)} actions={actions} pick={pick} />}
-    {kind && <CapabilityField object={object} kind={kind} catalog={catalog} runtimeVersion={runtimeVersion} issues={issues} actions={actions} onOpenScenario={onOpenScenario} />}
+    {kind && <CapabilityField object={object} kind={kind} catalog={catalog} runtimeVersion={runtimeVersion} issues={issues} actions={actions} onOpenScenario={onOpenScenario} scope={scope} />}
   </div>;
 }
 
@@ -144,11 +146,11 @@ function AnchorField({ object, kind, geometry, error, actions, pick }: { object:
   </fieldset>;
 }
 
-function CapabilityField({ object, kind, catalog, runtimeVersion, issues, actions, onOpenScenario }: { object: ObjectView; kind: ObjectKind; catalog: CatalogView; runtimeVersion: string | undefined; issues: Issue[]; actions: V1Actions; onOpenScenario: () => void }) {
+function CapabilityField({ object, kind, catalog, runtimeVersion, issues, actions, onOpenScenario, scope }: { object: ObjectView; kind: ObjectKind; catalog: CatalogView; scope: EditorScope; runtimeVersion: string | undefined; issues: Issue[]; actions: V1Actions; onOpenScenario: () => void }) {
   const required = (CAPABILITY_REQUIRED_KINDS as readonly ObjectKind[]).includes(kind);
   const base = `$.objects[${object.index}]`;
   const runtime = findRuntime(catalog.runtimes, runtimeVersion);
-  const options = capabilitiesForKind(runtime, kind);
+  const options = capabilitiesForKind(runtime, kind).filter((option) => capabilityAllowed(scope, kind, option.id));
   const selected = findCapability(runtime, object.capability?.id);
   const error = messageAt(issues, `${base}.capability`) ?? messageAt(issues, `${base}.capability.id`) ?? messageAt(issues, `${base}.capability.version`);
 

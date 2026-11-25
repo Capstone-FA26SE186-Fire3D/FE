@@ -30,12 +30,12 @@ export function ReadinessStrip({ readiness }: { readiness: ReviewReadiness }) {
 export function ReadinessBlock({ readiness }: { readiness: ReviewReadiness }) {
   return <Panel
     title="Điều kiện kỹ thuật"
-    description="Kết quả kiểm tra mô hình IFC và xác nhận dùng cho huấn luyện hiện tại; chỉ để tham khảo khi duyệt."
+    description="Kết quả kiểm tra mô hình IFC và xác nhận dùng cho huấn luyện hiện tại; chỉ để tham khảo khi thẩm định."
     actions={<StatusBadge tone={readiness.technicalReady ? "success" : "warning"} data-testid="technical-ready">{readiness.technicalReady ? "Sẵn sàng kỹ thuật" : "Chưa sẵn sàng kỹ thuật"}</StatusBadge>}
     bodyClassName="ops-stack"
     data-testid="readiness-block"
   >
-    <p className="rev-callout">Điều kiện kỹ thuật, duyệt nội dung và điều kiện phát hành là ba việc tách biệt: kiểm tra tự động đạt không có nghĩa nội dung đã được duyệt, và nội dung được duyệt chưa có nghĩa phiên bản đã phát hành.</p>
+    <p className="rev-callout">Điều kiện kỹ thuật, thẩm định nội dung và điều kiện phát hành là ba việc tách biệt: kiểm tra tự động đạt không có nghĩa nội dung đã đạt thẩm định, và nội dung đạt thẩm định chưa có nghĩa phiên bản đã phát hành.</p>
     <dl className="rev-dl">
       <dt>Kết quả kiểm tra tự động</dt><dd data-testid="readiness-outcome">{outcomeLabel(readiness.outcome)}</dd>
       <dt>Lỗi chặn (lỗi và lỗi nghiêm trọng)</dt><dd data-testid="readiness-blockers">{readiness.blockerCount}</dd>
@@ -56,14 +56,14 @@ export function GateSeparation({ summary, readiness }: { summary: ReviewSummary;
         <span>Kiểm tra tự động, lỗi chặn, xác nhận huấn luyện và tệp cho ứng dụng (khối bên dưới).</span>
       </li>
       <li>
-        <strong>2. Duyệt nội dung</strong>
+        <strong>2. Thẩm định nội dung</strong>
         <StatusBadge tone={statusTone(summary.status)} data-testid="review-status">{statusLabel(summary.status)}</StatusBadge>
-        <span>Quyết định của quản trị FET3D cho đúng nội dung kịch bản và tiêu chí chấm điểm đang xem.</span>
+        <span>Kết quả thẩm định của Chuyên viên PCCC cho đúng nội dung kịch bản và tiêu chí chấm điểm đang xem.</span>
       </li>
       <li>
         <strong>3. Điều kiện phát hành</strong>
         <StatusBadge tone="neutral">Không đánh giá ở màn này</StatusBadge>
-        <span>Khi tổ chức phát hành, hệ thống kiểm tra lại mọi điều kiện (gói đã dựng xong, quyền sử dụng, duyệt nội dung, điều kiện kỹ thuật).</span>
+        <span>Khi tổ chức phát hành, hệ thống kiểm tra lại mọi điều kiện (gói đã dựng xong, quyền sử dụng, thẩm định nội dung, điều kiện kỹ thuật).</span>
       </li>
     </ol>
   </Panel>;

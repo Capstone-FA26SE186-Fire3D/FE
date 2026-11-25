@@ -13,6 +13,8 @@ import type { Json, JsonObject } from "@/features/scenario-editor/store/json";
 import { KIND_META, type ObjectKind } from "@/features/scenario-editor/v1/contract";
 
 import { orgAiApi } from "../api";
+import type { EditorScope } from "@/features/scenario-editor/v1/scope";
+
 import { applyCount, buildApplyCommand, buildApplyPlan, previewIssues, readProposalNotes, readProposalState, type Chosen } from "../apply-plan";
 import { aiErrorText, isSuccessfulDraft, statusLabel } from "../labels";
 import styles from "../org-ai.module.css";
@@ -30,12 +32,14 @@ function show(value: Json | undefined): string {
  * URL or memory), shown as a preview next to what the draft has now, and applied only after an explicit confirmation as ONE
  * editor command: one Undo reverts all of it, and nothing is saved, validated or published by this step.
  */
-export function AiProposalApply<S>({ accessToken, requestId, draft, floorIds, onApply, onClose }: {
+export function AiProposalApply<S>({ accessToken, requestId, draft, floorIds, scope, onApply, onClose }: {
   accessToken: string;
   requestId: string;
   draft: JsonObject;
   /** Floors of the draft's own Geometry; null while it is not available. */
   floorIds: Set<string> | null;
+  /** What the open draft may hold; on a PC06 situation the proposal's exits and fixed equipment are not offered. */
+  scope?: EditorScope;
   onApply: (build: (draft: JsonObject, id: number, selection: S, now: number) => Command<S> | null) => void;
   onClose: () => void;
 }) {
@@ -46,7 +50,7 @@ export function AiProposalApply<S>({ accessToken, requestId, draft, floorIds, on
   const found = request.data;
   const proposal = found && isSuccessfulDraft(found) ? readProposalState(found.result) : null;
   const notes = found ? readProposalNotes(found.result) : null;
-  const plan = useMemo(() => (proposal ? buildApplyPlan(proposal, draft, floorIds) : null), [proposal, draft, floorIds]);
+  const plan = useMemo(() => (proposal ? buildApplyPlan(proposal, draft, floorIds, scope) : null), [proposal, draft, floorIds, scope]);
 
   const chosen: Chosen | null = plan ? {
     fields: new Set(plan.fields.filter((field) => field.selectable && (overrides[field.key] ?? field.defaultOn)).map((field) => field.key)),

@@ -25,9 +25,9 @@ const PAGE_SIZE = 20;
 
 function reviewTone(status: string | null | undefined) {
   switch (status?.toLowerCase()) {
-    case "approved": return { label: "Đã duyệt", tone: "success" as const };
-    case "submitted": return { label: "Chờ duyệt", tone: "warning" as const };
-    case "rejected": return { label: "Bị từ chối", tone: "danger" as const };
+    case "approved": return { label: "Đạt thẩm định", tone: "success" as const };
+    case "submitted": return { label: "Chờ thẩm định", tone: "warning" as const };
+    case "rejected": return { label: "Chưa đạt thẩm định", tone: "danger" as const };
     default: return null;
   }
 }

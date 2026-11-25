@@ -84,6 +84,34 @@ export const ERROR_TEXT: Record<string, string> = {
   IFC_STORAGE_UNAVAILABLE: "Kho lưu trữ đang bận. Hãy thử lại.",
   PREVIEW_STORAGE_UNAVAILABLE: "Chưa tải được hình 3D. Hãy thử lại sau.",
   EDITOR_SCHEMA_INVALID: "Bản nháp có chỗ chưa hợp lệ. Xem danh sách vấn đề rồi sửa.",
+  IFC_UNSUPPORTED_SCHEMA: "Tệp IFC dùng phiên bản hệ thống chưa nhận. Hãy xuất lại ở IFC2x3, IFC4 hoặc IFC4x3.",
+  IFC_UPLOAD_INTENT_NOT_FOUND: "Lượt tải này đã bị hủy vì tệp không hợp lệ. Hãy chọn tệp khác và tải lại.",
+  // junk-IFC guard (BE#219)
+  IFC_PRECHECK_FAILED: "Tệp IFC thiếu phần bắt buộc của mô hình (tầng, phòng, cửa, tường hoặc sàn). Hãy xuất lại mô hình kiến trúc đầy đủ rồi tải lên.",
+  IFC_SOURCE_ALREADY_FAILED: "Tệp này đã được xử lý trước đó và không đạt. Hãy sửa mô hình theo các tiêu chí chưa đạt rồi tải tệp mới.",
+  IFC_ORG_JOB_RUNNING: "Tổ chức đang có một mô hình được xử lý. Hãy chờ lượt đó xong rồi gửi mô hình tiếp theo.",
+  IFC_PROCESS_DAILY_LIMIT: "Tổ chức đã dùng hết số lượt xử lý mô hình của hôm nay. Hãy thử lại vào ngày mai hoặc liên hệ FET3D để tăng hạn mức.",
+  IFC_PROCESSING_DISABLED: "FET3D đang tạm dừng xử lý mô hình mới cho tổ chức này. Hãy liên hệ hỗ trợ.",
+  // PC06 situations and quotation order (BE#215, BE#217)
+  PLAN_SCENARIO_COVERAGE_INCOMPLETE: "Hạ tầng PCCC này cần ít nhất một tình huống trong giờ và một tình huống ngoài giờ làm việc đạt thẩm định trước khi phát hành.",
+  QUOTE_REQUIRES_APPROVED_SCENARIO: "Công trình cần có ít nhất một tình huống đạt thẩm định trước khi xin báo giá.",
+  // fire infrastructure and expert review (BE#211, BE#213)
+  FIRE_INFRASTRUCTURE_OPEN_VERSION_EXISTS: "Bản IFC này đang có một phiên bản hạ tầng chưa thẩm định xong. Hãy mở phiên bản đó.",
+  FIRE_INFRASTRUCTURE_LOCKED: "Phiên bản hạ tầng này đã đạt thẩm định và bị khoá. Muốn sửa, hãy tạo phiên bản mới.",
+  FIRE_INFRASTRUCTURE_NOT_DRAFT: "Phiên bản hạ tầng này đã gửi thẩm định nên không sửa được nữa.",
+  FIRE_INFRASTRUCTURE_INVALID: "Hạ tầng PCCC còn chỗ chưa hợp lệ. Xem danh sách vấn đề rồi sửa.",
+  FIRE_INFRASTRUCTURE_NOT_APPROVED: "Hạ tầng PCCC của bản IFC này chưa đạt thẩm định nên chưa tạo được tình huống.",
+  FIRE_INFRASTRUCTURE_REVISION_MISMATCH: "Hạ tầng PCCC đã chọn thuộc một bản IFC khác. Hãy chọn lại.",
+  FIRE_INFRASTRUCTURE_NOT_PENDING: "Phiên bản hạ tầng này đã có kết quả thẩm định.",
+  SCENARIO_CONTAINS_INFRASTRUCTURE: "Tình huống đang chứa lối thoát hoặc thiết bị cố định. Các mục này thuộc Hạ tầng PCCC đã khoá; hãy xóa khỏi tình huống.",
+  CONTENT_REVIEW_NOT_PENDING: "Nội dung này đã có kết quả thẩm định.",
+  CONTENT_HASH_MISMATCH: "Nội dung đã thay đổi so với bản đang xem. Hãy tải lại rồi xem lại.",
+  // signed PC06 plan (BE#212)
+  SIGNED_PLAN_NOT_PDF: "Tệp phải là PDF.",
+  SIGNED_PLAN_UPLOAD_MISSING: "Chưa nhận được tệp. Hãy tải lại.",
+  SIGNED_PLAN_UPLOAD_CHANGED: "Tệp đã thay đổi trong lúc tải. Hãy tải lại.",
+  SIGNED_PLAN_UPLOAD_EXPIRED: "Lượt tải đã hết hạn. Hãy chọn tệp và tải lại.",
+  SIGNED_PLAN_STORAGE_UNAVAILABLE: "Kho lưu trữ đang bận. Hãy thử lại.",
 };
 
 /** Field errors: the API names the field, so the sentence can say which one without echoing English. */

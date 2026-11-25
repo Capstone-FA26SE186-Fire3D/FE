@@ -130,6 +130,15 @@ function fieldDetail(error: ApiError) {
   return first?.message ?? error.message;
 }
 
+const MISSING_GROUP: Record<string, string> = { IfcBuildingStorey: "tầng", IfcSpace: "phòng (không gian)", IfcDoor: "cửa", "IfcWall/IfcSlab": "tường hoặc sàn" };
+
+/** `errors.missing` of 422 IFC_PRECHECK_FAILED as plain words ("tầng, cửa"); a generic phrase when the list is absent. */
+export function missingGroups(errors: unknown): string {
+  const list = errors && typeof errors === "object" && !Array.isArray(errors) ? (errors as Record<string, unknown>).missing : undefined;
+  const names = Array.isArray(list) ? list.flatMap((item) => (typeof item === "string" && MISSING_GROUP[item] ? [MISSING_GROUP[item]] : [])) : [];
+  return names.length > 0 ? names.join(", ") : "phần bắt buộc của mô hình (tầng, phòng, cửa, tường hoặc sàn)";
+}
+
 /** Maps whatever a stage threw (ApiError, storage failure, offline) to an `IfcUploadError`. */
 export function classifyUploadError(stage: IfcUploadStage, cause: unknown): IfcUploadError {
   if (cause instanceof IfcUploadError) return cause;
@@ -149,6 +158,27 @@ export function classifyUploadError(stage: IfcUploadStage, cause: unknown): IfcU
     }
     if (cause.status === 410 || cause.code === "IFC_UPLOAD_EXPIRED") {
       return new IfcUploadError(stage, "Phiên tải lên đã hết hạn. Hãy bắt đầu lại để tạo phiên tải lên mới.", { ...base, restart: true });
+    }
+    if (cause.code === "IFC_UNSUPPORTED_SCHEMA") {
+      // 422 at upload-complete: the bytes are STEP but declare a schema the server does not accept. The Draft revision is deleted, so only a new upload helps.
+      const declared = cause.payload?.errors && !Array.isArray(cause.payload.errors) ? (cause.payload.errors as Record<string, unknown>).fileSchema : undefined;
+      const schema = Array.isArray(declared) && typeof declared[0] === "string" ? ` (tệp ghi “${declared[0]}”)` : "";
+      return new IfcUploadError(stage, `Tệp IFC dùng phiên bản hệ thống chưa nhận${schema}. Hãy xuất lại mô hình ở IFC2x3, IFC4 hoặc IFC4x3 rồi tải lên lại.`, { ...base, restart: true });
+    }
+    if (cause.code === "IFC_PRECHECK_FAILED") {
+      // 422 at upload-complete (BE#219): the STEP text has no storeys, spaces, doors or walls/slabs. The Draft revision is deleted.
+      return new IfcUploadError(stage, `Tệp IFC thiếu ${missingGroups(cause.payload?.errors)}. Hãy xuất lại mô hình kiến trúc đầy đủ rồi tải lên lại.`, { ...base, restart: true });
+    }
+    if (cause.code === "IFC_SOURCE_ALREADY_FAILED") {
+      // 409 at initiate (BE#219): the same bytes already failed processing in this Organization; no revision is created.
+      return new IfcUploadError(stage, "Tệp này đã được xử lý trước đó và không đạt. Hãy sửa mô hình theo các tiêu chí chưa đạt rồi tải tệp mới.", { ...base, restart: true });
+    }
+    if (cause.code === "IFC_ORG_JOB_RUNNING" || cause.code === "IFC_PROCESS_DAILY_LIMIT" || cause.code === "IFC_PROCESSING_DISABLED") {
+      // Organization limits on processing (BE#219): the file is uploaded; asking again later is the only way forward, so do not auto-retry.
+      return new IfcUploadError(stage, cause.message, base);
+    }
+    if (cause.code === "IFC_UPLOAD_INTENT_NOT_FOUND") {
+      return new IfcUploadError(stage, "Lượt tải này đã bị hủy vì tệp không hợp lệ. Hãy chọn tệp khác rồi bắt đầu lại.", { ...base, restart: true });
     }
     if (cause.code === "IFC_UNSUPPORTED_FORMAT") {
       // 400 at initiate (name is not .ifc) or 422 at upload-complete (bytes do not start with ISO-10303-21;): not an IFC file.

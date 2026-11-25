@@ -127,3 +127,51 @@ test("Accounts form receives Organization scope from the admin handoff", async (
   await expect(form.getByRole("combobox", { name: "Vai trò" })).toHaveText("Tài khoản tổ chức");
   await expect(form.getByRole("combobox", { name: "Tổ chức" })).toHaveText("Fire3D Lab");
 });
+
+test("PlatformAdmin sees today's IFC processing use and sets the daily limit of an Organization or of everyone (BE#219, mock)", async ({ page }) => {
+  // Evidence level: mock of BE `docs/processing-worker.md` (BE main @ f589374); not the real API.
+  let usage = { organizationId: "org-1", dailyLimit: 20, source: "Configuration", policyId: null as string | null, used: 3, remaining: 17, resetsAt: "2026-11-26T00:00:00Z" };
+  const posts: Array<Record<string, unknown>> = [];
+  await signIn(page);
+  await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [organization], totalCount: 1, page: 1, pageSize: 20 } }));
+  await page.route("**/api/organizations/org-1", (route) => route.fulfill({ json: organization }));
+  await page.route("**/api/admin/organizations/org-1/ifc-processing", (route) => route.fulfill({ json: usage }));
+  await page.route("**/api/admin/ifc-processing/policies", (route) => {
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    posts.push(body);
+    if (body.organizationId && body.dailyLimit !== null) usage = { ...usage, dailyLimit: body.dailyLimit as number, source: "Organization", policyId: "p-1", remaining: Math.max(0, (body.dailyLimit as number) - usage.used) };
+    else if (body.organizationId) usage = { ...usage, dailyLimit: 20, source: "Default", policyId: null, remaining: 17 };
+    return route.fulfill({ status: 201, json: { id: "p-1", organizationId: body.organizationId ?? null, policyKind: "DailyGeometryRuns", dailyLimit: body.dailyLimit, effectiveFrom: "2026-11-25T00:00:00Z", note: body.note ?? null, createdAt: "2026-11-25T00:00:00Z" } });
+  });
+
+  await page.goto("/admin/organizations?organization=org-1");
+  const panel = page.getByTestId("ifc-processing-limit");
+  await expect(panel).toContainText("20 lượt");
+  await expect(panel).toContainText("mức chung cho mọi tổ chức");
+  await expect(panel).toContainText("3 lượt, còn 17 lượt");
+  await expect(panel.getByTestId("ifc-limit-reset")).toHaveCount(0); // nothing to reset while the default applies
+
+  await panel.getByTestId("ifc-limit-edit").click();
+  await panel.getByTestId("ifc-limit-input").fill("2,5");
+  await panel.getByTestId("ifc-limit-save").click();
+  await expect(panel.getByRole("alert")).toContainText("Nhập số nguyên từ 0 đến");
+  expect(posts).toHaveLength(0);
+  await panel.getByTestId("ifc-limit-input").fill("5");
+  await panel.getByTestId("ifc-limit-save").click();
+  await expect(panel).toContainText("5 lượt");
+  await expect(panel).toContainText("mức riêng của tổ chức này");
+  expect(posts[0]).toEqual({ organizationId: "org-1", dailyLimit: 5 });
+
+  // Removing the override is a version with dailyLimit null for that Organization.
+  await panel.getByTestId("ifc-limit-reset").click();
+  await expect(panel).toContainText("mức chung cho mọi tổ chức");
+  expect(posts[1]).toEqual({ organizationId: "org-1", dailyLimit: null });
+
+  // The default of every Organization carries no organizationId.
+  await panel.getByTestId("ifc-limit-edit").click();
+  await panel.getByTestId("ifc-limit-target").selectOption("default");
+  await panel.getByTestId("ifc-limit-input").fill("0");
+  await panel.getByTestId("ifc-limit-save").click();
+  await expect.poll(() => posts.length).toBe(3);
+  expect(posts[2]).toEqual({ dailyLimit: 0 });
+});

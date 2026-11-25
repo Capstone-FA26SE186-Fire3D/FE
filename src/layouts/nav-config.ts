@@ -8,7 +8,7 @@ export type NavStatus = "pending-be";
 export type NavItem = { href: string; label: string; icon: LucideIcon; group?: string; status?: NavStatus };
 
 export type OperationsArea = {
-  id: "organization" | "admin";
+  id: "organization" | "admin" | "expert";
   label: string;
   brandSubtitle: string;
   navLabel: string;
@@ -45,6 +45,24 @@ export const organizationArea: OperationsArea = {
   secondaryLink: { href: routes.learn, label: "Khám phá bài học", icon: BookOpen },
 };
 
+/** FireSafetyExpert: the API allows this role only /api/expert, /api/auth and /api/me, so the area holds the review queue and nothing else. */
+export const expertArea: OperationsArea = {
+  id: "expert",
+  label: "Thẩm định PCCC",
+  brandSubtitle: "Chuyên viên PCCC",
+  navLabel: "Thẩm định PCCC",
+  allowedRoles: [3],
+  signInPrompt: "Đăng nhập bằng tài khoản Chuyên viên PCCC để thẩm định hạ tầng và tình huống.",
+  deniedMessage: "Khu này chỉ dành cho Chuyên viên PCCC.",
+  deniedHref: routes.home,
+  deniedLabel: "Về trang chủ",
+  nav: [
+    { href: routes.expertReviews, label: "Hàng chờ thẩm định", icon: ClipboardCheck, group: "Thẩm định" },
+    { href: routes.account, label: "Tài khoản", icon: UserRound, group: "Cá nhân" },
+  ],
+  secondaryLink: { href: routes.home, label: "Về trang chủ", icon: Home },
+};
+
 export const adminArea: OperationsArea = {
   id: "admin",
   label: "Quản trị hệ thống",
@@ -57,7 +75,7 @@ export const adminArea: OperationsArea = {
   deniedLabel: "Về trang chủ",
   nav: [
     { href: routes.adminOverview, label: "Tổng quan", icon: LayoutDashboard, group: "Xử lý công việc" },
-    { href: routes.adminReviews, label: "Duyệt kịch bản", icon: ClipboardCheck, group: "Xử lý công việc" },
+    { href: routes.adminReviews, label: "Theo dõi thẩm định", icon: ClipboardCheck, group: "Xử lý công việc" },
     { href: routes.adminSupport, label: "Hỗ trợ & nhật ký", icon: LifeBuoy, group: "Xử lý công việc" },
     { href: routes.adminAccounts, label: "Tài khoản", icon: Users, group: "Quản lý hệ thống" },
     { href: routes.adminOrganizations, label: "Tổ chức", icon: Landmark, group: "Quản lý hệ thống" },

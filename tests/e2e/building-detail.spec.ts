@@ -18,7 +18,7 @@ const VALID_IFC = `${IFC_HEADER}#1=IFCBUILDINGSTOREY('s');\n#2=IFCSPACE('r');\n#
 
 const owner = { id: "owner", email: "owner@fire3d.test", fullName: "Nguyễn Văn A", username: "nguyen.van.a", role: 1, organizationId: "org-1", profileRevision: 1 };
 const admin = { id: "admin", email: "admin@fire3d.test", fullName: "Platform Admin", role: 0, organizationId: null, profileRevision: 1 };
-const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "Trường học", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: { id: "loc-1", address: "1 Test Street", city: "Hà Nội", district: "Cầu Giấy", latitude: null, longitude: null, geojson: null }, contact: null };
+const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "School", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: { id: "loc-1", address: "1 Test Street", city: "Hà Nội", district: "Cầu Giấy", latitude: null, longitude: null, geojson: null }, contact: null };
 const rev1 = { id: "rev-1", buildingId: "building-1", versionLabel: "IFC rev. 01", status: "ReadyForScenario", createdAt: "2026-10-01T00:00:00Z", sourceDocument: { id: "src-1", originalFilename: "school.ifc", fileSizeBytes: 128, quarantineStatus: "Accepted", createdAt: "2026-10-01T00:00:00Z" } };
 const rev2 = { id: "rev-2", buildingId: "building-1", versionLabel: "IFC rev. 02", status: "Uploaded", createdAt: "2026-10-02T00:00:00Z", sourceDocument: { id: "src-2", originalFilename: "school2.ifc", fileSizeBytes: 256, quarantineStatus: "Accepted", createdAt: "2026-10-02T00:00:00Z" } };
 const page1 = <T,>(items: T[]) => ({ items, totalCount: items.length, page: 1, pageSize: 20 });
@@ -784,7 +784,7 @@ test.describe("journey info card edit", () => {
 
 test.describe("PlatformAdmin by organization", () => {
   const orgs = { items: [{ id: "org-1", name: "FET3D Lab", slug: "fet3d-lab", isActive: true, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" }, { id: "org-2", name: "Trường ABC", slug: "abc", isActive: true, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" }], totalCount: 2, page: 1, pageSize: 100 };
-  const summary = { id: "building-1", name: "Trường Tiểu học", buildingType: "Trường học", totalFloors: 3, isActive: true, createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z" };
+  const summary = { id: "building-1", name: "Trường Tiểu học", buildingType: "School", totalFloors: 3, isActive: true, createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z" };
 
   test("lists, creates and archives buildings of the selected organization through organizationId", async ({ page }) => {
     await signIn(page, admin);
@@ -935,5 +935,52 @@ test.describe("helpers", () => {
     expect(safeNext("/admin/organizations/org-1/other")).toBe("/learning-hub");
     expect(postLoginRoute({ role: 0 }, "/admin/organizations/org-1/buildings")).toBe("/admin/organizations/org-1/buildings");
     expect(postLoginRoute({ role: 1 }, "/admin/organizations/org-1/buildings")).toBe("/workspace/buildings");
+  });
+});
+
+test.describe("plan dossier (BE#215, mock)", () => {
+  // Evidence level: mock of `GET /api/buildings/{id}/plan-dossier` as in BE docs/plan-dossier.md (BE main @ f589374); not the real API.
+  const item = (id: string, label: string, capability?: string) => ({ id, label, kind: capability ? "Equipment" : "Goal", placement: { floorId: "L1" }, ...(capability ? { capability: { id: capability, version: "1.0.0" } } : {}) });
+  const dossier = {
+    buildingId: "building-1", generatedAt: "2026-11-25T03:00:00Z", signedPlanDocumentId: null,
+    header: { name: "Trường Tiểu học", address: "12 Lê Lợi, Quận 1, TP. Hồ Chí Minh", phone: "0281234567", year: 2026 },
+    siteLayout: { revisionId: "rev-1", infrastructureId: "infra-1", infrastructureVersion: 2, exits: [item("exit-1", "Cửa thoát phía Đông")], assemblyPoints: [item("ap-1", "Sân trường")] },
+    facility: { name: "Trường Tiểu học", facilityHeadName: "Trần Thị B", facilityHeadPhone: "0900000001", onSiteForce: { teamSize: 10, leaderName: "Lê Văn C", leaderPhone: null, availableInHours: true, availableOffHours: false },
+      emergencyContacts: [{ name: "Cảnh sát PCCC", phone: "114", role: null }], equipment: [{ catalogKey: "extinguisher.portable", count: 6 }], waterSources: [] },
+    hazard: { buildingType: "School", riskGroup: "Group2", totalFloors: 3, floorAreaSquareMeters: 2400 },
+    scenarios: [{ number: 1, scenarioId: "sc-1", scenarioName: "Cháy bếp căng tin", scenarioVersionId: "sv-1", versionNumber: 2, audience: "Evacuee", assumption: { time: "10 giờ thứ Hai", location: "Bếp tầng 1", cause: "Chập điện", peoplePresent: 120 }, workingHours: "InHours", reviewStatus: "Approved", reviewedAt: "2026-11-24T08:00:00Z" }],
+    coverage: { inHours: true, offHours: false, complete: false },
+    history: [{ id: "infra-1", version: 2, status: "Approved", submittedAt: "2026-11-23T08:00:00Z", decidedAt: "2026-11-24T02:00:00Z" }],
+  };
+
+  test("shows the PC06 sections from the locked infrastructure and says which situation is still missing", async ({ page }) => {
+    await signIn(page);
+    await mockBuilding(page);
+    await page.route("**/api/buildings/building-1/plan-dossier*", (route) => route.fulfill({ json: dossier }));
+    await page.goto("/workspace/buildings/building-1?tab=ifc&sub=dossier");
+    const view = page.getByTestId("plan-dossier");
+    await expect(view.getByText("Bản tham khảo")).toBeVisible();
+    await expect(view.getByTestId("dossier-site")).toContainText("Phiên bản 2 (đã khoá)");
+    await expect(view.getByTestId("dossier-site")).toContainText("Cửa thoát phía Đông (tầng L1)");
+    await expect(view).toContainText("10 người, đội trưởng Lê Văn C (trong giờ)");
+    await expect(view).toContainText("Nhóm 2");
+    await expect(view).toContainText("Bình chữa cháy xách tay: 6");
+    const row = view.getByTestId("dossier-scenario");
+    await expect(row).toContainText("Cháy bếp căng tin");
+    await expect(row).toContainText("Người thoát nạn");
+    await expect(row).toContainText("Trong giờ làm việc");
+    await expect(row).toContainText("120 người có mặt");
+    await expect(row).toContainText("Đạt thẩm định");
+    await expect(view.getByTestId("dossier-scenarios")).toContainText("Còn thiếu một tình huống ngoài giờ làm việc đạt thẩm định");
+  });
+
+  test("without a locked infrastructure it explains what to do instead of showing empty sections", async ({ page }) => {
+    await signIn(page);
+    await mockBuilding(page);
+    await page.route("**/api/buildings/building-1/plan-dossier*", (route) => route.fulfill({ json: { ...dossier, siteLayout: null, scenarios: [], coverage: { inHours: false, offHours: false }, history: [] } }));
+    await page.goto("/workspace/buildings/building-1?tab=ifc&sub=dossier");
+    const view = page.getByTestId("plan-dossier");
+    await expect(view.getByText("Công trình chưa có Hạ tầng PCCC đạt thẩm định")).toBeVisible();
+    await expect(view.getByText("Chưa có tình huống nào trên hạ tầng này.")).toBeVisible();
   });
 });
