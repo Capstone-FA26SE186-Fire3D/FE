@@ -12,6 +12,8 @@ import type { Building } from "../../src/features/buildings/types";
 import { lockedVersion, toEditorState, toUpdateBody, type FireInfrastructure } from "../../src/features/fire-infrastructure/api";
 import { coverageGap } from "../../src/features/fire-infrastructure/plan-dossier";
 import { buildApplyPlan } from "../../src/features/org-ai/apply-plan";
+import { plainLimitation } from "../../src/features/org-ai/labels";
+import { scenarioDraftBody } from "../../src/features/org-ai/scenario-draft-body";
 import type { JsonObject } from "../../src/features/scenario-editor/store/json";
 import { capabilityAllowed, categoryOf, isInfrastructureObject, itemPathToObjectPath, itemsToObjects, objectsToItems, scopeKinds } from "../../src/features/scenario-editor/v1/scope";
 import { completenessIssues, shapeIssues, situationIssues } from "../../src/features/scenario-editor/v1/state";
@@ -292,6 +294,27 @@ test.describe("AI proposal on a PC06 situation (BE#213, BE#215)", () => {
   const proposal: JsonObject = { schemaVersion: "fet3d.editor/1", geometry: pin, audience: "Evacuee", assumption: { time: "8 giờ", location: "Bếp", cause: "Chập điện", peoplePresent: 30 },
     objects: [object("spawn-a", "Spawn"), object("exit-a", "Goal"), object("ext-a", "Equipment", "extinguisher.portable"), object("towel-a", "Equipment", "item.towel"), object("lock-a", "Equipment", "door.exit_locked")] };
   const draft: JsonObject = { schemaVersion: "fet3d.editor/1", geometry: pin, objects: [] };
+
+  test("a proposal asked from an open situation names its fire infrastructure (BE#231)", () => {
+    expect(scenarioDraftBody("b1", "Cháy bếp")).toEqual({ buildingId: "b1", prompt: "Cháy bếp" });
+    expect(scenarioDraftBody("b1", "Cháy bếp", { buildingId: "b1", infrastructureId: "infra-2" })).toEqual({ buildingId: "b1", prompt: "Cháy bếp", infrastructureId: "infra-2" });
+    // The assistant can be pointed at another Building while a situation is open: that Building's own infrastructure applies.
+    expect(scenarioDraftBody("b2", "Cháy bếp", { buildingId: "b1", infrastructureId: "infra-2" })).toEqual({ buildingId: "b2", prompt: "Cháy bếp" });
+  });
+
+  test("the server's note on missing PC06 fields is shown with the form's labels, never with field names (BE#231)", () => {
+    const all = plainLimitation("Bản nháp chưa có audience, workingHours, assumption.time, assumption.location, assumption.cause, assumption.peoplePresent: cần điền trước khi lưu (đối tượng, trong/ngoài giờ, giả định).");
+    expect(all).toBe("Bản nháp còn thiếu: đối tượng luyện tập, thời gian xảy ra (trong giờ hoặc ngoài giờ), thời điểm, vị trí xảy ra cháy, nguyên nhân, số người có mặt. Hãy điền ở nhóm “Giả định của tình huống” trước khi lưu.");
+    expect(all).not.toMatch(/audience|workingHours|assumption/);
+    expect(plainLimitation("Bản nháp chưa có assumption: cần điền trước khi lưu (đối tượng, trong/ngoài giờ, giả định).")).toContain("còn thiếu: giả định của tình huống.");
+    // A field this version does not know is not printed by its path.
+    const unknown = plainLimitation("Bản nháp chưa có workingHours, evacuationPlan.leader: cần điền trước khi lưu (…).");
+    expect(unknown).toContain("thời gian xảy ra (trong giờ hoặc ngoài giờ) và mục khác");
+    expect(unknown).not.toContain("evacuationPlan");
+    expect(plainLimitation("Bản nháp chưa có somethingNew: cần điền trước khi lưu.")).toContain("một số mục bắt buộc");
+    // Every other line is the AI's or the server's own sentence and stays as written.
+    for (const line of ["Không xét nhà xưởng", "Đã bỏ 3 đối tượng thuộc hạ tầng PCCC (1 lối thoát/điểm tập kết, 2 thiết bị cố định): tình huống dùng các đối tượng này từ hạ tầng đã thẩm định."]) expect(plainLimitation(line)).toBe(line);
+  });
 
   test("exits and fixed equipment are not offered; scenario objects and door states are", () => {
     const plan = buildApplyPlan(proposal, draft, new Set(["f1"]), "scenario-on-infrastructure");

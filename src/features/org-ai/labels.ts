@@ -7,6 +7,33 @@ const OPERATION: Record<string, string> = { ScenarioDraft: "Đề xuất kịch 
 export const operationLabel = (operation: string) => OPERATION[operation] ?? "Thao tác khác";
 const AUDIENCE: Record<string, string> = { organization: "Tổ chức", trainee: "Học viên" };
 export const audienceLabel = (audience: string) => AUDIENCE[audience] ?? "Khác";
+// The names the situation form shows for the PC06 fields (`v1-scenario-form.tsx`, group "Giả định của tình huống").
+const PLAN_FIELD: Record<string, string> = {
+  audience: "đối tượng luyện tập",
+  workingHours: "thời gian xảy ra (trong giờ hoặc ngoài giờ)",
+  assumption: "giả định của tình huống",
+  "assumption.time": "thời điểm",
+  "assumption.location": "vị trí xảy ra cháy",
+  "assumption.cause": "nguyên nhân",
+  "assumption.peoplePresent": "số người có mặt",
+};
+const MISSING_PLAN_FIELDS = /^Bản nháp chưa có (.+?): cần điền trước khi lưu/;
+
+/**
+ * A limitation line as the reader sees it. The server names the PC06 fields a draft still lacks by their field paths
+ * (BE#231: "Bản nháp chưa có audience, workingHours, assumption.time: …"); here they become the labels of the situation
+ * form. A path this list does not know is not printed. Any other line is returned unchanged.
+ */
+export function plainLimitation(text: string): string {
+  const match = MISSING_PLAN_FIELDS.exec(text.trim());
+  if (!match) return text;
+  const paths = match[1].split(",").map((item) => item.trim()).filter(Boolean);
+  const names = Array.from(new Set(paths.flatMap((path) => (PLAN_FIELD[path] ? [PLAN_FIELD[path]] : []))));
+  const other = paths.some((path) => !PLAN_FIELD[path]);
+  const list = names.length === 0 ? "một số mục bắt buộc" : `${names.join(", ")}${other ? " và mục khác" : ""}`;
+  return `Bản nháp còn thiếu: ${list}. Hãy điền ở nhóm “Giả định của tình huống” trước khi lưu.`;
+}
+
 const CONFIDENCE: Record<string, string> = { low: "Thấp", medium: "Trung bình", high: "Cao" };
 export const confidenceLabel = (value: string) => CONFIDENCE[value] ?? "Không rõ";
 

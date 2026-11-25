@@ -80,6 +80,8 @@ export type AiRequestInput = {
   buildingId?: string | null;
   buildingName?: string | null;
   revisionId?: string | null;
+  /** BE#231: the Approved fire infrastructure the request was pinned to; absent on a Building without one. */
+  infrastructureId?: string | null;
   requestedSources?: AiSourceRef[];
   context?: Record<string, unknown> | null;
 };
@@ -148,7 +150,7 @@ export type AdminAiRequestFilters = { status?: string; operation?: string; audie
 
 export type AnswerInput = { question: string; sources?: AiSourceRef[] };
 /** `revisionId` pins one accepted-geometry revision; without it the BE takes the newest such revision (none → 409 AI_REVISION_NOT_READY). */
-export type ScenarioDraftInput = { buildingId: string; prompt: string; sources?: AiSourceRef[]; revisionId?: string };
+export type ScenarioDraftInput = { buildingId: string; prompt: string; sources?: AiSourceRef[]; revisionId?: string; infrastructureId?: string };
 
 /** `GET /api/ai/organization/limits` item: what one request reserves now and whether the pooled balance covers it. */
 export type AiOperationLimit = {
