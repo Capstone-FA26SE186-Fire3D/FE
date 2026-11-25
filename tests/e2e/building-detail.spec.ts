@@ -16,6 +16,9 @@ const IFC_HEADER = "ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION(('ViewDefinition [R
 /** Smallest text the in-browser pre-check accepts: a storey, a room, a door and a wall. */
 const VALID_IFC = `${IFC_HEADER}#1=IFCBUILDINGSTOREY('s');\n#2=IFCSPACE('r');\n#3=IFCDOOR('d');\n#4=IFCWALL('w');\nENDSEC;\nEND-ISO-10303-21;\n`;
 
+/** Two storeys, a room on each (linked by IfcRelAggregates), no stair, lengths in millimetres. */
+const TWO_STOREY_IFC = `${IFC_HEADER}#5=IFCSIUNIT(*,.LENGTHUNIT.,.MILLI.,.METRE.);\n#10=IFCBUILDINGSTOREY('s1');\n#11=IFCBUILDINGSTOREY('s2');\n#20=IFCSPACE('r1');\n#21=IFCSPACE('r2');\n#30=IFCDOOR('d');\n#31=IFCWALL('w');\n#32=IFCRELAGGREGATES('a1',#2,$,$,#10,(#20));\n#33=IFCRELAGGREGATES('a2',#2,$,$,#11,(#21));\nENDSEC;\nEND-ISO-10303-21;\n`;
+
 const owner = { id: "owner", email: "owner@fire3d.test", fullName: "Nguyễn Văn A", username: "nguyen.van.a", role: 1, organizationId: "org-1", profileRevision: 1 };
 const admin = { id: "admin", email: "admin@fire3d.test", fullName: "Platform Admin", role: 0, organizationId: null, profileRevision: 1 };
 const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "School", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: { id: "loc-1", address: "1 Test Street", city: "Hà Nội", district: "Cầu Giấy", latitude: null, longitude: null, geojson: null }, contact: null };
@@ -278,6 +281,26 @@ test.describe("IFC upload stepper", () => {
     await expect(criteria.filter({ hasText: "Có khai báo tầng" })).toHaveAttribute("data-state", "pass");
     await expect(page.getByRole("button", { name: "Tải lên và xử lý" })).toBeEnabled();
   });
+
+  test("rooms on two storeys without a stair block the upload; a file in millimetres only gets a note", async ({ page, baseURL }) => {
+    const log = await setup(page, baseURL!);
+    await page.getByLabel("Tên bản IFC").fill("IFC rev. 03");
+    await page.getByLabel("Chọn tệp IFC").setInputFiles(ifc("hai-tang.ifc", TWO_STOREY_IFC));
+    const criteria = page.getByTestId("ifc-criteria").getByRole("listitem");
+    const stair = criteria.filter({ hasText: "Nhiều tầng thì có cầu thang" });
+    await expect(stair).toHaveAttribute("data-state", "fail");
+    await expect(stair).toContainText("2 tầng có phòng nhưng không có cầu thang");
+    await expect(criteria.filter({ hasText: "Đơn vị đo là mét" })).toHaveAttribute("data-state", "warn");
+    await expect(criteria.filter({ hasText: "Đơn vị đo là mét" })).toContainText("milimét");
+    await expect(page.getByRole("button", { name: "Tải lên và xử lý" })).toBeDisabled();
+    expect(log.initiates).toHaveLength(0);
+
+    // The same model with a stair: the unit note stays and does not stop the upload.
+    await page.getByLabel("Chọn tệp IFC").setInputFiles(ifc("hai-tang.ifc", TWO_STOREY_IFC.replace("ENDSEC;\nEND-ISO", "#40=IFCSTAIR('st');\nENDSEC;\nEND-ISO")));
+    await expect(stair).toHaveAttribute("data-state", "pass");
+    await expect(criteria.filter({ hasText: "Đơn vị đo là mét" })).toHaveAttribute("data-state", "warn");
+    await expect(page.getByRole("button", { name: "Tải lên và xử lý" })).toBeEnabled();
+  });
 });
 
 test.describe("IFC pre-check (in the browser, before upload)", () => {
@@ -323,6 +346,48 @@ test.describe("IFC pre-check (in the browser, before upload)", () => {
     const aborted = new AbortController();
     aborted.abort();
     await expect(scanIfcContent(file("a.ifc", VALID_IFC), { signal: aborted.signal })).rejects.toThrow();
+  });
+
+  test("stairs: storeys with rooms decide; a roof level without rooms does not make one floor multi-storey", async () => {
+    const stairRow = async (body: string) => {
+      const result = await precheckIfcFile(file("a.ifc", body));
+      if (result.stage !== "content") throw new Error("header rejected");
+      return { status: result.status, occupied: result.counts.occupiedStoreys, row: result.criteria.find((item) => item.id === "stair")! };
+    };
+    const blocked = await stairRow(TWO_STOREY_IFC);
+    expect(blocked).toMatchObject({ status: "blocked", occupied: 2, row: { passed: false, blocking: true } });
+    expect(blocked.row.detail).toContain("2 tầng có phòng");
+
+    // The second storey keeps a slab but has no room (a roof level): one floor, nothing to join.
+    const roof = await stairRow(TWO_STOREY_IFC.replace("#33=IFCRELAGGREGATES('a2',#2,$,$,#11,(#21));\n", "").replace("#21=IFCSPACE('r2');\n", "#21=IFCSLAB('roof');\n"));
+    expect(roof).toMatchObject({ status: "passed", occupied: 1, row: { passed: true, detail: "Chỉ một tầng có phòng" } });
+
+    // A ramp flight joins the storeys like a stair; the relations may come before the storeys they name; an instance may wrap lines.
+    expect((await stairRow(TWO_STOREY_IFC.replace("#30=IFCDOOR", "#29=IFCRAMPFLIGHT('ramp');\n#30=IFCDOOR"))).row.passed).toBe(true);
+    const reordered = TWO_STOREY_IFC.replace("#32=IFCRELAGGREGATES('a1',#2,$,$,#10,(#20));\n#33=IFCRELAGGREGATES('a2',#2,$,$,#11,(#21));\n", "").replace("#5=IFCSIUNIT", "#32=IFCRELAGGREGATES('a1',#2,$,$,#10,\n (#20));\n#33= IFCRELAGGREGATES ('a2', #2, $, $, #11, (#21) );\n#5=IFCSIUNIT");
+    expect(await stairRow(reordered)).toMatchObject({ status: "blocked", occupied: 2 });
+
+    // No link between rooms and storeys in the file: the browser cannot be sure, so it only warns and the worker decides.
+    const unlinked = await stairRow(TWO_STOREY_IFC.replace(/#3[23]=IFCRELAGGREGATES[^\n]*\n/g, ""));
+    expect(unlinked).toMatchObject({ status: "passed", occupied: undefined, row: { passed: false, blocking: false } });
+  });
+
+  test("unit: millimetres and feet are a note, metres pass, an unreadable unit adds no row", async () => {
+    const unitRow = async (body: string) => {
+      const result = await precheckIfcFile(file("a.ifc", body));
+      return result.stage === "content" ? result.criteria.find((item) => item.id === "unit") : undefined;
+    };
+    const withUnit = (unit: string) => VALID_IFC.replace("#1=IFCBUILDINGSTOREY", `${unit}\n#1=IFCBUILDINGSTOREY`);
+    expect(await unitRow(VALID_IFC)).toBeUndefined();
+    expect(await unitRow(withUnit("#90=IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.);"))).toMatchObject({ passed: true, detail: "Mét" });
+    const millimetre = await unitRow(withUnit("#90=IFCSIUNIT(*,.LENGTHUNIT.,.MILLI.,.METRE.);\n#91=IFCSIUNIT(*,.AREAUNIT.,$,.SQUARE_METRE.);"));
+    expect(millimetre).toMatchObject({ passed: false, blocking: false });
+    expect(millimetre?.detail).toContain("milimét");
+    // A foot is defined from the metre, so both units are in the file; the conversion-based one is the model's.
+    const foot = await unitRow(withUnit("#90=IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.);\n#91=IFCCONVERSIONBASEDUNIT(#92,.LENGTHUNIT.,'FOOT',#93);"));
+    expect(foot?.detail).toContain("foot");
+    // Two SI length units without telling which one the project uses: say nothing rather than guess.
+    expect(await unitRow(withUnit("#90=IFCSIUNIT(*,.LENGTHUNIT.,$,.METRE.);\n#91=IFCSIUNIT(*,.LENGTHUNIT.,.MILLI.,.METRE.);"))).toBeUndefined();
   });
 });
 

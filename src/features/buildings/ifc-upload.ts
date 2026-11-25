@@ -1,4 +1,5 @@
 import { ApiError } from "@/api/types/common";
+import { qaGuide } from "./qa-codes";
 import { sha256OfFile } from "./sha256";
 
 export const IFC_UPLOAD_MIME = "application/octet-stream";
@@ -105,8 +106,10 @@ export class IfcUploadError extends Error {
   readonly retryable: boolean;
   readonly renewUrl: boolean;
   readonly restart: boolean;
+  /** 409 IFC_ORG_JOB_RUNNING: the processing run that holds the Organization's single slot. */
+  readonly jobId?: string;
 
-  constructor(stage: IfcUploadStage, message: string, flags: { code?: string; status?: number; retryAfterSeconds?: number; retryable?: boolean; renewUrl?: boolean; restart?: boolean } = {}) {
+  constructor(stage: IfcUploadStage, message: string, flags: { code?: string; status?: number; retryAfterSeconds?: number; retryable?: boolean; renewUrl?: boolean; restart?: boolean; jobId?: string } = {}) {
     super(message);
     this.name = "IfcUploadError";
     this.stage = stage;
@@ -116,6 +119,7 @@ export class IfcUploadError extends Error {
     this.retryable = flags.retryable ?? false;
     this.renewUrl = flags.renewUrl ?? false;
     this.restart = flags.restart ?? false;
+    this.jobId = flags.jobId;
   }
 }
 
@@ -137,6 +141,50 @@ export function missingGroups(errors: unknown): string {
   const list = errors && typeof errors === "object" && !Array.isArray(errors) ? (errors as Record<string, unknown>).missing : undefined;
   const names = Array.isArray(list) ? list.flatMap((item) => (typeof item === "string" && MISSING_GROUP[item] ? [MISSING_GROUP[item]] : [])) : [];
   return names.length > 0 ? names.join(", ") : "phần bắt buộc của mô hình (tầng, phòng, cửa, tường hoặc sàn)";
+}
+
+const errorField = (errors: unknown, key: string): unknown => (errors && typeof errors === "object" && !Array.isArray(errors) ? (errors as Record<string, unknown>)[key] : undefined);
+const firstText = (value: unknown): string | undefined => (typeof value === "string" ? value : Array.isArray(value) && typeof value[0] === "string" ? value[0] : undefined);
+
+/** `errors.qaCodes` of 409 IFC_SOURCE_ALREADY_FAILED as the plain titles of the failed checks; empty when none is known. */
+export function failedChecks(errors: unknown): string[] {
+  const codes = errorField(errors, "qaCodes");
+  return Array.isArray(codes) ? Array.from(new Set(codes.flatMap((code) => (typeof code === "string" ? [qaGuide(code)?.title.toLowerCase() ?? ""] : [])).filter(Boolean))) : [];
+}
+
+/** When the daily runs come back, as a clock time on the reader's machine ("07:00 ngày mai"); empty when the server gave no wait. */
+export function limitResetText(retryAfterSeconds: number | undefined, now = new Date()): string {
+  if (!retryAfterSeconds || retryAfterSeconds <= 0) return "";
+  const at = new Date(now.getTime() + retryAfterSeconds * 1000);
+  const clock = `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
+  return `${clock} ${at.toDateString() === now.toDateString() ? "hôm nay" : "ngày mai"}`;
+}
+
+const DAILY_LIMIT_TEXT = (retryAfterSeconds: number | undefined) => {
+  const reset = limitResetText(retryAfterSeconds);
+  return `Tổ chức đã dùng hết số lượt xử lý mô hình của hôm nay. ${reset ? `Lượt mới có lại lúc ${reset}.` : "Lượt mới có lại vào ngày mai."} Tệp đã được lưu, không cần tải lại; khi có lượt, hãy gửi xử lý bản IFC này. Cần thêm lượt sớm hơn, hãy liên hệ FET3D.`;
+};
+
+/**
+ * A failure of `POST /api/revisions/{id}/process`, the last step: the file is already stored. The Organization's limits
+ * (BE#219) get their own sentence and no automatic retry: only waiting helps. Anything else may be sent again.
+ */
+export function classifyProcessError(cause: unknown): IfcUploadError {
+  const info = cause as { status?: number; code?: string; retryAfterSeconds?: number; message?: string; payload?: { errors?: unknown } } | undefined;
+  const base = { code: info?.code, status: info?.status };
+  if (info?.code === "IFC_PROCESS_DAILY_LIMIT") return new IfcUploadError("complete", DAILY_LIMIT_TEXT(info.retryAfterSeconds), base);
+  if (info?.code === "IFC_ORG_JOB_RUNNING") {
+    return new IfcUploadError("complete", "Tổ chức đang có một mô hình khác được xử lý, mỗi lúc chỉ xử lý một mô hình. Tệp này đã được lưu, không cần tải lại; khi lượt kia xong, hãy gửi xử lý bản IFC này.", { ...base, jobId: firstText(errorField(info.payload?.errors, "jobId")) });
+  }
+  if (info?.code === "IFC_PROCESSING_DISABLED") {
+    return new IfcUploadError("complete", "FET3D đang tạm dừng xử lý mô hình mới cho tổ chức này. Tệp đã được lưu; hãy liên hệ hỗ trợ để được mở lại.", base);
+  }
+  const transient = info?.status === undefined || info.status === 429 || info.status === 502 || info.status === 503 || info.status === 504 || cause instanceof TypeError;
+  const message = info?.status === 409 ? "IFC đã được lưu nhưng bản IFC này chưa nhận thêm yêu cầu xử lý lúc này (có thể đang được xử lý)."
+    : info?.status === 400 && info.code === "IDEMPOTENCY_KEY_REQUIRED" ? "Yêu cầu xử lý chưa hợp lệ. Hãy thử lại."
+    : cause instanceof TypeError ? "IFC đã được lưu nhưng mất kết nối khi gửi yêu cầu xử lý. Hãy thử lại."
+    : "IFC đã được lưu nhưng chưa gửi được yêu cầu xử lý. Hãy thử lại.";
+  return new IfcUploadError("complete", message, { ...base, retryAfterSeconds: info?.retryAfterSeconds, retryable: transient });
 }
 
 /** Maps whatever a stage threw (ApiError, storage failure, offline) to an `IfcUploadError`. */
@@ -171,11 +219,14 @@ export function classifyUploadError(stage: IfcUploadStage, cause: unknown): IfcU
     }
     if (cause.code === "IFC_SOURCE_ALREADY_FAILED") {
       // 409 at initiate (BE#219): the same bytes already failed processing in this Organization; no revision is created.
-      return new IfcUploadError(stage, "Tệp này đã được xử lý trước đó và không đạt. Hãy sửa mô hình theo các tiêu chí chưa đạt rồi tải tệp mới.", { ...base, restart: true });
+      const failed = failedChecks(cause.payload?.errors);
+      return new IfcUploadError(stage, failed.length > 0
+        ? `Tệp này đã được xử lý trước đó và không đạt: ${failed.join("; ")}. Hãy sửa mô hình rồi tải tệp mới.`
+        : "Tệp này đã được xử lý trước đó và không đạt. Hãy sửa mô hình theo các tiêu chí chưa đạt rồi tải tệp mới.", { ...base, restart: true });
     }
     if (cause.code === "IFC_ORG_JOB_RUNNING" || cause.code === "IFC_PROCESS_DAILY_LIMIT" || cause.code === "IFC_PROCESSING_DISABLED") {
-      // Organization limits on processing (BE#219): the file is uploaded; asking again later is the only way forward, so do not auto-retry.
-      return new IfcUploadError(stage, cause.message, base);
+      // Organization limits on processing (BE#219): asking again later is the only way forward, so do not auto-retry.
+      return classifyProcessError(cause);
     }
     if (cause.code === "IFC_UPLOAD_INTENT_NOT_FOUND") {
       return new IfcUploadError(stage, "Lượt tải này đã bị hủy vì tệp không hợp lệ. Hãy chọn tệp khác rồi bắt đầu lại.", { ...base, restart: true });
