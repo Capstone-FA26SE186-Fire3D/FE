@@ -1,6 +1,7 @@
 "use client";
 
 import { CircleCheck, FileUp, RotateCcw, TriangleAlert, Upload, X } from "lucide-react";
+import Link from "next/link";
 import { useId, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { useNow } from "@/api/use-now";
@@ -11,6 +12,7 @@ import { Field, Input } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { SupportCode } from "@/components/ui/support-code";
 import { cn } from "@/utils/cn";
+import { routes } from "@/configs/routes";
 import { ifcProcessingApi, usageText } from "@/features/organizations/ifc-processing";
 
 import { buildingsApi } from "../api";
@@ -80,6 +82,12 @@ export function IfcUploadModal({ open, onOpenChange, accessToken, buildingId, on
   const precheck = useIfcPrecheck(file, limits.data?.maxBytes);
   // BE#219: how many processing runs the Organization has left today. Advisory only; the server decides when the run is requested.
   const quota = useAsyncData("ifc-processing-usage", (signal) => ifcProcessingApi.myUsage(accessToken as string, signal), open && Boolean(accessToken));
+  // 409 IFC_ORG_JOB_RUNNING names the run that holds the Organization's slot; two small reads turn it into the Building to open.
+  const runningJobId = error?.runningJobId;
+  const runningBuilding = useAsyncData(`ifc-running-job:${runningJobId ?? ""}`, async (signal) => {
+    const detail = await buildingsApi.getJob(accessToken as string, runningJobId as string, signal);
+    return (await buildingsApi.getRevision(accessToken as string, detail.job.revisionId, signal)).buildingId;
+  }, Boolean(accessToken && runningJobId));
   const checked = precheck.phase === "done" ? precheck.result : null;
   const fileProblem = checked?.stage === "header" ? checked.problem : null;
   const criteria = checked?.stage === "content" ? checked.criteria : null;
@@ -159,6 +167,7 @@ export function IfcUploadModal({ open, onOpenChange, accessToken, buildingId, on
         {error.message}
         {error.retryable && !error.restart && !error.fileStored && " Nội dung bạn đã chọn được giữ nguyên; thử lại sẽ tiếp tục đúng yêu cầu cũ, không tạo bản trùng."}
         {waitSeconds > 0 && ` Hệ thống yêu cầu chờ ${waitSeconds} giây trước khi thử lại.`}
+        {runningJobId && runningBuilding.data && <span className="block mt-2"><Link href={`${routes.workspaceBuildings}/${runningBuilding.data}?tab=ifc`} data-testid="ifc-running-job-link">Xem mô hình đang xử lý</Link></span>}
         <SupportCode code={error.code} />
       </Alert>}
       {notice && <Alert tone="info">{notice}</Alert>}

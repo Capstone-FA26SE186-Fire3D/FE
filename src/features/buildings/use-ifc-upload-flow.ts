@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useIdempotencyKey } from "@/api/idempotency";
 import { buildingsApi } from "./api";
-import { IfcUploadError, classifyUploadError, isAbortError, uploadIfcRevision, validateIfcFile, type IfcUploadSession, type IfcUploadStage } from "./ifc-upload";
+import { IfcUploadError, classifyProcessError, classifyUploadError, isAbortError, uploadIfcRevision, validateIfcFile, type IfcUploadSession, type IfcUploadStage } from "./ifc-upload";
 
 export type UploadFlowStatus = "idle" | "running" | "error" | "done";
 
@@ -28,6 +28,8 @@ export type UploadFlowError = {
   retryAt?: number;
   /** Failed after the file was safely stored: retrying only repeats the remaining steps. */
   fileStored: boolean;
+  /** 409 IFC_ORG_JOB_RUNNING: the run that holds the Organization's single processing slot. */
+  runningJobId?: string;
 };
 
 export type UploadProgressState = { stage: "hash" | "upload"; fraction: number } | null;
@@ -152,7 +154,7 @@ export function useIfcUploadFlow({ accessToken, buildingId, onRevisionChanged }:
         return;
       }
       const classified = failedStep >= 4
-        ? new IfcUploadError("complete", describeProcessFailure(cause), processFlags(cause))
+        ? classifyProcessError(cause)
         : cause instanceof IfcUploadError ? cause : classifyUploadError(stageForStep(failedStep), cause);
       if (classified.restart) {
         // The server no longer honors this intent: a retry must be a new action with a new key.
@@ -169,6 +171,7 @@ export function useIfcUploadFlow({ accessToken, buildingId, onRevisionChanged }:
         retryAfterSeconds: classified.retryAfterSeconds,
         retryAt: classified.retryAfterSeconds ? Date.now() + classified.retryAfterSeconds * 1000 : undefined,
         fileStored: failedStep >= 4,
+        runningJobId: classified.jobId,
       });
       setStatus("error");
     } finally {
@@ -194,20 +197,4 @@ export function useIfcUploadFlow({ accessToken, buildingId, onRevisionChanged }:
 
 function stageForStep(step: number): IfcUploadStage {
   return step <= 1 ? "hash" : step === 2 ? "upload" : "complete";
-}
-
-type FailureCause = { status?: number; code?: string; retryAfterSeconds?: number; message?: string };
-
-function processFlags(cause: unknown) {
-  const info = cause as FailureCause;
-  const transient = info?.status === undefined || info.status === 429 || info.status === 502 || info.status === 503 || info.status === 504 || cause instanceof TypeError;
-  return { code: info?.code, status: info?.status, retryAfterSeconds: info?.retryAfterSeconds, retryable: transient };
-}
-
-function describeProcessFailure(cause: unknown) {
-  const info = cause as FailureCause;
-  if (info?.status === 409) return "IFC đã được lưu nhưng bản IFC này chưa nhận thêm yêu cầu xử lý lúc này (có thể đang được xử lý).";
-  if (info?.status === 400 && info.code === "IDEMPOTENCY_KEY_REQUIRED") return "Yêu cầu xử lý chưa hợp lệ. Hãy thử lại.";
-  if (cause instanceof TypeError) return "IFC đã được lưu nhưng mất kết nối khi gửi yêu cầu xử lý. Hãy thử lại.";
-  return "IFC đã được lưu nhưng chưa gửi được yêu cầu xử lý. Hãy thử lại.";
 }

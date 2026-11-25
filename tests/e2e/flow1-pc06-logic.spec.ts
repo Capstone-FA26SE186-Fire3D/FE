@@ -6,7 +6,7 @@ import { dashboardRouteFor, postLoginRoute } from "../../src/features/auth/redir
 import { buildingFormToInput, emptyForm, formFromBuilding, validateBuildingForm } from "../../src/features/buildings/building-form-model";
 import { buildingTypeLabel, isSupportedBuildingType, riskGroupInfo } from "../../src/features/buildings/data/building-types";
 import { lastPlayedText, withPracticeLogNote, PRACTICE_LOG_NOTE } from "../../src/features/analytics/practice-log-model";
-import { classifyUploadError, missingGroups } from "../../src/features/buildings/ifc-upload";
+import { classifyProcessError, classifyUploadError, failedChecks, limitResetText, missingGroups } from "../../src/features/buildings/ifc-upload";
 import { qaCriteria, qaGuide } from "../../src/features/buildings/qa-codes";
 import type { Building } from "../../src/features/buildings/types";
 import { lockedVersion, toEditorState, toUpdateBody, type FireInfrastructure } from "../../src/features/fire-infrastructure/api";
@@ -226,6 +226,37 @@ test.describe("junk-IFC guard and processing limit (BE#219)", () => {
       expect(error.retryable, code).toBeFalsy();
       expect(error.message, code).toMatch(/[àáạảãăâđêôơư]/i);
     }
+  });
+
+  test("a refused processing run says why, when to come back and which run is in the way", () => {
+    // Retry-After of the daily limit is the time to the next UTC midnight: a clock time, never a countdown of hours in seconds.
+    const now = new Date(2026, 10, 25, 22, 30);
+    expect(limitResetText(8.5 * 3600, now)).toBe("07:00 ngày mai");
+    expect(limitResetText(3600, now)).toBe("23:30 hôm nay");
+    expect(limitResetText(undefined, now)).toBe("");
+    const limit = classifyProcessError(new ApiError("x", 429, undefined, 30_600, "IFC_PROCESS_DAILY_LIMIT"));
+    expect(limit.message).toMatch(/Lượt mới có lại lúc \d\d:\d\d (hôm nay|ngày mai)\./);
+    expect(limit.message).toContain("không cần tải lại");
+    expect(limit).toMatchObject({ retryable: false, restart: false, retryAfterSeconds: undefined });
+
+    const running = classifyProcessError(new ApiError("x", 409, { errors: { jobId: ["job-7"] } }, undefined, "IFC_ORG_JOB_RUNNING"));
+    expect(running).toMatchObject({ jobId: "job-7", retryable: false });
+    expect(running.message).toContain("mỗi lúc chỉ xử lý một mô hình");
+    expect(classifyProcessError(new ApiError("x", 409, { errors: { jobId: "job-8" } }, undefined, "IFC_ORG_JOB_RUNNING")).jobId).toBe("job-8");
+    expect(classifyProcessError(new ApiError("x", 403, undefined, undefined, "IFC_PROCESSING_DISABLED")).message).toContain("tạm dừng");
+
+    // Anything else at this step keeps the old behaviour: the file is stored and the request may be sent again.
+    expect(classifyProcessError(new ApiError("x", 503, undefined, 5))).toMatchObject({ retryable: true, retryAfterSeconds: 5 });
+    expect(classifyProcessError(new ApiError("x", 409)).retryable).toBe(false);
+    for (const error of [limit, running]) expect(error.message).not.toMatch(/IFC_|jobId|Retry-After/);
+  });
+
+  test("a file that already failed lists what failed, in words", () => {
+    expect(failedChecks({ qaCodes: ["IFC_NO_STAIRS_MULTISTOREY", "IFC_NO_DOORS", "IFC_NO_DOORS", "SOMETHING_NEW"] })).toEqual(["nhà nhiều tầng nhưng không có cầu thang", "mô hình không có cửa"]);
+    const error = classifyUploadError("initiate", new ApiError("x", 409, { errors: { qaCodes: ["IFC_NO_WALLS_OR_SLABS"] } }, undefined, "IFC_SOURCE_ALREADY_FAILED"));
+    expect(error.message).toContain("không đạt: mô hình không có tường và sàn.");
+    expect(error.message).not.toContain("IFC_");
+    for (const code of ["IFC_NO_DOORS", "IFC_NO_WALLS_OR_SLABS"]) expect(qaGuide(code)?.action, code).toBe("reupload");
   });
 
   test("daily limit input and the usage line", () => {
