@@ -12,8 +12,12 @@ export type EditorScope = "scenario" | "infrastructure" | "scenario-on-infrastru
 
 export type InfrastructureCategory = "Exit" | "AssemblyPoint" | "Equipment" | "WaterSource";
 
-/** Equipment a scenario places itself; every other Equipment belongs to the infrastructure. */
-export const SCENARIO_ITEM_CAPABILITIES: readonly string[] = ["item.towel", "bait.belongings"];
+/**
+ * Equipment a scenario places itself; every other Equipment belongs to the infrastructure. Loose items (towel, belongings)
+ * and the STATE of an existing door: which exit is padlocked and which fire door is wedged open differs per scenario, while
+ * the door itself is part of the building (BE#224).
+ */
+export const SCENARIO_ITEM_CAPABILITIES: readonly string[] = ["item.towel", "bait.belongings", "door.exit_locked", "door.fire_wedged"];
 
 const KINDS: Record<EditorScope, readonly ObjectKind[]> = {
   scenario: OBJECT_KINDS,
