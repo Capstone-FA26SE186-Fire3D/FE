@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import { AiProposalApply } from "@/features/org-ai/components/ai-proposal-apply";
+import { useOptionalAiBubble } from "@/features/org-ai/floating/ai-bubble-context";
 import { AI_PROPOSAL_PARAM } from "@/features/org-ai/proposal-param";
 import { LIBRARY_USE_PARAM, parseLibraryUse } from "@/features/library/use-param";
 import { revisionLabel } from "@/features/buildings/pipeline";
@@ -73,6 +74,13 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const toast = useToast();
   const lockedId = infrastructure ? null : initial.draft.infrastructureId ?? null;
   const scope: EditorScope = infrastructure ? "infrastructure" : lockedId ? "scenario-on-infrastructure" : "scenario";
+  // A proposal asked from the assistant while this situation is open is drafted on the same fire infrastructure (BE#231).
+  const setDraftScope = useOptionalAiBubble()?.setDraftScope;
+  useEffect(() => {
+    if (!setDraftScope || !lockedId) return;
+    setDraftScope({ buildingId, infrastructureId: lockedId });
+    return () => setDraftScope(null);
+  }, [setDraftScope, buildingId, lockedId]);
   const kinds = scopeKinds(scope);
   const viewportRef = useRef<ViewportHandle>(null);
   const gesture = useRef(0);
