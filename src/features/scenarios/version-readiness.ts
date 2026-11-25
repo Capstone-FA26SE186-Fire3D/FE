@@ -128,6 +128,8 @@ const codeMessages: Record<string, string> = {
   RELEASE_PROVENANCE_MISMATCH: "Gói đã chốt không còn khớp với kết quả kiểm tra mới nhất. Tải lại trang, chốt lại gói rồi thử lại.",
   PACKAGE_METADATA_MISMATCH: "Gói không tương thích với phiên bản ứng dụng hiện tại. Hãy dựng lại gói.",
   RELEASE_ALREADY_EXISTS: "Phiên bản này đã có bản phát hành.",
+  FIRE_INFRASTRUCTURE_NOT_APPROVED: "Hạ tầng PCCC mà tình huống này dựa trên chưa đạt thẩm định nên chưa phát hành được.",
+  PLAN_SCENARIO_COVERAGE_INCOMPLETE: "Hạ tầng PCCC này cần ít nhất một tình huống trong giờ và một tình huống ngoài giờ làm việc đạt thẩm định trước khi phát hành.",
   PUBLISH_GATE_UNAVAILABLE: "Hệ thống chưa mở chức năng phát hành ở môi trường này. Bản phát hành vẫn giữ nguyên, chưa mở cho học viên.",
   BUILDING_ENTITLEMENT_REQUIRED: "Công trình chưa có dịch vụ trả phí còn hiệu lực. Gói dùng thử không đủ để phát hành.",
   CONFIRMATION_REQUIRED: "Chưa chốt gói phát hành ở tab Kiểm tra.",
@@ -156,11 +158,23 @@ const statusFallback: Record<number, string> = {
   503: "Dịch vụ chưa sẵn sàng. Hãy thử lại sau.",
 };
 
+/**
+ * 409 PLAN_SCENARIO_COVERAGE_INCOMPLETE (BE#215): `errors.workingHours` lists what is still missing on the infrastructure
+ * (`InHours`, `OffHours`). Says which one, so the author knows which situation to write and have appraised.
+ */
+export function coverageText(errors: unknown): string | undefined {
+  const list = errors && typeof errors === "object" && !Array.isArray(errors) ? (errors as Record<string, unknown>).workingHours : undefined;
+  const missing = Array.isArray(list) ? list.filter((item) => item === "InHours" || item === "OffHours") : [];
+  if (missing.length !== 1) return undefined;
+  const which = missing[0] === "InHours" ? "trong giờ làm việc" : "ngoài giờ làm việc";
+  return `Chưa phát hành được: hạ tầng PCCC này chưa có tình huống ${which} nào đạt thẩm định. Hãy soạn một tình huống ${which} và gửi Chuyên viên PCCC thẩm định.`;
+}
+
 export type DescribedError = { code?: string; status?: number; message: string; fieldErrors: Array<{ code: string; path: string; message: string }>; retryAfterSeconds?: number };
 
 export function describeError(error: unknown, fallback = "Đã xảy ra lỗi. Hãy thử lại."): DescribedError {
   if (error instanceof ApiError) {
-    const byCode = error.code ? codeMessages[error.code] : undefined;
+    const byCode = (error.code === "PLAN_SCENARIO_COVERAGE_INCOMPLETE" ? coverageText(error.payload?.errors) : undefined) ?? (error.code ? codeMessages[error.code] : undefined);
     return {
       code: error.code,
       status: error.status,

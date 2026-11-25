@@ -26,6 +26,16 @@ export const TRAINING_MODES = ["Learn", "Guided", "Assessment"] as const;
 export type TrainingMode = (typeof TRAINING_MODES)[number];
 export const MODE_LABEL: Record<TrainingMode, string> = { Learn: "Học", Guided: "Có hướng dẫn", Assessment: "Đánh giá" };
 
+/** BE#215 (Mẫu PC06 mục IV.1): who a situation trains, and whether it happens inside working hours. */
+export const AUDIENCES = ["Evacuee", "Communications", "EvacuationGuide", "FirstResponse"] as const;
+export type Audience = (typeof AUDIENCES)[number];
+export const AUDIENCE_LABEL: Record<Audience, string> = { Evacuee: "Người thoát nạn", Communications: "Thông tin liên lạc", EvacuationGuide: "Hướng dẫn thoát nạn", FirstResponse: "Chữa cháy ban đầu" };
+export const WORKING_HOURS = ["InHours", "OffHours"] as const;
+export type WorkingHours = (typeof WORKING_HOURS)[number];
+export const WORKING_HOURS_LABEL: Record<WorkingHours, string> = { InHours: "Trong giờ làm việc", OffHours: "Ngoài giờ làm việc" };
+export const audienceLabel = (value: unknown): string | null => (typeof value === "string" && value in AUDIENCE_LABEL ? AUDIENCE_LABEL[value as Audience] : null);
+export const workingHoursLabel = (value: unknown): string | null => (typeof value === "string" && value in WORKING_HOURS_LABEL ? WORKING_HOURS_LABEL[value as WorkingHours] : null);
+
 export const RUBRIC_OPERATORS = ["gte", "lte", "eq"] as const;
 export type RubricOperator = (typeof RUBRIC_OPERATORS)[number];
 
@@ -47,6 +57,7 @@ export const LIMITS = {
   labelMax: 255,
   positionAbs: 100_000,
   criterionDescriptionMax: 1_000,
+  assumption: { timeMax: 100, locationMax: 500, causeMax: 500, peopleMax: 100_000 },
 } as const;
 
 /** What the editor holds as the pinned Geometry artifact of the draft (`geometry` in the state). */

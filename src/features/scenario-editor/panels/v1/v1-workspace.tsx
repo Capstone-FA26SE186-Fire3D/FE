@@ -406,7 +406,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
           </TabsList>
           <div className="se-panel-scroll">
             <TabsContent value="object"><V1ObjectForm object={selectedObject} issues={issues} actions={actions} geometry={geometry} catalog={catalogView} runtimeVersion={runtimeVersion} pick={pick} onOpenScenario={() => setPanelTab("scenario")} scope={scope} /></TabsContent>
-            <TabsContent value="scenario"><V1ScenarioForm draft={state.draft} issues={issues} actions={actions} catalog={catalogView} rubricCatalog={rubricState} /></TabsContent>
+            <TabsContent value="scenario"><V1ScenarioForm draft={state.draft} issues={issues} actions={actions} catalog={catalogView} rubricCatalog={rubricState} situation={scope === "scenario-on-infrastructure"} /></TabsContent>
             <TabsContent value="library"><V1LibraryPanel accessToken={accessToken} ui={libraryUi} onUi={setLibraryUi} draft={state.draft} selectedObject={selectedObject} runtimeVersion={runtimeVersion} runtimes={runtimes} rubric={rubricView} applied={applied} canUndoLast={(label) => lastPast?.label === label} onUndo={() => dispatch({ type: "undo" })} onApply={onApplySample} /></TabsContent>
             <TabsContent value="issues"><V1IssuesPanel issues={issues} shapeProblems={editor.shapeProblems} report={editor.report} reportStale={editor.reportStale} validating={editor.validating} validateError={editor.validateError} dirty={dirty} onValidate={() => void onValidate()} onJump={onJump} /></TabsContent>
             <TabsContent value="geometry"><V1GeometryPanel reading={reading} preview={preview} pin={pin} buildingId={buildingId} revisionId={revisionId} onRepin={actions.pinGeometry} modelSummary={modelSummary} /></TabsContent>
@@ -426,7 +426,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
     {importOpen && <V1EquipmentImport accessToken={accessToken} buildingId={buildingId} revisionId={revisionId} draft={state.draft} runtime={findRuntime(runtimes ?? [], runtimeVersion)}
       runtimeVersion={runtimeVersion} geometry={geometry} onApply={edit} onClose={() => setImportOpen(false)} />}
 
-    {aiRequestId && !aiDismissed && !infrastructure && <AiProposalApply key={aiRequestId} accessToken={accessToken} requestId={aiRequestId} draft={state.draft} floorIds={aiFloorIds} onApply={edit} onClose={closeAiProposal} />}
+    {aiRequestId && !aiDismissed && !infrastructure && <AiProposalApply key={aiRequestId} accessToken={accessToken} requestId={aiRequestId} draft={state.draft} floorIds={aiFloorIds} scope={scope} onApply={edit} onClose={closeAiProposal} />}
 
     <Modal open={guard.pending} onOpenChange={(open) => { if (!open) guard.stay(); }} title="Rời khỏi trình soạn thảo?"
       description="Bạn có thay đổi chưa lưu. Nếu rời đi bây giờ, các thay đổi này sẽ mất."

@@ -11,7 +11,7 @@ import { metricHint, metricName, operatorLabel } from "@/configs/metric-labels";
 import { isObject, type JsonObject } from "../../store/json";
 import type { Issue } from "../../store/validation";
 import type { RubricCatalogView } from "../../v1/catalog";
-import { LIMITS, MODE_LABEL, RUBRIC_OPERATORS, TRAINING_MODES } from "../../v1/contract";
+import { AUDIENCES, AUDIENCE_LABEL, LIMITS, MODE_LABEL, RUBRIC_OPERATORS, TRAINING_MODES, WORKING_HOURS, WORKING_HOURS_LABEL } from "../../v1/contract";
 import { messageAt } from "../../v1/issues";
 import { readModes, readNumberField, readObjectives, readString } from "../../v1/state";
 import { NumberField, StringList, TextField } from "../fields";
@@ -28,7 +28,11 @@ export function Group({ title, description, children, testId }: { title: string;
   </fieldset>;
 }
 
-export function V1ScenarioForm({ draft, issues, actions, catalog, rubricCatalog }: { draft: JsonObject; issues: Issue[]; actions: V1Actions; catalog: CatalogView; rubricCatalog: RubricCatalogState }) {
+/**
+ * `situation`: the draft is a situation of a PC06 plan (built on a locked fire infrastructure), so audience, assumption and working
+ * hours are required (BE#215). An older draft shows the group only once it holds one of these fields.
+ */
+export function V1ScenarioForm({ draft, issues, actions, catalog, rubricCatalog, situation = false }: { draft: JsonObject; issues: Issue[]; actions: V1Actions; catalog: CatalogView; rubricCatalog: RubricCatalogState; situation?: boolean }) {
   const at = (path: string) => messageAt(issues, path);
   const runtimeVersion = readString(draft, "runtimeVersion");
   const versions = catalog.runtimes.map((runtime) => runtime.runtimeVersion);
@@ -64,6 +68,8 @@ export function V1ScenarioForm({ draft, issues, actions, catalog, rubricCatalog 
       </div>
     </Group>
 
+    {(situation || draft.audience !== undefined || draft.workingHours !== undefined || draft.assumption !== undefined) && <SituationGroup draft={draft} at={at} actions={actions} required={situation} />}
+
     <Group title="Chế độ huấn luyện" description="Chế độ người học được phép dùng. Không chọn chế độ nào thì chính sách không được lưu." testId="group-modes">
       {at("$.modePolicy.allowedModes") && <span className="ops-field-error" role="alert">{at("$.modePolicy.allowedModes")}</span>}
       <div className="ops-stack">
@@ -83,6 +89,36 @@ export function V1ScenarioForm({ draft, issues, actions, catalog, rubricCatalog 
 
     <RubricGroup draft={draft} issues={issues} actions={actions} catalog={rubricCatalog} />
   </div>;
+}
+
+/** Mẫu PC06 mục IV.1: giả định (a) and the group of people the situation trains (b), in or outside working hours. */
+function SituationGroup({ draft, at, actions, required }: { draft: JsonObject; at: (path: string) => string | undefined; actions: V1Actions; required: boolean }) {
+  const assumption = isObject(draft.assumption) ? draft.assumption : {};
+  const text = (key: string) => (typeof assumption[key] === "string" ? (assumption[key] as string) : "");
+  const setText = (key: string, label: string) => (value: string) => actions.setField(["assumption", key], value === "" ? undefined : value, label);
+  return <Group title="Giả định của tình huống" description="Theo Mẫu PC06 mục IV.1: mỗi tình huống luyện cho một nhóm người, với một giả định cụ thể, trong hoặc ngoài giờ làm việc. Mỗi hạ tầng cần ít nhất một tình huống trong giờ và một ngoài giờ đạt thẩm định trước khi phát hành." testId="group-situation">
+    <div className="ops-stack">
+      <Field label="Đối tượng luyện tập" required={required} error={at("$.audience")}>
+        {(props) => <Select {...props} data-testid="field-audience" value={typeof draft.audience === "string" ? draft.audience : ""} onChange={(event) => actions.setField(["audience"], event.target.value || undefined, "Chọn đối tượng luyện tập", false)}>
+          <option value="">Chọn…</option>
+          {AUDIENCES.map((value) => <option key={value} value={value}>{AUDIENCE_LABEL[value]}</option>)}
+        </Select>}
+      </Field>
+      <Field label="Thời gian xảy ra" required={required} error={at("$.workingHours")}>
+        {(props) => <Select {...props} data-testid="field-working-hours" value={typeof draft.workingHours === "string" ? draft.workingHours : ""} onChange={(event) => actions.setField(["workingHours"], event.target.value || undefined, "Chọn trong giờ hoặc ngoài giờ", false)}>
+          <option value="">Chọn…</option>
+          {WORKING_HOURS.map((value) => <option key={value} value={value}>{WORKING_HOURS_LABEL[value]}</option>)}
+        </Select>}
+      </Field>
+    </div>
+    {at("$.assumption") && <span className="ops-field-error" role="alert">{at("$.assumption")}</span>}
+    <div className="se-coord-grid">
+      <TextField label="Thời điểm" required={required} maxLength={LIMITS.assumption.timeMax} value={text("time")} hint="Ví dụ: 10 giờ sáng thứ Hai." error={at("$.assumption.time")} data-testid="assumption-time" onCommit={setText("time", "Sửa thời điểm giả định")} />
+      <NumberField label="Số người có mặt" required={required} hint={`Số nguyên 0–${LIMITS.assumption.peopleMax}.`} data-testid="assumption-people" value={typeof assumption.peoplePresent === "number" ? assumption.peoplePresent : undefined} error={at("$.assumption.peoplePresent")} onCommit={(value) => actions.setField(["assumption", "peoplePresent"], value, "Sửa số người có mặt")} />
+    </div>
+    <TextField label="Vị trí xảy ra cháy" required={required} maxLength={LIMITS.assumption.locationMax} value={text("location")} hint="Ví dụ: bếp căng tin tầng 1." error={at("$.assumption.location")} data-testid="assumption-location" onCommit={setText("location", "Sửa vị trí giả định")} />
+    <TextField label="Nguyên nhân" required={required} maxLength={LIMITS.assumption.causeMax} value={text("cause")} hint="Ví dụ: chập điện ở ổ cắm bếp." error={at("$.assumption.cause")} data-testid="assumption-cause" onCommit={setText("cause", "Sửa nguyên nhân giả định")} />
+  </Group>;
 }
 
 /** What the rubric form needs from its host: the editor passes its command-backed actions, the Library admin form plain state writes. */

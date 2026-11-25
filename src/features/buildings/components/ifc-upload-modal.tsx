@@ -11,6 +11,8 @@ import { Field, Input } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import { SupportCode } from "@/components/ui/support-code";
 import { cn } from "@/utils/cn";
+import { ifcProcessingApi, usageText } from "@/features/organizations/ifc-processing";
+
 import { buildingsApi } from "../api";
 import { formatBytes } from "../format";
 import type { IfcCriterion } from "../ifc-precheck";
@@ -76,6 +78,8 @@ export function IfcUploadModal({ open, onOpenChange, accessToken, buildingId, on
   // The size limit is the server's; while it is unknown (or unreadable) the browser check falls back to its own ceiling.
   const limits = useAsyncData("ifc-upload-limits", (signal) => buildingsApi.ifcUploadLimits(accessToken as string, signal), open && Boolean(accessToken));
   const precheck = useIfcPrecheck(file, limits.data?.maxBytes);
+  // BE#219: how many processing runs the Organization has left today. Advisory only; the server decides when the run is requested.
+  const quota = useAsyncData("ifc-processing-usage", (signal) => ifcProcessingApi.myUsage(accessToken as string, signal), open && Boolean(accessToken));
   const checked = precheck.phase === "done" ? precheck.result : null;
   const fileProblem = checked?.stage === "header" ? checked.problem : null;
   const criteria = checked?.stage === "content" ? checked.criteria : null;
@@ -128,6 +132,7 @@ export function IfcUploadModal({ open, onOpenChange, accessToken, buildingId, on
         {fileProblem && <span className="ops-field-error" role="alert">{fileProblem}</span>}
       </div>
 
+      {quota.data && <p className="ops-muted" data-testid="ifc-quota" role={quota.data.remaining <= 0 ? "alert" : undefined}>{usageText(quota.data)}</p>}
       {!file && <p className="ops-muted" data-testid="ifc-requirements">Tệp hợp lệ: mô hình kiến trúc IFC2x3, IFC4 hoặc IFC4x3, có tầng, phòng, cửa, tường hoặc sàn. Tệp được kiểm tra ngay trên máy bạn; tệp không đạt sẽ không được tải lên.</p>}
       {precheck.phase === "checking" && <div className="ops-progress-row" role="status">
         <label htmlFor={`${progressId}-check`}>Đang kiểm tra nội dung tệp</label>

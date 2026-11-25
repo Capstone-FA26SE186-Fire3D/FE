@@ -39,6 +39,7 @@ import { ProcessingStatusPanel } from "./processing-status-panel";
 import { QrPanel } from "./qr-panel";
 import { buildingTypeLabel } from "../data/building-types";
 import { InfrastructurePanel } from "@/features/fire-infrastructure/components/infrastructure-panel";
+import { PlanDossierView } from "@/features/fire-infrastructure/components/plan-dossier";
 import { RevisionDetailsPanel } from "./revision-details-panel";
 import { ScenariosPanel } from "./scenarios-panel";
 import "../building-v2.css";
@@ -50,9 +51,9 @@ const tabLabels: Record<BuildingTab, string> = { journey: "Hành trình", ifc: "
 const tabTour: Partial<Record<BuildingTab, string>> = { journey: "tab-journey", ifc: "tab-ifc" };
 /** Old links and bookmarks: `?tab=overview` → journey, `?tab=qr` → access with the QR sub-tab. */
 const tabAliases: Record<string, { tab: BuildingTab; sub?: string }> = { overview: { tab: "journey" }, qr: { tab: "access", sub: "qr" } };
-const ifcSubTabs = ["progress", "preview", "equipment", "infrastructure", "technical", "annotations"] as const;
+const ifcSubTabs = ["progress", "preview", "equipment", "infrastructure", "dossier", "technical", "annotations"] as const;
 type IfcSub = (typeof ifcSubTabs)[number];
-const ifcSubLabels: Record<IfcSub, string> = { progress: "Tiến trình", preview: "Xem trước 3D", equipment: "Thiết bị", infrastructure: "Hạ tầng PCCC", technical: "Kỹ thuật", annotations: "Ghi chú" };
+const ifcSubLabels: Record<IfcSub, string> = { progress: "Tiến trình", preview: "Xem trước 3D", equipment: "Thiết bị", infrastructure: "Hạ tầng PCCC", dossier: "Hồ sơ phương án", technical: "Kỹ thuật", annotations: "Ghi chú" };
 const SCENARIO_PAGE_SIZE = 20;
 // After a Succeeded job the revision is re-read until QA moved it out of Uploaded/Processing; ~1 minute at most.
 const MAX_SETTLE_POLLS = 20;
@@ -341,6 +342,9 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
             </SubTabsContent>
             <SubTabsContent value="infrastructure">
               <InfrastructurePanel key={revision.id} accessToken={accessToken} buildingId={buildingId} revisionId={revision.id} readOnly={isAdmin} />
+            </SubTabsContent>
+            <SubTabsContent value="dossier">
+              <PlanDossierView accessToken={accessToken} buildingId={buildingId} />
             </SubTabsContent>
             <SubTabsContent value="technical">
               <RevisionDetailsPanel accessToken={accessToken} revisionId={revision.id} processed={revision.status === "NeedsFix" || revision.status === "ReadyForScenario" || revision.status === "ConfirmedForTraining"} issues={{ data: issues.data?.items, error: issues.error, loading: issues.loading, reload: issues.reload }} reloadKey={reloadKey} onHighlight={(ids) => showInPreview(revision.id, ids)} onIssueAction={runAction} tab={detailsTab} onTabChange={setDetailsTab} />

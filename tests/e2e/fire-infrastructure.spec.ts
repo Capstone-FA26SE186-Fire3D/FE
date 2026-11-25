@@ -92,4 +92,21 @@ test("a scenario draft on a locked infrastructure shows its items read-only and 
   // The exit comes from the infrastructure, so the draft is not told to add one.
   await page.getByTestId("tab-issues").click();
   await expect(page.getByText("Cần ít nhất một điểm đến.")).toHaveCount(0);
+
+  // BE#215: a situation on an infrastructure names its audience, working hours and assumption; missing ones are listed until filled.
+  await expect(page.getByText("Chọn đối tượng luyện tập của tình huống.")).toBeVisible();
+  await page.getByRole("tab", { name: "Kịch bản", exact: true }).click();
+  const situation = page.getByTestId("group-situation");
+  await expect(situation).toBeVisible();
+  await situation.getByTestId("field-audience").selectOption("EvacuationGuide");
+  await situation.getByTestId("field-working-hours").selectOption("OffHours");
+  await situation.getByTestId("assumption-time").fill("22 giờ thứ Bảy");
+  await situation.getByTestId("assumption-people").fill("12");
+  await situation.getByTestId("assumption-location").fill("Bếp căng tin tầng 1");
+  await situation.getByTestId("assumption-cause").fill("Chập điện ở ổ cắm");
+  await page.getByTestId("save").click();
+  await expect(page.getByTestId("save-status")).toHaveText("Đã lưu");
+  expect(mock.state).toMatchObject({ audience: "EvacuationGuide", workingHours: "OffHours", assumption: { time: "22 giờ thứ Bảy", location: "Bếp căng tin tầng 1", cause: "Chập điện ở ổ cắm", peoplePresent: 12 } });
+  await page.getByTestId("tab-issues").click();
+  await expect(page.getByText("Chọn đối tượng luyện tập của tình huống.")).toHaveCount(0);
 });
