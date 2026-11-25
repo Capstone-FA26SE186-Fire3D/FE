@@ -19,7 +19,7 @@ import type { OperationsReport, TrainingReport } from "../types";
 import { KpiTile, Num, ReportTable, sumCounts, toneColor } from "./charts";
 import styles from "./analytics.module.css";
 
-const roleNames: Record<string, string> = { PlatformAdmin: "Quản trị FET3D", OrganizationUser: "Tổ chức", Trainee: "Học viên" };
+const roleNames: Record<string, string> = { PlatformAdmin: "Quản trị FET3D", OrganizationUser: "Tổ chức", Trainee: "Học viên", FireSafetyExpert: "Chuyên viên PCCC" };
 /** Job kinds as the Figma chips name them; an unknown kind keeps its server name. */
 const kindLabels: Record<string, string> = { IfcProcessing: "Dựng mô hình 3D", Geometry: "Dựng mô hình 3D", PlaytestPackage: "Gói chạy thử", ReleasePackage: "Gói phát hành", PackageBuild: "Dựng gói" };
 const jobStatusLabel: Record<string, string> = { Queued: "Đang chờ", Running: "Đang chạy", Processing: "Đang xử lý", Succeeded: "Hoàn tất", Failed: "Thất bại", Cancelled: "Đã hủy", Canceled: "Đã hủy" };

@@ -49,7 +49,7 @@ export function JourneyPanel({ input, editorHref, onTab, onSnapshot, canAct, gat
     <div className="ver-journey-main" data-testid="journey">
     <div className="ver-journey-head">
       <h2 id="ver-journey-title" className="ver-card-title">Hành trình từ bản nháp đến phát hành</h2>
-      <p className="ver-card-sub">Ba điều kiện để học viên dùng được: kiểm tra kỹ thuật đạt, nội dung được duyệt, và bấm phát hành.</p>
+      <p className="ver-card-sub">Ba điều kiện để học viên dùng được: kiểm tra kỹ thuật đạt, nội dung đạt thẩm định, và bấm phát hành.</p>
     </div>
     <ol className="ver-stepper" aria-label="Các bước từ lưu bản nháp đến phát hành">
       {main.map((item, index) => {

@@ -12,6 +12,8 @@ import { routes } from "@/configs/routes";
 
 import type { JsonObject } from "../store/json";
 import { carryOverCandidates, carryOverExtras, type CarryKey } from "../v1/carry-over";
+import { LockedInfrastructureNote, useLockedInfrastructure } from "@/features/fire-infrastructure/locked";
+
 import { createDraftV1 } from "../v1/create-draft";
 import { useRevisionFloors } from "../v1/use-revision-floors";
 import { FloorsStatus, ReprocessGuide } from "./geometry-status";
@@ -26,13 +28,16 @@ export function LegacyBanner({ accessToken, buildingId, scenarioId, revisionId, 
   const floors = useRevisionFloors(accessToken, revisionId);
   const [open, setOpen] = useState(false);
   const reading = floors.reading;
-  const canCreate = reading?.kind === "valid";
+  const infrastructure = useLockedInfrastructure(accessToken, revisionId || undefined);
+  const locked = infrastructure.locked;
+  const canCreate = reading?.kind === "valid" && Boolean(locked);
 
   return <Alert tone="warning" title="Bản nháp cũ (chưa soạn trên mô hình 3D)">
     <div className="ops-stack" data-testid="legacy-banner">
       <p style={{ margin: 0 }}>Tọa độ của bản nháp này không có khung tham chiếu hay đơn vị được khai báo nên <strong>không được tự chuyển đổi</strong>. Bạn vẫn sửa được theo cấu trúc cũ; lưu sẽ không đổi nó sang cấu trúc mới.</p>
       {reading?.kind === "reprocess" && revisionId ? <ReprocessGuide buildingId={buildingId} revisionId={revisionId} />
         : revisionId ? <FloorsStatus reading={reading} loading={floors.loading} error={floors.error} reload={floors.reload} buildingId={buildingId} revisionId={revisionId} /> : null}
+      {reading?.kind === "valid" && revisionId && <LockedInfrastructureNote state={infrastructure} buildingId={buildingId} revisionId={revisionId} />}
       <div>
         <Button type="button" variant="secondary" size="sm" disabled={!canCreate} onClick={() => setOpen(true)} data-testid="create-v1-draft"
           title={canCreate ? undefined : "Cần mô hình 3D hợp lệ của bản IFC này"}>
@@ -40,14 +45,14 @@ export function LegacyBanner({ accessToken, buildingId, scenarioId, revisionId, 
         </Button>
       </div>
     </div>
-    {open && reading?.kind === "valid" && revisionId && (
-      <ConvertDialog accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} revisionId={revisionId} pin={reading.pin} draft={draft} dirty={dirty} onClose={() => setOpen(false)} />
+    {open && reading?.kind === "valid" && revisionId && locked && (
+      <ConvertDialog infrastructureId={locked.id} accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} revisionId={revisionId} pin={reading.pin} draft={draft} dirty={dirty} onClose={() => setOpen(false)} />
     )}
   </Alert>;
 }
 
-function ConvertDialog({ accessToken, buildingId, scenarioId, revisionId, pin, draft, dirty, onClose }: {
-  accessToken: string; buildingId: string; scenarioId: string; revisionId: string; pin: { artifactId: string; sha256Hash: string }; draft: JsonObject; dirty: boolean; onClose: () => void;
+function ConvertDialog({ accessToken, buildingId, scenarioId, revisionId, infrastructureId, pin, draft, dirty, onClose }: {
+  infrastructureId: string; accessToken: string; buildingId: string; scenarioId: string; revisionId: string; pin: { artifactId: string; sha256Hash: string }; draft: JsonObject; dirty: boolean; onClose: () => void;
 }) {
   const items = useMemo(() => carryOverCandidates(draft), [draft]);
   const [chosen, setChosen] = useState<Set<CarryKey>>(() => new Set());
@@ -69,7 +74,7 @@ function ConvertDialog({ accessToken, buildingId, scenarioId, revisionId, pin, d
     try {
       const extras = carryOverExtras(items, chosen);
       // One key per intention (scenario + revision + what is copied): a retry after a lost response replays the same POST.
-      const result = await createDraftV1(accessToken, { scenarioId, revisionId, pin, extras, idempotencyKey: keyFor({ scenarioId, revisionId, copy: [...chosen].sort() }) });
+      const result = await createDraftV1(accessToken, { scenarioId, revisionId, infrastructureId, pin, extras, idempotencyKey: keyFor({ scenarioId, revisionId, infrastructureId, copy: [...chosen].sort() }) });
       done();
       setCreated(result);
     } catch (cause) {

@@ -20,8 +20,8 @@ export async function initializeDraft(accessToken: string, draftId: string, etag
   return scenarioEditorApi.putDraft(accessToken, draftId, initialStateV1(pin, extras), etag, signal);
 }
 
-export async function createDraftV1(accessToken: string, input: { scenarioId: string; revisionId: string; idempotencyKey: string; pin: GeometryPin; extras?: JsonObject }): Promise<CreatedDraft> {
-  const created = await scenarioEditorApi.createDraft(accessToken, input.scenarioId, input.revisionId, input.idempotencyKey);
+export async function createDraftV1(accessToken: string, input: { scenarioId: string; revisionId: string; infrastructureId: string; idempotencyKey: string; pin: GeometryPin; extras?: JsonObject }): Promise<CreatedDraft> {
+  const created = await scenarioEditorApi.createDraft(accessToken, input.scenarioId, input.revisionId, input.infrastructureId, input.idempotencyKey);
   try {
     const loaded = await scenarioEditorApi.getDraft(accessToken, created.id);
     if (!isEmptyState(loaded.draft.state)) return { id: created.id, initialized: true };

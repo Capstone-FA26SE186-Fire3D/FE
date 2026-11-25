@@ -1,5 +1,5 @@
 /**
- * Admin scenario reviews (/admin/reviews): queue, detail, approve/reject.
+ * Admin scenario reviews (/admin/reviews): queue and detail, read-only since BE#211 (a Chuyên viên PCCC decides in /expert/reviews).
  * Evidence level: Playwright route mocks that keep SERVER STATE (statuses, receipts by Idempotency-Key) and follow the
  * BE contract (ScenarioReviewQueriesController, ScenarioContentReviewsController, OpenAPI @1eaf988). Not an integration
  * test against the real API. Run against a production build (`NEXT_PUBLIC_API_BASE_URL=` empty so the mock is same-origin).
@@ -168,15 +168,13 @@ const drawer = (page: Page) => page.getByTestId("review-drawer");
 const rows = (page: Page) => page.getByTestId("review-table").locator("tbody tr, li.ops-dt-card");
 const row = (page: Page, name: string) => rows(page).filter({ hasText: name });
 const orgFilter = (page: Page) => page.getByRole("combobox", { name: "Tổ chức" });
-/** The decision modal is titled after the version ("Từ chối phiên bản v2?"). */
-const confirmDialog = (page: Page, action: "approve" | "reject") => page.getByRole("dialog", { name: action === "reject" ? /^Từ chối phiên bản v\d+\?/ : /^Duyệt nội dung phiên bản v\d+\?/ });
 
 test.describe("queue", () => {
   test("defaults to Submitted, shows the required columns and loads detail only on demand", async ({ page }) => {
     const server = new ReviewServer(baseSeeds());
     await install(page, server);
     await page.goto("/admin/reviews");
-    await expect(page.getByRole("heading", { level: 1, name: "Duyệt kịch bản" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Theo dõi thẩm định" })).toBeVisible();
     await expect(page.getByTestId("pending-module")).toHaveCount(0);
     await expect(page.getByTestId("prototype-banner")).toHaveCount(0);
     await expect(rows(page)).toHaveCount(2);
@@ -186,9 +184,9 @@ test.describe("queue", () => {
     const first = rows(page).first();
     await expect(first).toContainText("Công ty Sao Mai"); // newest submittedAt first
     await expect(first).toContainText("Kho hàng");
-    await expect(first).toContainText("Chờ duyệt");
+    await expect(first).toContainText("Chờ thẩm định");
     await expect(rows(page).nth(1)).toContainText("v2");
-    await expect(page.getByRole("navigation", { name: "Quản trị hệ thống" }).getByRole("link", { name: /Duyệt kịch bản/ })).not.toContainText("Sắp có");
+    await expect(page.getByRole("navigation", { name: "Quản trị hệ thống" }).getByRole("link", { name: /Theo dõi thẩm định/ })).not.toContainText("Sắp có");
   });
 
   test("status and organization filters live in the URL and drive the query", async ({ page }) => {
@@ -201,7 +199,7 @@ test.describe("queue", () => {
     await expect(page).toHaveURL(/status=Approved/);
     await expect(rows(page)).toHaveCount(1);
     await expect(rows(page).first()).toContainText("Mất điện và khói");
-    await expect(rows(page).first()).toContainText("Đã duyệt nội dung");
+    await expect(rows(page).first()).toContainText("Đạt thẩm định");
 
     await pick(page, "Trạng thái", { value: "" }); // "Tất cả" removes the status filter
     await expect(page).toHaveURL(/status=all/);
@@ -219,7 +217,7 @@ test.describe("queue", () => {
     await expect(orgFilter(page)).toContainText("Công ty Sao Mai");
     await expect(rows(page)).toHaveCount(1);
 
-    await page.getByRole("button", { name: "Về mặc định (chờ duyệt)" }).click();
+    await page.getByRole("button", { name: "Về mặc định (chờ thẩm định)" }).click();
     await expect(page).not.toHaveURL(/status=|organizationId=/);
     await expect(rows(page)).toHaveCount(2);
   });
@@ -247,22 +245,22 @@ test.describe("queue", () => {
     const server = new ReviewServer([{ n: 1, status: "Approved" }]);
     await install(page, server);
     await page.goto("/admin/reviews");
-    await expect(page.getByText("Chưa có kịch bản nào chờ duyệt")).toBeVisible();
+    await expect(page.getByText("Chưa có tình huống nào chờ thẩm định")).toBeVisible();
     await pick(page, "Trạng thái", { value: "Approved" });
     await expect(rows(page)).toHaveCount(1);
     await pick(page, "Trạng thái", { value: "Rejected" });
-    await expect(page.getByText("Không có bản duyệt phù hợp.")).toBeVisible();
+    await expect(page.getByText("Không có mục nào phù hợp.")).toBeVisible();
 
     server.faults.listStatus = 500;
     await page.getByRole("button", { name: "Tải lại" }).click();
-    await expect(page.getByText("Không tải được hàng chờ duyệt")).toBeVisible();
+    await expect(page.getByText("Không tải được danh sách thẩm định")).toBeVisible();
     server.faults.listStatus = undefined;
     await page.getByRole("button", { name: "Thử lại" }).click();
-    await expect(page.getByText("Không tải được hàng chờ duyệt")).toHaveCount(0);
+    await expect(page.getByText("Không tải được danh sách thẩm định")).toHaveCount(0);
 
     server.faults.listStatus = 403;
     await page.getByRole("button", { name: "Tải lại" }).click();
-    await expect(page.getByText("Chỉ quản trị FET3D xem và quyết định được bản duyệt kịch bản.")).toBeVisible();
+    await expect(page.getByText("Chỉ quản trị FET3D xem được danh sách thẩm định tình huống.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Thử lại" })).toHaveCount(0);
   });
 
@@ -292,7 +290,7 @@ test.describe("detail", () => {
     await page.goto(`/admin/reviews?review=${target.reviewId}`);
     const dialog = drawer(page);
     await expect(dialog.getByRole("heading", { name: "Sơ tán giờ ra chơi" })).toBeVisible();
-    await expect(dialog.locator(".ops-dialog-eyebrow")).toContainText("Chờ duyệt"); // status and version are the drawer's eyebrow chips
+    await expect(dialog.locator(".ops-dialog-eyebrow")).toContainText("Chờ thẩm định"); // status and version are the drawer's eyebrow chips
     await expect(dialog.locator(".ops-dialog-eyebrow")).toContainText("v2");
     await expect(dialog.getByText("Trường THPT Lê Quý Đôn · Nhà A")).toBeVisible();
     await expect(dialog.getByText("Tài khoản tổ chức").first()).toBeVisible(); // the API has no display names; ids sit in the support line
@@ -320,9 +318,9 @@ test.describe("detail", () => {
     await expect(readiness.getByTestId("readiness-blockers")).toHaveText("0");
     await expect(readiness.getByTestId("readiness-confirmation")).toContainText("Đã xác nhận");
     await expect(readiness.getByTestId("readiness-artifact")).toContainText("Đã có tệp");
-    await expect(readiness.getByText("Điều kiện kỹ thuật, duyệt nội dung và điều kiện phát hành là ba việc tách biệt")).toBeVisible();
+    await expect(readiness.getByText("Điều kiện kỹ thuật, thẩm định nội dung và điều kiện phát hành là ba việc tách biệt")).toBeVisible();
     await expect(dialog.getByTestId("gate-separation")).toContainText("Không đánh giá ở màn này");
-    await expect(dialog.getByTestId("review-status")).toHaveText("Chờ duyệt");
+    await expect(dialog.getByTestId("review-status")).toHaveText("Chờ thẩm định");
   });
 
   test("JSON content is a collapsible summary rendered as text, never HTML", async ({ page }) => {
@@ -347,8 +345,8 @@ test.describe("detail", () => {
     await expect(dialog.getByTestId("readiness-outcome")).toHaveText("Chưa có kết quả kiểm tra tự động");
     await expect(dialog.getByTestId("readiness-confirmation")).toContainText("Chưa xác nhận");
     await expect(dialog.getByTestId("readiness-artifact")).toContainText("Chưa có tệp cho ứng dụng");
-    await dialog.getByRole("button", { name: "Duyệt nội dung" }).click();
-    await expect(confirmDialog(page, "approve").getByText("Chưa đủ điều kiện kỹ thuật", { exact: true })).toBeVisible();
+    await expect(dialog.getByTestId("readiness-strip")).toContainText("Chưa đủ điều kiện kỹ thuật");
+    await expect(dialog.getByTestId("review-status")).toHaveText("Chờ thẩm định");
   });
 
   test("legacy snapshots with null content are shown as missing, not invented", async ({ page }) => {
@@ -367,11 +365,9 @@ test.describe("detail", () => {
     await install(page, server);
     await page.goto(`/admin/reviews?status=Rejected&review=${server.reviews[3].summary.reviewId}`);
     const dialog = drawer(page);
-    await expect(dialog.getByTestId("decision-result")).toContainText("đã bị từ chối");
+    await expect(dialog.getByTestId("decision-result")).toContainText("chưa đạt thẩm định");
     await expect(dialog.getByTestId("reject-reason")).toContainText("Thiếu tiêu chí thời gian phản ứng.");
-    await expect(dialog.getByText("Quản trị FET3D", { exact: true })).toBeVisible(); // the decider's id sits in the support line
-    await expect(dialog.getByRole("button", { name: "Duyệt nội dung" })).toHaveCount(0);
-    await expect(dialog.getByRole("button", { name: "Từ chối", exact: true })).toHaveCount(0);
+    await expect(dialog.getByText("Chuyên viên PCCC", { exact: true })).toBeVisible(); // the decider's id sits in the support line
   });
 
   test("opening a row sets ?review= and closing clears it; 404 and 403 are explained", async ({ page }) => {
@@ -381,17 +377,17 @@ test.describe("detail", () => {
     await row(page, "Sơ tán giờ ra chơi").click();
     await expect(page).toHaveURL(/review=/);
     await expect(drawer(page).getByTestId("review-detail")).toBeVisible();
-    await drawer(page).getByRole("button", { name: "Đóng", exact: true }).click();
+    await drawer(page).getByRole("button", { name: "Đóng", exact: true }).last().click();
     await expect(page).not.toHaveURL(/review=/);
 
     await page.goto("/admin/reviews?review=00000000-0000-4000-8000-00000000ffff");
-    await expect(drawer(page).getByRole("heading", { name: "Không tìm thấy bản duyệt" })).toBeVisible();
-    await drawer(page).getByRole("button", { name: "Về hàng chờ" }).click();
+    await expect(drawer(page).getByRole("heading", { name: "Không tìm thấy mục này" })).toBeVisible();
+    await drawer(page).getByRole("button", { name: "Về danh sách" }).click();
     await expect(page).not.toHaveURL(/review=/);
 
     server.faults.detailStatus = 403;
     await page.goto(`/admin/reviews?review=${server.reviews[0].summary.reviewId}`);
-    await expect(drawer(page).getByText("Chỉ quản trị FET3D xem và quyết định được bản duyệt kịch bản.")).toBeVisible();
+    await expect(drawer(page).getByText("Chỉ quản trị FET3D xem được danh sách thẩm định tình huống.")).toBeVisible();
   });
 
   test("a late detail response for a previous review never overwrites the one now open", async ({ page }) => {
@@ -409,223 +405,20 @@ test.describe("detail", () => {
   });
 });
 
-test.describe("decisions", () => {
-  test("approve pins the server hashes, confirms with consequences, and reload keeps the result", async ({ page }) => {
-    const server = new ReviewServer(baseSeeds());
-    await install(page, server);
-    const target = server.reviews[0].summary;
-    await page.goto(`/admin/reviews?review=${target.reviewId}`);
-    await drawer(page).getByRole("button", { name: "Duyệt nội dung" }).click();
-    const confirm = confirmDialog(page, "approve");
-    await expect(confirm).toContainText("đúng nội dung và tiêu chí chấm điểm (rubric) đang xem");
-    await expect(confirm).toContainText("không đổi được");
-    await expect(confirm).toContainText("không phải");
-    expect(server.decisionRequests).toHaveLength(0); // opening the dialog is not a decision
-    await confirm.getByRole("button", { name: "Duyệt nội dung" }).click();
-
-    await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Approved");
-    await expect(drawer(page).getByTestId("decision-result")).toContainText("đã được duyệt");
-    expect(server.decisionRequests).toHaveLength(1);
-    const request = server.decisionRequests[0];
-    expect(request.action).toBe("approve");
-    expect(request.versionId).toBe(target.scenarioVersionId); // the VERSION id, not the review id
-    expect(request.body).toEqual({ contentHash: target.contentHash, rubricHash: target.rubricHash }); // hashes from the server, no reason
-    expect(request.key).toMatch(/\S{8,}/);
-    await expect(drawer(page).getByRole("button", { name: "Duyệt nội dung" })).toHaveCount(0);
-
-    await page.keyboard.press("Escape");
-    await expect(rows(page)).toHaveCount(1); // queue refreshed from the server: the approved review left Submitted
-    await expect(rows(page).first()).toContainText("Cháy kho hàng giờ cao điểm");
-
-    await page.goto(`/admin/reviews?status=Approved&review=${target.reviewId}`);
-    await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Approved");
-    await expect(drawer(page).getByTestId("decision-result")).toContainText("đã được duyệt");
-  });
-
-  test("a lost response is retried with the SAME Idempotency-Key and writes once", async ({ page }) => {
-    const server = new ReviewServer(baseSeeds());
-    await install(page, server);
-    server.faults.dropNextResponse = true;
-    await page.goto(`/admin/reviews?review=${server.reviews[0].summary.reviewId}`);
-    await drawer(page).getByRole("button", { name: "Duyệt nội dung" }).click();
-    const confirm = confirmDialog(page, "approve");
-    await confirm.getByRole("button", { name: "Duyệt nội dung" }).click();
-    await expect(confirm.getByText("Chưa xác nhận được quyết định")).toBeVisible();
-    await expect(confirm.getByText("không bị ghi hai lần")).toBeVisible();
-    await confirm.getByRole("button", { name: "Thử lại", exact: true }).click();
-    await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Approved");
-    expect(server.decisionRequests).toHaveLength(2);
-    expect(server.decisionRequests[1].key).toBe(server.decisionRequests[0].key);
-    expect(server.decisionRequests[1].body).toEqual(server.decisionRequests[0].body);
-    expect(server.applied).toHaveLength(1);
-  });
-
-  test("closing and reopening the dialog after a lost response still replays the same key", async ({ page }) => {
-    const server = new ReviewServer(baseSeeds());
-    await install(page, server);
-    server.faults.dropNextResponse = true;
-    await page.goto(`/admin/reviews?review=${server.reviews[0].summary.reviewId}`);
-    await drawer(page).getByRole("button", { name: "Duyệt nội dung" }).click();
-    await confirmDialog(page, "approve").getByRole("button", { name: "Duyệt nội dung" }).click();
-    await expect(page.getByText("Chưa xác nhận được quyết định")).toBeVisible();
-    await page.getByRole("button", { name: "Hủy" }).click();
-    await drawer(page).getByRole("button", { name: "Duyệt nội dung" }).click();
-    await confirmDialog(page, "approve").getByRole("button", { name: "Duyệt nội dung" }).click();
-    await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Approved");
-    expect(server.decisionRequests[1].key).toBe(server.decisionRequests[0].key);
-    expect(server.applied).toHaveLength(1);
-  });
-
-  test("reject requires a 1-4000 character reason, counts characters, and sends the trimmed reason", async ({ page }) => {
-    const server = new ReviewServer(baseSeeds());
-    await install(page, server);
-    const target = server.reviews[0].summary;
-    await page.goto(`/admin/reviews?review=${target.reviewId}`);
-    await drawer(page).getByRole("button", { name: "Từ chối", exact: true }).click();
-    const confirm = confirmDialog(page, "reject");
-    await expect(confirm).toContainText("phiên bản mới");
-    await expect(confirm).toContainText("0/4000 ký tự");
-
-    await confirm.getByRole("button", { name: "Từ chối phiên bản" }).click();
-    await expect(confirm.getByText("Nhập lý do từ chối (1–4000 ký tự).")).toBeVisible();
-    await confirm.getByLabel(/Lý do từ chối/).fill("    \n  ");
-    await confirm.getByRole("button", { name: "Từ chối phiên bản" }).click();
-    await expect(confirm.getByText("Nhập lý do từ chối (1–4000 ký tự).")).toBeVisible();
-
-    await confirm.getByLabel(/Lý do từ chối/).fill("x".repeat(4001));
-    await expect(confirm).toContainText("4001/4000 ký tự");
-    await confirm.getByRole("button", { name: "Từ chối phiên bản" }).click();
-    await expect(confirm.getByText("Lý do tối đa 4000 ký tự (đang 4001).")).toBeVisible();
-    expect(server.decisionRequests).toHaveLength(0);
-
-    await confirm.getByLabel(/Lý do từ chối/).fill("  Thiếu tiêu chí thời gian phản ứng.  ");
-    await expect(confirm).toContainText("34/4000 ký tự");
-    await confirm.getByRole("button", { name: "Từ chối phiên bản" }).click();
-    await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Rejected");
-    expect(server.decisionRequests).toHaveLength(1);
-    expect(server.decisionRequests[0].action).toBe("reject");
-    expect(server.decisionRequests[0].body).toEqual({ contentHash: target.contentHash, rubricHash: target.rubricHash, reason: "Thiếu tiêu chí thời gian phản ứng." });
-    await expect(drawer(page).getByTestId("reject-reason")).toContainText("Thiếu tiêu chí thời gian phản ứng.");
-
-    await page.goto(`/admin/reviews?status=Rejected&review=${target.reviewId}`);
-    await expect(drawer(page).getByTestId("reject-reason")).toContainText("Thiếu tiêu chí thời gian phản ứng.");
-  });
-
-  test("a reason of exactly 4000 characters is accepted", async ({ page }) => {
-    const server = new ReviewServer(baseSeeds());
-    await install(page, server);
-    await page.goto(`/admin/reviews?review=${server.reviews[0].summary.reviewId}`);
-    await drawer(page).getByRole("button", { name: "Từ chối", exact: true }).click();
-    const confirm = confirmDialog(page, "reject");
-    await confirm.getByLabel(/Lý do từ chối/).fill("y".repeat(4000));
-    await confirm.getByRole("button", { name: "Từ chối phiên bản" }).click();
-    await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Rejected");
-    expect((server.decisionRequests[0].body.reason as string).length).toBe(4000);
-  });
-
-  test("429 keeps the dialog and the key; changing the reason mints a new key", async ({ page }) => {
-    const server = new ReviewServer(baseSeeds());
-    await install(page, server);
-    server.faults.rateLimitNext = true;
-    await page.goto(`/admin/reviews?review=${server.reviews[0].summary.reviewId}`);
-    await drawer(page).getByRole("button", { name: "Từ chối", exact: true }).click();
-    const confirm = confirmDialog(page, "reject");
-    await confirm.getByLabel(/Lý do từ chối/).fill("Cần bổ sung rubric.");
-    await confirm.getByRole("button", { name: "Từ chối phiên bản" }).click();
-    await expect(confirm.getByText("Thử lại sau 2 giây")).toBeVisible();
-    await expect(confirm.getByLabel(/Lý do từ chối/)).toHaveValue("Cần bổ sung rubric.");
-
-    await confirm.getByLabel(/Lý do từ chối/).fill("Cần bổ sung rubric và thời gian.");
-    server.faults.rateLimitNext = true;
-    await confirm.getByRole("button", { name: /Thử lại/ }).click();
-    await expect(confirm.getByText("Thử lại sau 2 giây")).toBeVisible();
-    expect(server.decisionRequests[1].key).not.toBe(server.decisionRequests[0].key);
-
-    await confirm.getByRole("button", { name: /Thử lại/ }).click();
-    await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Rejected");
-    expect(server.decisionRequests[2].key).toBe(server.decisionRequests[1].key);
-    expect(server.applied).toHaveLength(1);
-  });
-
-  test("409 not pending: another admin decided first, so the screen reloads and shows the real state", async ({ page }) => {
-    const server = new ReviewServer(baseSeeds());
-    await install(page, server);
-    const target = server.reviews[0];
-    await page.goto(`/admin/reviews?review=${target.summary.reviewId}`);
-    await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Submitted");
-    target.summary.status = "Rejected"; // someone else rejected it after this admin opened the detail
-    target.summary.decidedBy = ADMIN_ID;
-    target.summary.decidedAt = "2026-10-14T09:00:00Z";
-    target.summary.reason = "Từ chối bởi quản trị viên khác.";
-    await drawer(page).getByRole("button", { name: "Duyệt nội dung" }).click();
-    await confirmDialog(page, "approve").getByRole("button", { name: "Duyệt nội dung" }).click();
-    await expect(drawer(page).getByText("Quyết định chưa được ghi")).toBeVisible();
-    await expect(drawer(page).getByText("không còn ở trạng thái chờ duyệt")).toBeVisible();
-    await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Rejected");
-    await expect(drawer(page).getByTestId("reject-reason")).toContainText("Từ chối bởi quản trị viên khác.");
-    await expect(drawer(page).getByRole("button", { name: "Duyệt nội dung" })).toHaveCount(0);
-    expect(server.applied).toHaveLength(0);
-    await page.keyboard.press("Escape");
-    await expect(rows(page)).toHaveCount(1); // queue also refreshed
-  });
-
-  test("409 hash mismatch reloads the detail so the admin reviews the current hashes before deciding again", async ({ page }) => {
-    const server = new ReviewServer(baseSeeds());
-    await install(page, server);
-    const target = server.reviews[0];
-    const original = target.summary.contentHash;
-    await page.goto(`/admin/reviews?review=${target.summary.reviewId}`);
-    await expect(drawer(page).getByTestId("review-detail")).toBeVisible();
-    target.summary.contentHash = hex("f0");
-    await drawer(page).getByRole("button", { name: "Duyệt nội dung" }).click();
-    await confirmDialog(page, "approve").getByRole("button", { name: "Duyệt nội dung" }).click();
-    await expect(drawer(page).getByText("Nội dung phiên bản không khớp với bản đang xem")).toBeVisible();
-    await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Submitted");
-    await drawer(page).getByTestId("review-support").locator("summary").click();
-    await drawer(page).getByTestId("hash-content").locator("xpath=following-sibling::button").click();
-    await expect(drawer(page).getByTestId("hash-content")).toHaveText(hex("f0"));
-    await drawer(page).getByRole("button", { name: "Duyệt nội dung" }).click();
-    await confirmDialog(page, "approve").getByRole("button", { name: "Duyệt nội dung" }).click();
-    await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Approved");
-    expect(server.decisionRequests[0].body.contentHash).toBe(original);
-    expect(server.decisionRequests[1].body.contentHash).toBe(hex("f0"));
-    expect(server.decisionRequests[1].key).not.toBe(server.decisionRequests[0].key);
-  });
-
-  for (const [status, code, text] of [[404, "NOT_FOUND", "Không tìm thấy phiên bản này"], [403, "FORBIDDEN", "Chỉ quản trị FET3D được duyệt hoặc từ chối"], [401, "UNAUTHORIZED", "Phiên đăng nhập đã hết hạn hoặc bị thu hồi"]] as const) {
-    test(`${status} on a decision is explained and nothing is guessed`, async ({ page }) => {
-      const server = new ReviewServer(baseSeeds());
-      await install(page, server);
-      server.faults.failNext = { status, code };
-      await page.goto(`/admin/reviews?review=${server.reviews[0].summary.reviewId}`);
-      await drawer(page).getByRole("button", { name: "Duyệt nội dung" }).click();
-      await confirmDialog(page, "approve").getByRole("button", { name: "Duyệt nội dung" }).click();
-      await expect(drawer(page).getByText("Quyết định chưa được ghi")).toBeVisible();
-      await expect(drawer(page).getByText(text)).toBeVisible();
-      await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Submitted"); // server state, not an assumed success
-      expect(server.applied).toHaveLength(0);
-    });
-  }
-
-  test("buttons are locked while the detail is reloading and double clicks send one request", async ({ page }) => {
-    const server = new ReviewServer(baseSeeds());
-    await install(page, server);
-    await page.goto(`/admin/reviews?review=${server.reviews[0].summary.reviewId}`);
-    // The open drawer hides the rest of the page from the accessibility tree, so the sidebar badge is found by its link.
-    const navCount = page.locator('a[href="/admin/reviews"] .ops-nav-count').first();
-    await expect(navCount).toHaveText("2");
-    await drawer(page).getByRole("button", { name: "Duyệt nội dung" }).click();
-    const confirm = confirmDialog(page, "approve");
-    await confirm.getByTestId("confirm-decision").dblclick();
-    await expect(drawer(page).getByTestId("review-detail")).toHaveAttribute("data-review-status", "Approved");
-    expect(server.decisionRequests).toHaveLength(1);
-    await expect(navCount).toHaveText("1"); // the sidebar badge follows the decision without a reload
-  });
+test("the admin screen is read-only since BE#211: no decision buttons and no decision request", async ({ page }) => {
+  const server = new ReviewServer(baseSeeds());
+  await install(page, server);
+  await page.goto(`/admin/reviews?review=${server.reviews[0].summary.reviewId}`);
+  const dialog = drawer(page);
+  await expect(dialog.getByTestId("review-detail")).toHaveAttribute("data-review-status", "Submitted");
+  await expect(dialog.getByTestId("review-readonly")).toContainText("Chuyên viên PCCC thẩm định nội dung này.");
+  await expect(dialog.getByRole("button", { name: /thẩm định|chưa đạt|từ chối|duyệt/i })).toHaveCount(0);
+  expect(server.decisionRequests).toHaveLength(0);
 });
 
 for (const width of [1440, 375]) {
   for (const theme of ["light", "dark"] as const) {
-    test(`queue, detail and dialogs fit ${width}px in the ${theme} theme`, async ({ page }, testInfo) => {
+    test(`queue and detail fit ${width}px in the ${theme} theme`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: width === 375 ? 800 : 900 });
       await page.emulateMedia({ colorScheme: theme });
       const server = new ReviewServer(baseSeeds());
@@ -646,13 +439,6 @@ for (const width of [1440, 375]) {
       expect(box.scroll - box.client, "drawer overflows horizontally").toBeLessThanOrEqual(0);
       await page.screenshot({ path: testInfo.outputPath(`reviews-detail-${width}-${theme}.png`) });
 
-      await drawer(page).getByRole("button", { name: "Từ chối", exact: true }).click();
-      const confirm = confirmDialog(page, "reject");
-      await confirm.getByLabel(/Lý do từ chối/).fill("Thiếu tiêu chí thời gian phản ứng. ".repeat(6));
-      await noOverflow("reject dialog");
-      const dialogBox = await confirm.evaluate((element) => ({ scroll: element.scrollWidth, client: element.clientWidth }));
-      expect(dialogBox.scroll - dialogBox.client, "dialog overflows horizontally").toBeLessThanOrEqual(0);
-      await page.screenshot({ path: testInfo.outputPath(`reviews-reject-${width}-${theme}.png`) });
     });
   }
 }

@@ -7,7 +7,7 @@ import { classifyUploadError } from "../../src/features/buildings/ifc-upload";
 // (BE docs/ifc-equipment-candidates.md, docs/ifc-qa-codes.md). Route mocks only: UI evidence, not BE integration.
 
 const owner = { id: "owner", email: "owner@fire3d.test", fullName: "Nguyễn Văn A", username: "nguyen.van.a", role: 1, organizationId: "org-1", profileRevision: 1 };
-const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "Trường học", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: null, contact: null };
+const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "School", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: null, contact: null };
 const revision = (status: string) => ({ id: "rev-1", buildingId: "building-1", versionLabel: "IFC rev. 01", status, createdAt: "2026-10-01T00:00:00Z", sourceDocument: null });
 const page1 = <T,>(items: T[]) => ({ items, totalCount: items.length, page: 1, pageSize: 20 });
 

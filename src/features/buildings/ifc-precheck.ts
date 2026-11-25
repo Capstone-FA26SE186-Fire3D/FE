@@ -6,7 +6,7 @@
  * security boundary.
  */
 
-/** No server value is exposed yet (BE#214); above this the browser refuses instead of starting a very long upload. */
+/** Used only until `GET /api/ifc/upload-limits` answers (BE#214), or when it cannot be read; the server refuses anything above its own limit anyway. */
 export const IFC_MAX_BYTES = 1024 * 1024 * 1024;
 const HEADER_BYTES = 64 * 1024;
 const SUPPORTED_SCHEMAS = ["IFC2X3", "IFC4X3", "IFC4"] as const;

@@ -18,7 +18,7 @@ const VALID_IFC = `${IFC_HEADER}#1=IFCBUILDINGSTOREY('s');\n#2=IFCSPACE('r');\n#
 
 const owner = { id: "owner", email: "owner@fire3d.test", fullName: "Nguyễn Văn A", username: "nguyen.van.a", role: 1, organizationId: "org-1", profileRevision: 1 };
 const admin = { id: "admin", email: "admin@fire3d.test", fullName: "Platform Admin", role: 0, organizationId: null, profileRevision: 1 };
-const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "Trường học", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: { id: "loc-1", address: "1 Test Street", city: "Hà Nội", district: "Cầu Giấy", latitude: null, longitude: null, geojson: null }, contact: null };
+const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "School", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: { id: "loc-1", address: "1 Test Street", city: "Hà Nội", district: "Cầu Giấy", latitude: null, longitude: null, geojson: null }, contact: null };
 const rev1 = { id: "rev-1", buildingId: "building-1", versionLabel: "IFC rev. 01", status: "ReadyForScenario", createdAt: "2026-10-01T00:00:00Z", sourceDocument: { id: "src-1", originalFilename: "school.ifc", fileSizeBytes: 128, quarantineStatus: "Accepted", createdAt: "2026-10-01T00:00:00Z" } };
 const rev2 = { id: "rev-2", buildingId: "building-1", versionLabel: "IFC rev. 02", status: "Uploaded", createdAt: "2026-10-02T00:00:00Z", sourceDocument: { id: "src-2", originalFilename: "school2.ifc", fileSizeBytes: 256, quarantineStatus: "Accepted", createdAt: "2026-10-02T00:00:00Z" } };
 const page1 = <T,>(items: T[]) => ({ items, totalCount: items.length, page: 1, pageSize: 20 });
@@ -784,7 +784,7 @@ test.describe("journey info card edit", () => {
 
 test.describe("PlatformAdmin by organization", () => {
   const orgs = { items: [{ id: "org-1", name: "FET3D Lab", slug: "fet3d-lab", isActive: true, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" }, { id: "org-2", name: "Trường ABC", slug: "abc", isActive: true, createdAt: "2026-10-01T00:00:00Z", updatedAt: "2026-10-01T00:00:00Z" }], totalCount: 2, page: 1, pageSize: 100 };
-  const summary = { id: "building-1", name: "Trường Tiểu học", buildingType: "Trường học", totalFloors: 3, isActive: true, createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z" };
+  const summary = { id: "building-1", name: "Trường Tiểu học", buildingType: "School", totalFloors: 3, isActive: true, createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z" };
 
   test("lists, creates and archives buildings of the selected organization through organizationId", async ({ page }) => {
     await signIn(page, admin);

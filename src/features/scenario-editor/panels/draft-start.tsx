@@ -13,6 +13,7 @@ import { Panel } from "@/components/ui/panel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buildingsApi } from "@/features/buildings/api";
 import { revisionLabel } from "@/features/buildings/pipeline";
+import { LockedInfrastructureNote, useLockedInfrastructure } from "@/features/fire-infrastructure/locked";
 import { scenarioVersionsApi } from "@/features/scenarios/versions-api";
 
 import { createDraftV1 } from "../v1/create-draft";
@@ -38,15 +39,17 @@ export function DraftStart({ accessToken, buildingId, scenarioId, onOpen }: { ac
   const selectedStatus = items.find((revision) => revision.id === selected)?.status;
   const floors = useRevisionFloors(accessToken, selected || undefined);
   const geometry = floors.reading;
+  const infrastructure = useLockedInfrastructure(accessToken, selected || undefined);
+  const locked = infrastructure.locked;
 
   const create = async (event: FormEvent) => {
     event.preventDefault();
     // A v1 draft pins Geometry, so nothing is created for a revision without a valid, accepted artifact.
-    if (!selected || creating || geometry?.kind !== "valid") return;
+    if (!selected || creating || geometry?.kind !== "valid" || !locked) return;
     setCreating(true);
     setError(null);
     try {
-      const created = await createDraftV1(accessToken, { scenarioId, revisionId: selected, pin: geometry.pin, idempotencyKey: keyFor({ scenarioId, revisionId: selected }) });
+      const created = await createDraftV1(accessToken, { scenarioId, revisionId: selected, infrastructureId: locked.id, pin: geometry.pin, idempotencyKey: keyFor({ scenarioId, revisionId: selected, infrastructureId: locked.id }) });
       done();
       onOpen(created.id);
     } catch (cause) {
@@ -82,8 +85,9 @@ export function DraftStart({ accessToken, buildingId, scenarioId, onOpen }: { ac
               </Field>
               {selected && selectedStatus && <RevisionStatusNote status={selectedStatus} buildingId={buildingId} revisionId={selected} />}
               {selected && <FloorsStatus reading={geometry} loading={floors.loading} error={floors.error} reload={floors.reload} buildingId={buildingId} revisionId={selected} />}
+              {selected && geometry?.kind === "valid" && <LockedInfrastructureNote state={infrastructure} buildingId={buildingId} revisionId={selected} />}
               {error && <Alert tone="danger" title="Tạo bản nháp thất bại">{error}</Alert>}
-              <div><Button type="submit" disabled={creating || geometry?.kind !== "valid"} data-testid="create-draft" title={geometry?.kind === "valid" ? undefined : "Cần mô hình 3D hợp lệ của bản IFC này"}>{creating ? "Đang tạo…" : "Tạo bản nháp"}</Button></div>
+              <div><Button type="submit" disabled={creating || geometry?.kind !== "valid" || !locked} data-testid="create-draft" title={geometry?.kind === "valid" ? undefined : "Cần mô hình 3D hợp lệ của bản IFC này"}>{creating ? "Đang tạo…" : "Tạo bản nháp"}</Button></div>
             </form>}
     </Panel>
   </div>;

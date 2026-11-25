@@ -7,7 +7,7 @@ import { derivePipelineProgress, emptyPipeline } from "../../src/features/buildi
 // QA moves the revision with the Succeeded job). UI evidence, not BE integration.
 
 const owner = { id: "owner", email: "owner@fire3d.test", fullName: "Nguyễn Văn A", username: "nguyen.van.a", role: 1, organizationId: "org-1", profileRevision: 1 };
-const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "Trường học", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: null, contact: null };
+const building = { id: "building-1", name: "Trường Tiểu học", buildingType: "School", totalFloors: 3, isActive: true, organizationId: "org-1", createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z", location: null, contact: null };
 const page1 = <T,>(items: T[]) => ({ items, totalCount: items.length, page: 1, pageSize: 20 });
 const source = (quarantineStatus = "Accepted") => ({ id: "src-2", originalFilename: "school.ifc", fileSizeBytes: 256, quarantineStatus, createdAt: "2026-10-02T00:00:00Z" });
 const rev = (status: string, extra: Record<string, unknown> = {}) => ({ id: "rev-2", buildingId: "building-1", versionLabel: "IFC rev. 02", status, createdAt: "2026-10-02T00:00:00Z", sourceDocument: source(), ...extra });
@@ -130,7 +130,7 @@ test.describe("IFC progress view", () => {
     await expect(page.getByTestId("details-tab-issues")).toHaveAttribute("aria-pressed", "true");
     // Pass/fail criteria of the processed model, read from the same issues: the exit blocks, missing equipment is a note.
     const criteria = page.getByTestId("qa-criteria").getByRole("listitem");
-    await expect(criteria).toHaveCount(9);
+    await expect(criteria).toHaveCount(12);
     await expect(criteria.filter({ hasText: "Xác định được cửa thoát ra ngoài" })).toHaveAttribute("data-state", "fail");
     await expect(criteria.filter({ hasText: "Có thiết bị báo cháy, chữa cháy" })).toHaveAttribute("data-state", "warn");
     await expect(criteria.filter({ hasText: "Có phòng" }).first()).toHaveAttribute("data-state", "pass");

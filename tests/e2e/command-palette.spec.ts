@@ -5,7 +5,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const owner = { id: "owner", email: "owner@fire3d.test", fullName: "Nguyễn Văn A", username: "nguyen.van.a", role: 1, organizationId: "org-1", profileRevision: 1 };
 const buildings = [
-  { id: "b-1", name: "Trường Học GOT", buildingType: "Trường học", totalFloors: 3, isActive: true, createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z" },
+  { id: "b-1", name: "Trường Học GOT", buildingType: "School", totalFloors: 3, isActive: true, createdAt: "2026-10-05T00:00:00Z", updatedAt: "2026-10-05T00:00:00Z" },
   { id: "b-2", name: "Nhà ở", buildingType: "Nhà ở", totalFloors: 4, isActive: true, createdAt: "2026-10-04T00:00:00Z", updatedAt: "2026-10-04T00:00:00Z" },
 ];
 

@@ -48,7 +48,7 @@ const tabLabels: Record<TabId, string> = {
   content: "Tổng quan",
   build: "Dựng gói",
   readiness: "Kiểm tra",
-  review: "Gửi duyệt",
+  review: "Gửi thẩm định",
   release: "Phát hành",
   playtest: "Chạy thử",
 };
@@ -66,7 +66,7 @@ function VersionSummary({ version }: { version: ScenarioVersionDetail }) {
     </div>
     <dl className="ver-meta">
       <div><dt>Tạo lúc</dt><dd>{formatDateTime(version.createdAt)}</dd></div>
-      <div><dt>Mã nội dung</dt><dd className="ver-hash" title="Dùng để đối chiếu khi duyệt">#{shortHash(version.scenarioHash, 8)}</dd></div>
+      <div><dt>Mã nội dung</dt><dd className="ver-hash" title="Dùng để đối chiếu khi thẩm định">#{shortHash(version.scenarioHash, 8)}</dd></div>
       <div><dt>Thời gian làm bài</dt><dd>{version.timeLimitSeconds} giây</dd></div>
       <div><dt>Tiêu chí chấm</dt><dd>{version.rubric ? `${criteria} tiêu chí · đạt từ ${version.rubric.pass_threshold ?? "—"}` : "Chưa có"}</dd></div>
     </dl>
@@ -135,7 +135,7 @@ function Workbench({ accessToken, buildingId, scenario, versionCount, editorHref
   return <>
     <JourneyPanel input={journey} editorHref={editorHref} onTab={goToTab} onSnapshot={onSnapshot} canAct={canAct} gates={<GateStepper gates={[
       { id: "technical", title: "Kiểm tra kỹ thuật", state: technical },
-      { id: "approval", title: "Duyệt nội dung", state: approvalGate(version.reviewStatus, version.rejectReason) },
+      { id: "approval", title: "Thẩm định nội dung", state: approvalGate(version.reviewStatus, version.rejectReason) },
       { id: "release", title: "Phát hành", state: releaseGate(server.releaseView.release) },
     ]} />} />
     {server.readiness.error !== undefined && !readiness && <Alert tone="danger" title="Không đọc được điều kiện phát hành" action={<Button size="sm" variant="secondary" className="mt-3" onClick={server.readiness.reload}>Thử lại</Button>}>{describeError(server.readiness.error).message} Các cổng ở trên chỉ phản ánh phần đã tải được.</Alert>}
@@ -199,7 +199,7 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
 
   const detail = useAsyncData(`version:${selectedId}`, (signal) => scenarioVersionsApi.getVersion(token, selectedId, signal), enabled && Boolean(selectedId));
   // The submit response says the version is now under review; until the re-read reports it (a slow or failed read would
-  // leave "Chưa gửi duyệt" and an enabled button on screen), the page shows that state. The server's answer wins as soon
+  // leave "Chưa gửi thẩm định" and an enabled button on screen), the page shows that state. The server's answer wins as soon
   // as it says anything other than "not submitted".
   const [submittedHere, setSubmittedHere] = useState<{ versionId: string; submission: ContentReviewSubmission } | null>(null);
   const detailForSelection = useMemo(() => {
@@ -265,7 +265,7 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
           <h1>{scenario.data?.name ?? "Phiên bản và phát hành"}</h1>
           {selected && selectedGate && <StatusBadge tone={selectedGate.tone}>v{selected.versionNumber} · {selectedGate.label}</StatusBadge>}
         </div>
-        <p>{selected ? <>Nội dung đã khóa · tạo {formatDateTime(selected.createdAt)}</> : "Mỗi phiên bản được đóng băng khi tạo. Sửa nội dung sẽ tạo phiên bản mới và duyệt lại."}</p>
+        <p>{selected ? <>Nội dung đã khóa · tạo {formatDateTime(selected.createdAt)}</> : "Mỗi phiên bản được đóng băng khi tạo. Sửa nội dung sẽ tạo phiên bản mới và thẩm định lại."}</p>
       </div>
       <div className="ops-actions">
         <Button variant="secondary" size="icon" onClick={reloadAll} disabled={versions.loading} aria-label="Tải lại" title="Tải lại"><RefreshCw size={16} aria-hidden="true" /></Button>
@@ -290,7 +290,7 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
       <div className="ver-overview">
         {versionList}
         <div className="ver-overview-main">
-          <Alert tone="info" title="Chọn hoặc tạo một phiên bản">Dựng gói, kiểm tra, gửi duyệt và phát hành đều làm trên một phiên bản cụ thể.</Alert>
+          <Alert tone="info" title="Chọn hoặc tạo một phiên bản">Dựng gói, kiểm tra, gửi thẩm định và phát hành đều làm trên một phiên bản cụ thể.</Alert>
         </div>
       </div>
     </>}

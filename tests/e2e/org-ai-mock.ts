@@ -128,7 +128,7 @@ export function newAiMock(overrides: Partial<AiMock> = {}): AiMock {
     ],
     verify: {},
     orgs: [{ id: "org-1", name: "Trường Mẫu", isActive: true }, { id: "org-2", name: "Công ty B", isActive: true }],
-    buildings: [{ id: BUILDING_ID, name: "Tòa nhà A", buildingType: "Trường học", totalFloors: 2, isActive: true, createdAt: iso(-5000) }],
+    buildings: [{ id: BUILDING_ID, name: "Tòa nhà A", buildingType: "School", totalFloors: 2, isActive: true, createdAt: iso(-5000) }],
     revisions: [{ id: REVISION_ID, buildingId: BUILDING_ID, versionLabel: "IFC rev. 01", status: "ReadyForScenario", createdAt: iso(-4500), sourceDocument: null }],
     scenarios: [{ id: SCENARIO_ID, buildingId: BUILDING_ID, name: "Thoát hiểm tầng một", createdAt: iso(-4000) }],
     counter: 0,

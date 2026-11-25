@@ -110,7 +110,7 @@ export function SnapshotDrawer({ open, onOpenChange, accessToken, scenarioId, in
       const key = keyFor({ draftId: loaded.draft.id, eTag: loaded.eTag });
       const created = await scenarioVersionsApi.snapshotDraft(accessToken, loaded.draft.id, loaded.eTag, key);
       done();
-      toast.notify({ tone: "success", title: "Đã tạo phiên bản mới", description: "Nội dung đã khóa. Chưa gửi duyệt." });
+      toast.notify({ tone: "success", title: "Đã tạo phiên bản mới", description: "Nội dung đã khóa. Chưa gửi thẩm định." });
       onOpenChange(false);
       onCreated(created.id);
     } catch (cause) {
@@ -168,7 +168,7 @@ export function SnapshotDrawer({ open, onOpenChange, accessToken, scenarioId, in
     size="lg"
     onOpenChange={(next) => { if (!busy) onOpenChange(next); }}
     title="Tạo phiên bản mới từ bản nháp"
-    description="Khóa nội dung và tiêu chí chấm của bản nháp đã chọn thành một phiên bản không sửa được nữa. Việc này chưa gửi duyệt."
+    description="Khóa nội dung và tiêu chí chấm của bản nháp đã chọn thành một phiên bản không sửa được nữa. Việc này chưa gửi thẩm định."
   >
     <div className="ops-stack">
       <fieldset className="ops-fieldset">
@@ -223,7 +223,7 @@ export function SnapshotDrawer({ open, onOpenChange, accessToken, scenarioId, in
         </div>
       </fieldset>}
 
-      <p className="ver-note">Sau khi tạo, bạn dựng gói, xem kết quả kiểm tra rồi gửi duyệt. Bấm lại khi mạng lỗi không tạo thêm phiên bản trùng.</p>
+      <p className="ver-note">Sau khi tạo, bạn dựng gói, xem kết quả kiểm tra rồi gửi thẩm định. Bấm lại khi mạng lỗi không tạo thêm phiên bản trùng.</p>
 
       {snapshotHint && <p className="ver-note" role="status" id="snapshot-hint">{snapshotHint}</p>}
       <div className="ops-actions" style={{ justifyContent: "flex-end" }}>

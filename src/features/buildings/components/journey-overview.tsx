@@ -21,6 +21,8 @@ import { describeBuildingWriteError, formatDateTime } from "../format";
 import type { RevisionPipeline } from "../pipeline";
 import type { Building, BuildingRevision, RevisionIssue } from "../types";
 import { BuildingConflictAlert, BuildingForm, buildingFormToInput, formFromBuilding, validateBuildingForm, type FormState } from "./building-form";
+import { buildingTypeLabel, riskGroupInfo } from "../data/building-types";
+import { SignedPlan } from "./signed-plan";
 import "../journey.css";
 
 function StepMarker({ step }: { step: JourneyStepModel }) {
@@ -96,8 +98,8 @@ export function JourneyOverview({ accessToken, building, etag, revision, pipelin
   const next: NextCard | null = (() => {
     if (waiting && focus) {
       const review = scenario?.reviewStatus?.toLowerCase();
-      const title = review === "submitted" ? `Đang chờ quản trị FET3D duyệt v${scenario?.versionNumber}` : review === "rejected" ? `Phiên bản v${scenario?.versionNumber} bị từ chối` : "Tiếp theo: gửi duyệt nội dung";
-      const text = review === "rejected" && scenario?.rejectReason ? `Lý do: ${scenario.rejectReason}` : "Bạn vẫn xem và sửa bản nháp; sửa sau khi gửi sẽ tạo phiên bản mới và duyệt lại.";
+      const title = review === "submitted" ? `Đang chờ Chuyên viên PCCC thẩm định v${scenario?.versionNumber}` : review === "rejected" ? `Phiên bản v${scenario?.versionNumber} chưa đạt thẩm định` : "Tiếp theo: gửi thẩm định nội dung";
+      const text = review === "rejected" && scenario?.rejectReason ? `Lý do: ${scenario.rejectReason}` : "Bạn vẫn xem và sửa bản nháp; sửa sau khi gửi sẽ tạo phiên bản mới và thẩm định lại.";
       return versionsHref ? { eyebrow: `Việc tiếp theo · bước ${focus.index}`, title, detail: text, label: "Xem phiên bản", icon: <Clock size={18} />, href: versionsHref, passive: review === "submitted" } : null;
     }
     if (!current) return null;
@@ -163,6 +165,7 @@ function InfoCard({ accessToken, building, etag, address, isAdmin, onSaved }: { 
   // After a 412 the save targets the server's newer version (body `current` + new ETag) until the page reloads the detail.
   const [stale, setStale] = useState<{ current: Building; etag: string | null; adopted?: boolean } | null>(null);
   const base = stale?.current ?? building;
+  const risk = riskGroupInfo(building.riskGroup);
 
   const openEdit = () => { setForm(formFromBuilding(building)); setErrors({}); setFormError(""); setStale(null); setOpen(true); };
 
@@ -208,12 +211,19 @@ function InfoCard({ accessToken, building, etag, address, isAdmin, onSaved }: { 
     </div>
     <dl className="jr-kv">
       <div><dt>Tên</dt><dd>{building.name}</dd></div>
-      <div><dt>Loại công trình</dt><dd>{building.buildingType || "Chưa phân loại"}</dd></div>
+      <div><dt>Loại công trình</dt><dd>{buildingTypeLabel(building.buildingType) || "Chưa phân loại"}</dd></div>
       <div><dt>Số tầng</dt><dd>{building.totalFloors}</dd></div>
+      <div><dt>Tổng diện tích sàn</dt><dd>{building.floorAreaSquareMeters != null ? `${building.floorAreaSquareMeters.toLocaleString("vi-VN")} m²` : "Chưa nhập"}</dd></div>
+      <div><dt>Nhóm nguy cơ cháy</dt><dd data-testid="risk-group">{risk ? <><StatusBadge tone={risk.tone}>{risk.label}</StatusBadge> <small className="ops-field-hint">{risk.note}</small></> : "Chưa xác định (cần chọn loại công trình)"}</dd></div>
+      <div><dt>Người đứng đầu cơ sở</dt><dd>{building.facilityHeadName ? `${building.facilityHeadName}${building.facilityHeadPhone ? ` · ${building.facilityHeadPhone}` : ""}` : "Chưa nhập"}</dd></div>
+      <div><dt>Lực lượng PCCC tại chỗ</dt><dd>{building.onSiteForce ? `${building.onSiteForce.teamSize} người${building.onSiteForce.availableInHours ? " · trong giờ" : ""}${building.onSiteForce.availableOffHours ? " · ngoài giờ" : ""}` : "Chưa nhập"}</dd></div>
+      <div><dt>Danh bạ khẩn cấp</dt><dd>{building.emergencyContacts?.length ? `${building.emergencyContacts.length} liên hệ` : "Chưa nhập"}</dd></div>
       <div><dt>Địa chỉ</dt><dd>{address || "Chưa nhập"}</dd></div>
       <div><dt>Trạng thái</dt><dd><StatusBadge tone={building.isActive ? "success" : "neutral"}>{building.isActive ? "Đang dùng" : "Đã lưu trữ"}</StatusBadge></dd></div>
       <div><dt>Cập nhật</dt><dd>{formatDateTime(building.updatedAt)}</dd></div>
     </dl>
+    <h3 className="org-card-title" style={{ margin: "18px 0 10px", fontSize: "1rem" }}>Phương án PC06 đã ký</h3>
+    <SignedPlan accessToken={accessToken} buildingId={building.id} hasPlan={Boolean(building.signedPlanDocumentId)} onChanged={onSaved} />
 
     <Modal open={open} onOpenChange={(next) => { if (!next && !saving) setOpen(false); }} size="md" title="Sửa thông tin công trình" description="Tọa độ và liên hệ không hiển thị ở đây được giữ nguyên."
       footer={<><Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={saving}>Hủy</Button><SubmitButton type="submit" form="building-info-form" state={saving ? "busy" : "idle"}>Lưu thay đổi</SubmitButton></>}>

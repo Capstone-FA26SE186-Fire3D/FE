@@ -21,6 +21,10 @@ const CODES: Record<string, QaGuide> = {
   IFC_TRIANGLE_BUDGET_EXCEEDED: { title: "Mô hình quá nặng", guidance: "Xuất lại IFC với mức chi tiết thấp hơn.", action: "reupload" },
   IFC_DEFAULT_MASS_PRESENT: { title: "Có khối quy hoạch (đã loại bỏ)", guidance: null },
   IFC_UNSUPPORTED_FORMAT: { title: "Tệp không phải IFC", guidance: "Xuất IFC (IFC2X3, IFC4 hoặc IFC4X3) rồi tải lên lại.", action: "reupload" },
+  // BE#214
+  IFC_NO_STOREYS: { title: "Mô hình không có tầng", guidance: "Khai báo tầng trong phần mềm thiết kế rồi xuất lại IFC.", action: "reupload" },
+  IFC_NO_STAIRS_MULTISTOREY: { title: "Nhà nhiều tầng nhưng không có cầu thang", guidance: "Thêm cầu thang nối các tầng trong mô hình rồi xuất lại IFC.", action: "reupload" },
+  IFC_UNIT_NOT_METRE: { title: "Đơn vị đo không phải mét", guidance: "Hệ thống đã tự quy đổi sang mét; kiểm tra kích thước ở bản xem trước 3D." },
 };
 
 export function qaGuide(code: string): QaGuide | null {
@@ -32,7 +36,9 @@ export type QaCriterion = { id: string; label: string; passed: boolean; blocking
 /** What the server checks on the processed model, as pass/fail rows; each row is the absence of its issue codes. */
 const CRITERIA: Array<{ id: string; label: string; codes: string[] }> = [
   { id: "architectural", label: "Là mô hình kiến trúc", codes: ["IFC_NOT_ARCHITECTURAL", "IFC_UNSUPPORTED_FORMAT"] },
+  { id: "storeys", label: "Có tầng", codes: ["IFC_NO_STOREYS"] },
   { id: "spaces", label: "Có phòng", codes: ["IFC_NO_SPACES"] },
+  { id: "stairs", label: "Nhà nhiều tầng có cầu thang", codes: ["IFC_NO_STAIRS_MULTISTOREY"] },
   { id: "body", label: "Tường, sàn, cửa, cầu thang có hình khối 3D", codes: ["IFC_NO_BODY_GEOMETRY"] },
   { id: "exit", label: "Xác định được cửa thoát ra ngoài", codes: ["IFC_EXIT_UNKNOWN"] },
   { id: "floors", label: "Phòng có sàn bên dưới", codes: ["IFC_NO_FLOOR_UNDER_SPACE"] },
@@ -40,6 +46,7 @@ const CRITERIA: Array<{ id: string; label: string; codes: string[] }> = [
   { id: "names", label: "Phòng có tên", codes: ["IFC_SPACE_UNNAMED"] },
   { id: "weight", label: "Mô hình đủ nhẹ cho điện thoại", codes: ["IFC_TRIANGLE_BUDGET_EXCEEDED"] },
   { id: "equipment", label: "Có thiết bị báo cháy, chữa cháy", codes: ["IFC_NO_FIRE_EQUIPMENT"] },
+  { id: "units", label: "Đơn vị đo là mét", codes: ["IFC_UNIT_NOT_METRE"] },
 ];
 // The exit stays a blocker while reported as a warning: the model cannot be used until a door is chosen as the exit.
 const ALWAYS_BLOCKING = new Set(["IFC_EXIT_UNKNOWN"]);

@@ -28,7 +28,7 @@ export type AccountFilters = {
 
 export const accountsApi = {
   list(accessToken: string, filters: AccountFilters, signal?: AbortSignal) {
-    return apiClient.request<PageResponse<ApiManagedAccount>>("/api/accounts", { headers: headers(accessToken), query: filters, signal })
+    return apiClient.request<PageResponse<ApiManagedAccount>>("/api/accounts", { headers: headers(accessToken), query: { ...filters, role: filters.role === undefined ? undefined : roleToApiName(filters.role) }, signal })
       .then((page) => ({ ...page, items: page.items.map(normalizeAccount) }));
   },
   /**

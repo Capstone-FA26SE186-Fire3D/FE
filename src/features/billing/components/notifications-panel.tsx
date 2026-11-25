@@ -1,6 +1,7 @@
 "use client";
 
 import { Bell, CheckCheck } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
@@ -11,6 +12,7 @@ import { SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Pagination } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { routes } from "@/configs/routes";
 import { billingApi } from "../api";
 import { EXPIRY_REMINDER_DAYS } from "../entitlements";
 import { billingErrorText } from "../errors";
@@ -25,10 +27,11 @@ const PAGE_SIZE = 10;
  */
 export function ReminderBanner({ accessToken, refreshKey, onOpen }: { accessToken: string; refreshKey?: number; onOpen: () => void }) {
   const unread = useAsyncData(`billing:notifications:banner:${refreshKey ?? 0}`, (signal) => billingApi.listNotifications(accessToken, { unread: true, pageSize: 20 }, signal));
-  const relevant = (unread.data?.items ?? []).filter((item) => item.stillRelevant);
+  // Thẩm định results share the list but are not reminders: only items that carry a period end count here.
+  const relevant = (unread.data?.items ?? []).filter((item) => item.stillRelevant && item.referenceEndsAt);
   if (relevant.length === 0) return null;
   return <Alert tone="warning" title={`${relevant.length} nhắc gia hạn chưa đọc`} className="mb-4" action={<Button size="sm" variant="secondary" className="mt-3" onClick={onOpen}>Xem nhắc gia hạn</Button>}>
-    {relevant.slice(0, 3).map((item) => `${item.buildingName ?? "Công trình"}: hết hạn ${formatDate(item.referenceEndsAt)}`).join("; ")}{relevant.length > 3 ? "…" : ""}. Hệ thống nhắc trước {EXPIRY_REMINDER_DAYS} ngày; gia hạn chọn lọc theo từng công trình.
+    {relevant.slice(0, 3).map((item) => `${item.buildingName ?? "Công trình"}: hết hạn ${formatDate(item.referenceEndsAt as string)}`).join("; ")}{relevant.length > 3 ? "…" : ""}. Hệ thống nhắc trước {EXPIRY_REMINDER_DAYS} ngày; gia hạn chọn lọc theo từng công trình.
   </Alert>;
 }
 
@@ -62,21 +65,24 @@ export function NotificationsPanel({ accessToken, onChanged, onRenew }: { access
     </div>
     {list.error !== undefined && <Alert tone="danger" title="Không tải được thông báo" action={<Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{billingErrorText(list.error)}</Alert>}
     {list.loading && !list.data && <SkeletonRows rows={3} label="Đang tải thông báo…" />}
-    {list.data && items.length === 0 && <EmptyState icon={Bell} title={unreadOnly ? "Không có thông báo chưa đọc" : "Chưa có thông báo"} description="Thông báo hết hạn xuất hiện khi một công trình còn dưới 5 ngày dịch vụ mà chưa có kỳ gia hạn." />}
+    {list.data && items.length === 0 && <EmptyState icon={Bell} title={unreadOnly ? "Không có thông báo chưa đọc" : "Chưa có thông báo"} description="Nhắc gia hạn xuất hiện khi một công trình còn dưới 5 ngày dịch vụ mà chưa có kỳ gia hạn. Kết quả thẩm định hạ tầng PCCC và tình huống cũng báo ở đây." />}
     <ul className="bill-list">
       {items.map((item) => {
-        const days = daysUntil(item.referenceEndsAt);
+        const expiry = item.referenceEndsAt;
+        const days = expiry ? daysUntil(expiry) : null;
+        const resultHref = item.fireInfrastructureId ? `${routes.workspaceBuildings}/${item.buildingId}?tab=ifc&sub=infrastructure` : item.scenarioVersionId || item.contentReviewId ? `${routes.workspaceBuildings}/${item.buildingId}?tab=scenarios` : null;
         return <li key={item.id} data-testid="notification" data-read={item.readAt ? "true" : "false"} data-relevant={item.stillRelevant ? "true" : "false"}>
           <div className="bill-row">
             <div style={{ minWidth: 0 }}>
               <strong className="bill-wrap">{item.title}</strong>
               <p className="bill-muted bill-wrap" style={{ margin: "4px 0 0" }}>{item.body}</p>
-              <p className="bill-dim" style={{ margin: "6px 0 0" }}>{item.buildingName ?? "Công trình"} · kỳ kết thúc {formatDate(item.referenceEndsAt)}{item.stillRelevant && days !== null && days >= 0 ? ` (còn ${days} ngày)` : ""} · gửi {formatDateTime(item.createdAt)}</p>
+              <p className="bill-dim" style={{ margin: "6px 0 0" }}>{item.buildingName ?? "Công trình"}{expiry ? <> · kỳ kết thúc {formatDate(expiry)}{item.stillRelevant && days !== null && days >= 0 ? ` (còn ${days} ngày)` : ""}</> : null} · gửi {formatDateTime(item.createdAt)}</p>
             </div>
             <div className="ops-actions">
-              {!item.stillRelevant && <StatusBadge tone="neutral">Đã gia hạn hoặc hết kỳ</StatusBadge>}
+              {expiry && !item.stillRelevant && <StatusBadge tone="neutral">Đã gia hạn hoặc hết kỳ</StatusBadge>}
               {item.readAt ? <StatusBadge tone="neutral">Đã đọc</StatusBadge> : <StatusBadge tone="ember">Chưa đọc</StatusBadge>}
-              {item.stillRelevant && onRenew && <Button size="sm" variant="secondary" onClick={() => onRenew(item.buildingId)} aria-label={`Gia hạn ${item.buildingName ?? "công trình"}`}>Gia hạn</Button>}
+              {resultHref && <Button asChild size="sm" variant="secondary"><Link href={resultHref} data-testid="notification-open">{item.fireInfrastructureId ? "Mở Hạ tầng PCCC" : "Mở kịch bản"}</Link></Button>}
+              {expiry && item.stillRelevant && onRenew && <Button size="sm" variant="secondary" onClick={() => onRenew(item.buildingId)} aria-label={`Gia hạn ${item.buildingName ?? "công trình"}`}>Gia hạn</Button>}
               {!item.readAt && <Button size="sm" variant="quiet" onClick={() => void markRead(item.id)} disabled={busy === item.id} aria-label={`Đánh dấu đã đọc: ${item.title}`}><CheckCheck size={14} aria-hidden="true" />{busy === item.id ? "Đang lưu…" : "Đã đọc"}</Button>}
             </div>
           </div>

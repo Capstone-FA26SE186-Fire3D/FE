@@ -6,6 +6,7 @@ import {
   KIND_META, MODE_LABEL, TRAINING_MODES, UUID_PATTERN, type GeometryPin, type ObjectKind,
 } from "./contract";
 import type { GeometryInfo } from "./geometry";
+import { categoryOf, isInfrastructureObject, type EditorScope } from "./scope";
 import { quaternionLength, type Quat, type Vec3 } from "./matrix";
 
 /**
@@ -269,6 +270,8 @@ export type ReferenceContext = {
   runtimes: RuntimeOption[] | null;
   /** Server-computed rubric metrics, or null while the rubric catalog is not loaded. */
   metrics: ReadonlySet<string> | null;
+  /** What this editor session may place; absent means a plain scenario draft. */
+  scope?: EditorScope;
 };
 
 /**
@@ -328,5 +331,23 @@ export function completenessIssues(draft: JsonObject, context: ReferenceContext)
   if (typeof draft.runtimeVersion === "string" && context.runtimes && !runtime) {
     out.push(issue("RUNTIME_NOT_SUPPORTED", "$.runtimeVersion", "Phiên bản ứng dụng không còn trong danh sách đang dùng."));
   }
-  return out;
+  return scopedIssues(out, objects, context.scope ?? "scenario");
+}
+
+/** Narrows the scenario checks to what the scope owns (BE `FireInfrastructureRules` and the merged-document rules of BE#213). */
+function scopedIssues(out: Issue[], objects: ObjectView[], scope: EditorScope): Issue[] {
+  if (scope === "scenario") return out;
+  if (scope === "infrastructure") {
+    // An infrastructure has no name, rubric or spawn: only its objects, the pinned Geometry and the runtime are checked.
+    const kept = out.filter((item) => item.path.startsWith("$.objects[") || item.path === "$.geometry" || item.path === "$.runtimeVersion");
+    if (!objects.some((object) => categoryOf(object.kind, object.capability?.id) === "Exit")) kept.push(issue("EXIT_REQUIRED", "$.objects", "Cần ít nhất một lối thoát nạn."));
+    return kept;
+  }
+  // Exits come from the locked infrastructure, so the draft itself needs no Goal and may hold none.
+  const kept = out.filter((item) => item.code !== "GOAL_REQUIRED");
+  for (const object of objects) {
+    if (object.kind === "Equipment" && !object.capability) continue;
+    if (isInfrastructureObject(object.kind, object.capability?.id)) kept.push(issue("SCENARIO_CONTAINS_INFRASTRUCTURE", `$.objects[${object.index}]`, "Lối thoát và thiết bị cố định thuộc Hạ tầng PCCC đã khoá, không đặt trong tình huống. Hãy xóa đối tượng này."));
+  }
+  return kept;
 }

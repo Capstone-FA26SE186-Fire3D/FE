@@ -24,7 +24,7 @@ import { TourProvider } from "@/features/tour/tour-provider";
 import { SidebarMiniStepper } from "./sidebar-mini-stepper";
 import { useAdminNavCounts } from "./use-admin-nav-counts";
 import { useLocalPreference } from "@/utils/local-preference";
-import { adminArea, organizationArea, type NavItem, type OperationsArea } from "./nav-config";
+import { adminArea, expertArea, organizationArea, type NavItem, type OperationsArea } from "./nav-config";
 
 const isSidebarState = (value: string): value is "expanded" | "collapsed" => value === "expanded" || value === "collapsed";
 
@@ -147,7 +147,7 @@ function Shell({ area, children }: { area: OperationsArea; children: ReactNode }
  */
 export function OperationsShell({ areaId, children }: { areaId: OperationsArea["id"]; children: ReactNode }) {
   // Resolved here (client side): nav items hold icon components, which cannot cross the server→client boundary.
-  const area = areaId === "admin" ? adminArea : organizationArea;
+  const area = areaId === "admin" ? adminArea : areaId === "expert" ? expertArea : organizationArea;
   return <ThemeScope>
     <MotionProvider>
       <TooltipProvider><ToastProvider><CommandPaletteProvider><TourProvider><Shell area={area}>{children}</Shell></TourProvider></CommandPaletteProvider></ToastProvider></TooltipProvider>

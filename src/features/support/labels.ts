@@ -52,7 +52,7 @@ export const auditActionLabel = (action: string) => auditActionLabels[action] ??
 /** Audit `TargetEntity` values are table or class names ("organizations", "SupportTicket"); show them as plain words. */
 const auditTargetLabels: Record<string, string> = {
   release: "Bản phát hành", servicepackage: "Gói dịch vụ", quotation: "Báo giá", serviceentitlement: "Quyền sử dụng",
-  billingaiquotagrant: "Hạn mức AI", supportticket: "Yêu cầu hỗ trợ", feedback: "Phản hồi", scenariocontentreview: "Lượt duyệt kịch bản",
+  billingaiquotagrant: "Hạn mức AI", supportticket: "Yêu cầu hỗ trợ", feedback: "Phản hồi", scenariocontentreview: "Lượt thẩm định tình huống",
   scenarioversion: "Phiên bản kịch bản", user: "Tài khoản", organization: "Tổ chức", building: "Công trình", processingjob: "Lượt xử lý IFC",
   billingcheckoutoperation: "Thanh toán", billingquotapolicyversion: "Chính sách hạn mức", enterprisequoterequest: "Yêu cầu báo giá doanh nghiệp",
   servicepackagediscountrule: "Quy tắc giảm giá", legacy: "Dữ liệu cũ",
@@ -89,7 +89,7 @@ const auditFieldLabels: Record<string, string> = {
   discountAmount: "Giảm giá", taxAmount: "Thuế", totalAmount: "Tổng cộng", durationMonths: "Thời hạn (tháng)",
   learnerLimit: "Giới hạn học viên", aiQuotaUnits: "Hạn mức AI", startsAt: "Bắt đầu", endsAt: "Kết thúc",
   buildingId: "Công trình", servicePackageId: "Gói dịch vụ", quotaUnits: "Hạn mức", quotaUnit: "Đơn vị hạn mức",
-  policyVersionId: "Phiên bản chính sách", rollover: "Chuyển kỳ", reviewId: "Lượt duyệt", scenarioVersionId: "Phiên bản kịch bản",
+  policyVersionId: "Phiên bản chính sách", rollover: "Chuyển kỳ", reviewId: "Lượt thẩm định", scenarioVersionId: "Phiên bản kịch bản",
   revisionId: "Bản IFC", validationRunId: "Lần kiểm tra", candidateArtifactId: "Tệp kết quả chờ duyệt", annotationSetId: "Bộ ghi chú",
   packageRevision: "Phiên bản gói", aiPolicyVersionId: "Phiên bản chính sách AI",
 };
