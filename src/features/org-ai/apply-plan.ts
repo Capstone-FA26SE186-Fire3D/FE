@@ -1,6 +1,7 @@
 import { applyPatch, makeSetPatch, type Command, type Patch } from "@/features/scenario-editor/store/commands";
 import { deepEqual, isObject, type Json, type JsonObject } from "@/features/scenario-editor/store/json";
 import { ID_PATTERN, LIMITS, OBJECT_KINDS, SCHEMA_VERSION } from "@/features/scenario-editor/v1/contract";
+import { isInfrastructureObject, type EditorScope } from "@/features/scenario-editor/v1/scope";
 import { readGeometryPin, readObjects, shapeIssues } from "@/features/scenario-editor/v1/state";
 import type { Issue } from "@/features/scenario-editor/store/validation";
 
@@ -13,6 +14,8 @@ import type { Issue } from "@/features/scenario-editor/store/validation";
  * - The draft's pinned Geometry is never replaced by the proposal.
  * - Spatial `objects[]` are offered only when the proposal pins the SAME Geometry (artifact + hash) as the draft and the
  *   object names a floor of that Geometry; otherwise they stay read-only with the reason.
+ * - On a draft built on a locked fire infrastructure (BE#213), exits and fixed equipment of the proposal are never offered:
+ *   they belong to the infrastructure, and the server would refuse the save (422 SCENARIO_CONTAINS_INFRASTRUCTURE).
  * - After the chosen changes, the whole document must still pass the same shape check the BE runs on PUT.
  */
 
@@ -48,6 +51,10 @@ const FIELD_DEFS: Array<{ key: string; label: string; defaultOn: boolean; note?:
   { key: "rubric", label: "Tiêu chí chấm điểm và điểm đạt tối thiểu", defaultOn: false, note: "Điểm đạt tối thiểu do tổ chức quyết định; chỉ số được kiểm tra theo danh mục sau khi áp dụng." },
   { key: "runtimeVersion", label: "Phiên bản ứng dụng", defaultOn: false, note: "Đổi phiên bản ứng dụng làm thay đổi khả năng hợp lệ của đối tượng." },
   { key: "randomSeed", label: "Biến thể đám cháy", defaultOn: false },
+  // BE#215: offered when a proposal carries them; who is trained and when are the organization's decisions.
+  { key: "assumption", label: "Giả định của tình huống (thời điểm, vị trí, nguyên nhân, số người)", defaultOn: true },
+  { key: "audience", label: "Đối tượng luyện tập", defaultOn: false, note: "Quyết định của tổ chức; chọn có chủ ý." },
+  { key: "workingHours", label: "Trong giờ hoặc ngoài giờ làm việc", defaultOn: false, note: "Quyết định của tổ chức; chọn có chủ ý." },
   { key: "replanIntervalSeconds", label: "Tần suất tính lại đường thoát (giây)", defaultOn: false },
 ];
 
@@ -90,7 +97,7 @@ function objectReason(object: JsonObject, existingIds: Set<string>, seen: Set<st
   return undefined;
 }
 
-export function buildApplyPlan(proposal: JsonObject, draft: JsonObject, floorIds: Set<string> | null): ApplyPlan {
+export function buildApplyPlan(proposal: JsonObject, draft: JsonObject, floorIds: Set<string> | null, scope: EditorScope = "scenario"): ApplyPlan {
   const fields: PlanField[] = [];
   for (const def of FIELD_DEFS) {
     const proposed = proposal[def.key];
@@ -109,7 +116,9 @@ export function buildApplyPlan(proposal: JsonObject, draft: JsonObject, floorIds
   const list = Array.isArray(proposal.objects) ? proposal.objects : [];
   const objects: PlanObject[] = list.map((raw, index) => {
     const object: JsonObject = isObject(raw) ? raw : {};
-    const reason = isObject(raw) ? objectReason(object, existingIds, seen, floorIds, matches) : "Mục không phải đối tượng.";
+    const capability = isObject(object.capability) && typeof object.capability.id === "string" ? object.capability.id : undefined;
+    const fixed = scope === "scenario-on-infrastructure" && isObject(raw) && isInfrastructureObject(typeof object.kind === "string" ? object.kind : null, capability);
+    const reason = !isObject(raw) ? "Mục không phải đối tượng." : fixed ? "Lối thoát và thiết bị cố định thuộc Hạ tầng PCCC đã khoá, không thêm vào tình huống." : objectReason(object, existingIds, seen, floorIds, matches);
     const id = typeof object.id === "string" ? object.id : "";
     if (!reason && id) seen.add(id);
     const placement = isObject(object.placement) ? object.placement : {};

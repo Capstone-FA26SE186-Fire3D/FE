@@ -426,7 +426,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
     {importOpen && <V1EquipmentImport accessToken={accessToken} buildingId={buildingId} revisionId={revisionId} draft={state.draft} runtime={findRuntime(runtimes ?? [], runtimeVersion)}
       runtimeVersion={runtimeVersion} geometry={geometry} onApply={edit} onClose={() => setImportOpen(false)} />}
 
-    {aiRequestId && !aiDismissed && !infrastructure && <AiProposalApply key={aiRequestId} accessToken={accessToken} requestId={aiRequestId} draft={state.draft} floorIds={aiFloorIds} onApply={edit} onClose={closeAiProposal} />}
+    {aiRequestId && !aiDismissed && !infrastructure && <AiProposalApply key={aiRequestId} accessToken={accessToken} requestId={aiRequestId} draft={state.draft} floorIds={aiFloorIds} scope={scope} onApply={edit} onClose={closeAiProposal} />}
 
     <Modal open={guard.pending} onOpenChange={(open) => { if (!open) guard.stay(); }} title="Rời khỏi trình soạn thảo?"
       description="Bạn có thay đổi chưa lưu. Nếu rời đi bây giờ, các thay đổi này sẽ mất."

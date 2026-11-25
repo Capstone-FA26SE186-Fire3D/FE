@@ -11,6 +11,7 @@ import { qaCriteria, qaGuide } from "../../src/features/buildings/qa-codes";
 import type { Building } from "../../src/features/buildings/types";
 import { lockedVersion, toEditorState, toUpdateBody, type FireInfrastructure } from "../../src/features/fire-infrastructure/api";
 import { coverageGap } from "../../src/features/fire-infrastructure/plan-dossier";
+import { buildApplyPlan } from "../../src/features/org-ai/apply-plan";
 import type { JsonObject } from "../../src/features/scenario-editor/store/json";
 import { capabilityAllowed, categoryOf, isInfrastructureObject, itemPathToObjectPath, itemsToObjects, objectsToItems, scopeKinds } from "../../src/features/scenario-editor/v1/scope";
 import { completenessIssues, shapeIssues, situationIssues } from "../../src/features/scenario-editor/v1/state";
@@ -252,5 +253,28 @@ test.describe("practice log (BE#218)", () => {
     expect(lastPlayedText("2026-09-20T18:30:00Z")).toBe("21/09/2026");
     expect(lastPlayedText(null)).toBeNull();
     expect(lastPlayedText("not a date")).toBeNull();
+  });
+});
+
+test.describe("AI proposal on a PC06 situation (BE#213, BE#215)", () => {
+  const pin = { artifactId: "a1", sha256Hash: "h".repeat(64) };
+  const proposal: JsonObject = { schemaVersion: "fet3d.editor/1", geometry: pin, audience: "Evacuee", assumption: { time: "8 giờ", location: "Bếp", cause: "Chập điện", peoplePresent: 30 },
+    objects: [object("spawn-a", "Spawn"), object("exit-a", "Goal"), object("ext-a", "Equipment", "extinguisher.portable"), object("towel-a", "Equipment", "item.towel"), object("lock-a", "Equipment", "door.exit_locked")] };
+  const draft: JsonObject = { schemaVersion: "fet3d.editor/1", geometry: pin, objects: [] };
+
+  test("exits and fixed equipment are not offered; scenario objects and door states are", () => {
+    const plan = buildApplyPlan(proposal, draft, new Set(["f1"]), "scenario-on-infrastructure");
+    const eligible = plan.objects.filter((item) => item.eligible).map((item) => item.id);
+    expect(eligible).toEqual(["spawn-a", "towel-a", "lock-a"]);
+    expect(plan.objects.find((item) => item.id === "exit-a")?.reason).toContain("Hạ tầng PCCC");
+    // A draft created before fire infrastructures existed still takes everything.
+    expect(buildApplyPlan(proposal, draft, new Set(["f1"])).objects.every((item) => item.eligible)).toBe(true);
+  });
+
+  test("the situation fields can be applied; audience stays a deliberate choice", () => {
+    const plan = buildApplyPlan(proposal, draft, new Set(["f1"]), "scenario-on-infrastructure");
+    expect(plan.fields.find((field) => field.key === "assumption")).toMatchObject({ selectable: true, defaultOn: true });
+    expect(plan.fields.find((field) => field.key === "audience")).toMatchObject({ selectable: true, defaultOn: false });
+    expect(plan.ignoredKeys).not.toContain("audience");
   });
 });
