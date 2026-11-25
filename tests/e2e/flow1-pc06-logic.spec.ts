@@ -5,13 +5,17 @@ import { normalizeRole, roleToApiName } from "../../src/features/auth/roles";
 import { dashboardRouteFor, postLoginRoute } from "../../src/features/auth/redirect";
 import { buildingFormToInput, emptyForm, formFromBuilding, validateBuildingForm } from "../../src/features/buildings/building-form-model";
 import { buildingTypeLabel, isSupportedBuildingType, riskGroupInfo } from "../../src/features/buildings/data/building-types";
-import { classifyUploadError } from "../../src/features/buildings/ifc-upload";
+import { lastPlayedText, withPracticeLogNote, PRACTICE_LOG_NOTE } from "../../src/features/analytics/practice-log-model";
+import { classifyUploadError, missingGroups } from "../../src/features/buildings/ifc-upload";
 import { qaCriteria, qaGuide } from "../../src/features/buildings/qa-codes";
 import type { Building } from "../../src/features/buildings/types";
 import { lockedVersion, toEditorState, toUpdateBody, type FireInfrastructure } from "../../src/features/fire-infrastructure/api";
+import { coverageGap } from "../../src/features/fire-infrastructure/plan-dossier";
 import type { JsonObject } from "../../src/features/scenario-editor/store/json";
 import { capabilityAllowed, categoryOf, isInfrastructureObject, itemPathToObjectPath, itemsToObjects, objectsToItems, scopeKinds } from "../../src/features/scenario-editor/v1/scope";
-import { completenessIssues } from "../../src/features/scenario-editor/v1/state";
+import { completenessIssues, shapeIssues, situationIssues } from "../../src/features/scenario-editor/v1/state";
+import { parseDailyLimit, sourceText, usageText } from "../../src/features/organizations/ifc-processing";
+import { coverageText, describeError } from "../../src/features/scenarios/version-readiness";
 
 // Evidence level: pure logic against the BE contracts of BE#211–#214 (BE main @ 3786664). No browser, no network.
 
@@ -170,5 +174,83 @@ test.describe("IFC upload and QA codes (BE#214)", () => {
     expect(rows.find((row) => row.id === "stairs")).toMatchObject({ passed: false, blocking: true });
     expect(rows.find((row) => row.id === "units")).toMatchObject({ passed: false, blocking: false });
     expect(rows.find((row) => row.id === "storeys")).toMatchObject({ passed: true });
+  });
+});
+
+// Evidence level: pure logic against BE#215–#219 (BE main @ f589374). No browser, no network.
+test.describe("PC06 situation fields (BE#215)", () => {
+  const filled = { audience: "Evacuee", workingHours: "OffHours", assumption: { time: "22 giờ", location: "Bếp tầng 1", cause: "Chập điện", peoplePresent: 12 } };
+
+  test("a draft on a fire infrastructure needs audience, working hours and every assumption field", () => {
+    expect(situationIssues({}).map((item) => item.path)).toEqual(["$.audience", "$.workingHours", "$.assumption"]);
+    expect(situationIssues({ audience: "Evacuee", workingHours: "InHours", assumption: { time: "8 giờ" } }).map((item) => item.path)).toEqual(["$.assumption.location", "$.assumption.cause", "$.assumption.peoplePresent"]);
+    expect(situationIssues(filled)).toEqual([]);
+    const paths = (scope: "scenario" | "scenario-on-infrastructure") => completenessIssues({ objects: [] }, { ...context, scope }).map((item) => item.path);
+    expect(paths("scenario-on-infrastructure")).toContain("$.audience");
+    // A draft created before fire infrastructures existed keeps the old rules.
+    expect(paths("scenario")).not.toContain("$.audience");
+  });
+
+  test("wrong values are reported at the path the server uses", () => {
+    const paths = shapeIssues({ schemaVersion: "fet3d.editor/1", audience: "Everyone", workingHours: "Night", assumption: { time: "", peoplePresent: 1.5, extra: 1 } }).map((item) => item.path);
+    expect(paths).toEqual(expect.arrayContaining(["$.audience", "$.workingHours", "$.assumption.time", "$.assumption.peoplePresent", "$.assumption.extra"]));
+    expect(shapeIssues({ schemaVersion: "fet3d.editor/1", ...filled }).filter((item) => item.path.startsWith("$.a") || item.path === "$.workingHours")).toEqual([]);
+  });
+
+  test("publish says which working hours still lack an appraised situation", () => {
+    expect(coverageGap({ inHours: true, offHours: true })).toBeNull();
+    expect(coverageGap({ inHours: true, offHours: false })).toContain("ngoài giờ");
+    expect(coverageGap({ inHours: false, offHours: false })).toContain("Chưa có tình huống nào đạt thẩm định");
+    expect(coverageText({ workingHours: ["OffHours"] })).toContain("ngoài giờ làm việc");
+    expect(coverageText({ workingHours: ["InHours"] })).toContain("trong giờ làm việc");
+    expect(coverageText({ workingHours: ["InHours", "OffHours"] })).toBeUndefined();
+    const error = new ApiError("x", 409, { errors: { workingHours: ["OffHours"] } }, undefined, "PLAN_SCENARIO_COVERAGE_INCOMPLETE");
+    expect(describeError(error).message).toContain("ngoài giờ làm việc");
+    expect(describeError(new ApiError("x", 409, undefined, undefined, "PLAN_SCENARIO_COVERAGE_INCOMPLETE")).message).toContain("một tình huống trong giờ và một tình huống ngoài giờ");
+  });
+});
+
+test.describe("junk-IFC guard and processing limit (BE#219)", () => {
+  test("a precheck refusal names the missing parts and asks for a new file", () => {
+    expect(missingGroups({ missing: ["IfcBuildingStorey", "IfcDoor"] })).toBe("tầng, cửa");
+    const error = classifyUploadError("complete", new ApiError("x", 422, { errors: { missing: ["IfcSpace"], qaCodes: ["IFC_NO_SPACES"] } }, undefined, "IFC_PRECHECK_FAILED"));
+    expect(error.message).toContain("phòng");
+    expect(error.restart).toBe(true);
+    expect(classifyUploadError("initiate", new ApiError("x", 409, undefined, undefined, "IFC_SOURCE_ALREADY_FAILED")).restart).toBe(true);
+  });
+
+  test("organization limits are not retried automatically", () => {
+    for (const [status, code] of [[409, "IFC_ORG_JOB_RUNNING"], [429, "IFC_PROCESS_DAILY_LIMIT"], [403, "IFC_PROCESSING_DISABLED"]] as const) {
+      const error = classifyUploadError("complete", new ApiError("x", status, undefined, undefined, code));
+      expect(error.retryable, code).toBeFalsy();
+      expect(error.message, code).toMatch(/[àáạảãăâđêôơư]/i);
+    }
+  });
+
+  test("daily limit input and the usage line", () => {
+    expect(parseDailyLimit(" 20 ")).toBe(20);
+    expect(parseDailyLimit("0")).toBe(0);
+    expect(parseDailyLimit("100001")).toBeNull();
+    expect(parseDailyLimit("2.5")).toBeNull();
+    expect(parseDailyLimit("")).toBeNull();
+    expect(usageText({ dailyLimit: 20, used: 3, remaining: 17 })).toBe("Hôm nay còn 17 trong 20 lượt xử lý mô hình.");
+    expect(usageText({ dailyLimit: 20, used: 20, remaining: 0 })).toContain("đã dùng hết 20 lượt");
+    expect(usageText({ dailyLimit: 0, used: 0, remaining: 0 })).toContain("tạm dừng");
+    expect(sourceText("Organization")).toContain("riêng");
+    expect(sourceText("Configuration")).toContain("chung");
+  });
+});
+
+test.describe("practice log (BE#218)", () => {
+  test("the note is written once, also when the server quoted it", () => {
+    expect(withPracticeLogNote("a,b\n")).toBe(`${PRACTICE_LOG_NOTE}\na,b\n`);
+    expect(withPracticeLogNote(`"${PRACTICE_LOG_NOTE}"\na,b\n`)).toBe(`"${PRACTICE_LOG_NOTE}"\na,b\n`);
+    expect(withPracticeLogNote(`\ufeff${PRACTICE_LOG_NOTE}\na,b\n`)).toBe(`\ufeff${PRACTICE_LOG_NOTE}\na,b\n`);
+  });
+
+  test("last practice date is shown in Vietnam time, and a missing one is not invented", () => {
+    expect(lastPlayedText("2026-09-20T18:30:00Z")).toBe("21/09/2026");
+    expect(lastPlayedText(null)).toBeNull();
+    expect(lastPlayedText("not a date")).toBeNull();
   });
 });

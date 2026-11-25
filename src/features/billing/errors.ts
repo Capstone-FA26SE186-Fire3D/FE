@@ -50,6 +50,7 @@ const CODE_MESSAGES: Record<string, string> = {
   QUOTATION_CHECKOUT_UNRESOLVED: "Báo giá còn thanh toán chưa kết thúc. Hủy thanh toán (hoặc chờ PayOS xác nhận hết hạn) rồi hủy báo giá.",
   QUOTATION_V7_REQUIRED: "Báo giá theo mẫu cũ không thể phát hành hoặc thanh toán. Hãy tạo báo giá mới.",
   PACKAGE_NOT_PURCHASABLE: "Gói chưa cấu hình đủ (6/12 tháng, số học viên, hạn mức AI và chính sách) nên chưa bán được. Quản trị FET3D cần hoàn tất cấu hình gói.",
+  QUOTE_REQUIRES_APPROVED_SCENARIO: "Công trình cần có ít nhất một tình huống đạt thẩm định trước khi xin báo giá. Hãy lập Hạ tầng PCCC, soạn tình huống và gửi Chuyên viên PCCC thẩm định trước.",
   BUILDING_PROFILE_INCOMPLETE: "Công trình thiếu tên hoặc địa chỉ. Bổ sung trong thông tin công trình rồi tạo lại báo giá.",
   UPGRADE_LIMIT_NOT_HIGHER: "Gói đích phải có số học viên lớn hơn mức hiện tại của công trình.",
   UPGRADE_ENTITLEMENT_INVALID: "Công trình không có kỳ dịch vụ đã trả tiền phù hợp để nâng cấp. Tải lại thông tin dịch vụ rồi thử lại.",

@@ -2,8 +2,8 @@ import { isObject, type Json, type JsonObject } from "../store/json";
 import type { Issue } from "../store/validation";
 import { findCapability, findRuntime, isBuildingOnly, validateParameters, type RuntimeOption } from "./catalog";
 import {
-  CAPABILITY_REQUIRED_KINDS, ID_PATTERN, IFC_GLOBAL_ID_PATTERN, LIMITS, OBJECT_KINDS, RUBRIC_OPERATORS, SCHEMA_VERSION, SEMVER_PATTERN, SHA256_PATTERN,
-  KIND_META, MODE_LABEL, TRAINING_MODES, UUID_PATTERN, type GeometryPin, type ObjectKind,
+  AUDIENCES, CAPABILITY_REQUIRED_KINDS, ID_PATTERN, IFC_GLOBAL_ID_PATTERN, LIMITS, OBJECT_KINDS, RUBRIC_OPERATORS, SCHEMA_VERSION, SEMVER_PATTERN, SHA256_PATTERN,
+  KIND_META, MODE_LABEL, TRAINING_MODES, UUID_PATTERN, WORKING_HOURS, type GeometryPin, type ObjectKind,
 } from "./contract";
 import type { GeometryInfo } from "./geometry";
 import { categoryOf, isInfrastructureObject, type EditorScope } from "./scope";
@@ -112,7 +112,8 @@ function unique(list: unknown, path: string, max: number, check: (item: unknown)
   });
 }
 
-const ROOT_KEYS = new Set(["schemaVersion", "name", "geometry", "runtimeVersion", "objects", "timeLimitSeconds", "rubric", "learningObjectives", "learnerInstructions", "modePolicy", "randomSeed", "replanIntervalSeconds", "libraryRefs"]);
+const ROOT_KEYS = new Set(["schemaVersion", "name", "geometry", "runtimeVersion", "objects", "timeLimitSeconds", "rubric", "learningObjectives", "learnerInstructions", "modePolicy", "randomSeed", "replanIntervalSeconds", "libraryRefs", "audience", "workingHours", "assumption"]);
+const ASSUMPTION_KEYS = new Set(["time", "location", "cause", "peoplePresent"]);
 const LIBRARY_REF_KEYS = new Set(["versionId", "kind", "code"]);
 const LIBRARY_REF_KINDS = ["ScenarioTemplate", "RubricSample", "Equipment"];
 const OBJECT_KEYS = new Set(["id", "kind", "placement", "anchorId", "capability", "parameters", "label"]);
@@ -165,6 +166,22 @@ export function shapeIssues(draft: JsonObject): Issue[] {
     }
   }
   if (draft.learningObjectives !== undefined) unique(draft.learningObjectives, "$.learningObjectives", LIMITS.objectivesMax, (item) => printable(item, LIMITS.objectiveMax), out, `Mỗi mục dùng 1–${LIMITS.objectiveMax} ký tự, không để trống.`);
+  // BE#215: checked whenever present (a wrong value is 422 EDITOR_SCHEMA_INVALID on PUT).
+  if (draft.audience !== undefined && !(AUDIENCES as readonly unknown[]).includes(draft.audience)) out.push(issue("VALUE_UNSUPPORTED", "$.audience", "Chọn một đối tượng trong danh sách."));
+  if (draft.workingHours !== undefined && !(WORKING_HOURS as readonly unknown[]).includes(draft.workingHours)) out.push(issue("VALUE_UNSUPPORTED", "$.workingHours", "Chọn trong giờ hoặc ngoài giờ làm việc."));
+  if (draft.assumption !== undefined) {
+    if (!isObject(draft.assumption)) out.push(issue("TYPE_INVALID", "$.assumption", "Phần giả định không đúng định dạng."));
+    else {
+      const a = draft.assumption;
+      unknownKeys(a, ASSUMPTION_KEYS, "$.assumption", out);
+      const text = (key: "time" | "location" | "cause", max: number, label: string) => { if (a[key] !== undefined && !printable(a[key], max)) out.push(issue("STRING_INVALID", `$.assumption.${key}`, `${label}: dùng 1–${max} ký tự.`)); };
+      text("time", LIMITS.assumption.timeMax, "Thời điểm");
+      text("location", LIMITS.assumption.locationMax, "Vị trí");
+      text("cause", LIMITS.assumption.causeMax, "Nguyên nhân");
+      const people = a.peoplePresent;
+      if (people !== undefined && !(typeof people === "number" && Number.isInteger(people) && people >= 0 && people <= LIMITS.assumption.peopleMax)) out.push(issue("NUMBER_OUT_OF_RANGE", "$.assumption.peoplePresent", `Số người có mặt là số nguyên 0–${LIMITS.assumption.peopleMax}.`));
+    }
+  }
   if (draft.learnerInstructions !== undefined && !printable(draft.learnerInstructions, LIMITS.instructionsMax)) out.push(issue("STRING_INVALID", "$.learnerInstructions", `Dùng 1–${LIMITS.instructionsMax} ký tự.`));
   if (draft.libraryRefs !== undefined) libraryRefsShape(draft.libraryRefs, out);
   if (draft.rubric !== undefined) rubricShape(draft.rubric, out);
@@ -331,11 +348,27 @@ export function completenessIssues(draft: JsonObject, context: ReferenceContext)
   if (typeof draft.runtimeVersion === "string" && context.runtimes && !runtime) {
     out.push(issue("RUNTIME_NOT_SUPPORTED", "$.runtimeVersion", "Phiên bản ứng dụng không còn trong danh sách đang dùng."));
   }
-  return scopedIssues(out, objects, context.scope ?? "scenario");
+  return scopedIssues(out, objects, context.scope ?? "scenario", draft);
+}
+
+/**
+ * BE#215 (`EditorContract.RequireSituation`): a situation of a PC06 plan, i.e. a draft on a fire infrastructure, names its
+ * audience, its assumption and whether it happens in working hours. Drafts created before BE#213 do not need them.
+ */
+export function situationIssues(draft: JsonObject): Issue[] {
+  const out: Issue[] = [];
+  if (draft.audience === undefined) out.push(issue("FIELD_REQUIRED", "$.audience", "Chọn đối tượng luyện tập của tình huống."));
+  if (draft.workingHours === undefined) out.push(issue("FIELD_REQUIRED", "$.workingHours", "Chọn trong giờ hoặc ngoài giờ làm việc."));
+  if (!isObject(draft.assumption)) out.push(issue("FIELD_REQUIRED", "$.assumption", "Nhập giả định của tình huống: thời điểm, vị trí, nguyên nhân và số người có mặt."));
+  else {
+    const labels: Record<string, string> = { time: "Nhập thời điểm xảy ra.", location: "Nhập vị trí xảy ra.", cause: "Nhập nguyên nhân.", peoplePresent: "Nhập số người có mặt." };
+    for (const key of ["time", "location", "cause", "peoplePresent"]) if (draft.assumption[key] === undefined) out.push(issue("FIELD_REQUIRED", `$.assumption.${key}`, labels[key]));
+  }
+  return out;
 }
 
 /** Narrows the scenario checks to what the scope owns (BE `FireInfrastructureRules` and the merged-document rules of BE#213). */
-function scopedIssues(out: Issue[], objects: ObjectView[], scope: EditorScope): Issue[] {
+function scopedIssues(out: Issue[], objects: ObjectView[], scope: EditorScope, draft: JsonObject): Issue[] {
   if (scope === "scenario") return out;
   if (scope === "infrastructure") {
     // An infrastructure has no name, rubric or spawn: only its objects, the pinned Geometry and the runtime are checked.
@@ -345,6 +378,7 @@ function scopedIssues(out: Issue[], objects: ObjectView[], scope: EditorScope): 
   }
   // Exits come from the locked infrastructure, so the draft itself needs no Goal and may hold none.
   const kept = out.filter((item) => item.code !== "GOAL_REQUIRED");
+  kept.push(...situationIssues(draft));
   for (const object of objects) {
     if (object.kind === "Equipment" && !object.capability) continue;
     if (isInfrastructureObject(object.kind, object.capability?.id)) kept.push(issue("SCENARIO_CONTAINS_INFRASTRUCTURE", `$.objects[${object.index}]`, "Lối thoát và thiết bị cố định thuộc Hạ tầng PCCC đã khoá, không đặt trong tình huống. Hãy xóa đối tượng này. Trong tình huống bạn vẫn chọn được cửa bị khoá, cửa chống cháy bị chèn, khăn và đồ đạc cá nhân."));

@@ -39,6 +39,11 @@ export type TrainingCohort = {
   /** `null` when nothing was assessed. */
   passRate: number | null;
   averageDurationSeconds: number | null;
+  /** BE#218: latest session start in the range; null without a play. Absent on older responses. */
+  lastPlayedAt?: string | null;
+  /** BE#218, only with `groupBy=scenario`: from the newest version of the situation (BE#215). */
+  audience?: string | null;
+  workingHours?: string | null;
 };
 
 export type TrainingReport = {

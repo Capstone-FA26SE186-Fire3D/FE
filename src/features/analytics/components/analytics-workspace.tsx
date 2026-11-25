@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { describeApiError } from "@/api/describe-error";
 import { analyticsApi } from "../api";
-import type { AnalyticsScope, OperationsReport } from "../types";
+import type { AnalyticsRange, AnalyticsScope, OperationsReport } from "../types";
 import { readTrainingFilters, TrainingFilterBar, withDefaultGroup } from "./filters";
 import { OperationsReportView } from "./operations-report";
 import { PracticeLogView, withPracticeLogNote } from "./practice-log";
@@ -30,6 +30,9 @@ const TABS: Record<AnalyticsVariant, TabKey[]> = {
   "admin-organization": ["training", "operations"],
   platform: ["operations", "training", "revenue"],
 };
+/** Practice log window: no from/to, so the server applies its 365-day default for `groupBy=scenario`. */
+const LOG_RANGE: AnalyticsRange = {};
+
 const TAB_LABELS: Record<TabKey, string> = { training: "Huấn luyện", operations: "Vận hành", revenue: "Doanh thu", log: "Nhật ký luyện tập" };
 const ROLE: Record<AnalyticsVariant, 0 | 1> = { organization: 1, platform: 0, "admin-organization": 0 };
 
@@ -62,7 +65,8 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
 
   // Practice log (Docs FR-PLAN-11): the same report grouped by scenario, narrowed by building only.
   const logFilters = useMemo(() => ({ buildingId: filters.buildingId, groupBy: "scenario" as const }), [filters.buildingId]);
-  const log = useAsyncData(`log:${key}:${logFilters.buildingId ?? ""}`, (signal) => analyticsApi.training(accessToken as string, scope, range, signal, logFilters), enabled && tab === "log", { keepWhenDenied: true });
+  // BE#218: with groupBy=scenario and no from/to the server answers the last 365 days, the window of the yearly practice rule; the period picker (90 days at most) does not apply here.
+  const log = useAsyncData(`log:${variant}:${organizationId ?? ""}:${logFilters.buildingId ?? ""}`, (signal) => analyticsApi.training(accessToken as string, scope, LOG_RANGE, signal, logFilters), allowed && tab === "log", { keepWhenDenied: true });
 
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -71,7 +75,7 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
     setExporting(true);
     setExportError(null);
     try {
-      const raw = await analyticsApi.exportTraining(accessToken, scope, range, undefined, tab === "log" ? logFilters : requestFilters);
+      const raw = await analyticsApi.exportTraining(accessToken, scope, tab === "log" ? LOG_RANGE : range, undefined, tab === "log" ? logFilters : requestFilters);
       const text = tab === "log" ? withPracticeLogNote(raw) : raw;
       const url = URL.createObjectURL(new Blob(["﻿", text.replace(/^﻿/, "")], { type: "text/csv;charset=utf-8" }));
       const link = document.createElement("a");
@@ -106,7 +110,7 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
   const toolbar = <div className={styles.toolbar}>
     <FilterChips label="Bộ lọc báo cáo">
       {filterable && (tab === "training" || tab === "log") && <TrainingFilterBar accessToken={accessToken} filters={filters} buildingOnly={tab === "log"} onChange={(patch) => setParams(patch)} />}
-      <RangeBar key={`${urlFrom}|${urlTo}`} urlFrom={urlFrom} urlTo={urlTo} onApply={apply} />
+      {tab !== "log" && <RangeBar key={`${urlFrom}|${urlTo}`} urlFrom={urlFrom} urlTo={urlTo} onApply={apply} />}
     </FilterChips>
     <PeriodMeta data={meta} hasRange={hasRange} urlFrom={urlFrom} urlTo={urlTo} />
   </div>;
@@ -124,7 +128,7 @@ export function AnalyticsWorkspace({ variant, organizationId, title, description
       <RangeError message={rangeError} />
       <TabsContent value="training">{!rangeError && <ReportShell query={training} title="báo cáo huấn luyện">{(data) => <TrainingReportView data={data} groupBy={requestFilters.groupBy} showOrganizationLinks={variant === "platform"} />}</ReportShell>}</TabsContent>
       <TabsContent value="operations">{!rangeError && <ReportShell query={operations} title="báo cáo vận hành">{(data) => <OperationsReportView data={data} scope={variant === "organization" ? "organization" : variant === "platform" ? "platform" : "admin-organization"} organizationId={organizationId} activity={{ report: activity.data, loading: activity.loading && !activity.data, failed: activity.error !== undefined && !activity.data }} />}</ReportShell>}</TabsContent>
-      {variant === "organization" && <TabsContent value="log">{!rangeError && <ReportShell query={log} title="nhật ký luyện tập">{(data) => <PracticeLogView data={data} />}</ReportShell>}</TabsContent>}
+      {variant === "organization" && <TabsContent value="log">{<ReportShell query={log} title="nhật ký luyện tập">{(data) => <PracticeLogView data={data} />}</ReportShell>}</TabsContent>}
       {variant === "platform" && <TabsContent value="revenue">{!rangeError && <ReportShell query={revenue} title="báo cáo doanh thu">{(data) => <RevenueReportView data={data} />}</ReportShell>}</TabsContent>}
     </Tabs>
   </div>;

@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/toast";
 import { Rows } from "@/features/admin-overview/components/admin-kit";
 import { routes } from "@/configs/routes";
 import { organizationsApi } from "../api";
+import { IfcProcessingLimit } from "./ifc-processing-limit";
 import type { AdminUpdateOrganizationInput, Organization, OrganizationDetail as OrganizationDetailData } from "../types";
 import { useTokenRef } from "@/api/use-token-ref";
 
@@ -153,6 +154,7 @@ export function OrganizationDetail({ id, accessToken, onLoaded, onSaved }: { id:
       { label: "Cập nhật", value: formatDate(organization.updatedAt) },
     ]} />}
     {!edits && <SupportCode id={organization.id} />}
+    {!edits && <IfcProcessingLimit organizationId={organization.id} accessToken={accessToken} />}
 
     {edits && <form onSubmit={submit} noValidate className="ops-stack" aria-label="Sửa hồ sơ tổ chức">
       {staleEtag !== null && <Alert tone="warning" title={reloaded ? "Đã tải bản mới nhất" : "Hồ sơ vừa được thay đổi ở nơi khác"} action={!reloaded && <Button type="button" size="sm" variant="secondary" className="mt-3" onClick={reload} disabled={loading}>{loading ? "Đang tải…" : "Tải bản mới để đối chiếu"}</Button>}>

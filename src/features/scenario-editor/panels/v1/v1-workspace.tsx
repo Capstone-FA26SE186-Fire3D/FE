@@ -406,7 +406,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
           </TabsList>
           <div className="se-panel-scroll">
             <TabsContent value="object"><V1ObjectForm object={selectedObject} issues={issues} actions={actions} geometry={geometry} catalog={catalogView} runtimeVersion={runtimeVersion} pick={pick} onOpenScenario={() => setPanelTab("scenario")} scope={scope} /></TabsContent>
-            <TabsContent value="scenario"><V1ScenarioForm draft={state.draft} issues={issues} actions={actions} catalog={catalogView} rubricCatalog={rubricState} /></TabsContent>
+            <TabsContent value="scenario"><V1ScenarioForm draft={state.draft} issues={issues} actions={actions} catalog={catalogView} rubricCatalog={rubricState} situation={scope === "scenario-on-infrastructure"} /></TabsContent>
             <TabsContent value="library"><V1LibraryPanel accessToken={accessToken} ui={libraryUi} onUi={setLibraryUi} draft={state.draft} selectedObject={selectedObject} runtimeVersion={runtimeVersion} runtimes={runtimes} rubric={rubricView} applied={applied} canUndoLast={(label) => lastPast?.label === label} onUndo={() => dispatch({ type: "undo" })} onApply={onApplySample} /></TabsContent>
             <TabsContent value="issues"><V1IssuesPanel issues={issues} shapeProblems={editor.shapeProblems} report={editor.report} reportStale={editor.reportStale} validating={editor.validating} validateError={editor.validateError} dirty={dirty} onValidate={() => void onValidate()} onJump={onJump} /></TabsContent>
             <TabsContent value="geometry"><V1GeometryPanel reading={reading} preview={preview} pin={pin} buildingId={buildingId} revisionId={revisionId} onRepin={actions.pinGeometry} modelSummary={modelSummary} /></TabsContent>
