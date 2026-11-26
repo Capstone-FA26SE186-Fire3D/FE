@@ -12,6 +12,8 @@ import type { Building } from "../../src/features/buildings/types";
 import { lockedVersion, toEditorState, toUpdateBody, type FireInfrastructure } from "../../src/features/fire-infrastructure/api";
 import { coverageGap } from "../../src/features/fire-infrastructure/plan-dossier";
 import { buildApplyPlan } from "../../src/features/org-ai/apply-plan";
+import { planApply } from "../../src/features/library/apply";
+import type { LibraryVersion } from "../../src/features/library/types";
 import { plainLimitation } from "../../src/features/org-ai/labels";
 import { scenarioDraftBody } from "../../src/features/org-ai/scenario-draft-body";
 import type { JsonObject } from "../../src/features/scenario-editor/store/json";
@@ -286,6 +288,37 @@ test.describe("practice log (BE#218)", () => {
     expect(lastPlayedText("2026-09-20T18:30:00Z")).toBe("21/09/2026");
     expect(lastPlayedText(null)).toBeNull();
     expect(lastPlayedText("not a date")).toBeNull();
+  });
+});
+
+test.describe("library template on a PC06 situation (BE#215)", () => {
+  const template = { id: "v1", itemId: "i1", kind: "ScenarioTemplate", code: "TPL-PC06-X", versionNumber: 1, name: "Mẫu", status: "Published", revision: 2, requiredCapabilities: [], publishedAt: null,
+    payload: { state: { schemaVersion: "fet3d.editor/1", name: "Cháy bếp", audience: "EvacuationGuide", workingHours: "OffHours", assumption: { time: "1 giờ sáng", location: "Căn 402", cause: "Chập điện", peoplePresent: 260 } } } } as unknown as LibraryVersion;
+  const context = { metrics: null, schemaVersions: null, object: null, runtimeCapabilities: null };
+  const ids = (plan: ReturnType<typeof planApply>) => plan.groups.map((group) => group.id);
+
+  test("a template fills audience, working hours and the assumption of a situation, shown with the form's words", () => {
+    const plan = planApply(template, { schemaVersion: "fet3d.editor/1" }, { ...context, situation: true });
+    expect(ids(plan)).toEqual(["template:name", "template:audience", "template:workingHours", "template:assumption"]);
+    const by = Object.fromEntries(plan.groups.map((group) => [group.id, group]));
+    expect(by["template:audience"]).toMatchObject({ label: "Đối tượng luyện tập", incoming: "Hướng dẫn thoát nạn", status: "new", defaultAction: "fill" });
+    expect(by["template:workingHours"].incoming).toBe("Ngoài giờ làm việc");
+    expect(by["template:assumption"].incoming).toBe("1 giờ sáng · Căn 402 · Chập điện · 260 người có mặt");
+    expect(by["template:assumption"].writes.fill).toEqual([{ path: ["assumption"], value: { time: "1 giờ sáng", location: "Căn 402", cause: "Chập điện", peoplePresent: 260 } }]);
+    for (const group of plan.groups) expect(`${group.label} ${group.incoming}`).not.toMatch(/EvacuationGuide|OffHours|peoplePresent/);
+  });
+
+  test("what the author already chose is kept unless they ask to replace it", () => {
+    const plan = planApply(template, { schemaVersion: "fet3d.editor/1", audience: "Evacuee", workingHours: "OffHours" }, { ...context, situation: true });
+    const by = Object.fromEntries(plan.groups.map((group) => [group.id, group]));
+    expect(by["template:audience"]).toMatchObject({ status: "different", defaultAction: "keep", current: "Người thoát nạn" });
+    expect(by["template:workingHours"].status).toBe("same");
+  });
+
+  test("a draft that is not a situation on a fire infrastructure does not take these fields, and is told why", () => {
+    const plan = planApply(template, { schemaVersion: "fet3d.editor/1" }, { ...context, situation: false });
+    expect(ids(plan)).toEqual(["template:name"]);
+    expect(plan.notes.join(" ")).toContain("Hạ tầng PCCC");
   });
 });
 

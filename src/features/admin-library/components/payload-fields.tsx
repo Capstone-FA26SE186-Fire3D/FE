@@ -10,7 +10,7 @@ import { NO_CAPABILITY_NOTICE } from "@/features/library/components/version-prev
 import { ignoredTemplateParts, type PropertyRow, type PropertyType, type VersionForm } from "@/features/library/payload";
 import { LIBRARY_LIMITS, type LibraryKind } from "@/features/library/types";
 import { NumberField, StringList, TextField } from "@/features/scenario-editor/panels/fields";
-import { Group, RubricGroup, type RubricCatalogState } from "@/features/scenario-editor/panels/v1/v1-scenario-form";
+import { Group, RubricGroup, SituationGroup, type RubricCatalogState } from "@/features/scenario-editor/panels/v1/v1-scenario-form";
 import { insertAt, isObject, removeAt, setIn, type Json, type Path } from "@/features/scenario-editor/store/json";
 import { messageAt } from "@/features/scenario-editor/v1/issues";
 import { LIMITS, MODE_LABEL, TRAINING_MODES } from "@/features/scenario-editor/v1/contract";
@@ -80,13 +80,14 @@ function TemplateFields({ form, actions, issues, rubricCatalog }: { form: Versio
     else actions.setField(["modePolicy", "allowedModes"], [...next]);
   };
   return <>
-    <Alert tone="info" title="Kịch bản mẫu chỉ mang phần nội dung, không có vị trí">Tên, mục tiêu, hướng dẫn, thời gian, chế độ và tiêu chí chấm điểm (rubric). Mẫu không tạo vị trí hay đối tượng trong công trình; tổ chức tự đặt đối tượng trên mô hình của mình.</Alert>
+    <Alert tone="info" title="Kịch bản mẫu chỉ mang phần nội dung, không có vị trí">Tên, đối tượng luyện tập, thời gian xảy ra, giả định, mục tiêu, hướng dẫn, thời gian tối đa, chế độ và tiêu chí chấm điểm (rubric). Mẫu không tạo vị trí hay đối tượng trong công trình; tổ chức tự đặt đối tượng trên mô hình của mình.</Alert>
     {ignored.length > 0 && <Alert tone="warning" title="Phiên bản này còn mang phần không chỉnh sửa được ở đây">Có {ignored.join(", ")} từ trước. Biểu mẫu này giữ nguyên chúng khi lưu nhưng tổ chức không nhận chúng khi áp dụng.</Alert>}
     {at("$") && <span className="ops-field-error" role="alert">{at("$")}</span>}
     <Group title="Thông tin kịch bản" testId="group-info">
       <TextField label="Tên kịch bản" maxLength={LIMITS.nameMax} value={typeof state.name === "string" ? state.name : ""} error={at("$.name")} data-testid="tpl-name" hint="1–255 ký tự." onCommit={optional("name")} />
       <NumberField label="Thời gian tối đa" unit="giây" hint={`Số nguyên ${LIMITS.timeLimit.min}–${LIMITS.timeLimit.max}; để trống nếu mẫu không đặt.`} data-testid="tpl-time-limit" value={typeof state.timeLimitSeconds === "number" ? state.timeLimitSeconds : undefined} error={at("$.timeLimitSeconds")} onCommit={(value) => actions.setField(["timeLimitSeconds"], value)} />
     </Group>
+    <SituationGroup draft={state} at={at} required={false} actions={{ setField: (path, value) => actions.setField(path, value) }} />
     <Group title="Chế độ huấn luyện" description="Không chọn chế độ nào thì mẫu không đặt chính sách chế độ." testId="group-modes">
       {at("$.modePolicy.allowedModes") && <span className="ops-field-error" role="alert">{at("$.modePolicy.allowedModes")}</span>}
       <div className="ops-stack">{TRAINING_MODES.map((mode) => <label key={mode} className="se-check"><input type="checkbox" checked={modes.includes(mode)} onChange={(event) => toggleMode(mode, event.target.checked)} data-testid={`tpl-mode-${mode}`} /> {MODE_LABEL[mode]}</label>)}</div>
