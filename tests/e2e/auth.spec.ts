@@ -370,9 +370,11 @@ test("platform admin loads and manages accounts through Fire3D endpoints", async
   await form.getByLabel("Email").fill("member@fire3d.test");
   await form.getByLabel("Mật khẩu").fill("long-enough-password");
   await form.getByLabel("Họ và tên").fill("New Member");
+  // The server refuses a Học viên account without a user name.
+  await form.getByLabel("Tên người dùng").fill("new.member");
   await form.getByRole("button", { name: "Tạo tài khoản" }).click();
   await expect(page.getByText("Đã tạo tài khoản", { exact: true })).toBeVisible();
-  expect(createPayload).toMatchObject({ email: "member@fire3d.test", password: "long-enough-password", fullName: "New Member", role: "Trainee", organizationId: null });
+  expect(createPayload).toMatchObject({ email: "member@fire3d.test", password: "long-enough-password", fullName: "New Member", role: "Trainee", organizationId: null, username: "new.member" });
 });
 
 test("an unreachable API while restoring keeps the session and offers a retry instead of an endless spinner (FE#100)", async ({ page }) => {
