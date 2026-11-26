@@ -300,6 +300,8 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
     if (state.tool === "rotate") { actions.rotateTo(ref.index, next.quaternion, gesture.current); return; }
     const local = glbToLocal(floor.transform, next.position);
     if (local) actions.dragTo(ref.index, { x: round3(local.x), y: round3(local.y), z: round3(local.z) }, gesture.current);
+    // A wall item dragged along a wall also takes the wall's facing; same gesture, so still one history entry.
+    if (local && next.turned) actions.rotateTo(ref.index, next.quaternion, gesture.current);
   }, [actions, geometry, objects, state.tool]);
 
   const onJump = useCallback((issue: Issue) => {

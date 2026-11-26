@@ -46,7 +46,8 @@ export type WallHit = { point: Point3; normal: Point3; distance: number };
 
 export type SceneTool = "select" | "move" | "rotate" | "place";
 
-export type TransformResult = { position: Point3; yawDegrees: number; quaternion: Quaternion4 };
+/** `turned`: the move also set the facing (a wall item dragged onto a wall), so the caller stores the quaternion too. */
+export type TransformResult = { position: Point3; yawDegrees: number; quaternion: Quaternion4; turned?: boolean };
 
 export type SceneCallbacks = {
   onSelect: (selection: MarkerRef | null) => void;
@@ -166,6 +167,11 @@ export class EditorSceneController {
     this.transform.addEventListener("objectChange", this.onObjectChange);
     this.scene.add(this.transform.getHelper());
 
+    // Capture phase: a grab has to switch the orbit off before OrbitControls sees the same pointerdown.
+    canvas.addEventListener("pointerdown", this.onGrabDown, true);
+    canvas.addEventListener("pointermove", this.onGrabMove);
+    canvas.addEventListener("pointerup", this.onGrabUp);
+    canvas.addEventListener("pointercancel", this.onGrabUp);
     canvas.addEventListener("pointerdown", this.onPointerDown);
     canvas.addEventListener("pointerup", this.onPointerUp);
     canvas.addEventListener("webglcontextlost", this.onContextLost as EventListener);
@@ -204,6 +210,10 @@ export class EditorSceneController {
     cancelAnimationFrame(this.frame);
     this.observer.disconnect();
     const canvas = this.renderer.domElement;
+    canvas.removeEventListener("pointerdown", this.onGrabDown, true);
+    canvas.removeEventListener("pointermove", this.onGrabMove);
+    canvas.removeEventListener("pointerup", this.onGrabUp);
+    canvas.removeEventListener("pointercancel", this.onGrabUp);
     canvas.removeEventListener("pointerdown", this.onPointerDown);
     canvas.removeEventListener("pointerup", this.onPointerUp);
     canvas.removeEventListener("webglcontextlost", this.onContextLost as EventListener);
@@ -582,7 +592,7 @@ export class EditorSceneController {
     ring.name = "selection-ring";
     ring.visible = false;
     if (shape) this.buildShape(marker, shape, mesh);
-    marker.userData = { kind, variant, shape: shapeKey(shape), glyph: group };
+    marker.userData = { kind, variant, shape: shapeKey(shape), mount: shape?.mount, glyph: group };
     return marker;
   }
 
@@ -698,6 +708,93 @@ export class EditorSceneController {
       yawDegrees: round3(degrees),
       quaternion: { x: q.x, y: q.y, z: q.z, w: q.w },
     }, "change");
+  };
+
+  // ───────── grab and drag ─────────
+
+  private grab: { marker: THREE.Group; ref: MarkerRef; pointerId: number; x: number; y: number; moved: boolean; orbitWas: boolean } | null = null;
+
+  /** The marker under the current ray, if any; the selection ring is not a handle. */
+  private markerUnderRay(): THREE.Group | null {
+    const hits = this.raycaster.intersectObjects([...this.markers.values()].filter((marker) => marker.visible), true);
+    const first = hits.find((hit) => hit.object.name !== "selection-ring");
+    let node: THREE.Object3D | null = first?.object ?? null;
+    while (node && !node.userData.kind) node = node.parent;
+    return (node as THREE.Group | null) ?? null;
+  }
+
+  /**
+   * With the select tool an object can be taken and dragged: a wall item slides along the wall under the pointer and keeps
+   * its front turned into the room, anything else slides at its own height. Markers of kind `locked` are not the author's
+   * to move. Nothing happens until the pointer has travelled 5 px, so a click still only selects.
+   */
+  private readonly onGrabDown = (event: PointerEvent) => {
+    if (event.button !== 0 || this.dragging || this.inputs.tool !== "select") return;
+    this.raycaster.setFromCamera(this.ndc(event.clientX, event.clientY), this.camera);
+    const marker = this.markerUnderRay();
+    if (!marker || marker.userData.kind === "locked") return;
+    this.grab = { marker, ref: { kind: marker.userData.kind as string, index: marker.userData.index as number }, pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false, orbitWas: this.orbit.enabled };
+    this.orbit.enabled = false;
+  };
+
+  private readonly onGrabMove = (event: PointerEvent) => {
+    const grab = this.grab;
+    if (!grab || event.pointerId !== grab.pointerId) return;
+    if (!grab.moved) {
+      if (Math.hypot(event.clientX - grab.x, event.clientY - grab.y) <= 5) return;
+      grab.moved = true;
+      this.dragging = true;
+      this.renderer.domElement.setPointerCapture?.(event.pointerId);
+      this.renderer.domElement.style.cursor = "grabbing";
+      this.callbacks.onSelect(grab.ref);
+      this.callbacks.onTransform(grab.ref, null, "start");
+    }
+    this.raycaster.setFromCamera(this.ndc(event.clientX, event.clientY), this.camera);
+    const marker = grab.marker;
+    let turned = false;
+    if (marker.userData.mount === "wall") {
+      // A wall item follows what the pointer is on: a wall face (it sits on it, turned into the room) or the floor below
+      // it (it is carried towards another wall). Anything else, such as the top edge of a wall, is ignored, so the item
+      // is never pushed through a wall.
+      const hit = this.modelHit();
+      const normal = hit ? this.facingNormal(hit, this.raycaster.ray.direction) : null;
+      const flat = normal ? Math.hypot(normal.x, normal.z) : 0;
+      if (hit && normal && Math.abs(normal.y) < 0.35 && flat > 0.5) {
+        marker.position.set(hit.point.x, marker.position.y, hit.point.z);
+        // Front (local -Z) along the wall's normal, the same turn as "Áp vào tường gần nhất".
+        marker.rotation.set(0, Math.atan2(-normal.x / flat, -normal.z / flat), 0);
+        turned = true;
+      } else if (hit && normal && normal.y > 0.7 && hit.point.y <= marker.position.y + 0.3) {
+        marker.position.set(hit.point.x, marker.position.y, hit.point.z);
+      } else {
+        return;
+      }
+    } else {
+      const point = this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -marker.position.y), new THREE.Vector3());
+      if (!point) return;
+      marker.position.set(point.x, marker.position.y, point.z);
+    }
+    const q = marker.quaternion;
+    const yaw = Math.atan2(2 * (q.w * q.y + q.x * q.z), 1 - 2 * (q.y * q.y + q.z * q.z));
+    this.callbacks.onTransform(grab.ref, {
+      position: { x: round3(marker.position.x), y: round3(marker.position.y), z: round3(marker.position.z) },
+      yawDegrees: round3(((yaw / DEG) % 360 + 360) % 360),
+      quaternion: { x: q.x, y: q.y, z: q.z, w: q.w },
+      turned,
+    }, "change");
+    this.requestRender();
+  };
+
+  private readonly onGrabUp = (event: PointerEvent) => {
+    const grab = this.grab;
+    if (!grab || event.pointerId !== grab.pointerId) return;
+    this.grab = null;
+    this.orbit.enabled = grab.orbitWas;
+    if (!grab.moved) return;
+    this.dragging = false;
+    this.renderer.domElement.style.cursor = "";
+    this.renderer.domElement.releasePointerCapture?.(event.pointerId);
+    this.callbacks.onTransform(grab.ref, null, "end");
   };
 
   // ───────── picking ─────────
@@ -862,6 +959,12 @@ export class EditorSceneController {
       loseContext: () => loseExt?.loseContext(),
       restoreContext: () => loseExt?.restoreContext(),
       markerPosition: (kind: string, index: number) => this.markers.get(`${kind}:${index}`)?.position.toArray() ?? null,
+      /** Screen position of a world point, for tests that point at a place on the model. */
+      projectPoint: (point: Point3) => {
+        const p = new THREE.Vector3(point.x, point.y, point.z).project(this.camera);
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        return { x: rect.left + ((p.x + 1) / 2) * rect.width, y: rect.top + ((1 - p.y) / 2) * rect.height };
+      },
       /** `mount:width:height:depth:lift:front` of the true-size shape drawn for a marker; "" when it has none. */
       markerShape: (kind: string, index: number) => (this.markers.get(`${kind}:${index}`)?.userData.shape as string | undefined) ?? null,
       clipConstant: () => this.clipPlane.constant,
