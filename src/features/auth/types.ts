@@ -24,6 +24,26 @@ export type AuthUser = {
   updatedAt?: string | null;
   emailVerifiedAt?: string | null;
   registrationExpiresAt?: string | null;
+  /**
+   * BE#235, account created by an admin (FireSafetyExpert): "VerifyEmail" before the first sign-in is finished (no session
+   * exists yet), "ChangePassword" once the email is verified: the session may only change the password, read
+   * /api/auth/me and log out. Null or absent for a normal account.
+   */
+  firstLoginStep?: FirstLoginStep | null;
+};
+
+export type FirstLoginStep = "VerifyEmail" | "ChangePassword";
+
+/**
+ * Carried by the 403 FIRST_LOGIN_VERIFICATION_REQUIRED of `POST /api/auth/login` and by `POST /api/auth/first-login/resend`
+ * (BE `FirstLoginChallenge`). `resendAfterSeconds` is 0 when a new code may be requested now.
+ */
+export type FirstLoginChallenge = {
+  challengeToken: string;
+  challengeExpiresAt: string;
+  codeExpiresAt: string;
+  emailHint: string;
+  resendAfterSeconds: number;
 };
 
 export type UpdateProfileInput = {

@@ -16,6 +16,7 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ToastProvider } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuthSession } from "@/features/auth/auth-session";
+import { FirstPasswordChange } from "@/features/auth/components/first-password-change";
 import { ThemeScope } from "@/features/theme/theme-scope";
 import { TopbarSlotContext } from "@/features/theme/topbar-slot";
 import { CommandPaletteButton, CommandPaletteProvider } from "@/features/command-palette/palette";
@@ -107,6 +108,8 @@ function Shell({ area, children }: { area: OperationsArea; children: ReactNode }
     const next = pathname + (params.size ? "?" + params.toString() : "");
     return <AccessScreen title={area.label} message={area.signInPrompt} action={<Button asChild><Link href={`/login?next=${encodeURIComponent(next)}`}>Đăng nhập</Link></Button>} />;
   }
+  // BE#235: the initial password set by an admin has to change before anything else answers.
+  if (user.firstLoginStep === "ChangePassword") return <FirstPasswordChange />;
   if (!area.allowedRoles.includes(user.role)) {
     return <AccessScreen title="Không có quyền truy cập" message={area.deniedMessage} action={<Button asChild variant="secondary"><Link href={area.deniedHref}>{area.deniedLabel}</Link></Button>} />;
   }

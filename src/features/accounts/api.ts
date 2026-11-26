@@ -46,6 +46,21 @@ export const accountsApi = {
   get(accessToken: string, id: string) {
     return apiClient.request<ApiManagedAccount>(`/api/accounts/${id}`, { headers: headers(accessToken) }).then(normalizeAccount);
   },
+  /** The account with the `ETag` (profile revision) that `changeEmail` sends back as `If-Match`. */
+  async detail(accessToken: string, id: string): Promise<{ account: ManagedAccount; etag: string | null }> {
+    const response = await apiClient.requestWithMeta<ApiManagedAccount>(`/api/accounts/${id}`, { headers: headers(accessToken) });
+    const account = normalizeAccount(response.data);
+    return { account, etag: response.headers.get("etag") ?? (account.profileRevision ? `"${account.profileRevision}"` : null) };
+  },
+  /**
+   * BE#235: fixes a mistyped email while the account has not verified it. 409 EMAIL_ALREADY_VERIFIED / EMAIL_EXISTS,
+   * 412 when the account changed meanwhile. The pending code of the old address is dropped by the server.
+   */
+  async changeEmail(accessToken: string, id: string, email: string, etag: string): Promise<{ account: ManagedAccount; etag: string | null }> {
+    const response = await apiClient.requestWithMeta<ApiManagedAccount>(`/api/accounts/${id}/email`, { headers: { ...headers(accessToken), "If-Match": etag }, json: { email }, method: "PATCH" });
+    const account = normalizeAccount(response.data);
+    return { account, etag: response.headers.get("etag") ?? (account.profileRevision ? `"${account.profileRevision}"` : null) };
+  },
   setStatus(accessToken: string, id: string, isActive: boolean) {
     return apiClient.request<ApiManagedAccount>(`/api/accounts/${id}/status`, { headers: headers(accessToken), json: { isActive }, method: "PATCH" }).then(normalizeAccount);
   },

@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, RefreshCw, Search, ShieldAlert, UserCog, Users } from "lucide-react";
+import { MailWarning, Plus, RefreshCw, Search, ShieldAlert, UserCog, Users } from "lucide-react";
 import { useId, useState, type FormEvent } from "react";
 import { ApiError } from "@/api";
 import { useAsyncData } from "@/api/use-async-data";
@@ -42,7 +42,14 @@ const roleOptions: ComboboxOption[] = creatableRoles.map((item) => ({ value: Str
 const roleLabel = (role: UserRole) => roles.find((item) => item.value === role)?.label ?? "Không xác định";
 const roleTone = (role: UserRole): Tone => (role === 0 ? "ember" : role === 1 ? "info" : role === 3 ? "success" : "neutral");
 const formatDate = (value: string | null | undefined) => (value ? new Date(value).toLocaleString("vi-VN") : "Chưa có");
-const statusChip = (account: Pick<ManagedAccount, "isActive">) => <StatusBadge tone={account.isActive ? "success" : "danger"}>{account.isActive ? "Hoạt động" : "Đã khóa"}</StatusBadge>;
+/** One chip: locked wins; then the first sign-in of an account an admin created (BE#235); otherwise active. */
+const statusChip = (account: Pick<ManagedAccount, "isActive" | "firstLoginStep">) => {
+  if (!account.isActive) return <StatusBadge tone="danger">Đã khóa</StatusBadge>;
+  if (account.firstLoginStep === "VerifyEmail") return <StatusBadge tone="warning">Chưa xác minh email</StatusBadge>;
+  if (account.firstLoginStep === "ChangePassword") return <StatusBadge tone="info">Chưa đổi mật khẩu ban đầu</StatusBadge>;
+  return <StatusBadge tone="success">Hoạt động</StatusBadge>;
+};
+const emailState = (account: ManagedAccount) => (account.firstLoginStep === "VerifyEmail" ? "Chưa xác minh" : account.emailVerifiedAt ? `Đã xác minh ${formatDate(account.emailVerifiedAt)}` : "Không cần xác minh lại");
 
 type CreateForm = { email: string; password: string; fullName: string; role: UserRole; organizationId: string };
 
@@ -80,6 +87,9 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
   const [submitState, setSubmitState] = useState<"idle" | "busy" | "done">("idle");
   const [toggling, setToggling] = useState<ManagedAccount | null>(null);
   const [toggleBusy, setToggleBusy] = useState(false);
+  const [selectedEtag, setSelectedEtag] = useState<string | null>(null);
+  const [emailEdit, setEmailEdit] = useState<{ value: string; error: string; busy: boolean } | null>(null);
+  const emailFormId = useId();
 
   const enabled = ready && user?.role === 0 && Boolean(accessToken);
   const list = useAsyncData(
@@ -109,7 +119,9 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
     if (!accessToken || opening) return;
     setOpening(account.id);
     try {
-      setSelected(await accountsApi.get(accessToken, account.id));
+      const detail = await accountsApi.detail(accessToken, account.id);
+      setSelected(detail.account);
+      setSelectedEtag(detail.etag);
     } catch {
       toast.notify({ tone: "danger", title: "Không mở được tài khoản", description: "Hãy tải lại danh sách rồi thử lại." });
     } finally {
@@ -130,7 +142,7 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
     try {
       await accountsApi.create(accessToken, { email: form.email.trim(), password: form.password, fullName: form.fullName.trim(), role: form.role, organizationId: form.role === 1 ? form.organizationId || null : null });
       setSubmitState("done");
-      toast.notify({ tone: "success", title: "Đã tạo tài khoản", description: "Danh sách đã được tải lại." });
+      toast.notify({ tone: "success", title: "Đã tạo tài khoản", description: form.role === 3 ? "Hãy đưa mật khẩu ban đầu cho chuyên viên qua kênh riêng. Lần đăng nhập đầu, họ nhập mã gửi về email rồi đổi mật khẩu." : "Danh sách đã được tải lại." });
       list.reload();
       window.setTimeout(() => {
         setCreating(false);
@@ -143,6 +155,27 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
       }
       setFormError(cause instanceof ApiError && cause.status === 409 ? "Email này đã được sử dụng." : "Không thể tạo tài khoản. Nội dung bạn nhập vẫn được giữ lại; hãy kiểm tra và thử lại.");
       setSubmitState("idle");
+    }
+  };
+
+  const saveEmail = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!accessToken || !selected || !emailEdit || emailEdit.busy) return;
+    const email = emailEdit.value.trim();
+    if (!/^\S+@\S+\.\S+$/.test(email)) { setEmailEdit({ ...emailEdit, error: "Nhập email hợp lệ." }); return; }
+    if (email.toLowerCase() === selected.email.toLowerCase()) { setEmailEdit({ ...emailEdit, error: "Email mới đang trùng email hiện tại." }); return; }
+    if (!selectedEtag) { setEmailEdit({ ...emailEdit, error: "Hãy đóng rồi mở lại tài khoản này để tải dữ liệu mới nhất." }); return; }
+    setEmailEdit({ ...emailEdit, error: "", busy: true });
+    try {
+      const updated = await accountsApi.changeEmail(accessToken, selected.id, email, selectedEtag);
+      setSelected(updated.account);
+      setSelectedEtag(updated.etag);
+      setEmailEdit(null);
+      toast.notify({ tone: "success", title: "Đã sửa email", description: `Lần đăng nhập kế tiếp, mã xác minh được gửi về ${updated.account.email}.` });
+      list.reload();
+    } catch (cause) {
+      const stale = cause instanceof ApiError && (cause.status === 412 || cause.status === 428);
+      setEmailEdit({ value: email, busy: false, error: stale ? "Tài khoản vừa thay đổi ở nơi khác. Hãy đóng rồi mở lại tài khoản này, sau đó thử lại." : (cause instanceof ApiError && cause.fieldMessage("email")) || describeApiError(cause, "Chưa sửa được email. Hãy thử lại.") });
     }
   };
 
@@ -169,7 +202,7 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
     { key: "email", header: "Email", primary: true, render: (account) => <CellTitle title={account.email} sub={account.fullName || account.username || undefined} /> },
     { key: "role", header: "Vai trò", width: 170, render: (account) => <StatusBadge tone={roleTone(account.role)}>{roleLabel(account.role)}</StatusBadge> },
     { key: "organization", header: "Tổ chức", width: 200, hideBelow: 900, render: (account) => orgCell(account.organizationId) },
-    { key: "status", header: "Trạng thái", width: 140, render: statusChip },
+    { key: "status", header: "Trạng thái", width: 200, render: statusChip },
     { key: "lastLogin", header: "Đăng nhập gần nhất", width: 180, hideBelow: 1200, cardHidden: true, render: (account) => formatDate(account.lastLoginAt) },
   ];
 
@@ -230,6 +263,7 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
       {selected && <div className="ops-stack">
         <Rows items={[
           { label: "Họ tên", value: selected.fullName?.trim() ? selected.fullName : "Chưa có" },
+          { label: "Email", value: `${selected.email} · ${emailState(selected)}` },
           { label: "Vai trò", value: roleLabel(selected.role) },
           ...(selected.username ? [{ label: "Tên người dùng", value: selected.username }] : []),
           { label: "Tổ chức", value: orgCell(selected.organizationId) },
@@ -237,6 +271,11 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
           { label: "Đăng nhập gần nhất", value: formatDate(selected.lastLoginAt) },
           { label: "Ngày tạo", value: formatDate(selected.createdAt) },
         ]} />
+        {selected.firstLoginStep === "VerifyEmail" && <Alert tone="warning" title="Chưa xác minh email"
+          action={<Button type="button" size="sm" variant="secondary" className="mt-3" onClick={() => setEmailEdit({ value: selected.email, error: "", busy: false })}><MailWarning size={16} aria-hidden="true" />Sửa email</Button>}>
+          Tài khoản này chưa đăng nhập lần nào. Ở lần đăng nhập đầu, hệ thống gửi mã xác minh về email trên, sau đó người dùng phải đổi mật khẩu ban đầu. Nếu địa chỉ bị gõ sai, hãy sửa lại; khi đã xác minh thì không sửa được nữa.
+        </Alert>}
+        {selected.firstLoginStep === "ChangePassword" && <Alert tone="info" title="Chưa đổi mật khẩu ban đầu">Email đã được xác minh. Người dùng cần đổi mật khẩu ban đầu thì mới dùng được tài khoản.</Alert>}
         <Alert tone="info" title="Không cấp quyền quản trị FET3D ở đây">Quyền quản trị FET3D được cấp riêng, không qua trang này. Vai trò và tổ chức của tài khoản không đổi được sau khi tạo.</Alert>
       </div>}
     </Drawer>
@@ -250,9 +289,19 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
         <Field label="Email" required error={fieldErrors.email}>{(p) => <Input {...p} type="email" autoComplete="off" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />}</Field>
         <Field label="Mật khẩu" required hint="Từ 12 đến 128 ký tự." error={fieldErrors.password}>{(p) => <Input {...p} type="password" autoComplete="new-password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />}</Field>
         <Field label="Họ và tên">{(p) => <Input {...p} maxLength={200} autoComplete="off" value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} />}</Field>
-        <Field label="Vai trò" hint={form.role === 3 ? "Chuyên viên PCCC không thuộc tổ chức nào; tài khoản chỉ vào được hàng chờ thẩm định." : "Quyền quản trị FET3D được cấp riêng, không chọn ở đây."}>{(p) => <Combobox {...p} value={String(form.role)} onChange={(value) => setForm({ ...form, role: Number(value) as UserRole })} options={roleOptions} groupLabel="Vai trò" />}</Field>
+        <Field label="Vai trò" hint={form.role === 3 ? "Chuyên viên PCCC không thuộc tổ chức nào; tài khoản chỉ vào được hàng chờ thẩm định. Lần đăng nhập đầu, chuyên viên nhập mã gửi về email này rồi đổi mật khẩu, nên hãy nhập đúng email." : "Quyền quản trị FET3D được cấp riêng, không chọn ở đây."}>{(p) => <Combobox {...p} value={String(form.role)} onChange={(value) => setForm({ ...form, role: Number(value) as UserRole })} options={roleOptions} groupLabel="Vai trò" />}</Field>
         {form.role === 1 && <Field label="Tổ chức" required error={fieldErrors.organizationId}>{(p) => <Combobox {...p} value={form.organizationId} onChange={(value) => setForm({ ...form, organizationId: value })} options={orgOptions} placeholder="Chọn tổ chức" searchPlaceholder="Tìm theo tên tổ chức…" groupLabel="Tổ chức đang hoạt động" emptyText="Không có tổ chức phù hợp" loading={organizations.loading && !organizations.data} />}</Field>}
         {formError && <Alert tone="danger">{formError}</Alert>}
+      </form>
+    </Modal>
+
+    <Modal open={emailEdit !== null} onOpenChange={(open) => { if (!open && !emailEdit?.busy) setEmailEdit(null); }} size="sm" title="Sửa email" description="Chỉ sửa được khi tài khoản chưa xác minh email. Mã đã gửi về địa chỉ cũ sẽ hết dùng được."
+      footer={<>
+        <Button type="button" variant="ghost" onClick={() => setEmailEdit(null)} disabled={emailEdit?.busy}>Hủy</Button>
+        <Button type="submit" form={emailFormId} disabled={emailEdit?.busy}>{emailEdit?.busy ? "Đang lưu…" : "Lưu email"}</Button>
+      </>}>
+      <form id={emailFormId} onSubmit={saveEmail} noValidate className="ops-stack">
+        <Field label="Email mới" required error={emailEdit?.error || undefined}>{(p) => <Input {...p} type="email" autoComplete="off" maxLength={254} value={emailEdit?.value ?? ""} onChange={(event) => setEmailEdit((current) => (current ? { ...current, value: event.target.value, error: "" } : current))} />}</Field>
       </form>
     </Modal>
 
