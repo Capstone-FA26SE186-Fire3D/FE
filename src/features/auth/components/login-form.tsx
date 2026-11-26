@@ -9,13 +9,14 @@ import { Button } from "@/components/ui/button";
 import { LoadingBlock } from "@/components/ui/spinner";
 import { PasswordInput } from "@/components/ui/password-input";
 import { hasFirebaseAuthConfig } from "@/configs/env";
-import { authApi } from "../api";
+import { authApi, firstLoginChallengeOf } from "../api";
 import { useAuthSession } from "../auth-session";
 import { postLoginRoute } from "../redirect";
 import type { RegisterInput } from "../types";
 import { Iconsax } from "@/components/ui/iconsax";
 import { googleErrorMessage } from "../google-errors";
-import type { GoogleOnboardingProof } from "../types";
+import type { FirstLoginChallenge, GoogleOnboardingProof } from "../types";
+import { FirstLoginVerify } from "./first-login-verify";
 import { GoogleIcon } from "./google-icon";
 
 type FieldErrors = Record<string, string>;
@@ -23,6 +24,7 @@ type FieldErrors = Record<string, string>;
 // Shown after the server revoked every session (explicit Google link, first local password).
 const sessionNotices: Record<string, string> = {
   "google-linked": "Google đã được liên kết với tài khoản của bạn. Vì lý do bảo mật, mọi phiên đăng nhập đã được thu hồi: hãy đăng nhập lại bằng email hoặc Google.",
+  "first-password-changed": "Mật khẩu đã được đổi. Hãy đăng nhập lại bằng email và mật khẩu mới.",
   "password-set": "Mật khẩu FET3D đã được đặt. Vì lý do bảo mật, mọi phiên đăng nhập đã được thu hồi: hãy đăng nhập lại bằng email và mật khẩu mới hoặc bằng Google.",
 };
 
@@ -56,6 +58,8 @@ export function LoginForm() {
   const { isAuthenticated, login, loginWithGoogle, completeGoogleOnboarding, ready, register, user } = useAuthSession();
   const [googleOnboarding, setGoogleOnboarding] = useState<{ proof: GoogleOnboardingProof | null; recovery?: boolean } | null>(null);
   const [proofExpired, setProofExpired] = useState(false);
+  // First sign-in of an account an admin created (BE#235): the password was right, the email is not verified yet.
+  const [firstLogin, setFirstLogin] = useState<FirstLoginChallenge | null>(null);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -221,9 +225,11 @@ export function LoginForm() {
       try {
         redirectAfterLogin(await login(email.trim(), password));
       } catch (error) {
+        const challenge = errorCode(error) === "FIRST_LOGIN_VERIFICATION_REQUIRED" && error instanceof ApiError ? firstLoginChallengeOf(error.payload) : null;
+        setSubmitting(false);
+        if (challenge) { setPassword(""); setFirstLogin(challenge); return; }
         setFieldErrors(toFieldErrors(error));
         setMessage(errorMessage(error, "Không thể đăng nhập. Vui lòng thử lại."));
-        setSubmitting(false);
       }
       return;
     }
@@ -320,6 +326,10 @@ export function LoginForm() {
       waitForGoogle(error);
     } finally { googleRequestRef.current = false; setSubmitting(false); }
   };
+
+  if (firstLogin) {
+    return <FirstLoginVerify challenge={firstLogin} onDone={redirectAfterLogin} onBack={(reason) => { setFirstLogin(null); setMessage(reason ?? ""); }} />;
+  }
 
   return (
     <form className="login-panel" onSubmit={submit} aria-describedby="auth-note">

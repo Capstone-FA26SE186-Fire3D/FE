@@ -39,7 +39,9 @@ export function safeNext(value: string | null): string {
   return validatedNext(value) ?? "/learning-hub";
 }
 
-export function postLoginRoute(user: Pick<AuthUser, "role"> | null | undefined, next: string | null): string {
+export function postLoginRoute(user: Pick<AuthUser, "role" | "firstLoginStep"> | null | undefined, next: string | null): string {
+  // The initial password must be changed first (BE#235); the workspace of the role shows that step.
+  if (user?.firstLoginStep === "ChangePassword") return dashboardRouteFor(user);
   const destination = validatedNext(next);
   return destination && canOpenRoleRoute(user, destination) ? destination : dashboardRouteFor(user);
 }
