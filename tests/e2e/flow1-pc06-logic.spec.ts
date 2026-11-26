@@ -17,6 +17,8 @@ import type { LibraryVersion } from "../../src/features/library/types";
 import { plainLimitation } from "../../src/features/org-ai/labels";
 import { scenarioDraftBody } from "../../src/features/org-ai/scenario-draft-body";
 import type { JsonObject } from "../../src/features/scenario-editor/store/json";
+import { MOUNTED_CAPABILITIES, heightProblem, heightText, isWallNormal, mountedY, mountingOf, shapeOf, sizeText, yawFacing } from "../../src/features/scenario-editor/v1/equipment-mounting";
+import { yawToQuaternion } from "../../src/features/scenario-editor/v1/matrix";
 import { capabilityAllowed, categoryOf, isInfrastructureObject, itemPathToObjectPath, itemsToObjects, objectsToItems, scopeKinds } from "../../src/features/scenario-editor/v1/scope";
 import { completenessIssues, shapeIssues, situationIssues } from "../../src/features/scenario-editor/v1/state";
 import { parseDailyLimit, sourceText, usageText } from "../../src/features/organizations/ifc-processing";
@@ -288,6 +290,56 @@ test.describe("practice log (BE#218)", () => {
     expect(lastPlayedText("2026-09-20T18:30:00Z")).toBe("21/09/2026");
     expect(lastPlayedText(null)).toBeNull();
     expect(lastPlayedText("not a date")).toBeNull();
+  });
+});
+
+test.describe("how equipment is mounted in the app", () => {
+  // Equipment capabilities of runtime 2.5.0 (BE runtime catalog, objectKinds Equipment).
+  const EQUIPMENT = ["door.exit", "door.fire", "gas.valve", "glass.pane", "item.towel", "water.bath", "water.sink", "blanket.fire", "firstaid.kit", "item.blanket", "water.shower", "door.standard", "furniture.bed", "item.clothing", "power.breaker", "signal.window", "alarm.detector", "bait.belongings", "ppe.escape_hood", "window.openable", "alarm.call_point", "door.exit_locked", "door.fire_wedged", "transport.elevator", "extinguisher.portable", "suppression.sprinkler", "tool.emergency_hammer", "extinguisher.hose_reel"];
+
+  test("every Equipment capability of the app has a mounting, and nothing else is listed", () => {
+    expect([...MOUNTED_CAPABILITIES].sort()).toEqual([...EQUIPMENT].sort());
+    expect(mountingOf("fire.source")).toBeNull();
+    expect(mountingOf(undefined)).toBeNull();
+  });
+
+  test("the front of a wall item is turned out of the wall it is put on", () => {
+    // With yaw θ the front of a prefab (local -Z) points to (-sin θ, 0, -cos θ): it must equal the wall's normal.
+    for (const normal of [{ x: 0, z: 1 }, { x: 0, z: -1 }, { x: 1, z: 0 }, { x: -1, z: 0 }, { x: Math.SQRT1_2, z: Math.SQRT1_2 }]) {
+      const yaw = (yawFacing(normal) * Math.PI) / 180;
+      expect(-Math.sin(yaw)).toBeCloseTo(normal.x, 6);
+      expect(-Math.cos(yaw)).toBeCloseTo(normal.z, 6);
+    }
+    expect(yawFacing({ x: 0, z: 1 })).toBe(180);
+    expect(yawFacing({ x: 0, z: -1 })).toBe(0);
+    expect(yawToQuaternion(yawFacing({ x: 0, z: 1 })).y).toBeCloseTo(1, 6);
+    expect(isWallNormal({ x: 0, y: 0, z: 1 })).toBe(true);
+    expect(isWallNormal({ x: 0, y: 1, z: 0 })).toBe(false); // a floor
+    expect(isWallNormal({ x: 0.2, y: -0.98, z: 0 })).toBe(false); // a ceiling
+  });
+
+  test("the height follows the prefab: some lift themselves, the fire blanket hangs where it is put", () => {
+    const cabinet = mountingOf("extinguisher.hose_reel")!;
+    const blanket = mountingOf("blanket.fire")!;
+    const bottle = mountingOf("extinguisher.portable")!;
+    expect(mountedY(cabinet, 1.4)).toBe(0);
+    expect(mountedY(blanket, 0)).toBe(1.25);
+    expect(mountedY(bottle, 0.75)).toBe(0.75); // on a table
+    expect(heightProblem(cabinet, 1.2)).toContain("Y phải là 0");
+    expect(heightProblem(cabinet, 0)).toBeNull();
+    expect(heightProblem(blanket, 0)).toContain("1,25 m");
+    expect(heightProblem(blanket, 1.25)).toBeNull();
+    expect(heightProblem(bottle, 0.75)).toBeNull();
+    expect(heightText(cabinet)).toContain("1,15 m");
+    expect(sizeText(blanket)).toBe("Rộng 0,3 × cao 0,32 × sâu 0,07 m");
+  });
+
+  test("only items with a body of their own get a true-size shape; doors, windows and lifts follow the model", () => {
+    expect(shapeOf("extinguisher.hose_reel")).toEqual({ mount: "wall", width: 0.9, height: 0.9, depth: 0.24, lift: 1.15, front: true });
+    expect(shapeOf("alarm.detector")).toMatchObject({ mount: "ceiling", front: false });
+    expect(shapeOf("extinguisher.portable")).toMatchObject({ mount: "stand", front: false });
+    for (const id of ["door.exit", "door.exit_locked", "window.openable", "transport.elevator"]) expect(shapeOf(id), id).toBeUndefined();
+    expect(shapeOf("fire.source")).toBeUndefined();
   });
 });
 

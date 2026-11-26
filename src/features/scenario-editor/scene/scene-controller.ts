@@ -30,7 +30,19 @@ export type MarkerInput = MarkerRef & {
   /** Full orientation in GLB axes (v1). */
   quaternion?: Quaternion4;
   dormant?: boolean;
+  /** Real size of the thing the app will draw here (metres), drawn unscaled next to the glyph. */
+  shape?: MarkerShape;
 };
+
+/**
+ * True-size stand-in of an Equipment prefab, in the prefab's own axes: front is local -Z. A wall item has its back on the
+ * placement plane (z = 0) with its middle `lift` above the point; a standing item stands on the point; a ceiling item hangs
+ * under it.
+ */
+export type MarkerShape = { mount: "wall" | "ceiling" | "stand"; width: number; height: number; depth: number; lift: number; front: boolean };
+
+/** A wall found near a point: where it is, which way it faces (out of the wall, horizontal) and how far away. */
+export type WallHit = { point: Point3; normal: Point3; distance: number };
 
 export type SceneTool = "select" | "move" | "rotate" | "place";
 
@@ -38,8 +50,8 @@ export type TransformResult = { position: Point3; yawDegrees: number; quaternion
 
 export type SceneCallbacks = {
   onSelect: (selection: MarkerRef | null) => void;
-  /** `kind` is `SceneInputs.placeKind`; `point` is the world point under the pointer. */
-  onPlace: (kind: string, point: Point3) => void;
+  /** `kind` is `SceneInputs.placeKind`; `point` is the world point under the pointer, `normal` the surface it lies on (facing the viewer). */
+  onPlace: (kind: string, point: Point3, normal?: Point3) => void;
   onTransform: (ref: MarkerRef, next: TransformResult | null, phase: TransformPhase) => void;
   onModelPick: (pick: { name: string; point: Point3 } | null) => void;
   onContextLost: () => void;
@@ -72,6 +84,7 @@ export type DebugStats = { renders: number; geometries: number; textures: number
 
 const DEG = Math.PI / 180;
 const markerKey = (ref: MarkerRef) => `${ref.kind}:${ref.index}`;
+const shapeKey = (shape: MarkerShape | undefined) => (shape ? `${shape.mount}:${shape.width}:${shape.height}:${shape.depth}:${shape.lift}:${shape.front}` : "");
 const round3 = (value: number) => Math.round(value * 1000) / 1000;
 const NO_CLIP = 1e7;
 
@@ -505,6 +518,9 @@ export class EditorSceneController {
     make("npc", p.npc);
     make("blocked", p.blocked, 0.9, 0.3);
     make("equipment", p.equipment);
+    make("proxy", p.equipment, 0.38, 0.2);
+    make("proxyFront", p.other, 0.95, 0.45);
+    make("proxyBack", p.blocked, 0.6, 0.1);
     const ring = this.materials.ring as THREE.MeshBasicMaterial | undefined;
     if (ring) ring.color.set(p.selected);
     else this.materials.ring = new THREE.MeshBasicMaterial({ color: p.selected, side: THREE.DoubleSide, transparent: true, opacity: 0.95, depthTest: false });
@@ -516,13 +532,17 @@ export class EditorSceneController {
     return (this.geometries[key] ??= create());
   }
 
-  private buildMarker(kind: string, variant: string): THREE.Group {
+  private buildMarker(kind: string, variant: string, shape?: MarkerShape): THREE.Group {
+    const marker = new THREE.Group();
+    // The glyph grows with the camera distance so it stays visible from afar; the true-size shape next to it never scales.
     const group = new THREE.Group();
-    const mesh = (geometryKey: string, create: () => THREE.BufferGeometry, material: string, setup?: (m: THREE.Mesh) => void) => {
+    group.name = "glyph";
+    marker.add(group);
+    const mesh = (geometryKey: string, create: () => THREE.BufferGeometry, material: string, setup?: (m: THREE.Mesh) => void, parent: THREE.Group = group) => {
       const m = new THREE.Mesh(this.geometry(geometryKey, create), this.materials[material]);
       m.renderOrder = 10;
       setup?.(m);
-      group.add(m);
+      parent.add(m);
       return m;
     };
     const figure = (material: string) => {
@@ -561,8 +581,28 @@ export class EditorSceneController {
     const ring = mesh("ring", () => new THREE.TorusGeometry(0.62, 0.04, 8, 48), "ring", (m) => { m.rotation.x = Math.PI / 2; m.position.y = 0.04; });
     ring.name = "selection-ring";
     ring.visible = false;
-    group.userData = { kind, variant };
-    return group;
+    if (shape) this.buildShape(marker, shape, mesh);
+    marker.userData = { kind, variant, shape: shapeKey(shape), glyph: group };
+    return marker;
+  }
+
+  /** The body at real size, a bright front plate with an arrow where the prefab has a front, and the plate that goes on the wall. */
+  private buildShape(marker: THREE.Group, shape: MarkerShape, mesh: (geometryKey: string, create: () => THREE.BufferGeometry, material: string, setup?: (m: THREE.Mesh) => void, parent?: THREE.Group) => THREE.Mesh) {
+    const { width: w, height: h, depth: d } = shape;
+    const proxy = new THREE.Group();
+    proxy.name = "true-size";
+    marker.add(proxy);
+    const y = shape.mount === "wall" ? shape.lift : shape.mount === "ceiling" ? -h / 2 : h / 2;
+    const z = shape.mount === "wall" ? -d / 2 : 0;
+    const key = `${w}:${h}:${d}`;
+    mesh(`proxy-body-${key}`, () => new THREE.BoxGeometry(w, h, d), "proxy", (m) => { m.position.set(0, y, z); }, proxy);
+    if (shape.mount === "wall") mesh(`proxy-back-${key}`, () => new THREE.BoxGeometry(w + 0.08, h + 0.08, 0.012), "proxyBack", (m) => { m.position.set(0, y, 0.006); }, proxy);
+    if (shape.front) {
+      const front = z - d / 2;
+      mesh(`proxy-front-${key}`, () => new THREE.BoxGeometry(w, h, 0.012), "proxyFront", (m) => { m.position.set(0, y, front - 0.006); }, proxy);
+      // A cone points along +Y; turned by -90° about X it points to -Z, the way the front looks.
+      mesh("proxy-arrow", () => new THREE.ConeGeometry(0.07, 0.22, 16), "proxyFront", (m) => { m.rotation.x = -Math.PI / 2; m.position.set(0, y, front - 0.16); }, proxy);
+    }
   }
 
   setInputs(inputs: SceneInputs) {
@@ -578,14 +618,14 @@ export class EditorSceneController {
       const key = markerKey(input);
       wanted.add(key);
       let marker = this.markers.get(key);
-      if (marker && marker.userData.variant !== input.variant) {
+      if (marker && (marker.userData.variant !== input.variant || marker.userData.shape !== shapeKey(input.shape))) {
         if (this.transform.object === marker) this.transform.detach();
         this.markerGroup.remove(marker);
         this.markers.delete(key);
         marker = undefined;
       }
       if (!marker) {
-        marker = this.buildMarker(input.kind, input.variant);
+        marker = this.buildMarker(input.kind, input.variant, input.shape);
         this.markers.set(key, marker);
         this.markerGroup.add(marker);
       }
@@ -601,7 +641,7 @@ export class EditorSceneController {
       const ring = marker.getObjectByName("selection-ring");
       if (ring) ring.visible = isSelected;
       marker.userData.dormant = input.dormant ?? false;
-      marker.scale.setScalar(this.markerScale * (input.dormant ? 0.6 : 1));
+      (marker.userData.glyph as THREE.Group).scale.setScalar(this.markerScale * (input.dormant ? 0.6 : 1));
     }
     for (const [key, marker] of [...this.markers]) {
       if (wanted.has(key)) continue;
@@ -634,7 +674,7 @@ export class EditorSceneController {
     const next = Math.max(1, distance / 16);
     if (Math.abs(next - this.markerScale) < 0.02) return;
     this.markerScale = next;
-    this.markers.forEach((marker) => marker.scale.setScalar(this.markerScale * (marker.userData.dormant ? 0.6 : 1)));
+    this.markers.forEach((marker) => (marker.userData.glyph as THREE.Group).scale.setScalar(this.markerScale * (marker.userData.dormant ? 0.6 : 1)));
   }
 
   // ───────── gizmo ─────────
@@ -699,7 +739,8 @@ export class EditorSceneController {
       if (!point) {
         point = this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -this.floorElevation()), new THREE.Vector3());
       }
-      if (point) this.callbacks.onPlace(this.inputs.placeKind, { x: round3(point.x), y: round3(point.y), z: round3(point.z) });
+      const normal = hit ? this.facingNormal(hit, this.raycaster.ray.direction) : null;
+      if (point) this.callbacks.onPlace(this.inputs.placeKind, { x: round3(point.x), y: round3(point.y), z: round3(point.z) }, normal ?? undefined);
       return;
     }
     const markerHits = this.raycaster.intersectObjects([...this.markers.values()].filter((marker) => marker.visible), true);
@@ -715,6 +756,56 @@ export class EditorSceneController {
     const hit = this.modelHit();
     this.callbacks.onSelect(null);
     this.callbacks.onModelPick(hit ? { name: this.nameOf(hit.object), point: { x: round3(hit.point.x), y: round3(hit.point.y), z: round3(hit.point.z) } } : null);
+  }
+
+  /** Normal of the face that was hit, in world axes and turned towards where the ray came from. */
+  private facingNormal(hit: THREE.Intersection, direction: THREE.Vector3): Point3 | null {
+    if (!hit.face) return null;
+    const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+    if (normal.dot(direction) > 0) normal.negate();
+    return { x: round3(normal.x), y: round3(normal.y), z: round3(normal.z) };
+  }
+
+  /**
+   * The closest wall around a world point: 16 level rays from `height` above it, each at most `reach` metres long. Only
+   * near-vertical faces count, so furniture tops and floors are never taken for a wall. A ray starts a little behind the
+   * point, so an object that already sits on a wall still finds that wall (distance 0). Faces that look towards the point
+   * win; a model whose walls are single faces wound the other way is read from its back faces instead.
+   */
+  nearestWall(point: Point3, reach = 1.5, height = 1.0): WallHit | null {
+    const origin = new THREE.Vector3(point.x, point.y + height, point.z);
+    const back = 0.05;
+    const probe = new THREE.Raycaster();
+    probe.far = reach + back;
+    let facing: WallHit | null = null;
+    let turned: WallHit | null = null;
+    for (let step = 0; step < 16; step += 1) {
+      const angle = (step / 16) * Math.PI * 2;
+      const direction = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
+      probe.set(origin.clone().addScaledVector(direction, -back), direction);
+      for (const hit of probe.intersectObject(this.modelGroup, true)) {
+        if (!hit.face) continue;
+        let visible = true;
+        for (let node: THREE.Object3D | null = hit.object; node; node = node.parent) if (!node.visible) { visible = false; break; }
+        if (!visible) continue;
+        const normal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld);
+        const flat = Math.hypot(normal.x, normal.z);
+        if (Math.abs(normal.y) >= 0.35 || flat < 0.5) continue;
+        const towards = normal.dot(direction) < 0;
+        const sign = towards ? 1 : -1;
+        const nx = (normal.x / flat) * sign;
+        const nz = (normal.z / flat) * sign;
+        // The ray rarely meets the wall head-on: take the foot of the perpendicular from the point, so the object slides
+        // straight back onto the wall instead of sideways along it.
+        const gap = (origin.x - hit.point.x) * nx + (origin.z - hit.point.z) * nz;
+        if (gap < -0.02 || gap > reach) continue;
+        const found: WallHit = { point: { x: round3(origin.x - nx * gap), y: round3(point.y), z: round3(origin.z - nz * gap) }, normal: { x: round3(nx), y: 0, z: round3(nz) }, distance: round3(Math.max(gap, 0)) };
+        if (towards) { if (!facing || found.distance < facing.distance) facing = found; }
+        else if (!turned || found.distance < turned.distance) turned = found;
+        break;
+      }
+    }
+    return facing ?? turned;
   }
 
   private nameOf(object: THREE.Object3D): string {
@@ -771,6 +862,8 @@ export class EditorSceneController {
       loseContext: () => loseExt?.loseContext(),
       restoreContext: () => loseExt?.restoreContext(),
       markerPosition: (kind: string, index: number) => this.markers.get(`${kind}:${index}`)?.position.toArray() ?? null,
+      /** `mount:width:height:depth:lift:front` of the true-size shape drawn for a marker; "" when it has none. */
+      markerShape: (kind: string, index: number) => (this.markers.get(`${kind}:${index}`)?.userData.shape as string | undefined) ?? null,
       clipConstant: () => this.clipPlane.constant,
       gizmoAttached: () => Boolean(this.transform.object),
     };
