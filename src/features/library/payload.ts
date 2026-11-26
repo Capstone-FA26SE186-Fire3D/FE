@@ -163,12 +163,19 @@ export function describeDifferences(kind: LibraryKind, form: VersionForm, server
 
 // ───────── what a template carries ─────────
 
-/** Non-spatial fields of `fet3d.editor/1` that a template can fill. Everything else (geometry, objects, runtime, seed) is never applied. */
-export const TEMPLATE_FIELDS = ["name", "learningObjectives", "learnerInstructions", "timeLimitSeconds", "modePolicy", "rubric"] as const;
+/**
+ * Non-spatial fields of `fet3d.editor/1` that a template can fill. Everything else (geometry, objects, runtime, seed) is never applied.
+ * `audience`, `workingHours` and `assumption` are the PC06 situation fields (BE#215): a draft has them only when it is built on a fire infrastructure.
+ */
+export const TEMPLATE_FIELDS = ["name", "audience", "workingHours", "assumption", "learningObjectives", "learnerInstructions", "timeLimitSeconds", "modePolicy", "rubric"] as const;
 export type TemplateField = (typeof TEMPLATE_FIELDS)[number];
+export const SITUATION_TEMPLATE_FIELDS: readonly TemplateField[] = ["audience", "workingHours", "assumption"];
 
 export const templateFieldLabel: Record<TemplateField, string> = {
   name: "Tên kịch bản",
+  audience: "Đối tượng luyện tập",
+  workingHours: "Thời gian xảy ra",
+  assumption: "Giả định của tình huống",
   learningObjectives: "Mục tiêu học tập",
   learnerInstructions: "Hướng dẫn cho người học",
   timeLimitSeconds: "Thời gian tối đa",

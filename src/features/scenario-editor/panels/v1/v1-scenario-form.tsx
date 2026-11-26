@@ -92,7 +92,7 @@ export function V1ScenarioForm({ draft, issues, actions, catalog, rubricCatalog,
 }
 
 /** Mẫu PC06 mục IV.1: giả định (a) and the group of people the situation trains (b), in or outside working hours. */
-function SituationGroup({ draft, at, actions, required }: { draft: JsonObject; at: (path: string) => string | undefined; actions: V1Actions; required: boolean }) {
+export function SituationGroup({ draft, at, actions, required }: { draft: JsonObject; at: (path: string) => string | undefined; actions: Pick<V1Actions, "setField">; required: boolean }) {
   const assumption = isObject(draft.assumption) ? draft.assumption : {};
   const text = (key: string) => (typeof assumption[key] === "string" ? (assumption[key] as string) : "");
   const setText = (key: string, label: string) => (value: string) => actions.setField(["assumption", key], value === "" ? undefined : value, label);

@@ -1,7 +1,7 @@
 import { deepEqual, isObject, type Json, type JsonObject, type Path } from "@/features/scenario-editor/store/json";
 import type { CapabilityOption } from "@/features/scenario-editor/v1/catalog";
-import { LIMITS, MODE_LABEL, TRAINING_MODES, type TrainingMode } from "@/features/scenario-editor/v1/contract";
-import { TEMPLATE_FIELDS, ignoredTemplateParts, templateFieldLabel, type TemplateField } from "./payload";
+import { LIMITS, MODE_LABEL, TRAINING_MODES, audienceLabel, workingHoursLabel, type TrainingMode } from "@/features/scenario-editor/v1/contract";
+import { SITUATION_TEMPLATE_FIELDS, TEMPLATE_FIELDS, ignoredTemplateParts, templateFieldLabel, type TemplateField } from "./payload";
 import { isScenarioKind, type LibraryVersion, type ScenarioLibraryKind } from "./types";
 import { capabilityName } from "@/configs/capability-labels";
 import { metricName } from "@/configs/metric-labels";
@@ -60,6 +60,8 @@ export type ApplyContext = {
   object: { index: number; kind: string | null; id: string; label: string; capability?: { id: string; version: string } } | null;
   /** Capabilities the draft's runtime publishes (null: no runtime chosen or catalog not loaded). */
   runtimeCapabilities: CapabilityOption[] | null;
+  /** False when the open draft is not a situation on a fire infrastructure: the PC06 situation fields are then left out. */
+  situation?: boolean;
 };
 
 const isEmpty = (value: unknown) => value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0) || (isObject(value) && Object.keys(value).length === 0);
@@ -73,7 +75,18 @@ export function summarizeField(field: TemplateField, value: unknown): string {
   if (field === "timeLimitSeconds") return `${String(value)} giây`;
   if (field === "modePolicy") return strings(isObject(value) ? value.allowedModes : []).map((mode) => MODE_LABEL[mode as TrainingMode] ?? mode).join(", ") || NONE;
   if (field === "rubric") return describeRubric(value);
+  if (field === "audience") return audienceLabel(value) ?? NONE;
+  if (field === "workingHours") return workingHoursLabel(value) ?? NONE;
+  if (field === "assumption") return describeAssumption(value);
   return clip(String(value), 120);
+}
+
+/** The four assumption fields of a situation in one line, in the order of the form. */
+export function describeAssumption(value: unknown): string {
+  if (!isObject(value)) return NONE;
+  const text = (key: string) => (typeof value[key] === "string" && value[key] ? String(value[key]) : null);
+  const parts = [text("time"), text("location"), text("cause"), typeof value.peoplePresent === "number" ? `${value.peoplePresent} người có mặt` : null].filter((part): part is string => part !== null);
+  return parts.length > 0 ? clip(parts.join(" · "), 200) : NONE;
 }
 
 export function describeRubric(value: unknown): string {
@@ -130,12 +143,19 @@ function group(base: Base, merged: { value: Json; note: string } | null, warning
   return { id: base.id, label: base.label, status, current: summarizeField(base.field, base.current), incoming: summarizeField(base.field, base.incoming), options, defaultAction, writes, notes, warnings };
 }
 
+const SITUATION_ONLY_NOTE = "Đối tượng luyện tập, thời gian xảy ra và giả định của mẫu chỉ áp dụng cho tình huống dựng trên Hạ tầng PCCC; bản nháp này không nhận các mục đó.";
+
 function planTemplate(version: LibraryVersion, draft: JsonObject, context: ApplyContext): ApplyPlan {
   const state = isObject(version.payload.state) ? version.payload.state : {};
   const groups: ApplyGroup[] = [];
+  const notes: string[] = [];
   for (const field of TEMPLATE_FIELDS) {
     const incoming = state[field];
     if (isEmpty(incoming)) continue;
+    if (context.situation === false && SITUATION_TEMPLATE_FIELDS.includes(field)) {
+      if (notes.length === 0) notes.push(SITUATION_ONLY_NOTE);
+      continue;
+    }
     const current = draft[field];
     const base: Base = { id: `template:${field}`, label: templateFieldLabel[field], field, path: [field], current, incoming };
     let merged: { value: Json; note: string } | null = null;
@@ -155,7 +175,7 @@ function planTemplate(version: LibraryVersion, draft: JsonObject, context: Apply
     groups.push(group(base, merged, warnings));
   }
   const ignored = ignoredTemplateParts(state);
-  return { groups, reference: [], notes: [], ignored, blocker: groups.length === 0 ? "Kịch bản mẫu này không có trường nào áp dụng được cho bản nháp." : null };
+  return { groups, reference: [], notes, ignored, blocker: groups.length === 0 ? "Kịch bản mẫu này không có trường nào áp dụng được cho bản nháp." : null };
 }
 
 function planRubric(version: LibraryVersion, draft: JsonObject, context: ApplyContext): ApplyPlan {

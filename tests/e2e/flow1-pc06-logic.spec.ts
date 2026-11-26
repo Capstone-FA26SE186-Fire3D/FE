@@ -12,9 +12,13 @@ import type { Building } from "../../src/features/buildings/types";
 import { lockedVersion, toEditorState, toUpdateBody, type FireInfrastructure } from "../../src/features/fire-infrastructure/api";
 import { coverageGap } from "../../src/features/fire-infrastructure/plan-dossier";
 import { buildApplyPlan } from "../../src/features/org-ai/apply-plan";
+import { planApply } from "../../src/features/library/apply";
+import type { LibraryVersion } from "../../src/features/library/types";
 import { plainLimitation } from "../../src/features/org-ai/labels";
 import { scenarioDraftBody } from "../../src/features/org-ai/scenario-draft-body";
 import type { JsonObject } from "../../src/features/scenario-editor/store/json";
+import { MOUNTED_CAPABILITIES, heightProblem, heightText, isWallNormal, mountedY, mountingOf, shapeOf, sizeText, yawFacing } from "../../src/features/scenario-editor/v1/equipment-mounting";
+import { yawToQuaternion } from "../../src/features/scenario-editor/v1/matrix";
 import { capabilityAllowed, categoryOf, isInfrastructureObject, itemPathToObjectPath, itemsToObjects, objectsToItems, scopeKinds } from "../../src/features/scenario-editor/v1/scope";
 import { completenessIssues, shapeIssues, situationIssues } from "../../src/features/scenario-editor/v1/state";
 import { parseDailyLimit, sourceText, usageText } from "../../src/features/organizations/ifc-processing";
@@ -286,6 +290,87 @@ test.describe("practice log (BE#218)", () => {
     expect(lastPlayedText("2026-09-20T18:30:00Z")).toBe("21/09/2026");
     expect(lastPlayedText(null)).toBeNull();
     expect(lastPlayedText("not a date")).toBeNull();
+  });
+});
+
+test.describe("how equipment is mounted in the app", () => {
+  // Equipment capabilities of runtime 2.5.0 (BE runtime catalog, objectKinds Equipment).
+  const EQUIPMENT = ["door.exit", "door.fire", "gas.valve", "glass.pane", "item.towel", "water.bath", "water.sink", "blanket.fire", "firstaid.kit", "item.blanket", "water.shower", "door.standard", "furniture.bed", "item.clothing", "power.breaker", "signal.window", "alarm.detector", "bait.belongings", "ppe.escape_hood", "window.openable", "alarm.call_point", "door.exit_locked", "door.fire_wedged", "transport.elevator", "extinguisher.portable", "suppression.sprinkler", "tool.emergency_hammer", "extinguisher.hose_reel"];
+
+  test("every Equipment capability of the app has a mounting, and nothing else is listed", () => {
+    expect([...MOUNTED_CAPABILITIES].sort()).toEqual([...EQUIPMENT].sort());
+    expect(mountingOf("fire.source")).toBeNull();
+    expect(mountingOf(undefined)).toBeNull();
+  });
+
+  test("the front of a wall item is turned out of the wall it is put on", () => {
+    // With yaw θ the front of a prefab (local -Z) points to (-sin θ, 0, -cos θ): it must equal the wall's normal.
+    for (const normal of [{ x: 0, z: 1 }, { x: 0, z: -1 }, { x: 1, z: 0 }, { x: -1, z: 0 }, { x: Math.SQRT1_2, z: Math.SQRT1_2 }]) {
+      const yaw = (yawFacing(normal) * Math.PI) / 180;
+      expect(-Math.sin(yaw)).toBeCloseTo(normal.x, 6);
+      expect(-Math.cos(yaw)).toBeCloseTo(normal.z, 6);
+    }
+    expect(yawFacing({ x: 0, z: 1 })).toBe(180);
+    expect(yawFacing({ x: 0, z: -1 })).toBe(0);
+    expect(yawToQuaternion(yawFacing({ x: 0, z: 1 })).y).toBeCloseTo(1, 6);
+    expect(isWallNormal({ x: 0, y: 0, z: 1 })).toBe(true);
+    expect(isWallNormal({ x: 0, y: 1, z: 0 })).toBe(false); // a floor
+    expect(isWallNormal({ x: 0.2, y: -0.98, z: 0 })).toBe(false); // a ceiling
+  });
+
+  test("the height follows the prefab: some lift themselves, the fire blanket hangs where it is put", () => {
+    const cabinet = mountingOf("extinguisher.hose_reel")!;
+    const blanket = mountingOf("blanket.fire")!;
+    const bottle = mountingOf("extinguisher.portable")!;
+    expect(mountedY(cabinet, 1.4)).toBe(0);
+    expect(mountedY(blanket, 0)).toBe(1.25);
+    expect(mountedY(bottle, 0.75)).toBe(0.75); // on a table
+    expect(heightProblem(cabinet, 1.2)).toContain("Y phải là 0");
+    expect(heightProblem(cabinet, 0)).toBeNull();
+    expect(heightProblem(blanket, 0)).toContain("1,25 m");
+    expect(heightProblem(blanket, 1.25)).toBeNull();
+    expect(heightProblem(bottle, 0.75)).toBeNull();
+    expect(heightText(cabinet)).toContain("1,15 m");
+    expect(sizeText(blanket)).toBe("Rộng 0,3 × cao 0,32 × sâu 0,07 m");
+  });
+
+  test("only items with a body of their own get a true-size shape; doors, windows and lifts follow the model", () => {
+    expect(shapeOf("extinguisher.hose_reel")).toEqual({ mount: "wall", width: 0.9, height: 0.9, depth: 0.24, lift: 1.15, front: true });
+    expect(shapeOf("alarm.detector")).toMatchObject({ mount: "ceiling", front: false });
+    expect(shapeOf("extinguisher.portable")).toMatchObject({ mount: "stand", front: false });
+    for (const id of ["door.exit", "door.exit_locked", "window.openable", "transport.elevator"]) expect(shapeOf(id), id).toBeUndefined();
+    expect(shapeOf("fire.source")).toBeUndefined();
+  });
+});
+
+test.describe("library template on a PC06 situation (BE#215)", () => {
+  const template = { id: "v1", itemId: "i1", kind: "ScenarioTemplate", code: "TPL-PC06-X", versionNumber: 1, name: "Mẫu", status: "Published", revision: 2, requiredCapabilities: [], publishedAt: null,
+    payload: { state: { schemaVersion: "fet3d.editor/1", name: "Cháy bếp", audience: "EvacuationGuide", workingHours: "OffHours", assumption: { time: "1 giờ sáng", location: "Căn 402", cause: "Chập điện", peoplePresent: 260 } } } } as unknown as LibraryVersion;
+  const context = { metrics: null, schemaVersions: null, object: null, runtimeCapabilities: null };
+  const ids = (plan: ReturnType<typeof planApply>) => plan.groups.map((group) => group.id);
+
+  test("a template fills audience, working hours and the assumption of a situation, shown with the form's words", () => {
+    const plan = planApply(template, { schemaVersion: "fet3d.editor/1" }, { ...context, situation: true });
+    expect(ids(plan)).toEqual(["template:name", "template:audience", "template:workingHours", "template:assumption"]);
+    const by = Object.fromEntries(plan.groups.map((group) => [group.id, group]));
+    expect(by["template:audience"]).toMatchObject({ label: "Đối tượng luyện tập", incoming: "Hướng dẫn thoát nạn", status: "new", defaultAction: "fill" });
+    expect(by["template:workingHours"].incoming).toBe("Ngoài giờ làm việc");
+    expect(by["template:assumption"].incoming).toBe("1 giờ sáng · Căn 402 · Chập điện · 260 người có mặt");
+    expect(by["template:assumption"].writes.fill).toEqual([{ path: ["assumption"], value: { time: "1 giờ sáng", location: "Căn 402", cause: "Chập điện", peoplePresent: 260 } }]);
+    for (const group of plan.groups) expect(`${group.label} ${group.incoming}`).not.toMatch(/EvacuationGuide|OffHours|peoplePresent/);
+  });
+
+  test("what the author already chose is kept unless they ask to replace it", () => {
+    const plan = planApply(template, { schemaVersion: "fet3d.editor/1", audience: "Evacuee", workingHours: "OffHours" }, { ...context, situation: true });
+    const by = Object.fromEntries(plan.groups.map((group) => [group.id, group]));
+    expect(by["template:audience"]).toMatchObject({ status: "different", defaultAction: "keep", current: "Người thoát nạn" });
+    expect(by["template:workingHours"].status).toBe("same");
+  });
+
+  test("a draft that is not a situation on a fire infrastructure does not take these fields, and is told why", () => {
+    const plan = planApply(template, { schemaVersion: "fet3d.editor/1" }, { ...context, situation: false });
+    expect(ids(plan)).toEqual(["template:name"]);
+    expect(plan.notes.join(" ")).toContain("Hạ tầng PCCC");
   });
 });
 

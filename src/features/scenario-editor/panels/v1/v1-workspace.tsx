@@ -36,7 +36,8 @@ import { findRuntime, parseRubricCatalog, parseRuntimeCatalog } from "../../v1/c
 import type { ObjectKind } from "../../v1/contract";
 import { parseGeometry, type GeometryInfo } from "../../v1/geometry";
 import { targetOf } from "../../v1/issues";
-import { applyMatrix, glbToLocal, localToGlb, round3, isUnitQuaternion } from "../../v1/matrix";
+import { isWallNormal, mountedY, mountingOf, shapeOf, yawFacing } from "../../v1/equipment-mounting";
+import { applyMatrix, glbToLocal, localToGlb, round3, isUnitQuaternion, yawToQuaternion } from "../../v1/matrix";
 import { setFieldsCommand } from "../../v1/commands";
 import { itemsToObjects, scopeKinds, type EditorScope } from "../../v1/scope";
 import { readGeometryPin, readObjects, readString, type ReferenceContext } from "../../v1/state";
@@ -69,6 +70,9 @@ const ORIGIN = { x: 0, y: 0, z: 0 };
 
 /** Set when the workspace edits a fire infrastructure version instead of a scenario draft: where it is stored and where "back" leads. */
 export type InfrastructureSession = { backend: EditorBackend; backHref: string };
+
+/** True-size shape of an Equipment object; none while it is anchored to a part of the model (the app then draws that part). */
+const shapeFor = (object: { kind: string | null; anchorId: string | undefined; capability: { id: string } | undefined }) => (object.kind === "Equipment" && !object.anchorId ? shapeOf(object.capability?.id) : undefined);
 
 export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, initial, infrastructure }: { accessToken: string; buildingId: string; scenarioId: string; draftId: string; initial: LoadedDraft; infrastructure?: InfrastructureSession }) {
   const toast = useToast();
@@ -160,14 +164,14 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const markers = useMemo<MarkerInput[]>(() => objects.flatMap((object): MarkerInput[] => {
     const floor = geometry?.floors.find((item) => item.id === object.floorId);
     if (!floor || !object.kind) return [];
-    return [{ kind: "object", index: object.index, variant: object.kind, layer: object.kind, position: localToGlb(floor.transform, object.position), quaternion: isUnitQuaternion(object.rotation, 0.5) ? object.rotation : undefined }];
+    return [{ kind: "object", index: object.index, variant: object.kind, layer: object.kind, position: localToGlb(floor.transform, object.position), quaternion: isUnitQuaternion(object.rotation, 0.5) ? object.rotation : undefined, shape: shapeFor(object) }];
   }), [objects, geometry]);
   const lockedObjects = useMemo(() => (locked.data ? readObjects({ objects: itemsToObjects(locked.data.infrastructure.items) }) : []), [locked.data]);
   // Kind "locked" is never a selection (`onSelect` and `onTransform` act on kind "object" only), so these cannot be moved or deleted here.
   const sceneMarkers = useMemo<MarkerInput[]>(() => [...markers, ...lockedObjects.flatMap((object): MarkerInput[] => {
     const floor = geometry?.floors.find((item) => item.id === object.floorId);
     if (!floor || !object.kind) return [];
-    return [{ kind: "locked", index: object.index, variant: object.kind, layer: object.kind, position: localToGlb(floor.transform, object.position), quaternion: isUnitQuaternion(object.rotation, 0.5) ? object.rotation : undefined }];
+    return [{ kind: "locked", index: object.index, variant: object.kind, layer: object.kind, position: localToGlb(floor.transform, object.position), quaternion: isUnitQuaternion(object.rotation, 0.5) ? object.rotation : undefined, shape: shapeFor(object) }];
   })], [markers, lockedObjects, geometry]);
 
   const layerSource = useMemo(() => {
@@ -187,6 +191,16 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const gizmoEnabled = !isMobile;
   const selectedIndex = state.selection?.index ?? null;
   const selectedObject = selectedIndex === null ? undefined : objects[selectedIndex];
+  // Distance from the selected wall item to the closest wall: undefined = not a wall item (or no model), null = no wall within reach.
+  const [wallGap, setWallGap] = useState<number | null | undefined>(undefined);
+  useEffect(() => {
+    const floor = geometry?.floors.find((item) => item.id === selectedObject?.floorId);
+    const wallItem = selectedObject?.kind === "Equipment" && !selectedObject.anchorId && mountingOf(selectedObject.capability?.id)?.mount === "wall";
+    const next = wallItem && floor && modelStatus.phase === "loaded"
+      ? viewportRef.current?.nearestWall(localToGlb(floor.transform, { ...selectedObject.position, y: 0 }))?.distance ?? null
+      : undefined;
+    setWallGap(next);
+  }, [selectedObject, geometry, modelStatus.phase]);
   /**
    * A library sample becomes ONE undoable command: the copied fields plus the `libraryRefs[]` entry that records the source
    * version in the draft (kept when another sample is applied, never duplicated). Undo removes both.
@@ -228,18 +242,47 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
     }
   }, [dispatch, objects, activeFloor]);
 
-  /** Places an object on the active floor. `world` is a GLB point (picked on the model); null means the floor origin. */
-  const placeAt = useCallback((kind: ObjectKind, world: Point3 | null) => {
+  /**
+   * Places an object on the active floor. `world` is a GLB point (picked on the model); null means the floor origin.
+   * Equipment clicked onto a wall faces out of that wall at once; its height follows once a capability is chosen.
+   */
+  const placeAt = useCallback((kind: ObjectKind, world: Point3 | null, normal?: Point3) => {
     if (!activeFloorV1) {
       toast.notify({ tone: "warning", title: "Chọn một tầng trước", description: "Vị trí được lưu theo tọa độ cục bộ của tầng." });
       return;
     }
     const local = world ? glbToLocal(activeFloorV1.transform, world) : ORIGIN;
     if (!local) return;
-    actions.addObject({ kind, floorId: activeFloorV1.id, position: { x: round3(local.x), y: round3(local.y), z: round3(local.z) } });
+    const rotation = kind === "Equipment" && normal && isWallNormal(normal) ? yawToQuaternion(yawFacing(normal)) : undefined;
+    actions.addObject({ kind, floorId: activeFloorV1.id, position: { x: round3(local.x), y: round3(local.y), z: round3(local.z) }, ...(rotation ? { rotation } : {}) });
     dispatch({ type: "tool", tool: "select" });
     setPanelTab("object");
   }, [actions, activeFloorV1, dispatch, toast]);
+
+  /**
+   * Puts an Equipment object the way its capability is mounted: a wall item goes onto the closest wall (back on the wall,
+   * front into the room) and every item gets the height its prefab expects. `capabilityId` is given when the capability
+   * was chosen in this same tick and the draft does not hold it yet.
+   */
+  const mountObject = useCallback((index: number, capabilityId?: string) => {
+    const object = objects[index];
+    const floor = geometry?.floors.find((item) => item.id === object?.floorId);
+    const mounting = mountingOf(capabilityId ?? object?.capability?.id);
+    if (!object || !floor || object.anchorId || !mounting || mounting.mount === "attached") return;
+    const y = mountedY(mounting, object.position.y);
+    if (mounting.mount !== "wall") {
+      if (y !== object.position.y) actions.mountTo(index, { ...object.position, y }, undefined, "Đặt đúng chiều cao");
+      return;
+    }
+    const wallHit = viewportRef.current?.nearestWall(localToGlb(floor.transform, { ...object.position, y: 0 })) ?? null;
+    const local = wallHit ? glbToLocal(floor.transform, wallHit.point) : null;
+    if (!wallHit || !local) {
+      if (y !== object.position.y) actions.mountTo(index, { ...object.position, y }, undefined, "Đặt đúng chiều cao");
+      toast.notify({ tone: "warning", title: "Không thấy tường gần thiết bị", description: "Thiết bị này gắn tường. Kéo nó lại gần một bức tường (trong 1,5 m) rồi bấm “Áp vào tường gần nhất”, hoặc bấm đặt thẳng lên mặt tường." });
+      return;
+    }
+    actions.mountTo(index, { x: round3(local.x), y, z: round3(local.z) }, yawToQuaternion(yawFacing(wallHit.normal)), "Áp vào tường");
+  }, [actions, geometry, objects, toast]);
 
   const addAtCentre = useCallback((kind: ObjectKind) => {
     const centre = viewportRef.current?.viewCentre();
@@ -385,7 +428,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
         <div className="se-stage">
         <EditorViewport ref={viewportRef} markers={sceneMarkers} selection={state.selection} tool={viewportTool} placeKind={state.placeKind} gizmoEnabled={gizmoEnabled}
           model={model} floors={sceneFloors} activeFloor={activeFloor} showModel={modelVisible} layerVisibility={layerVisibility}
-          onSelect={(ref) => selectObject(ref && ref.kind === "object" ? ref.index : null)} onPlace={(kind, point) => placeAt(kind as ObjectKind, point)}
+          onSelect={(ref) => selectObject(ref && ref.kind === "object" ? ref.index : null)} onPlace={(kind, point, normal) => placeAt(kind as ObjectKind, point, normal)}
           onTransform={onTransform} onModelPick={setPick} onModelStatus={setModelStatus} onUrlExpired={preview.refresh} onSelectionScreen={setSelectionScreen} />
         <V1ToolFloat tool={state.tool} onTool={(tool) => dispatch({ type: "tool", tool })} gizmoEnabled={gizmoEnabled} onOpenTree={() => setTreeOpen(true)} hasTree={!isDesktop && !isMobile} />
         <V1PlaceFloat tool={state.tool} placeKind={state.placeKind} onPlace={(kind) => dispatch({ type: "tool", tool: "place", placeKind: kind })} kindStatus={kindStatus} placeDisabledReason={placeDisabledReason} kinds={kinds} />
@@ -413,9 +456,9 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
             <TabsTrigger value="kinds" data-testid="tab-kinds">Khả dụng</TabsTrigger>
           </TabsList>
           <div className="se-panel-scroll">
-            <TabsContent value="object"><V1ObjectForm object={selectedObject} issues={issues} actions={actions} geometry={geometry} catalog={catalogView} runtimeVersion={runtimeVersion} pick={pick} onOpenScenario={() => setPanelTab("scenario")} scope={scope} /></TabsContent>
+            <TabsContent value="object"><V1ObjectForm object={selectedObject} issues={issues} actions={actions} geometry={geometry} catalog={catalogView} runtimeVersion={runtimeVersion} pick={pick} onOpenScenario={() => setPanelTab("scenario")} scope={scope} onMount={mountObject} wallGap={wallGap} /></TabsContent>
             <TabsContent value="scenario"><V1ScenarioForm draft={state.draft} issues={issues} actions={actions} catalog={catalogView} rubricCatalog={rubricState} situation={scope === "scenario-on-infrastructure"} /></TabsContent>
-            <TabsContent value="library"><V1LibraryPanel accessToken={accessToken} ui={libraryUi} onUi={setLibraryUi} draft={state.draft} selectedObject={selectedObject} runtimeVersion={runtimeVersion} runtimes={runtimes} rubric={rubricView} applied={applied} canUndoLast={(label) => lastPast?.label === label} onUndo={() => dispatch({ type: "undo" })} onApply={onApplySample} /></TabsContent>
+            <TabsContent value="library"><V1LibraryPanel accessToken={accessToken} ui={libraryUi} onUi={setLibraryUi} draft={state.draft} situation={scope === "scenario-on-infrastructure"} selectedObject={selectedObject} runtimeVersion={runtimeVersion} runtimes={runtimes} rubric={rubricView} applied={applied} canUndoLast={(label) => lastPast?.label === label} onUndo={() => dispatch({ type: "undo" })} onApply={onApplySample} /></TabsContent>
             <TabsContent value="issues"><V1IssuesPanel issues={issues} shapeProblems={editor.shapeProblems} report={editor.report} reportStale={editor.reportStale} validating={editor.validating} validateError={editor.validateError} dirty={dirty} onValidate={() => void onValidate()} onJump={onJump} /></TabsContent>
             <TabsContent value="geometry"><V1GeometryPanel reading={reading} preview={preview} pin={pin} buildingId={buildingId} revisionId={revisionId} onRepin={actions.pinGeometry} modelSummary={modelSummary} /></TabsContent>
             <TabsContent value="kinds"><KindAvailability statuses={kindStatus} onRetryCatalog={catalogQuery.reload} /></TabsContent>

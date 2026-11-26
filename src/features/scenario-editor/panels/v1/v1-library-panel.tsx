@@ -55,7 +55,9 @@ function GroupCard({ group, action, onChoose }: { group: ApplyGroup; action: App
   </fieldset>;
 }
 
-function Preview({ version, draft, object, runtimeVersion, runtimes, rubric, applied, canUndoLast, onUndo, onApply, onBack, choices, onChoices }: {
+function Preview({ version, draft, object, runtimeVersion, runtimes, rubric, applied, canUndoLast, onUndo, onApply, onBack, choices, onChoices, situation }: {
+  /** The open draft is a situation on a fire infrastructure: a template may fill its PC06 fields. */
+  situation: boolean;
   version: LibraryVersion;
   draft: JsonObject;
   object: ObjectView | undefined;
@@ -77,7 +79,8 @@ function Preview({ version, draft, object, runtimeVersion, runtimes, rubric, app
     schemaVersions: rubric?.supportedSchemaVersions ?? null,
     object: object ? { index: object.index, kind: object.kind, id: object.id, label: object.label, capability: object.capability } : null,
     runtimeCapabilities: runtime ? runtime.capabilities : null,
-  }), [version, draft, rubric, object, runtime]);
+    situation,
+  }), [version, draft, rubric, object, runtime, situation]);
   const changes = changesFor(plan, choices);
   const summary = summarizeChoices(plan, choices);
   const label = `Áp dụng ${version.code} v${version.versionNumber}`;
@@ -127,7 +130,8 @@ function Preview({ version, draft, object, runtimeVersion, runtimes, rubric, app
  * decide per field group (fill / replace / merge / keep) and apply it as one undoable command. Nothing is written silently and
  * a field that already has content defaults to "keep". Only non-spatial fields are ever filled.
  */
-export function V1LibraryPanel({ accessToken, ui, onUi, draft, selectedObject, runtimeVersion, runtimes, rubric, applied, canUndoLast, onUndo, onApply }: {
+export function V1LibraryPanel({ accessToken, ui, onUi, draft, selectedObject, runtimeVersion, runtimes, rubric, applied, canUndoLast, onUndo, onApply, situation = false }: {
+  situation?: boolean;
   accessToken: string;
   ui: LibraryUi;
   onUi: (update: (ui: LibraryUi) => LibraryUi) => void;
@@ -186,7 +190,7 @@ export function V1LibraryPanel({ accessToken, ui, onUi, draft, selectedObject, r
       <div><Button type="button" variant="quiet" size="sm" onClick={() => { setChosen(null); list.reload(); }}><ArrowLeft size={14} aria-hidden="true" /> Chọn mẫu khác</Button></div>
     </div>}
     {current && !current.latestPublished && <Alert tone="warning" title="Mẫu chưa có phiên bản đã xuất bản">Chỉ phiên bản đã xuất bản mới áp dụng được.</Alert>}
-    {current?.latestPublished && <Preview key={current.latestPublished.id} version={current.latestPublished} draft={draft} object={selectedObject} runtimeVersion={runtimeVersion} runtimes={runtimes} rubric={rubric} applied={applied} canUndoLast={canUndoLast} onUndo={onUndo} onApply={onApply} onBack={() => setChosen(null)} choices={ui.choices} onChoices={(update) => onUi((current) => ({ ...current, choices: update(current.choices) }))} />}
+    {current?.latestPublished && <Preview key={current.latestPublished.id} version={current.latestPublished} draft={draft} situation={situation} object={selectedObject} runtimeVersion={runtimeVersion} runtimes={runtimes} rubric={rubric} applied={applied} canUndoLast={canUndoLast} onUndo={onUndo} onApply={onApply} onBack={() => setChosen(null)} choices={ui.choices} onChoices={(update) => onUi((current) => ({ ...current, choices: update(current.choices) }))} />}
 
     {chosen && current?.latestPublished && <details>
       <summary style={{ cursor: "pointer", minHeight: 44, display: "flex", alignItems: "center", fontSize: 13 }}>Toàn bộ nội dung phiên bản này</summary>

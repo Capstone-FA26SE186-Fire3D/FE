@@ -1,7 +1,7 @@
 import type { Json, JsonObject, Path } from "../../store/json";
 import type { CapabilityOption } from "../../v1/catalog";
 import {
-  addItemCommand, addObjectCommand, duplicateObjectCommand, moveObjectCommand, pinGeometryCommand, removeItemCommand, removeObjectCommand, rotateObjectCommand, setCapabilityCommand, setFloorCommand, setPathCommand,
+  addItemCommand, addObjectCommand, duplicateObjectCommand, moveObjectCommand, pinGeometryCommand, removeItemCommand, removeObjectCommand, rotateObjectCommand, setCapabilityCommand, setFieldsCommand, setFloorCommand, setPathCommand,
   type NewObject, type V1Command, type V1Selection,
 } from "../../v1/commands";
 import type { GeometryInfo } from "../../v1/geometry";
@@ -46,6 +46,13 @@ export function createV1Actions(edit: Edit, select: (selection: V1Selection) => 
     /** Yaw typed in degrees: written only when the author types, so an untouched quaternion is never rewritten. */
     setYaw(index: number, degrees: number) {
       edit((draft, id, _selection, now) => rotateObjectCommand(draft, id, index, roundQuaternion(yawToQuaternion(degrees)), { at: now, label: "Xoay", mergeKey: `typing:${index}:yaw` }));
+    },
+    /** Position and (when given) facing in one history entry: an item put against a wall, or set to its mounting height. */
+    mountTo(index: number, position: Vec3, rotation: Quat | undefined, label: string) {
+      edit((draft, id, selection, now) => setFieldsCommand(draft, id, [
+        { path: ["objects", index, "placement", "position"], value: { ...position } },
+        ...(rotation ? [{ path: ["objects", index, "placement", "rotation"] as Path, value: { ...roundQuaternion(rotation) } }] : []),
+      ], { label, at: now, selection }));
     },
     setFloor(index: number, floorId: string) {
       edit((draft, id, _selection, now) => setFloorCommand(draft, id, index, floorId, geometry, now));

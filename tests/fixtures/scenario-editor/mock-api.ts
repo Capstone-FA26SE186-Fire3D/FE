@@ -252,6 +252,7 @@ export type EditorDebug = {
   loseContext: () => void;
   restoreContext: () => void;
   markerPosition: (kind: string, index: number) => number[] | null;
+  markerShape: (kind: string, index: number) => string | null;
   clipConstant: () => number;
   gizmoAttached: () => boolean;
 };
