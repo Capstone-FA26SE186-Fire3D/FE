@@ -189,3 +189,48 @@ test.describe("admin: unverified expert accounts", () => {
     expect(patches.at(-1)).toEqual({ ifMatch: '"4"', body: { email: "chuyenvien2@fire3d.test" } });
   });
 });
+
+test.describe("admin: creating an account says what went wrong", () => {
+  test("a server error is reported as one, with the trace id; a taken email and a trainee without a user name are explained", async ({ page }) => {
+    const bodies: Array<Record<string, unknown>> = [];
+    let answer: "500" | "409" | "201" = "500";
+    await page.addInitScript(() => sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "a", refreshToken: "r" })));
+    await page.route("**/api/auth/me", (route) => route.fulfill({ json: { id: "admin", email: "admin@fire3d.test", fullName: "Admin", role: "PlatformAdmin", organizationId: null, profileRevision: 1 } }));
+    await page.route("**/api/organizations?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 100 } }));
+    await page.route("**/api/accounts?*", (route) => route.fulfill({ json: { items: [], totalCount: 0, page: 1, pageSize: 20 } }));
+    await page.route((url) => url.pathname === "/api/accounts", (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      bodies.push(route.request().postDataJSON() as Record<string, unknown>);
+      if (answer === "500") return problem(route, 500, { title: "An unexpected error occurred.", traceId: "00-trace-abc-01" });
+      if (answer === "409") return problem(route, 409, { title: "Email is already registered.", code: "EMAIL_EXISTS" });
+      return route.fulfill({ status: 201, json: { id: "new-1", ...bodies.at(-1), isActive: true } });
+    });
+
+    await page.goto("/admin/accounts");
+    await page.getByRole("button", { name: "Tạo tài khoản" }).click();
+    const dialog = page.getByRole("dialog", { name: "Tạo tài khoản" });
+    await dialog.getByLabel("Email").fill("hocvien@fire3d.test");
+    await dialog.getByLabel("Mật khẩu").fill("initial-password-1");
+
+    // Học viên is the default role: the user name is asked for before anything is sent.
+    await dialog.getByRole("button", { name: "Tạo tài khoản" }).click();
+    await expect(dialog.getByText(/Tên người dùng dài 3 đến 30 ký tự/)).toBeVisible();
+    expect(bodies).toHaveLength(0);
+    await dialog.getByLabel("Tên người dùng").fill("HocVien.01");
+
+    await dialog.getByRole("button", { name: "Tạo tài khoản" }).click();
+    await expect(dialog.getByText(/Máy chủ gặp lỗi khi tạo tài khoản\. Lỗi này không do thông tin bạn nhập/)).toBeVisible();
+    await dialog.getByText("Thông tin cho bộ phận hỗ trợ").click();
+    await expect(dialog.getByText("00-trace-abc-01")).toBeVisible();
+    expect(bodies[0]).toMatchObject({ email: "hocvien@fire3d.test", role: "Trainee", username: "hocvien.01", organizationId: null });
+
+    answer = "409";
+    await dialog.getByRole("button", { name: "Tạo tài khoản" }).click();
+    await expect(dialog.getByText("Email này đã được đăng ký.")).toBeVisible();
+    await expect(dialog.getByText("00-trace-abc-01")).toHaveCount(0);
+
+    answer = "201";
+    await dialog.getByRole("button", { name: "Tạo tài khoản" }).click();
+    await expect(dialog).toBeHidden();
+  });
+});

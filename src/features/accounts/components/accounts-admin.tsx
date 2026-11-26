@@ -18,6 +18,7 @@ import { FilterChip, FilterChips } from "@/components/ui/filter-chip";
 import { PageHeader } from "@/components/ui/page-header";
 import { SubmitButton, LoadingBlock } from "@/components/ui/spinner";
 import { StatusBadge, type Tone } from "@/components/ui/status-badge";
+import { SupportCode } from "@/components/ui/support-code";
 import { useToast } from "@/components/ui/toast";
 import { RetryButton } from "@/components/ui/retry-button";
 import { routes } from "@/configs/routes";
@@ -51,13 +52,15 @@ const statusChip = (account: Pick<ManagedAccount, "isActive" | "firstLoginStep">
 };
 const emailState = (account: ManagedAccount) => (account.firstLoginStep === "VerifyEmail" ? "Chưa xác minh" : account.emailVerifiedAt ? `Đã xác minh ${formatDate(account.emailVerifiedAt)}` : "Không cần xác minh lại");
 
-type CreateForm = { email: string; password: string; fullName: string; role: UserRole; organizationId: string };
+type CreateForm = { email: string; password: string; fullName: string; username: string; role: UserRole; organizationId: string };
 
 function createErrors(form: CreateForm) {
   const errors: Partial<Record<keyof CreateForm, string>> = {};
   if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) errors.email = "Nhập email hợp lệ.";
   if (form.password.length < 12 || form.password.length > 128) errors.password = "Mật khẩu dài từ 12 đến 128 ký tự.";
   if (form.role === 1 && !form.organizationId) errors.organizationId = "Chọn tổ chức cho tài khoản này.";
+  // The server refuses a Học viên account without a user name (same rule as self-registration).
+  if (form.role === 2 && !/^[a-z0-9._-]{3,30}$/.test(form.username.trim().toLowerCase())) errors.username = "Tên người dùng dài 3 đến 30 ký tự, chỉ gồm chữ thường không dấu, số, dấu chấm, gạch dưới và gạch ngang.";
   return errors;
 }
 
@@ -81,9 +84,11 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
   const [selected, setSelected] = useState<ManagedAccount | null>(null);
   const [opening, setOpening] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState<CreateForm>({ email: "", password: "", fullName: "", role: initialOrganizationId ? 1 : 2, organizationId: initialOrganizationId });
+  const [form, setForm] = useState<CreateForm>({ email: "", password: "", fullName: "", username: "", role: initialOrganizationId ? 1 : 2, organizationId: initialOrganizationId });
   const [fieldErrors, setFieldErrors] = useState<ReturnType<typeof createErrors>>({});
   const [formError, setFormError] = useState("");
+  /** The server's trace id of a failed create, for whoever looks into a server error. */
+  const [formTrace, setFormTrace] = useState("");
   const [submitState, setSubmitState] = useState<"idle" | "busy" | "done">("idle");
   const [toggling, setToggling] = useState<ManagedAccount | null>(null);
   const [toggleBusy, setToggleBusy] = useState(false);
@@ -129,7 +134,7 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
     }
   };
 
-  const openCreate = () => { setFieldErrors({}); setFormError(""); setCreating(true); };
+  const openCreate = () => { setFieldErrors({}); setFormError(""); setFormTrace(""); setCreating(true); };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -139,21 +144,29 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
     if (Object.keys(errors).length) return;
     setSubmitState("busy");
     setFormError("");
+    setFormTrace("");
     try {
-      await accountsApi.create(accessToken, { email: form.email.trim(), password: form.password, fullName: form.fullName.trim(), role: form.role, organizationId: form.role === 1 ? form.organizationId || null : null });
+      await accountsApi.create(accessToken, { email: form.email.trim(), password: form.password, fullName: form.fullName.trim(), role: form.role, organizationId: form.role === 1 ? form.organizationId || null : null, ...(form.role === 2 ? { username: form.username.trim().toLowerCase() } : {}) });
       setSubmitState("done");
       toast.notify({ tone: "success", title: "Đã tạo tài khoản", description: form.role === 3 ? "Hãy đưa mật khẩu ban đầu cho chuyên viên qua kênh riêng. Lần đăng nhập đầu, họ nhập mã gửi về email rồi đổi mật khẩu." : "Danh sách đã được tải lại." });
       list.reload();
       window.setTimeout(() => {
         setCreating(false);
-        setForm({ email: "", password: "", fullName: "", role: initialOrganizationId ? 1 : 2, organizationId: initialOrganizationId });
+        setForm({ email: "", password: "", fullName: "", username: "", role: initialOrganizationId ? 1 : 2, organizationId: initialOrganizationId });
         setSubmitState("idle");
       }, 600);
     } catch (cause) {
       if (cause instanceof ApiError && cause.fieldErrors.length) {
-        setFieldErrors({ email: cause.fieldMessage("email"), password: cause.fieldMessage("password"), organizationId: cause.fieldMessage("organizationId") });
+        setFieldErrors({ email: cause.fieldMessage("email"), password: cause.fieldMessage("password"), username: cause.fieldMessage("username"), organizationId: cause.fieldMessage("organizationId") });
       }
-      setFormError(cause instanceof ApiError && cause.status === 409 ? "Email này đã được sử dụng." : "Không thể tạo tài khoản. Nội dung bạn nhập vẫn được giữ lại; hãy kiểm tra và thử lại.");
+      // Say what happened: a server error is not something the admin can fix by checking the form.
+      const serverFault = cause instanceof ApiError && cause.status >= 500;
+      const trace = cause instanceof ApiError ? cause.payload?.traceId : undefined;
+      setFormTrace(serverFault && typeof trace === "string" ? trace : "");
+      setFormError(serverFault
+        ? "Máy chủ gặp lỗi khi tạo tài khoản. Lỗi này không do thông tin bạn nhập, và tài khoản chưa được tạo. Hãy thử lại sau; nếu vẫn lỗi, báo bộ phận kỹ thuật."
+        : cause instanceof ApiError && cause.status === 409 && !cause.code ? "Email này đã được sử dụng."
+        : describeApiError(cause, "Không thể tạo tài khoản. Nội dung bạn nhập vẫn được giữ lại; hãy kiểm tra và thử lại."));
       setSubmitState("idle");
     }
   };
@@ -290,8 +303,9 @@ export function AccountsAdmin({ initialOrganizationId = "" }: { initialOrganizat
         <Field label="Mật khẩu" required hint="Từ 12 đến 128 ký tự." error={fieldErrors.password}>{(p) => <Input {...p} type="password" autoComplete="new-password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} />}</Field>
         <Field label="Họ và tên">{(p) => <Input {...p} maxLength={200} autoComplete="off" value={form.fullName} onChange={(event) => setForm({ ...form, fullName: event.target.value })} />}</Field>
         <Field label="Vai trò" hint={form.role === 3 ? "Chuyên viên PCCC không thuộc tổ chức nào; tài khoản chỉ vào được hàng chờ thẩm định. Lần đăng nhập đầu, chuyên viên nhập mã gửi về email này rồi đổi mật khẩu, nên hãy nhập đúng email." : "Quyền quản trị FET3D được cấp riêng, không chọn ở đây."}>{(p) => <Combobox {...p} value={String(form.role)} onChange={(value) => setForm({ ...form, role: Number(value) as UserRole })} options={roleOptions} groupLabel="Vai trò" />}</Field>
+        {form.role === 2 && <Field label="Tên người dùng" required hint="3 đến 30 ký tự: chữ thường không dấu, số, dấu chấm, gạch dưới, gạch ngang." error={fieldErrors.username}>{(p) => <Input {...p} maxLength={30} autoComplete="off" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} />}</Field>}
         {form.role === 1 && <Field label="Tổ chức" required error={fieldErrors.organizationId}>{(p) => <Combobox {...p} value={form.organizationId} onChange={(value) => setForm({ ...form, organizationId: value })} options={orgOptions} placeholder="Chọn tổ chức" searchPlaceholder="Tìm theo tên tổ chức…" groupLabel="Tổ chức đang hoạt động" emptyText="Không có tổ chức phù hợp" loading={organizations.loading && !organizations.data} />}</Field>}
-        {formError && <Alert tone="danger">{formError}</Alert>}
+        {formError && <Alert tone="danger">{formError}<SupportCode id={formTrace || undefined} /></Alert>}
       </form>
     </Modal>
 
