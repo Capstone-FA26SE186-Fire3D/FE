@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTheme } from "@/features/theme/theme-scope";
 
-import { EditorSceneController, isWebGLAvailable, ModelLoadError, type MarkerInput, type MarkerRef, type ModelInfo, type Point3, type SceneTool, type TransformPhase, type TransformResult } from "./scene-controller";
+import { EditorSceneController, isWebGLAvailable, ModelLoadError, type MarkerInput, type MarkerRef, type ModelInfo, type Point3, type SceneTool, type TransformPhase, type TransformResult, type WallHit } from "./scene-controller";
 import type { FloorInfo } from "./preview-model";
 
 export type ModelRequest = {
@@ -33,6 +33,8 @@ export type ViewportHandle = {
   resetCamera: () => void;
   focusSelection: () => void;
   viewCentre: () => { x: number; y: number; z: number };
+  /** The closest wall within `reach` metres of a GLB point, or null (also while no model is shown). */
+  nearestWall: (point: Point3, reach?: number) => WallHit | null;
   zoomBy: (factor: number) => void;
   setCameraLocked: (locked: boolean) => void;
 };
@@ -52,7 +54,7 @@ export type ViewportProps = {
   showModel: boolean;
   layerVisibility: Record<string, boolean>;
   onSelect: (selection: MarkerRef | null) => void;
-  onPlace: (kind: string, point: Point3) => void;
+  onPlace: (kind: string, point: Point3, normal?: Point3) => void;
   onTransform: (ref: MarkerRef, next: TransformResult | null, phase: TransformPhase) => void;
   onModelPick: (pick: { name: string; point: Point3 } | null) => void;
   onModelStatus: (status: ModelStatus) => void;
@@ -88,6 +90,7 @@ export default function EditorViewport({ ref, markers, selection, tool, placeKin
     resetCamera: () => controllerRef.current?.resetCamera(),
     focusSelection: () => controllerRef.current?.focusSelection(),
     viewCentre: () => controllerRef.current?.viewCentre() ?? { x: 0, y: 0, z: 0 },
+    nearestWall: (point, reach) => controllerRef.current?.nearestWall(point, reach) ?? null,
     zoomBy: (factor) => controllerRef.current?.zoomBy(factor),
     setCameraLocked: (locked) => controllerRef.current?.setCameraLocked(locked),
   }), []);
@@ -110,7 +113,7 @@ export default function EditorViewport({ ref, markers, selection, tool, placeKin
     }
     const controller = new EditorSceneController(host, {
       onSelect: (selection) => latest.current.onSelect(selection),
-      onPlace: (kind, point) => latest.current.onPlace(kind, point),
+      onPlace: (kind, point, normal) => latest.current.onPlace(kind, point, normal),
       onTransform: (ref, next, phase) => latest.current.onTransform(ref, next, phase),
       onModelPick: (pick) => latest.current.onModelPick(pick),
       onContextLost: () => setLost(true),

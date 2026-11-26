@@ -237,6 +237,37 @@ test("canvas placement stores floor-local coordinates: the marker lands where th
   expect(log.relevant()).toEqual([]);
 });
 
+test("wall equipment: the form says how it is mounted, the viewport draws its real size, and one click puts it on the closest wall facing the room", async ({ page }) => {
+  // The fixture's north wall has its inner face at z = -5.7. A hose reel cabinet left 0.7 m in front of it, 1.2 m up and unturned
+  // is what the app would draw sticking out in mid-air.
+  const state = v1State() as { objects: Array<Record<string, any>> }; // eslint-disable-line @typescript-eslint/no-explicit-any
+  state.objects[5] = { ...state.objects[5], capability: { id: "extinguisher.hose_reel", version: "1.0.0" }, parameters: undefined, placement: { ...state.objects[5].placement, position: { x: 4, y: 1.2, z: -5 } } };
+  const mock = v1Mock({ state });
+  await openV1(page, mock);
+  await item(page, 5).click();
+  await expect(page.getByTestId("mounting-kind")).toHaveText("Gắn tường");
+  await expect(page.getByTestId("mounting-size")).toHaveText("Rộng 0,9 × cao 0,9 × sâu 0,24 m");
+  await expect(page.getByTestId("mounting-height")).toContainText("Để Y = 0");
+  await expect(page.getByTestId("mounting-height-problem")).toContainText("Y phải là 0");
+  await expect(page.getByTestId("mounting-far-wall")).toContainText("0,7 m");
+  expect(await page.evaluate(() => window.__fire3dEditorScene?.markerShape("object", 5))).toBe("wall:0.9:0.9:0.24:1.15:true");
+  // Other kinds keep their glyph only.
+  expect(await page.evaluate(() => window.__fire3dEditorScene?.markerShape("object", 0))).toBe("");
+
+  await page.getByTestId("snap-wall").click();
+  await expect(coord(page, "x")).toHaveValue("4");
+  await expect(coord(page, "y")).toHaveValue("0");
+  await expect(coord(page, "z")).toHaveValue("-5.7");
+  await expect(page.getByTestId("field-yaw")).toHaveValue("180"); // front (-Z) turned to +Z, out of the north wall
+  await expect(page.getByTestId("mounting-far-wall")).toHaveCount(0);
+  await expect(page.getByTestId("mounting-height-problem")).toHaveCount(0);
+  await expect(page.getByTestId("mounting-no-wall")).toHaveCount(0); // sitting on the wall is "at the wall", not "no wall"
+  await page.getByTestId("undo").click(); // position and facing are one history entry
+  await expect(coord(page, "z")).toHaveValue("-5");
+  await expect(coord(page, "y")).toHaveValue("1.2");
+  await expect(page.getByTestId("field-yaw")).toHaveValue("0");
+});
+
 test("gizmo drag: a world-space drag is stored as floor-local coordinates (inverse of the floor transform), one drag = one undo step; rotate writes a unit quaternion", async ({ page }) => {
   const mock = v1Mock();
   await openV1(page, mock);

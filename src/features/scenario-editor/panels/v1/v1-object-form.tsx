@@ -16,6 +16,7 @@ import { capabilitiesForKind, findCapability, findRuntime, rangeMessage, type Ca
 import { CAPABILITY_REQUIRED_KINDS, KIND_META, type ObjectKind } from "../../v1/contract";
 import { anchorsForFloor, floorOf, type GeometryInfo } from "../../v1/geometry";
 import { messageAt, objectIssues } from "../../v1/issues";
+import { MOUNT_LABEL, WALL_HINT, heightProblem, heightText, mountingOf, sizeText, type Mounting } from "../../v1/equipment-mounting";
 import { localToGlb, quaternionToYaw, round3 } from "../../v1/matrix";
 import type { ObjectView } from "../../v1/state";
 import { NumberField, TextField } from "../fields";
@@ -25,7 +26,11 @@ const MAX_ANCHOR_OPTIONS = 200;
 
 export type CatalogView = { loading: boolean; error: boolean; reload: () => void; runtimes: RuntimeOption[] };
 
-export function V1ObjectForm({ object, issues, actions, geometry, catalog, runtimeVersion, pick, onOpenScenario, scope = "scenario" }: {
+export function V1ObjectForm({ object, issues, actions, geometry, catalog, runtimeVersion, pick, onOpenScenario, scope = "scenario", onMount, wallGap }: {
+  /** Puts the object the way its capability is mounted (onto the closest wall, at the right height). */
+  onMount?: (index: number, capabilityId?: string) => void;
+  /** Metres from a wall item to the closest wall; null when no wall is within reach; undefined when it does not apply. */
+  wallGap?: number | null;
   object: ObjectView | undefined;
   issues: Issue[];
   actions: V1Actions;
@@ -94,8 +99,9 @@ export function V1ObjectForm({ object, issues, actions, geometry, catalog, runti
       </p>
     </fieldset>
 
+    {kind === "Equipment" && mountingOf(object.capability?.id) && <MountingField object={object} mounting={mountingOf(object.capability?.id) as Mounting} wallGap={wallGap} onMount={onMount} />}
     {kind && <AnchorField object={object} kind={kind} geometry={geometry} error={messageAt(issues, `${base}.anchorId`)} actions={actions} pick={pick} />}
-    {kind && <CapabilityField object={object} kind={kind} catalog={catalog} runtimeVersion={runtimeVersion} issues={issues} actions={actions} onOpenScenario={onOpenScenario} scope={scope} />}
+    {kind && <CapabilityField object={object} kind={kind} catalog={catalog} runtimeVersion={runtimeVersion} issues={issues} actions={actions} onOpenScenario={onOpenScenario} scope={scope} onChosen={onMount ? (capabilityId) => onMount(object.index, capabilityId) : undefined} />}
   </div>;
 }
 
@@ -146,7 +152,33 @@ function AnchorField({ object, kind, geometry, error, actions, pick }: { object:
   </fieldset>;
 }
 
-function CapabilityField({ object, kind, catalog, runtimeVersion, issues, actions, onOpenScenario, scope }: { object: ObjectView; kind: ObjectKind; catalog: CatalogView; scope: EditorScope; runtimeVersion: string | undefined; issues: Issue[]; actions: V1Actions; onOpenScenario: () => void }) {
+/**
+ * How the app will draw this Equipment: where it is mounted, how big it is and what the Y field means for it. The same
+ * numbers draw the true-size shape in the viewport.
+ */
+function MountingField({ object, mounting, wallGap, onMount }: { object: ObjectView; mounting: Mounting; wallGap: number | null | undefined; onMount?: (index: number, capabilityId?: string) => void }) {
+  const size = sizeText(mounting);
+  const anchored = Boolean(object.anchorId);
+  const problem = anchored ? null : heightProblem(mounting, object.position.y);
+  const wall = mounting.mount === "wall" && !anchored;
+  return <fieldset className="ops-fieldset" data-testid="mounting-field">
+    <legend>Cách đặt trong ứng dụng</legend>
+    <dl className="ops-stack" style={{ margin: 0, gap: 4 }}>
+      <div><dt className="ops-field-hint" style={{ margin: 0 }}>Kiểu lắp</dt><dd style={{ margin: 0 }} data-testid="mounting-kind">{MOUNT_LABEL[mounting.mount]}</dd></div>
+      {size && <div><dt className="ops-field-hint" style={{ margin: 0 }}>Kích thước (khoảng)</dt><dd style={{ margin: 0 }} data-testid="mounting-size">{size}</dd></div>}
+      <div><dt className="ops-field-hint" style={{ margin: 0 }}>Chiều cao</dt><dd style={{ margin: 0 }} data-testid="mounting-height">{anchored ? "Đối tượng đang neo vào một cấu kiện của mô hình: vị trí và hướng lấy theo cấu kiện đó." : heightText(mounting)}</dd></div>
+    </dl>
+    {wall && <p className="ops-field-hint" style={{ margin: 0 }}>{WALL_HINT} Hộp mờ trong khung nhìn là kích thước thật của thiết bị.</p>}
+    {problem && <Alert tone="warning"><span data-testid="mounting-height-problem">{problem}</span></Alert>}
+    {wall && wallGap === null && <Alert tone="warning"><span data-testid="mounting-no-wall">Không thấy tường trong 1,5 m quanh thiết bị. Trong ứng dụng thiết bị sẽ lơ lửng giữa phòng.</span></Alert>}
+    {wall && typeof wallGap === "number" && wallGap > 0.3 && <Alert tone="warning"><span data-testid="mounting-far-wall">Thiết bị đang cách tường gần nhất {String(Math.round(wallGap * 100) / 100).replace(".", ",")} m.</span></Alert>}
+    {!anchored && onMount && (wall
+      ? <div className="ops-actions"><Button type="button" size="sm" variant="secondary" data-testid="snap-wall" onClick={() => onMount(object.index)}>Áp vào tường gần nhất</Button></div>
+      : problem && mounting.y.rule === "zero" && <div className="ops-actions"><Button type="button" size="sm" variant="secondary" data-testid="fix-height" onClick={() => onMount(object.index)}>Đặt Y về 0</Button></div>)}
+  </fieldset>;
+}
+
+function CapabilityField({ object, kind, catalog, runtimeVersion, issues, actions, onOpenScenario, scope, onChosen }: { object: ObjectView; kind: ObjectKind; catalog: CatalogView; scope: EditorScope; runtimeVersion: string | undefined; issues: Issue[]; actions: V1Actions; onOpenScenario: () => void; onChosen?: (capabilityId: string) => void }) {
   const required = (CAPABILITY_REQUIRED_KINDS as readonly ObjectKind[]).includes(kind);
   const base = `$.objects[${object.index}]`;
   const runtime = findRuntime(catalog.runtimes, runtimeVersion);
@@ -171,6 +203,8 @@ function CapabilityField({ object, kind, catalog, runtimeVersion, issues, action
         onChange={(event) => {
           const next = options.find((option) => option.id === event.target.value);
           actions.setCapability(object.index, next ? { id: next.id, version: next.version } : undefined);
+          // A freshly chosen Equipment capability is put the way that equipment is mounted (wall, height).
+          if (next && kind === "Equipment" && !object.anchorId) onChosen?.(next.id);
         }}>
         <option value="">{required ? "Chọn khả năng…" : "Không dùng khả năng"}</option>
         {object.capability && !options.some((option) => option.id === object.capability?.id) && <option value={object.capability.id}>{capabilityName(object.capability.id)} (phiên bản ứng dụng đang chọn không có)</option>}
