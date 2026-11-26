@@ -93,6 +93,7 @@ export function V1ObjectForm({ object, issues, actions, geometry, catalog, runti
         <NumberField key={`${index}-yaw`} label="Hướng xoay quanh trục đứng" unit="độ" data-testid="field-yaw" error={messageAt(issues, `${base}.placement.rotation`)}
           value={round3(yaw.degrees)} onCommit={(value) => { if (value !== undefined) actions.setYaw(index, value); }} />
       </div>
+      <p className="ops-field-hint" style={{ margin: 0 }} data-testid="drag-hint">Có thể cầm đối tượng trong khung nhìn rồi kéo để dời (công cụ Chọn). Thiết bị gắn tường trượt dọc mặt tường và luôn quay mặt trước vào phòng.</p>
       <p className="ops-field-hint" data-testid="glb-position">
         {glb ? `Trong mô hình (GLB, Y hướng lên): ${round3(glb.x)}, ${round3(glb.y)}, ${round3(glb.z)} m.` : "Chưa tính được vị trí trong mô hình vì tầng không có trong mô hình 3D."}
         {!yaw.pure && " Hướng hiện có nghiêng ngoài trục đứng; nhập độ sẽ thay bằng xoay quanh trục đứng."}

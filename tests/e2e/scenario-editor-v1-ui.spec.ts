@@ -268,6 +268,57 @@ test("wall equipment: the form says how it is mounted, the viewport draws its re
   await expect(page.getByTestId("field-yaw")).toHaveValue("0");
 });
 
+test("grab and drag with the select tool: a floor object slides at its height, a wall item slides along the wall and keeps facing the room; one drag = one undo step", async ({ page }) => {
+  const state = v1State() as { objects: Array<Record<string, any>> }; // eslint-disable-line @typescript-eslint/no-explicit-any
+  // A hose reel cabinet already on the north wall (inner face z = -5.7), front into the room.
+  state.objects[5] = { ...state.objects[5], capability: { id: "extinguisher.hose_reel", version: "1.0.0" }, parameters: undefined, placement: { ...state.objects[5].placement, position: { x: 4, y: 0, z: -5.7 }, rotation: { x: 0, y: 1, z: 0, w: 0 } } };
+  const mock = v1Mock({ state });
+  const log = await openV1(page, mock);
+  await page.getByRole("radiogroup", { name: "Chọn tầng" }).getByRole("radio", { name: /Tầng 1/ }).click();
+  const screen = (kind: string, index: number) => page.evaluate(([k, i]) => window.__fire3dEditorScene?.project(k as string, i as number) ?? null, [kind, index] as const);
+  const drag = async (from: { x: number; y: number }, to: { x: number; y: number }) => {
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    for (let step = 1; step <= 8; step += 1) await page.mouse.move(from.x + ((to.x - from.x) * step) / 8, from.y + ((to.y - from.y) * step) / 8);
+    await page.mouse.up();
+  };
+
+  // The spawn point stands on the floor of Tầng 1 at (2, 0, 3): dragging it moves x and z, never its height.
+  const spawn = (await screen("object", 0))!;
+  await drag(spawn, { x: spawn.x + 90, y: spawn.y + 30 });
+  await expect(item(page, 0)).toHaveAttribute("aria-pressed", "true");
+  await expect(coord(page, "y")).toHaveValue("0");
+  const moved = { x: Number(await coord(page, "x").inputValue()), z: Number(await coord(page, "z").inputValue()) };
+  expect(Math.hypot(moved.x - 2, moved.z - 3)).toBeGreaterThan(0.3);
+  await page.getByTestId("undo").click(); // the whole drag is one history entry
+  await expect(coord(page, "x")).toHaveValue("2");
+  await expect(coord(page, "z")).toHaveValue("3");
+
+  // The cabinet is taken and slid along its wall towards the middle of that wall: it stays on the wall plane, turned into the room.
+  const cabinet = (await screen("object", 5))!;
+  const wall = (await page.evaluate(() => window.__fire3dEditorScene?.projectPoint({ x: 0, y: 1.6, z: -5.7 })))!; // a point on the wall's inner face
+  await drag(cabinet, wall);
+  await expect(item(page, 5)).toHaveAttribute("aria-pressed", "true");
+  await expect(coord(page, "z")).toHaveValue("-5.7");
+  await expect(coord(page, "y")).toHaveValue("0");
+  await expect(page.getByTestId("field-yaw")).toHaveValue("180");
+  expect(Math.abs(Number(await coord(page, "x").inputValue()) - 4)).toBeGreaterThan(0.5);
+  await expect(page.getByTestId("mounting-no-wall")).toHaveCount(0);
+  await page.getByTestId("undo").click();
+  await expect(coord(page, "x")).toHaveValue("4");
+
+  // The pointer leaves the wall over its top edge: the cabinet stops at the wall instead of going through it.
+  const beyond = (await page.evaluate(() => window.__fire3dEditorScene?.projectPoint({ x: 4, y: 0.3, z: -9 })))!;
+  await drag((await screen("object", 5))!, beyond);
+  expect(Number(await coord(page, "z").inputValue())).toBeGreaterThanOrEqual(-5.7);
+
+  // A plain click still only selects: nothing moves and nothing is added to the history.
+  await page.mouse.click(spawn.x, spawn.y);
+  await expect(item(page, 0)).toHaveAttribute("aria-pressed", "true");
+  await expect(coord(page, "x")).toHaveValue("2");
+  expect(log.relevant()).toEqual([]);
+});
+
 test("gizmo drag: a world-space drag is stored as floor-local coordinates (inverse of the floor transform), one drag = one undo step; rotate writes a unit quaternion", async ({ page }) => {
   const mock = v1Mock();
   await openV1(page, mock);
