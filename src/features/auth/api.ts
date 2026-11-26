@@ -2,6 +2,7 @@ import { apiClient } from "@/api/client";
 import { ApiError } from "@/api/types/common";
 import { normalizeRole } from "./roles";
 import type { ForgotPasswordAccepted, GoogleExchangeResponse, GoogleLinkInput, GoogleLinkResult, GoogleLoginResult, GoogleOnboardingInput, SetLocalPasswordInput } from "./types";
+import type { FirstLoginChallenge } from "./types";
 import type { AuthUser, AvatarResponse, AvatarUploadIntent, RegisterInput, RegistrationOtpVerification, TokenResponse, UpdateProfileInput } from "./types";
 
 type ApiUserRole = AuthUser["role"] | "PlatformAdmin" | "OrganizationUser" | "Trainee" | "FireSafetyExpert";
@@ -28,6 +29,21 @@ function normalizeUser(user: ApiAuthUser): AuthUser {
 function normalizeTokenResponse(response: ApiTokenResponse): TokenResponse {
   if (typeof response?.accessToken !== "string" || !response.accessToken.trim() || typeof response.refreshToken !== "string" || !response.refreshToken.trim() || !response.user) throw new Error("Máy chủ chưa trả phiên đăng nhập hợp lệ.");
   return { ...response, user: normalizeUser(response.user) };
+}
+
+/** The challenge of a first sign-in that still has to verify the email (BE#235), read from a login refusal or a resend. */
+export function firstLoginChallengeOf(body: unknown): FirstLoginChallenge | null {
+  if (typeof body !== "object" || body === null) return null;
+  const value = body as Record<string, unknown>;
+  if (typeof value.challengeToken !== "string" || !value.challengeToken.trim()) return null;
+  const seconds = Number(value.resendAfterSeconds);
+  return {
+    challengeToken: value.challengeToken,
+    challengeExpiresAt: typeof value.challengeExpiresAt === "string" ? value.challengeExpiresAt : "",
+    codeExpiresAt: typeof value.codeExpiresAt === "string" ? value.codeExpiresAt : "",
+    emailHint: typeof value.emailHint === "string" ? value.emailHint : "",
+    resendAfterSeconds: Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds) : 0,
+  };
 }
 
 function bearer(accessToken: string): HeadersInit {
@@ -57,6 +73,20 @@ export const authApi = {
       if (error instanceof ApiError && error.payload?.code === "ACCOUNT_LINK_REQUIRED") return { status: "AccountLinkRequired" };
       throw error;
     }
+  },
+  /** BE#235: the 6-digit code sent to the account email finishes the first sign-in; the session is in "ChangePassword". */
+  async verifyFirstLogin(challengeToken: string, code: string) {
+    return normalizeTokenResponse(await apiClient.request<ApiTokenResponse>("/api/auth/first-login/verify", { json: { challengeToken, code } }));
+  },
+  /** BE#235: a Google identity of the account email instead of the code (the password was checked by the login before). */
+  async verifyFirstLoginWithGoogle(challengeToken: string, idToken: string) {
+    return normalizeTokenResponse(await apiClient.request<ApiTokenResponse>("/api/auth/first-login/google", { json: { challengeToken, idToken } }));
+  },
+  /** BE#235: a new code (one a minute, five an hour: 429 OTP_RATE_LIMITED + Retry-After). The challenge token stays the same. */
+  async resendFirstLoginCode(challengeToken: string): Promise<FirstLoginChallenge> {
+    const challenge = firstLoginChallengeOf(await apiClient.request<unknown>("/api/auth/first-login/resend", { json: { challengeToken } }));
+    if (!challenge) throw new Error("Máy chủ chưa xác nhận đã gửi mã. Hãy thử lại.");
+    return challenge;
   },
   /** Explicit link of a verified Google identity to the signed-in local account. A first link revokes every session (`requiresLogin`). */
   async linkGoogle(accessToken: string, input: GoogleLinkInput): Promise<GoogleLinkResult> {

@@ -46,6 +46,16 @@ export const ERROR_TEXT: Record<string, string> = {
   GOOGLE_PROVIDER_UNAVAILABLE: "Đăng nhập Google đang tạm gián đoạn. Hãy thử lại sau.",
   IDENTITY_UNAVAILABLE: "Dịch vụ đăng nhập đang tạm gián đoạn. Hãy thử lại sau.",
   INVALID_ORGANIZATION: "Tổ chức không khả dụng.",
+  // first sign-in of an account created by an admin (BE#235)
+  FIRST_LOGIN_VERIFICATION_REQUIRED: "Đây là lần đăng nhập đầu của tài khoản. Hãy nhập mã xác minh đã gửi về email.",
+  FIRST_LOGIN_CODE_INVALID: "Mã xác minh chưa đúng.",
+  FIRST_LOGIN_CODE_EXPIRED: "Mã xác minh đã hết hạn. Hãy bấm Gửi lại mã.",
+  FIRST_LOGIN_CODE_LOCKED: "Bạn đã nhập sai quá nhiều lần. Hãy bấm Gửi lại mã để nhận mã mới.",
+  FIRST_LOGIN_CHALLENGE_INVALID: "Bước xác minh đã hết hạn. Hãy đăng nhập lại bằng email và mật khẩu.",
+  PASSWORD_CHANGE_REQUIRED: "Hãy đổi mật khẩu ban đầu trước khi dùng tài khoản.",
+  GOOGLE_EMAIL_MISMATCH: "Tài khoản Google này dùng email khác với email của tài khoản. Hãy chọn đúng tài khoản Google hoặc nhập mã.",
+  GOOGLE_ACCOUNT_IN_USE: "Tài khoản Google này đã gắn với một tài khoản FET3D khác.",
+  EMAIL_ALREADY_VERIFIED: "Tài khoản đã xác minh email nên không sửa email ở đây được nữa.",
   ORGANIZATION_CONFLICT: "Chưa tạo được tổ chức. Hãy thử lại.",
   // profile and avatar
   AVATAR_NOT_FOUND: "Chưa có ảnh đại diện.",

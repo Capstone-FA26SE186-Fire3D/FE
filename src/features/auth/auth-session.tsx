@@ -27,6 +27,8 @@ type AuthSessionContextValue = {
   user: AuthUser | null;
   login: (email: string, password: string) => Promise<AuthUser>;
   loginWithGoogle: () => Promise<GoogleLoginResult>;
+  /** Starts the session a sign-in step outside this provider just received (first sign-in of an expert account, BE#235). */
+  adoptSession: (response: TokenResponse) => AuthUser;
   completeGoogleOnboarding: (input: GoogleOnboardingInput) => Promise<AuthUser>;
   logout: () => Promise<void>;
   /** Drops the local session without navigating or calling the API (e.g. after a 401 on a public landing page). */
@@ -251,6 +253,11 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     }
   }, [saveSession]);
 
+  const adoptSession = useCallback((response: TokenResponse) => {
+    saveSession(response, true);
+    return response.user;
+  }, [saveSession]);
+
   const loginWithGoogle = useCallback(async () => {
     try {
       const firebaseIdToken = await signInWithGoogle();
@@ -333,6 +340,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     user,
     login,
     loginWithGoogle,
+    adoptSession,
     completeGoogleOnboarding,
     logout,
     endSession,
@@ -340,7 +348,7 @@ export function AuthSessionProvider({ children }: { children: ReactNode }) {
     requestPasswordReset,
     resetPassword,
     updateUser,
-  }), [accessToken, completeGoogleOnboarding, endSession, login, loginWithGoogle, logout, pending, ready, register, requestPasswordReset, resetPassword, retrySession, sessionError, updateUser, user]);
+  }), [accessToken, adoptSession, completeGoogleOnboarding, endSession, login, loginWithGoogle, logout, pending, ready, register, requestPasswordReset, resetPassword, retrySession, sessionError, updateUser, user]);
 
   return <AuthSessionContext.Provider value={value}>{children}</AuthSessionContext.Provider>;
 }

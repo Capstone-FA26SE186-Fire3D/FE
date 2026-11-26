@@ -1,5 +1,5 @@
 import type { PageResponse } from "@/api/types/common";
-import type { UserRole } from "@/features/auth/types";
+import type { FirstLoginStep, UserRole } from "@/features/auth/types";
 
 /**
  * BE `ManagedAccountResponse` (`GET /api/accounts`, `GET /api/accounts/{id}`, `PATCH /api/accounts/{id}/status`).
@@ -22,6 +22,10 @@ export type ManagedAccount = {
   phoneNumber?: string | null;
   avatarUrl?: string | null;
   profileRevision?: number;
+  /** BE#235. Null while the account has not proved its mailbox (only accounts an admin created start that way). */
+  emailVerifiedAt?: string | null;
+  /** BE#235: "VerifyEmail" = email not verified yet, "ChangePassword" = verified but still on the initial password, null = normal. */
+  firstLoginStep?: FirstLoginStep | null;
 };
 
 /** BE `OrganizationResponse` as listed for filters/pickers (`GET /api/organizations`); only id/name are used here. */
