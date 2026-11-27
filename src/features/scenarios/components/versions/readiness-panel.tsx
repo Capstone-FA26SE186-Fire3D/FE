@@ -166,7 +166,7 @@ export function ReadinessPanel({ accessToken, version, jobs, readiness, canAct, 
             <thead><tr><th>Mức độ</th><th>Nội dung</th></tr></thead>
             <tbody>{state.blockers.map((blocker, index) => <tr key={blocker.issueCode + "-" + index}>
               <td><StatusBadge tone={severityTone[severityKey(blocker.severity)] ?? "neutral"}>{severityLabel[severityKey(blocker.severity)] ?? blocker.severity}</StatusBadge></td>
-              <td>{blocker.message}<small className="ver-code-hint">{blocker.issueCode}</small></td>
+              <td>{blocker.message}<SupportCode code={blocker.issueCode} /></td>
             </tr>)}</tbody>
           </Table>}
         </>}

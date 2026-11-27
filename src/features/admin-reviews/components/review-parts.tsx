@@ -11,7 +11,7 @@ import type { ReviewReadiness, ReviewSummary } from "../types";
 export function HashValue({ value, label }: { value: string; label: string }) {
   const [full, setFull] = useState(false);
   return <span className="rev-hash-wrap">
-    <code className="rev-hash" aria-label={label} data-testid={`hash-${label.toLowerCase().includes("rubric") ? "rubric" : "content"}`}>{full ? value : shortHash(value)}</code>
+    <code className="rev-hash" aria-label={label} data-testid={`hash-${label.toLowerCase().includes("tiêu chí chấm") ? "rubric" : "content"}`}>{full ? value : shortHash(value)}</code>
     <button type="button" className="rev-link-button" aria-expanded={full} onClick={() => setFull((current) => !current)}>{full ? "Thu gọn" : "Xem đầy đủ"}</button>
   </span>;
 }

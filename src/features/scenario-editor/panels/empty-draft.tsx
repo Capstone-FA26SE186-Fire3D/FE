@@ -4,13 +4,15 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { ApiError } from "@/api/types/common";
+import { useAsyncData } from "@/api/use-async-data";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
 import { routes } from "@/configs/routes";
 
-import type { LoadedDraft } from "../api";
+import { scenarioEditorApi, type LoadedDraft } from "../api";
 import { initializeDraft } from "../v1/create-draft";
+import { scenarioNameExtras } from "../v1/state";
 import { useRevisionFloors } from "../v1/use-revision-floors";
 import { FloorsStatus } from "./geometry-status";
 import { describeApiError } from "@/api/describe-error";
@@ -22,16 +24,18 @@ import { describeApiError } from "@/api/describe-error";
 export function EmptyDraftPanel({ accessToken, buildingId, scenarioId, draftId, initial, onInitialized }: { accessToken: string; buildingId: string; scenarioId: string; draftId: string; initial: LoadedDraft; onInitialized: () => void }) {
   const revisionId = initial.draft.revisionId;
   const floors = useRevisionFloors(accessToken, revisionId);
+  // The scenario's name becomes the draft's first name; a failed read only leaves the name out.
+  const scenario = useAsyncData(`scenario:${scenarioId}`, (signal) => scenarioEditorApi.getScenario(accessToken, scenarioId, signal));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const reading = floors.reading;
 
   const initialize = async () => {
-    if (reading?.kind !== "valid" || busy) return;
+    if (reading?.kind !== "valid" || busy || scenario.loading) return;
     setBusy(true);
     setError(null);
     try {
-      await initializeDraft(accessToken, draftId, initial.etag, reading.pin);
+      await initializeDraft(accessToken, draftId, initial.etag, reading.pin, scenarioNameExtras(scenario.data?.name));
       onInitialized();
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 412) setError("Bản nháp vừa được thay đổi ở nơi khác. Tải lại trang để xem nội dung mới nhất; chưa có gì bị ghi đè.");
@@ -49,7 +53,7 @@ export function EmptyDraftPanel({ accessToken, buildingId, scenarioId, draftId, 
         <FloorsStatus reading={reading} loading={floors.loading} error={floors.error} reload={floors.reload} buildingId={buildingId} revisionId={revisionId} />
         {error && <Alert tone="danger" title="Khởi tạo thất bại">{error}</Alert>}
         <div className="ops-actions">
-          <Button type="button" onClick={() => void initialize()} disabled={reading?.kind !== "valid" || busy} data-testid="initialize-draft">{busy ? "Đang khởi tạo…" : "Khởi tạo bản nháp trên mô hình 3D"}</Button>
+          <Button type="button" onClick={() => void initialize()} disabled={reading?.kind !== "valid" || busy || scenario.loading} data-testid="initialize-draft">{busy ? "Đang khởi tạo…" : "Khởi tạo bản nháp trên mô hình 3D"}</Button>
           <Button asChild variant="quiet"><Link href={`${routes.workspaceBuildings}/${buildingId}/scenarios/${scenarioId}`}>Chọn bản nháp khác</Link></Button>
         </div>
       </div>

@@ -7,6 +7,8 @@ import { BUILDING_ID, SCENARIO_ID } from "../fixtures/scenario-editor/fixture-bu
 import { EDITOR_URL, installEditorMocks, newMock, type MockState } from "../fixtures/scenario-editor/mock-api";
 import { ARTIFACT_ID, GEOMETRY_HASH, SAMPLE_RUNTIME_CATALOG } from "../fixtures/scenario-editor/v1-fixtures";
 import { installLibraryBackend, LibraryBackend, signIn, type Actor } from "./library-mock";
+import { planApply } from "../../src/features/library/apply";
+import type { LibraryVersion } from "../../src/features/library/types";
 
 /*
  * Organization side of the Library: the read-only list and applying a PUBLISHED sample to an open draft in the v1 editor. Routes are
@@ -526,3 +528,34 @@ for (const width of [1440, 375]) {
     });
   }
 }
+
+test.describe("a template on a draft without its own name (UAT 27/11)", () => {
+  const version = { id: "v1", itemId: "i1", kind: "ScenarioTemplate", code: "TEMPLATE-SO-TAN", versionNumber: 1, name: "Template sơ tán văn phòng", status: "Published", revision: 1, requiredCapabilities: [], publishedAt: null,
+    payload: { state: TEMPLATE_STATE } } as unknown as LibraryVersion;
+  const context = { metrics: null, schemaVersions: null, object: null, runtimeCapabilities: null };
+  const nameGroup = (plan: ReturnType<typeof planApply>) => plan.groups.find((group) => group.id === "template:name")!;
+
+  test("the scenario's name counts as filled: keep by default, replace still offered", () => {
+    const named = nameGroup(planApply(version, { schemaVersion: "fet3d.editor/1" }, { ...context, scenarioName: "Thoát hiểm tầng một" }));
+    expect(named).toMatchObject({ status: "different", current: "Thoát hiểm tầng một", incoming: "Sơ tán văn phòng", defaultAction: "keep" });
+    expect(named.options).toEqual(["keep", "replace"]);
+    expect(named.writes.replace).toEqual([{ path: ["name"], value: "Sơ tán văn phòng" }]);
+    // A draft with its own name is compared with that name; without any name the template fills it as before.
+    expect(nameGroup(planApply(version, { schemaVersion: "fet3d.editor/1", name: "Tên của tôi" }, { ...context, scenarioName: "Thoát hiểm tầng một" })).current).toBe("Tên của tôi");
+    expect(nameGroup(planApply(version, { schemaVersion: "fet3d.editor/1" }, context))).toMatchObject({ status: "new", defaultAction: "fill" });
+    expect(nameGroup(planApply(version, { schemaVersion: "fet3d.editor/1" }, { ...context, scenarioName: "  " }))).toMatchObject({ status: "new", defaultAction: "fill" });
+  });
+
+  test("in the editor the template keeps the scenario's name unless the author replaces it", async ({ page }) => {
+    const { mock } = await openEditor(page, { state: { schemaVersion: "fet3d.editor/1", geometry: pin } });
+    await choose(page, "ScenarioTemplate", "TEMPLATE-SO-TAN");
+    await expect(page.getByTestId("apply-current-template:name")).toHaveText("Thoát hiểm tầng một");
+    await expect(page.getByTestId("apply-template:name-keep")).toBeChecked();
+    await page.getByTestId("apply-open").click();
+    await page.getByTestId("apply-confirm").click();
+    await page.getByTestId("save").click();
+    await expect(status(page)).toHaveText("Đã lưu");
+    expect(lastPut(mock).name).toBeUndefined(); // the template's name was not written over the scenario's
+    expect(lastPut(mock).learnerInstructions).toBe("Đi theo lối thoát gần nhất.");
+  });
+});

@@ -51,7 +51,7 @@ export function ReviewPanel({ accessToken, version, review, canSubmit, onSubmitt
       done();
       setConfirming(false);
       onSubmitted(submission);
-      toast.notify({ tone: "success", title: "Đã gửi thẩm định", description: "Nội dung và tiêu chí chấm của phiên bản này đã gửi cho quản trị FET3D." });
+      toast.notify({ tone: "success", title: "Đã gửi thẩm định", description: "Nội dung và tiêu chí chấm của phiên bản này đã gửi cho Chuyên viên PCCC." });
     } catch (cause) {
       const described = describeError(cause, "Không gửi thẩm định được.");
       setError(described);
@@ -66,8 +66,8 @@ export function ReviewPanel({ accessToken, version, review, canSubmit, onSubmitt
   const steps: Array<{ title: string; when: string; state: "done" | "current" | "failed" | "todo" }> = [
     { title: "Phiên bản đã đóng băng", when: formatDateTime(version.createdAt), state: "done" },
     { title: "Đã gửi thẩm định", when: submitted ? (frozen ? formatDateTime(frozen.submittedAt) : "Đã gửi") : "Chưa gửi", state: submitted ? "done" : "todo" },
-    status === "approved" ? { title: "Đạt thẩm định", when: frozen?.decidedAt ? formatDateTime(frozen.decidedAt) : "Quản trị FET3D", state: "done" }
-      : status === "rejected" ? { title: "Chưa đạt thẩm định", when: frozen?.decidedAt ? formatDateTime(frozen.decidedAt) : "Quản trị FET3D", state: "failed" }
+    status === "approved" ? { title: "Đạt thẩm định", when: frozen?.decidedAt ? formatDateTime(frozen.decidedAt) : "Chuyên viên PCCC", state: "done" }
+      : status === "rejected" ? { title: "Chưa đạt thẩm định", when: frozen?.decidedAt ? formatDateTime(frozen.decidedAt) : "Chuyên viên PCCC", state: "failed" }
       : { title: "Chuyên viên PCCC thẩm định", when: submitted ? "Đang chờ" : "Sau khi gửi", state: submitted ? "current" : "todo" },
   ];
 
@@ -105,12 +105,13 @@ export function ReviewPanel({ accessToken, version, review, canSubmit, onSubmitt
       <section className="ver-card" aria-labelledby="ver-frozen-title">
         <div>
           <h2 id="ver-frozen-title" className="ver-card-title">Nội dung đã đóng băng</h2>
-          <p className="ver-card-sub">Chuyên viên PCCC thẩm định đúng nội dung có các mã này.</p>
+          <p className="ver-card-sub">Chuyên viên PCCC thẩm định đúng nội dung đã khóa này.</p>
         </div>
         <dl className="ver-hash-list">
-          <div><dt>Nội dung (mục tiêu, hướng dẫn, đối tượng)</dt><dd className="ver-hash">{frozen?.contentHash ?? version.scenarioHash}{frozen && (frozen.contentHash === version.scenarioHash ? " · khớp phiên bản" : " · khác phiên bản đang xem")}</dd></div>
-          <div><dt>Tiêu chí chấm</dt><dd className="ver-hash">{frozen?.rubricHash ?? "Có mã khi gửi thẩm định"}</dd></div>
+          <div><dt>Nội dung (mục tiêu, hướng dẫn, đối tượng)</dt><dd>{frozen ? (frozen.contentHash === version.scenarioHash ? "Đã khóa · khớp phiên bản" : "Đã khóa · khác phiên bản đang xem") : "Đã khóa"}</dd></div>
+          <div><dt>Tiêu chí chấm</dt><dd>{frozen ? "Đã khóa" : "Khóa khi gửi thẩm định"}</dd></div>
         </dl>
+        <SupportCode detail={`nội dung ${frozen?.contentHash ?? version.scenarioHash}${frozen?.rubricHash ? `; tiêu chí chấm ${frozen.rubricHash}` : ""}`} />
       </section>
 
       <section className="ver-card" aria-labelledby="ver-decision-title">
@@ -121,7 +122,7 @@ export function ReviewPanel({ accessToken, version, review, canSubmit, onSubmitt
         {submitted && review.loading && !review.data && <SkeletonRows rows={2} label="Đang tải chi tiết gửi thẩm định…" />}
         {submitted && review.error !== undefined && <Alert tone="danger" title="Không tải được chi tiết gửi thẩm định" action={<Button size="sm" variant="secondary" className="mt-3" onClick={review.reload}>Thử lại</Button>}>{describeError(review.error).message}</Alert>}
         {frozen && <dl className="ver-meta ver-meta--3">
-          <div><dt>Trạng thái</dt><dd>{gate.label}<span className="ver-sr" data-testid="review-status">{frozen.status}</span></dd></div>
+          <div><dt>Trạng thái</dt><dd>{gate.label}<span data-testid="review-status" data-status={frozen.status} /></dd></div>
           <div><dt>Gửi lúc</dt><dd>{formatDateTime(frozen.submittedAt)}</dd></div>
           <div><dt>Quyết định lúc</dt><dd>{frozen.decidedAt ? formatDateTime(frozen.decidedAt) : "Chưa có"}</dd></div>
           

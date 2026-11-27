@@ -22,9 +22,9 @@ const STATUS_LABEL: Record<UnitStatus, { text: string; tone: "info" | "warning" 
 };
 
 const FIELD_NAME: Record<string, string> = {
-  spawnPoints: "Điểm xuất phát", hazards: "Nguy cơ", scoringConfig: "Chấm điểm", routingConfig: "Tuyến thoát hiểm", rubric: "Rubric",
+  spawnPoints: "Điểm xuất phát", hazards: "Nguy cơ", scoringConfig: "Chấm điểm", routingConfig: "Tuyến thoát hiểm", rubric: "Tiêu chí chấm điểm",
   learningObjectives: "Mục tiêu học tập", learnerInstructions: "Hướng dẫn người học", objectAnchors: "Neo đối tượng", requiredCapabilities: "Khả năng cần có của ứng dụng",
-  runtimeVersion: "Phiên bản ứng dụng", goals: "Điểm đến", npcs: "NPC", blockedElements: "Vùng chặn", modePolicy: "Chính sách chế độ", safetyThresholds: "Ngưỡng an toàn",
+  runtimeVersion: "Phiên bản ứng dụng", goals: "Điểm đến", npcs: "Người trong tòa nhà", blockedElements: "Vùng chặn", modePolicy: "Chính sách chế độ", safetyThresholds: "Ngưỡng an toàn",
   // fet3d.editor/1
   schemaVersion: "Định dạng bản nháp", name: "Tên kịch bản", geometry: "Mô hình 3D đã gắn", objects: "Đối tượng", timeLimitSeconds: "Thời gian tối đa", randomSeed: "Biến thể đám cháy", replanIntervalSeconds: "Tần suất tính lại đường thoát", libraryRefs: "Mẫu đã dùng",
 };

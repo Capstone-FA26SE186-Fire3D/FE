@@ -5,6 +5,7 @@ import {
   type NewObject, type V1Command, type V1Selection,
 } from "../../v1/commands";
 import type { GeometryInfo } from "../../v1/geometry";
+import { parameterCopyWrites } from "../../v1/object-name";
 import type { GeometryPin } from "../../v1/contract";
 import { roundQuaternion, yawToQuaternion, type Quat, type Vec3 } from "../../v1/matrix";
 
@@ -62,6 +63,10 @@ export function createV1Actions(edit: Edit, select: (selection: V1Selection) => 
     },
     setParameter(index: number, name: string, value: Json | undefined, typing: boolean) {
       edit((draft, id, selection, now) => setPathCommand(draft, id, ["objects", index, "parameters", name], value, { label: "Sửa tham số", at: now, selection, typing }));
+    },
+    /** One value copied to several objects' empty parameter (bulk fill): one history entry, one undo. */
+    setParameterMany(indices: readonly number[], name: string, value: Json) {
+      edit((draft, id, selection, now) => setFieldsCommand(draft, id, parameterCopyWrites(indices, name, value), { label: "Áp dụng tham số cho nhiều đối tượng", at: now, selection }));
     },
     setAnchor(index: number, anchorId: string | undefined) {
       edit((draft, id, selection, now) => setPathCommand(draft, id, ["objects", index, "anchorId"], anchorId, { label: anchorId ? "Chọn cấu kiện neo" : "Bỏ cấu kiện neo", at: now, selection }));

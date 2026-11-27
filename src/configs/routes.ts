@@ -25,6 +25,7 @@ export const routes = {
   adminAi: "/admin/ai",
   adminRuntime: "/admin/runtime",
   expertReviews: "/expert/reviews",
+  expertReview: (id: string) => `/expert/reviews/${encodeURIComponent(id)}`,
   workspaceBuildings: "/workspace/buildings",
   workspaceAnalytics: "/workspace/analytics",
   workspaceLibrary: "/workspace/library",

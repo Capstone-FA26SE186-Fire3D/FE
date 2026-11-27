@@ -5,6 +5,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Table } from "@/components/ui/table";
 import { SupportCode } from "@/components/ui/support-code";
 import { fieldName } from "@/features/library/errors";
+import { audienceLabel, workingHoursLabel } from "@/features/scenario-editor/v1/contract";
 import { metricName } from "@/features/training-history/labels";
 import type { ReviewDetail } from "../types";
 
@@ -12,6 +13,12 @@ const JSON_LIMIT = 30000;
 const operatorLabel: Record<string, string> = { gte: "≥", lte: "≤", eq: "=" };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+/** Technical fields the reader has nothing to check in. */
+const HIDDEN_FIELDS = new Set(["schemaVersion"]);
+/** Plain words for the fixed choices of a situation (same labels as the editor). */
+const valueLabel = (key: string, value: unknown): string | null => (key === "audience" ? audienceLabel(value) : key === "workingHours" ? workingHoursLabel(value) : null);
+/** Pass threshold as a percentage: the editor stores 0–1 (0.7 = 70%). */
+const percent = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? `${Math.round((value <= 1 ? value * 100 : value) * 10) / 10}%` : String(value));
 
 function describe(value: unknown): string {
   if (Array.isArray(value)) return `${value.length} mục`;
@@ -35,13 +42,13 @@ export function JsonSummary({ value, label }: { value: unknown; label: string })
   if (!isRecord(value)) {
     return <details className="rev-json"><summary>{label}: {describe(value)}</summary><JsonText value={value} label={label} /></details>;
   }
-  const entries = Object.entries(value);
+  const entries = Object.entries(value).filter(([key]) => !HIDDEN_FIELDS.has(key));
   if (!entries.length) return <p className="rev-note">Không có trường nào.</p>;
   return <ul className="rev-json-list">
     {entries.map(([key, item]) => <li key={key}>
       {isRecord(item) || Array.isArray(item)
         ? <details className="rev-json"><summary><span className="rev-json-key">{fieldName(key)}</span><span className="rev-json-sum">{describe(item)}</span></summary><JsonText value={item} label={`${label} · ${fieldName(key)}`} /></details>
-        : <div className="rev-json-flat"><span className="rev-json-key">{fieldName(key)}</span><span className="rev-json-sum">{describe(item)}</span></div>}
+        : <div className="rev-json-flat"><span className="rev-json-key">{fieldName(key)}</span><span className="rev-json-sum">{valueLabel(key, item) ?? describe(item)}</span></div>}
     </li>)}
   </ul>;
 }
@@ -60,7 +67,7 @@ function Rubric({ value }: { value: unknown }) {
   if (!isRecord(value) || !criteria || !criteria.every(isRecord)) return <JsonSummary value={value} label="Tiêu chí chấm điểm" />;
   const threshold = value.pass_threshold;
   return <>
-    {threshold !== undefined && <p className="rev-note">Điểm đạt tối thiểu: <strong>{String(threshold)}</strong></p>}
+    {threshold !== undefined && <p className="rev-note">Điểm đạt tối thiểu: <strong>{percent(threshold)}</strong></p>}
     {criteria.length
       ? <Table caption="Tiêu chí chấm điểm đã khóa">
         <thead><tr><th>Tiêu chí</th><th>Điều kiện</th><th>Mức quan trọng</th><th>Bắt buộc</th></tr></thead>
@@ -88,7 +95,7 @@ export function ReviewContent({ detail }: { detail: Pick<ReviewDetail, "content"
         ? <p className="rev-text" data-testid="review-instructions">{detail.learnerInstructions}</p>
         : <p className="rev-note">Phiên bản này không có hướng dẫn (bản cũ chưa lưu).</p>}
     </Panel>
-    <Panel title="Tiêu chí chấm điểm (rubric)" description="Tiêu chí chấm điểm đã khóa cùng phiên bản." bodyClassName="ops-stack"><Rubric value={detail.rubric} /></Panel>
+    <Panel title="Tiêu chí chấm điểm" description="Tiêu chí chấm điểm đã khóa cùng phiên bản." bodyClassName="ops-stack"><Rubric value={detail.rubric} /></Panel>
     <Panel title="Nội dung kịch bản" description="Tóm tắt theo từng phần; mở từng mục để xem dữ liệu gốc (chỉ đọc)." bodyClassName="ops-stack">
       {detail.content == null
         ? <p className="rev-note">Phiên bản này không có nội dung kịch bản (bản cũ chưa lưu). Hệ thống không tự bổ sung dữ liệu.</p>

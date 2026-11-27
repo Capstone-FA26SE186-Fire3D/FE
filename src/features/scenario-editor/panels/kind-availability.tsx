@@ -65,7 +65,7 @@ export function LegacyKinds() {
   return <div className="se-form" data-testid="legacy-kinds">
     <section className="se-locked" data-state="v1-only">
       <header><h3>Chỉ có khi soạn trên mô hình 3D</h3><StatusBadge tone="neutral"><FileClock size={12} aria-hidden="true" /> Bản nháp cũ</StatusBadge></header>
-      <p>Điểm đến, NPC, cấu kiện bị chặn và thiết bị chỉ đặt được trong bản nháp soạn trên mô hình 3D, theo tọa độ của từng tầng.</p>
+      <p>Điểm đến, người trong tòa nhà, cấu kiện bị chặn và thiết bị chỉ đặt được trong bản nháp soạn trên mô hình 3D, theo tọa độ của từng tầng.</p>
       <p>Bản nháp cũ không bị đổi hay chuyển tọa độ. Dùng nút “Tạo bản nháp mới trên mô hình 3D” ở đầu trang khi mô hình 3D của bản IFC hợp lệ.</p>
     </section>
   </div>;

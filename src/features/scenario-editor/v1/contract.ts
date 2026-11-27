@@ -17,7 +17,7 @@ export const KIND_META: Record<ObjectKind, { label: string; /** Same label insid
   Spawn: { label: "Điểm xuất phát", lower: "điểm xuất phát", plural: "Điểm xuất phát", description: "Nơi người học bắt đầu tình huống.", idPrefix: "spawn" },
   Hazard: { label: "Nguy cơ", lower: "nguy cơ", plural: "Nguy cơ", description: "Nguồn nguy cơ; cách hoạt động do khả năng bạn chọn quyết định.", idPrefix: "hazard" },
   Goal: { label: "Điểm đến", lower: "điểm đến", plural: "Điểm đến", description: "Điểm hoặc cấu kiện người học phải đạt, ví dụ lối ra.", idPrefix: "goal" },
-  Npc: { label: "NPC", lower: "NPC", plural: "NPC", description: "Nhân vật mô phỏng; cách hoạt động do khả năng bạn chọn quyết định.", idPrefix: "npc" },
+  Npc: { label: "Người trong tòa nhà", lower: "người trong tòa nhà", plural: "Người trong tòa nhà", description: "Người mô phỏng có mặt trong tòa nhà; cách hoạt động do khả năng bạn chọn quyết định.", idPrefix: "npc" },
   BlockedElement: { label: "Cấu kiện bị chặn", lower: "cấu kiện bị chặn", plural: "Cấu kiện bị chặn", description: "Cửa hoặc cấu kiện IFC không đi qua được; bắt buộc chọn cấu kiện neo.", idPrefix: "blocked" },
   Equipment: { label: "Thiết bị", lower: "thiết bị", plural: "Thiết bị", description: "Thiết bị hỗ trợ; cách hoạt động do khả năng bạn chọn quyết định.", idPrefix: "equipment" },
 };

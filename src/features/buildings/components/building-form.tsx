@@ -30,7 +30,7 @@ export function BuildingForm({ form, errors, onChange, autoFocus }: { form: Form
   return <div className="ops-stack" data-testid="building-form">
     <Field label="Tên công trình" required error={errors.name}>{(p) => <Input {...p} required maxLength={200} value={form.name} autoFocus={autoFocus} placeholder="Trường Tiểu học Hòa Bình" onChange={(event) => onChange({ name: event.target.value })} />}</Field>
     <div className="ops-form-grid">
-      <Field label="Loại công trình" required error={errors.buildingType} hint="Trường học: từ tiểu học trở lên.">{(p) => <Combobox {...p} value={form.buildingType} options={typeOptions} placeholder="Chọn loại công trình" searchPlaceholder="Tìm loại công trình…" aria-label="Loại công trình" onChange={(value) => onChange({ buildingType: value })} />}</Field>
+      <Field label="Loại công trình" required error={errors.buildingType} hint={form.buildingType === "School" ? "Trường học: từ tiểu học trở lên." : undefined}>{(p) => <Combobox {...p} value={form.buildingType} options={typeOptions} placeholder="Chọn loại công trình" searchPlaceholder="Tìm loại công trình…" aria-label="Loại công trình" onChange={(value) => onChange({ buildingType: value })} />}</Field>
       <Field label="Số tầng" required error={errors.totalFloors}>{(p) => <Input {...p} required min="1" inputMode="numeric" type="number" value={form.totalFloors} onChange={(event) => onChange({ totalFloors: event.target.value })} />}</Field>
     </div>
     <div className="ops-form-grid">

@@ -57,6 +57,8 @@ const FIELD_NAMES: Record<string, string> = {
   timeLimitSeconds: "Thời gian tối đa", modePolicy: "Chế độ huấn luyện", rubric: "Tiêu chí chấm điểm", schema_version: "Phiên bản tiêu chí",
   pass_threshold: "Điểm đạt tối thiểu", id: "Tên ngắn của tiêu chí", metric: "Chỉ số", operator: "Điều kiện", threshold: "Giá trị so sánh", weight: "Mức quan trọng",
   mandatory: "Bắt buộc", requiredCapabilities: "Yêu cầu", properties: "Thuộc tính", state: "Kịch bản mẫu", payload: "Nội dung",
+  objects: "Đối tượng trên mô hình", audience: "Đối tượng luyện tập", workingHours: "Thời gian xảy ra", assumption: "Giả định của tình huống", geometry: "Mô hình 3D",
+  libraryRefs: "Mẫu đã dùng", runtimeVersion: "Phiên bản ứng dụng", randomSeed: "Biến thể đám cháy", replanIntervalSeconds: "Tần suất tính lại đường thoát",
 };
 
 /** Plain name of one content field; a field this list does not know keeps its own name. */

@@ -169,7 +169,7 @@ const IFC_TYPE_LABELS: Record<string, string> = {
   IfcSlab: "Sàn", IfcColumn: "Cột", IfcBeam: "Dầm", IfcStair: "Cầu thang", IfcStairFlight: "Cầu thang", IfcRamp: "Dốc",
   IfcRampFlight: "Dốc", IfcRailing: "Lan can", IfcRoof: "Mái", IfcCovering: "Trần, ốp", IfcPlate: "Tấm", IfcMember: "Thanh",
   IfcFurniture: "Đồ nội thất", IfcFurnishingElement: "Đồ nội thất", IfcSanitaryTerminal: "Thiết bị vệ sinh", IfcSpace: "Phòng",
-  IfcFlowTerminal: "Thiết bị", IfcBuildingElementProxy: "Bộ phận khác", IfcOpeningElement: "Lỗ mở",
+  IfcFlowTerminal: "Thiết bị", IfcLightFixture: "Đèn", IfcBuildingElementProxy: "Bộ phận khác", IfcOpeningElement: "Lỗ mở",
 };
 
 export function ifcTypeLabel(type: string): string {

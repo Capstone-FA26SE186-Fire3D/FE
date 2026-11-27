@@ -1,5 +1,6 @@
 import { deepEqual, isObject, type Json, type JsonObject, type Path } from "@/features/scenario-editor/store/json";
 import type { CapabilityOption } from "@/features/scenario-editor/v1/catalog";
+import { objectName } from "@/features/scenario-editor/v1/object-name";
 import { LIMITS, MODE_LABEL, TRAINING_MODES, audienceLabel, workingHoursLabel, type TrainingMode } from "@/features/scenario-editor/v1/contract";
 import { SITUATION_TEMPLATE_FIELDS, TEMPLATE_FIELDS, ignoredTemplateParts, templateFieldLabel, type TemplateField } from "./payload";
 import { isScenarioKind, type LibraryVersion, type ScenarioLibraryKind } from "./types";
@@ -62,6 +63,8 @@ export type ApplyContext = {
   runtimeCapabilities: CapabilityOption[] | null;
   /** False when the open draft is not a situation on a fire infrastructure: the PC06 situation fields are then left out. */
   situation?: boolean;
+  /** Name of the scenario the draft belongs to. A draft with no name of its own shows this name, so it counts as filled. */
+  scenarioName?: string | null;
 };
 
 const isEmpty = (value: unknown) => value === undefined || value === null || value === "" || (Array.isArray(value) && value.length === 0) || (isObject(value) && Object.keys(value).length === 0);
@@ -156,7 +159,8 @@ function planTemplate(version: LibraryVersion, draft: JsonObject, context: Apply
       if (notes.length === 0) notes.push(SITUATION_ONLY_NOTE);
       continue;
     }
-    const current = draft[field];
+    // A draft without its own name is shown under the scenario's name: the template's name must not replace it by default.
+    const current = field === "name" && isEmpty(draft.name) && context.scenarioName?.trim() ? context.scenarioName.trim() : draft[field];
     const base: Base = { id: `template:${field}`, label: templateFieldLabel[field], field, path: [field], current, incoming };
     let merged: { value: Json; note: string } | null = null;
     let warnings: string[] = [];
@@ -196,7 +200,7 @@ function planEquipment(version: LibraryVersion, context: ApplyContext): ApplyPla
   if (!object || object.kind !== "Equipment") return { groups: [], reference, notes: [], ignored: [], blocker: "Chọn một đối tượng Thiết bị trong cây đối tượng hoặc khung nhìn để áp dụng thông tin thiết bị." };
 
   const groups: ApplyGroup[] = [];
-  const labelBase = { id: "equipment:label", label: `Nhãn của ${object.id}`, path: ["objects", object.index, "label"] as Path };
+  const labelBase = { id: "equipment:label", label: `Nhãn của ${objectName({ label: object.label, kind: "Equipment", capability: object.capability })} #${object.index + 1}`, path: ["objects", object.index, "label"] as Path };
   const labelStatus: GroupStatus = isEmpty(object.label) ? "new" : object.label === version.name ? "same" : "different";
   const labelWrites = labelStatus === "same" ? {} : labelStatus === "new" ? { fill: [{ path: labelBase.path, value: version.name }] } : { replace: [{ path: labelBase.path, value: version.name }] };
   groups.push({ ...labelBase, status: labelStatus, current: object.label || NONE, incoming: version.name, options: labelStatus === "new" ? ["fill", "keep"] : labelStatus === "same" ? ["keep"] : ["keep", "replace"], defaultAction: labelStatus === "new" ? "fill" : "keep", writes: labelWrites, notes: labelStatus === "same" ? ["Nhãn đã giống mẫu."] : [], warnings: [] });
