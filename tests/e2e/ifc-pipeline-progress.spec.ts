@@ -155,6 +155,8 @@ test.describe("IFC progress view", () => {
       logs: [
         { id: "l1", revisionId: "rev-2", jobId: "job-1", step: "Geometry", status: "Expired", message: null, durationMs: null, attemptNumber: 1, loggedAt: "2026-10-02T00:58:00Z", endReason: "LeaseExpired" },
         { id: "l2", revisionId: "rev-2", jobId: "job-1", step: "Geometry", status: "Running", message: null, durationMs: null, attemptNumber: 2, loggedAt: "2026-10-02T01:01:00Z", endReason: null },
+        // Log `step` is the job kind; the BE sends Geometry, PlaytestPackage or ReleasePackage.
+        { id: "l3", revisionId: "rev-2", jobId: "job-pkg", step: "ReleasePackage", status: "Succeeded", message: null, durationMs: 2300, attemptNumber: 3, loggedAt: "2026-10-02T00:40:00Z", endReason: "Completed" },
       ],
     });
     await page.getByTestId("ifc-sub-technical").click();
@@ -165,6 +167,10 @@ test.describe("IFC progress view", () => {
     await expect(expiredRow).toContainText("Dựng mô hình 3D");
     await expect(expiredRow).toContainText("Máy xử lý bị ngắt giữa chừng (khởi động lại hoặc mất kết nối) nên hệ thống đã giao lại việc.");
     await expect(table.getByRole("row").filter({ hasText: "Lần 2" })).toContainText("Đang chạy");
+    const packageRow = table.getByRole("row").filter({ hasText: "Lần 3" });
+    await expect(packageRow).toContainText("Dựng gói phát hành");
+    await expect(packageRow).toContainText("Xong");
+    await expect(table).not.toContainText("Bước khác");
     await expect(table).not.toContainText("Ghi nhận");
     await expect(table).not.toContainText("Expired");
   });
