@@ -23,7 +23,7 @@ import { formatDate } from "@/features/billing/format";
 import { rememberRecentBuilding } from "@/features/command-palette/recent-buildings";
 import { buildingsApi } from "../api";
 import { describeApiError, isStatus } from "../format";
-import { derivePipelineProgress, emptyPipeline, isTerminalJob, isUnsettledRevision, revisionLabel, type PipelineAction, type RevisionPipeline } from "../pipeline";
+import { derivePipelineProgress, emptyPipeline, isTerminalJob, newestGeometryJob, isUnsettledRevision, revisionLabel, type PipelineAction, type RevisionPipeline } from "../pipeline";
 import type { QaAction } from "../qa-codes";
 import type { BuildingRevision, ProcessingJob, ProcessingLog } from "../types";
 import { useProcessingActions } from "../use-processing-actions";
@@ -57,6 +57,9 @@ const ifcSubLabels: Record<IfcSub, string> = { progress: "Tiến trình", previe
 const SCENARIO_PAGE_SIZE = 20;
 // After a Succeeded job the revision is re-read until QA moved it out of Uploaded/Processing; ~1 minute at most.
 const MAX_SETTLE_POLLS = 20;
+/** Job list paging while looking for the Geometry job behind newer package builds. */
+const JOB_PAGE_SIZE = 20;
+const MAX_JOB_PAGES = 5;
 
 /** `revision` is a fresh read, taken only while the listed status still waits for QA. */
 type PipelineSnapshot = { revisionId: string; jobs: ProcessingJob[]; pipeline: RevisionPipeline; revision?: BuildingRevision };
@@ -96,7 +99,7 @@ function isIfcSub(value: string): value is IfcSub {
  * Building detail (Figma "Chi tiết" v2): compact header (name, type · floors · address, visibility/service chips, "Mã QR
  * công trình", "···" menu), five tabs Hành trình · IFC · Kịch bản · Truy cập · Dịch vụ. The tab (`?tab=`), the IFC/access
  * sub-tab (`?sub=`) and the selected revision (`?revision=`) live in the URL; `?upload=1` / `?create=1` open the modals
- * (⌘K and the list's "Việc tiếp theo"). The newest processing job of the selected revision is polled every 3s until it ends.
+ * (⌘K and the list's "Việc tiếp theo"). The newest model-building (Geometry) job of the selected revision is polled every 3s until it ends.
  */
 export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: { buildingId: string; defaultTab?: BuildingTab }) {
   const { accessToken, ready, user } = useAuthSession();
@@ -156,9 +159,18 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
     enabled: pollEnabled,
     resetKey: revisionId,
     fetcher: async (signal) => {
-      const list = await buildingsApi.listProcessingJobs(token, revisionId, 1, 20, signal);
-      const jobs = [...list.items].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-      const newest = jobs[0];
+      const list = await buildingsApi.listProcessingJobs(token, revisionId, 1, JOB_PAGE_SIZE, signal);
+      let items = list.items;
+      let newest = newestGeometryJob(items);
+      // Package builds share the list (no kind filter on the BE): page on until the model-building job shows up.
+      for (let page = 2; !newest && page <= MAX_JOB_PAGES && items.length < list.totalCount; page++) {
+        const more = await buildingsApi.listProcessingJobs(token, revisionId, page, JOB_PAGE_SIZE, signal);
+        if (more.items.length === 0) break;
+        items = [...items, ...more.items];
+        newest = newestGeometryJob(items);
+      }
+      // Every kind stays in `jobs` (confirm-for-training looks up the package job of a scenario version).
+      const jobs = [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       if (!newest) return { revisionId, jobs, pipeline: emptyPipeline };
       const detail = await buildingsApi.getJob(token, newest.id, signal);
       const pipeline: RevisionPipeline = { job: detail.job, detail, qa: null };
