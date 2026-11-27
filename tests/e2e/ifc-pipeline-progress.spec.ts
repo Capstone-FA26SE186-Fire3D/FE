@@ -26,6 +26,8 @@ type Mock = {
   attemptNumber?: number;
   /** Replaces the `GET /api/processing-jobs/job-1` body (attempt end reasons, previous attempt). */
   detail?: () => unknown;
+  /** Extra jobs of other kinds in the revision's job list, with their `GET /api/processing-jobs/{id}` bodies. */
+  otherJobs?: Array<{ row: { id: string }; detail: unknown }>;
   qa?: { status: number; body: unknown };
   issues?: unknown[];
   logs?: unknown[];
@@ -34,7 +36,7 @@ type Mock = {
 };
 
 async function open(page: Page, mock: Mock, url = "/workspace/buildings/building-1?tab=ifc") {
-  const calls = { revision: 0, preview: 0, logs: 0 };
+  const calls = { revision: 0, preview: 0, logs: 0, qaJobs: [] as string[] };
   await page.addInitScript(() => {
     sessionStorage.setItem("fire3d-auth-tokens", JSON.stringify({ accessToken: "ops-access", refreshToken: "ops-refresh" }));
     localStorage.setItem("fire3d-org-tour", "done"); // the spotlight tour must never cover the page under test
@@ -44,9 +46,10 @@ async function open(page: Page, mock: Mock, url = "/workspace/buildings/building
   await page.route("**/api/buildings/building-1/revisions?*", (route) => route.fulfill({ json: page1(mock.revisions) }));
   await page.route("**/api/buildings/building-1/scenarios?*", (route) => route.fulfill({ json: page1([]) }));
   await page.route("**/api/revisions/*", (route) => { calls.revision++; return route.fulfill({ json: mock.revision?.() ?? mock.revisions.find((item) => (item as { id: string }).id === route.request().url().split("/").pop()) }); });
-  await page.route("**/api/revisions/*/processing-jobs?*", (route) => route.fulfill({ json: page1(mock.jobStatus ? [job(mock.jobStatus)] : []) }));
+  await page.route("**/api/revisions/*/processing-jobs?*", (route) => route.fulfill({ json: page1([...(mock.otherJobs ?? []).map((other) => other.row), ...(mock.jobStatus ? [job(mock.jobStatus)] : [])]) }));
   await page.route("**/api/processing-jobs/job-1", (route) => route.fulfill({ json: mock.detail?.() ?? detail(mock.jobStatus ?? "Queued", mock.attemptNumber) }));
-  await page.route("**/api/processing-jobs/job-1/qa?*", (route) => route.fulfill(mock.qa ? { status: mock.qa.status, json: mock.qa.body } : { json: { jobId: "job-1", currentAttemptId: "att-1", validationRuns: page1([run("Passed")]) } }));
+  for (const other of mock.otherJobs ?? []) await page.route(`**/api/processing-jobs/${other.row.id}`, (route) => route.fulfill({ json: other.detail }));
+  await page.route("**/api/processing-jobs/*/qa?*", (route) => { calls.qaJobs.push(route.request().url().split("/processing-jobs/")[1].split("/")[0]); return route.fulfill(mock.qa ? { status: mock.qa.status, json: mock.qa.body } : { json: { jobId: "job-1", currentAttemptId: "att-1", validationRuns: page1([run("Passed")]) } }); });
   await page.route("**/api/revisions/*/issues?*", (route) => route.fulfill({ json: page1(mock.issues ?? []) }));
   await page.route("**/api/revisions/*/processing-logs?*", (route) => { calls.logs++; return route.fulfill({ json: page1(mock.logs ?? []) }); });
   for (const part of ["artifacts", "bim-facts"]) await page.route(`**/api/revisions/*/${part}?*`, (route) => route.fulfill({ json: page1([]) }));
@@ -173,6 +176,43 @@ test.describe("IFC progress view", () => {
     await expect(table).not.toContainText("Bước khác");
     await expect(table).not.toContainText("Ghi nhận");
     await expect(table).not.toContainText("Expired");
+  });
+
+  // A package build of a scenario on this revision shares its job list; it is newer than the model build but never drives the IFC pipeline.
+  const packageJob = (status: string, attempt: Record<string, unknown>, previousAttempt: unknown = null) => ({
+    row: { ...job(status), id: "job-pkg", kind: "ReleasePackage", scenarioVersionId: "ver-1", createdAt: "2026-10-02T03:00:00Z" },
+    detail: { job: { ...job(status), id: "job-pkg", kind: "ReleasePackage", scenarioVersionId: "ver-1", createdAt: "2026-10-02T03:00:00Z" }, inputHash: "c".repeat(64), currentAttemptId: "att-pkg-2", currentAttempt: { id: "att-pkg-2", attemptNumber: 2, status, toolchainVersion: "pkg-1", startedAt: "2026-10-02T03:10:00Z", finishedAt: "2026-10-02T03:20:00Z", outputHash: null, message: null, endReason: null, ...attempt }, previousAttempt },
+  });
+
+  test("a newer package build does not take over the model-building step, its runs or its QA", async ({ page }) => {
+    const cutOff = { id: "att-pkg-1", attemptNumber: 1, status: "Expired", toolchainVersion: "pkg-1", startedAt: "2026-10-02T03:01:00Z", finishedAt: "2026-10-02T03:09:00Z", outputHash: null, message: null, endReason: "LeaseExpired" };
+    const calls = await open(page, {
+      revisions: [rev("ReadyForScenario")],
+      jobStatus: "Succeeded",
+      attemptNumber: 1,
+      otherJobs: [packageJob("Succeeded", { endReason: "Completed" }, cutOff)],
+    });
+    await expect(step(page, "geometry")).toHaveAttribute("data-state", "done");
+    await expect(step(page, "geometry")).toContainText("lượt xử lý thứ 1");
+    await expect(step(page, "geometry")).not.toContainText("lượt xử lý thứ 2");
+    const panel = page.locator("#ifc-processing");
+    await expect(panel).toContainText("Dựng mô hình 3D");
+    await expect(panel).not.toContainText("Dựng gói phát hành");
+    await expect(page.getByTestId("previous-attempt")).toHaveCount(0);
+    await expect.poll(() => calls.qaJobs).toContain("job-1");
+    expect(calls.qaJobs).not.toContain("job-pkg");
+  });
+
+  test("a newer failed package build does not fail the IFC pipeline or offer its retry there", async ({ page }) => {
+    await open(page, {
+      revisions: [rev("ReadyForScenario")],
+      jobStatus: "Succeeded",
+      otherJobs: [packageJob("Failed", { endReason: "WorkerFailed" })],
+    });
+    await expect(step(page, "geometry")).toHaveAttribute("data-state", "done");
+    await expect(next(page)).toContainText("Sẵn sàng soạn kịch bản");
+    await expect(next(page)).not.toContainText("Xử lý IFC thất bại");
+    await expect(page.getByRole("button", { name: "Chạy lại lượt xử lý bị lỗi" })).toHaveCount(0);
   });
 
   test("NeedsFix with IFC_EXIT_UNKNOWN: QA done, the exit step blocks and its action goes to the exit door choice", async ({ page }) => {

@@ -17,6 +17,14 @@ export type RevisionPipeline = {
 
 export const emptyPipeline: RevisionPipeline = { job: null, detail: null, qa: null };
 
+/**
+ * The job the IFC pipeline follows: the newest model-building (`Geometry`) job of the revision. Package builds of its
+ * scenarios share the revision's job list but say nothing about the 3D model, its QA or its retry.
+ */
+export function newestGeometryJob(jobs: ProcessingJob[]): ProcessingJob | null {
+  return jobs.filter((job) => job.kind === "Geometry").sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
+}
+
 /** The BE moves a revision out of these when QA of its Geometry job is recorded. */
 export function isUnsettledRevision(status: string | undefined | null) {
   return status === "Uploaded" || status === "Processing";
