@@ -1,6 +1,9 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
+import { isVietnamese } from "@/api/error-text";
+import { attemptEndReasonText } from "@/configs/processing-end-reason";
+import { SupportCode } from "@/components/ui/support-code";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Panel } from "@/components/ui/panel";
@@ -8,7 +11,17 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { Table } from "@/components/ui/table";
 import { describeApiError, formatDateTime } from "../format";
 import { deriveQaVerdict, isTerminalJob, jobKindLabel, jobLabel, revisionLabel, runStatusLabel, type RevisionPipeline } from "../pipeline";
-import type { BuildingRevision, RevisionIssue } from "../types";
+import type { BuildingRevision, ProcessingAttempt, RevisionIssue } from "../types";
+
+/** " · why the run ended" plus the worker's text when it is Vietnamese; other worker text goes to `AttemptSupport`. */
+function attemptReason(attempt: ProcessingAttempt, fallback = "") {
+  const reason = attemptEndReasonText(attempt.endReason, "xử lý") ?? fallback;
+  return `${reason ? ` · ${reason}` : ""}${isVietnamese(attempt.message) ? ` ${attempt.message}` : ""}`;
+}
+
+function AttemptSupport({ attempt }: { attempt: ProcessingAttempt }) {
+  return attempt.message && !isVietnamese(attempt.message) ? <SupportCode detail={attempt.message} /> : null;
+}
 
 /** Worker status and QA of the selected revision. Starting and retrying live in the progress view above. */
 export function ProcessingStatusPanel({ revision, pipeline, issues, polling, pollError, onRefresh }: {
@@ -21,6 +34,7 @@ export function ProcessingStatusPanel({ revision, pipeline, issues, polling, pol
 }) {
   const { job, detail, qa } = pipeline;
   const attempt = detail?.currentAttempt ?? null;
+  const previous = detail?.previousAttempt ?? null;
   const rev = revisionLabel(revision.status);
   const jl = jobLabel(job?.status);
   const verdict = deriveQaVerdict(pipeline, issues?.filter((issue) => issue.isCurrentAttempt));
@@ -44,7 +58,11 @@ export function ProcessingStatusPanel({ revision, pipeline, issues, polling, pol
       {job && <><dt>Tạo lúc</dt><dd>{formatDateTime(job.createdAt)}</dd></>}
       {attempt && <>
         <dt>Lần chạy mới nhất</dt>
-        <dd>Lần thứ {attempt.attemptNumber} · {jobLabel(attempt.status).label}<br /><span className="ops-muted">Bắt đầu {formatDateTime(attempt.startedAt)}{attempt.finishedAt ? ` · kết thúc ${formatDateTime(attempt.finishedAt)}` : ""}</span></dd>
+        <dd>Lần thứ {attempt.attemptNumber}{attemptReason(attempt, jobLabel(attempt.status).label)}<br /><span className="ops-muted">Bắt đầu {formatDateTime(attempt.startedAt)}{attempt.finishedAt ? ` · kết thúc ${formatDateTime(attempt.finishedAt)}` : ""}</span><AttemptSupport attempt={attempt} /></dd>
+      </>}
+      {previous && <>
+        <dt>Lần chạy trước</dt>
+        <dd data-testid="previous-attempt">Lần thứ {previous.attemptNumber}{attemptReason(previous, jobLabel(previous.status).label)}<br /><span className="ops-muted">Bắt đầu {formatDateTime(previous.startedAt)}{previous.finishedAt ? ` · kết thúc ${formatDateTime(previous.finishedAt)}` : ""}</span><AttemptSupport attempt={previous} /></dd>
       </>}
       {job && !attempt && !isTerminalJob(job.status) && <><dt>Lần chạy mới nhất</dt><dd><span className="ops-muted">Đang chờ máy xử lý nhận tệp.</span></dd></>}
     </dl>

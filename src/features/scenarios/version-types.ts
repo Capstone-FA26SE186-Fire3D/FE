@@ -150,6 +150,10 @@ export type ProcessingAttempt = {
   startedAt: string;
   finishedAt: string | null;
   outputHash: string | null;
+  /** Worker's own message (often English); absent on older servers. */
+  message: string | null;
+  /** `Completed | WorkerFailed | LeaseExpired`, null while running; absent on older servers. */
+  endReason: string | null;
 };
 
 export type ProcessingJobDetail = {
@@ -157,6 +161,8 @@ export type ProcessingJobDetail = {
   inputHash: string;
   currentAttemptId: string | null;
   currentAttempt: ProcessingAttempt | null;
+  /** The attempt before the current one; null when there is none, absent on older servers. */
+  previousAttempt: ProcessingAttempt | null;
 };
 
 export type ValidationRun = {

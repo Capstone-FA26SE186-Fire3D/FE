@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { isVietnamese } from "@/api/error-text";
 import { useAsyncData } from "@/api/use-async-data";
 import { SupportCode } from "@/components/ui/support-code";
+import { attemptEndReasonText } from "@/configs/processing-end-reason";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -24,7 +25,7 @@ import type { RevisionIssue } from "../types";
 type IssueState = { data: RevisionIssue[] | undefined; error: unknown; loading: boolean; reload: () => void };
 
 const ISSUE_STATUS: Record<string, string> = { Open: "Chưa xử lý", Resolved: "Đã xử lý", Ignored: "Đã bỏ qua", Dismissed: "Đã bỏ qua", Superseded: "Không còn áp dụng" };
-const LOG_STATUS: Record<string, { label: string; tone: "success" | "danger" | "info" }> = { Success: { label: "Xong", tone: "success" }, Succeeded: { label: "Xong", tone: "success" }, Failed: { label: "Lỗi", tone: "danger" } };
+const LOG_STATUS: Record<string, { label: string; tone: "success" | "danger" | "info" | "warning" | "pending" }> = { Success: { label: "Xong", tone: "success" }, Succeeded: { label: "Xong", tone: "success" }, Failed: { label: "Lỗi", tone: "danger" }, Expired: { label: "Bị ngắt", tone: "warning" }, Running: { label: "Đang chạy", tone: "pending" } };
 const ARTIFACT_TYPE: Record<string, string> = { Glb: "Mô hình 3D (GLB)", GLB: "Mô hình 3D (GLB)", NavMesh: "Bản đồ đường đi", HazardGrid: "Bản đồ vùng nguy hiểm", BuildingMetadata: "Thông tin công trình", Package: "Gói kịch bản", Manifest: "Danh sách tệp của gói" };
 
 /** A BIM value as people read it: text and numbers as they are, yes/no, lists joined; anything structured is not shown raw. */
@@ -117,7 +118,7 @@ function LogsTab({ accessToken, revisionId, reloadKey }: { accessToken: string; 
       <thead><tr><th>Thời gian</th><th>Bước</th><th>Kết quả</th><th>Lần chạy</th><th>Chi tiết</th></tr></thead>
       <tbody>
         {logs.loading && !logs.data && <TableMessage colSpan={5}><SkeletonRows rows={3} label="Đang tải nhật ký…" /></TableMessage>}
-        {logs.data?.items.map((log) => <tr key={log.id}><td>{formatDateTime(log.loggedAt)}</td><td>{processingStepLabel(log.step)}</td><td><StatusBadge tone={LOG_STATUS[log.status]?.tone ?? "info"}>{LOG_STATUS[log.status]?.label ?? "Ghi nhận"}</StatusBadge></td><td>Lần {log.attemptNumber}{log.durationMs !== null ? ` · ${durationText(log.durationMs)}` : ""}</td><td>{!log.message ? "—" : isVietnamese(log.message) ? log.message : <SupportCode detail={log.message} />}</td></tr>)}
+        {logs.data?.items.map((log) => <tr key={log.id}><td>{formatDateTime(log.loggedAt)}</td><td>{processingStepLabel(log.step)}</td><td><StatusBadge tone={LOG_STATUS[log.status]?.tone ?? "info"}>{LOG_STATUS[log.status]?.label ?? "Ghi nhận"}</StatusBadge></td><td>Lần {log.attemptNumber}{log.durationMs !== null ? ` · ${durationText(log.durationMs)}` : ""}</td><td>{isVietnamese(log.message) ? log.message : <>{attemptEndReasonText(log.endReason, "xử lý") ?? (log.message ? null : "—")}{log.message && <SupportCode detail={log.message} />}</>}</td></tr>)}
         {logs.data && logs.data.items.length === 0 && <TableMessage colSpan={5}><EmptyState icon={ListChecks} title="Chưa có nhật ký" description="Nhật ký xuất hiện khi máy xử lý bắt đầu dựng bản IFC này." /></TableMessage>}
       </tbody>
     </Table>
