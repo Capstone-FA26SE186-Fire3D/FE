@@ -8,9 +8,6 @@ import { expect, test, type Page } from "@playwright/test";
 import { BUILDING_ID, REVISION_ID } from "../fixtures/scenario-editor/fixture-building";
 import { EDITOR_URL, INFRASTRUCTURE_ID, installEditorMocks, lockedInfrastructure, newMock, type MockState } from "../fixtures/scenario-editor/mock-api";
 import { ARTIFACT_ID, GEOMETRY_HASH, SAMPLE_RUNTIME_CATALOG } from "../fixtures/scenario-editor/v1-fixtures";
-import { withExitGoals } from "../../src/features/fire-infrastructure/exit-goals";
-import { categoryOf } from "../../src/features/scenario-editor/v1/scope";
-import { completenessIssues, readObjects, shapeIssues } from "../../src/features/scenario-editor/v1/state";
 
 const DRAFT_INFRASTRUCTURE = "88888888-8888-4888-8888-888888888888";
 const placement = { floorId: "L1", position: { x: 1, y: 0, z: 1 }, rotation: { x: 0, y: 0, z: 0, w: 1 } };
@@ -18,7 +15,7 @@ const exit = { id: "exit-1", kind: "Goal", label: "Cửa thoát phía Đông", c
 
 type Put = { ifMatch: string | undefined; body: { geometry: unknown; runtimeVersion: unknown; items: Array<Record<string, unknown>> } };
 
-/** A Draft version as the server seeds the first one: no Geometry pin, runtime of the newest active runtime, no exits. */
+/** A Draft version with no Geometry pin and no runtime yet, and no items, so the test adds the first exit itself (the server seeds an exit Goal per exit door; this fixture has no doors). */
 async function installDraftInfrastructure(page: Page, mock: MockState, puts: Put[]) {
   const stored = lockedInfrastructure({ id: DRAFT_INFRASTRUCTURE, status: "Draft", version: 2, revision: 5, decidedAt: null, runtimeVersion: null });
   mock.infrastructures = [stored, ...mock.infrastructures];
@@ -112,38 +109,4 @@ test("a scenario draft on a locked infrastructure shows its items read-only and 
   expect(mock.state).toMatchObject({ audience: "EvacuationGuide", workingHours: "OffHours", assumption: { time: "22 giờ thứ Bảy", location: "Bếp căng tin tầng 1", cause: "Chập điện ở ổ cắm", peoplePresent: 12 } });
   await page.getByTestId("tab-issues").click();
   await expect(page.getByText("Chọn đối tượng luyện tập của tình huống.")).toHaveCount(0);
-});
-
-test("seeded exit doors become exits once: a Goal on the same door, exit.final of the catalog, nothing added twice", () => {
-  const anchorId = "2O2Fr$t4X7Zf8NOew3FLOH";
-  const rotation = { x: 0, y: 0.707106781, z: 0, w: 0.707106781 };
-  // What the server seeds from the confirmed IFC equipment (FireInfrastructures.SeedAsync): the IFC class as label, no parameters.
-  const door = { id: "infra-eq-1", kind: "Equipment", label: "IfcDoor", capability: { id: "door.exit", version: "1.2.0" }, anchorId, placement: { floorId: "L1", position: { x: 2, y: 0, z: 5 }, rotation } };
-  const unanchored = { id: "infra-eq-2", kind: "Equipment", label: "IfcDoor", capability: { id: "door.exit", version: "1.2.0" }, placement: { floorId: "L2", position: { x: 1, y: 0, z: 1 }, rotation } };
-  const extinguisher = { id: "infra-eq-3", kind: "Equipment", label: "IfcBuildingElementProxy", capability: { id: "extinguisher.portable", version: "1.0.0" }, placement };
-  const exitCapability = { id: "exit.final", version: "1.1.0" };
-  const before = [door, unanchored, extinguisher];
-  const exitRule = (objects: unknown[]) => completenessIssues({ schemaVersion: "fet3d.editor/1", objects: objects as never }, { geometry: null, runtimes: null, metrics: null, scope: "infrastructure" }).filter((issue) => issue.code === "EXIT_REQUIRED");
-  expect(exitRule(before)).toHaveLength(1); // the bug: the doors were there, yet "Cần ít nhất một lối thoát nạn"
-
-  const after = withExitGoals(before, exitCapability)!;
-  expect(after).toHaveLength(5);
-  expect(after.slice(0, 3)).toEqual(before); // the seeded items are untouched
-  // The same object the author makes in the editor: a Goal attached to the door ("Gắn vào bộ phận tòa nhà"), at the door's place.
-  expect(after[3]).toEqual({ id: "goal-1", kind: "Goal", placement: door.placement, anchorId, capability: exitCapability, label: "Lối ra ngoài" });
-  expect(after[3].placement).not.toBe(door.placement);
-  expect(after[4]).toEqual({ id: "goal-2", kind: "Goal", placement: unanchored.placement, capability: exitCapability, label: "Lối ra ngoài" });
-  expect(readObjects({ objects: after }).map((object) => categoryOf(object.kind, object.capability?.id))).toEqual(["Equipment", "Equipment", "Equipment", "Exit", "Exit"]);
-  expect(exitRule(after)).toEqual([]);
-  expect(shapeIssues({ schemaVersion: "fet3d.editor/1", objects: after })).toEqual([]);
-
-  // Run again (a replayed create, a later version): nothing is missing, so nothing is saved.
-  expect(withExitGoals(after, exitCapability)).toBeNull();
-  // A Goal the author already put on the door counts; ids in use are skipped.
-  const authored = { id: "goal-1", kind: "Goal", label: "Cửa thoát phía Đông", anchorId, capability: { id: "exit.stair", version: "1.0.0" }, placement };
-  const mixed = withExitGoals([door, authored], exitCapability);
-  expect(mixed).toBeNull();
-  const other = withExitGoals([unanchored, authored], exitCapability)!;
-  expect(other[2]).toMatchObject({ id: "goal-2", kind: "Goal" });
-  expect(withExitGoals([extinguisher], exitCapability)).toBeNull();
 });
