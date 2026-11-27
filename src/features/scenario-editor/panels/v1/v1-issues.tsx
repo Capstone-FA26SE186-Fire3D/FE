@@ -8,13 +8,17 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { SupportCode } from "@/components/ui/support-code";
 
 import type { Issue } from "../../store/validation";
+import type { FloorV1 } from "../../v1/geometry";
+import { parameterIssueText } from "../../v1/object-name";
+import type { ObjectView } from "../../v1/state";
 import type { ServerReport } from "../../v1/use-editor-v1";
 
-function IssueList({ items, onJump, label }: { items: Issue[]; onJump?: (issue: Issue) => void; label: string }) {
+/** `describe` names the object and field of a parameter issue; absent (a stale report) shows the message as received. */
+function IssueList({ items, onJump, label, describe }: { items: Issue[]; onJump?: (issue: Issue) => void; label: string; describe?: (issue: Issue) => string | null }) {
   return <ul className="se-issues" aria-label={label}>
     {items.map((issue) => <li key={`${issue.source}|${issue.code}|${issue.path}`}>
       <button type="button" onClick={() => onJump?.(issue)} disabled={!onJump} data-testid="issue-item" data-code={issue.code} data-path={issue.path}>
-        <span className="se-issue-top"><span>{issue.message}</span><StatusBadge tone={issue.source === "server" ? "info" : "neutral"}>{issue.source === "server" ? "Hệ thống" : "Trình duyệt"}</StatusBadge></span>
+        <span className="se-issue-top"><span>{describe?.(issue) ?? issue.message}</span><StatusBadge tone={issue.source === "server" ? "info" : "neutral"}>{issue.source === "server" ? "Hệ thống" : "Trình duyệt"}</StatusBadge></span>
       </button>
       <SupportCode code={issue.code} id={issue.path} />
     </li>)}
@@ -27,7 +31,10 @@ const time = (at: number) => new Date(at).toLocaleTimeString("vi-VN", { hour: "2
  * Validation of the document being edited. `validate-state` checks the UNSAVED body; its answer is tied to the hash of what
  * was sent. After any further edit the answer is shown as stale and no longer drives per-object markers.
  */
-export function V1IssuesPanel({ issues, shapeProblems, report, reportStale, validating, validateError, dirty, onValidate, onJump }: {
+export function V1IssuesPanel({ objects = [], floors = [], issues, shapeProblems, report, reportStale, validating, validateError, dirty, onValidate, onJump }: {
+  /** The document being edited, so a parameter issue says which object and field ("Bình chữa cháy xách tay #1 (Tầng 1): chưa điền …"). */
+  objects?: ObjectView[];
+  floors?: FloorV1[];
   issues: Issue[];
   shapeProblems: Issue[];
   report: ServerReport | null;
@@ -42,6 +49,7 @@ export function V1IssuesPanel({ issues, shapeProblems, report, reportStale, vali
   const live = issues.filter((issue) => !shapePaths.has(`${issue.code}|${issue.path}`));
   const server = live.filter((issue) => issue.source === "server");
   const client = live.filter((issue) => issue.source === "client");
+  const describe = (issue: Issue) => parameterIssueText(issue, objects, (floorId) => floors.find((floor) => floor.id === floorId)?.name);
   return <div className="se-form" data-testid="issues-panel">
     <div className="se-form-head se-validation-head">
       <div><h3>Kiểm tra bản nháp</h3><p>Nút Kiểm tra gửi đúng nội dung đang sửa (kể cả chưa lưu) để hệ thống kiểm tra; không lưu và không đổi phiên bản. Lỗi cấu trúc và thiếu sót hiện ngay trong trình duyệt.</p></div>
@@ -63,10 +71,10 @@ export function V1IssuesPanel({ issues, shapeProblems, report, reportStale, vali
     )}
     {shapeProblems.length > 0 && <section aria-label="Chưa thể lưu" className="ops-stack" data-testid="shape-problems">
       <Alert tone="danger" title={`Chưa thể lưu: ${shapeProblems.length} lỗi cấu trúc`}>Hệ thống sẽ không nhận nội dung này, nên nút Lưu bị khóa cho đến khi sửa.</Alert>
-      <IssueList items={shapeProblems} onJump={onJump} label="Lỗi cấu trúc" />
+      <IssueList items={shapeProblems} onJump={onJump} label="Lỗi cấu trúc" describe={describe} />
     </section>}
-    {server.length > 0 && <section aria-label="Hệ thống báo" className="ops-stack"><h3>Hệ thống báo</h3><IssueList items={server} onJump={onJump} label="Vấn đề do hệ thống báo" /></section>}
-    {client.length > 0 && <section aria-label="Còn thiếu" className="ops-stack" data-testid="client-gaps"><h3>Còn thiếu hoặc chưa khớp</h3><IssueList items={client} onJump={onJump} label="Vấn đề do trình duyệt phát hiện" /></section>}
+    {server.length > 0 && <section aria-label="Hệ thống báo" className="ops-stack"><h3>Hệ thống báo</h3><IssueList items={server} onJump={onJump} label="Vấn đề do hệ thống báo" describe={describe} /></section>}
+    {client.length > 0 && <section aria-label="Còn thiếu" className="ops-stack" data-testid="client-gaps"><h3>Còn thiếu hoặc chưa khớp</h3><IssueList items={client} onJump={onJump} label="Vấn đề do trình duyệt phát hiện" describe={describe} /></section>}
     {live.length === 0 && shapeProblems.length === 0 && <div className="se-empty-ok"><CheckCircle2 size={18} aria-hidden="true" /> Không phát hiện vấn đề nào ở phía trình duyệt{report && !reportStale ? " và hệ thống." : ". Bấm Kiểm tra để hệ thống xác nhận."}</div>}
   </div>;
 }

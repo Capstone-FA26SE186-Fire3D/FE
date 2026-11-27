@@ -18,7 +18,7 @@ import { useToast } from "@/components/ui/toast";
 
 import type { ReleaseView } from "../../use-version-server-state";
 import { approvalGate, describeError, missingText, releaseGate, type DescribedError } from "../../version-readiness";
-import type { ScenarioVersionDetail, VersionReadiness } from "../../version-types";
+import type { ScenarioVersionDetail, TrainingItem, VersionReadiness } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
 import { SupportCode } from "@/components/ui/support-code";
 import { formatDateTime } from "./version-content";
@@ -26,6 +26,14 @@ import { formatDateTime } from "./version-content";
 const ENTITLEMENT_STATUS: Record<string, string> = { active: "Đang hiệu lực", pending: "Chưa đến kỳ", scheduled: "Chưa đến kỳ", expired: "Đã hết hạn", revoked: "Đã thu hồi", cancelled: "Đã hủy", canceled: "Đã hủy" };
 const TRAINING_STATUS: Record<string, string> = { active: "Đang dùng", inactive: "Tạm ngừng", archived: "Đã lưu trữ" };
 const RELEASE_STATUS: Record<string, string> = { built: "Đã tạo", published: "Đã phát hành", revoked: "Đã thu hồi" };
+
+/** A training whose release is not Published (still Built, or revoked) is not in use, whatever the training row says. */
+function TrainingStatusBadge({ training }: { training: TrainingItem }) {
+  const release = training.releaseStatus?.toLowerCase();
+  if (release && release !== "published") return <StatusBadge tone="neutral">{release === "revoked" ? "Đã thu hồi" : "Chưa phát hành"}</StatusBadge>;
+  const status = training.status.toLowerCase();
+  return <StatusBadge tone={status === "active" ? "success" : "neutral"}>{TRAINING_STATUS[status] ?? "Khác"}</StatusBadge>;
+}
 
 /** A publish that did not happen is a gate decision, not a failure of the release: it stays Built. */
 function PublishBlocked({ error }: { error: DescribedError }) {
@@ -140,7 +148,7 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
       {release && <>
         <p className="ver-note">{gate.detail}</p>
         <dl className="ver-meta">
-          <div><dt>Trạng thái</dt><dd>{gate.label}<span className="ver-sr" data-testid="release-status">{release.status}</span></dd></div>
+          <div><dt>Trạng thái</dt><dd>{gate.label}<span data-testid="release-status" data-status={release.status} /></dd></div>
           <div><dt>Tạo lúc</dt><dd>{formatDateTime(release.createdAt)}</dd></div>
           <div><dt>Phát hành lúc</dt><dd>{release.publishedAt ? formatDateTime(release.publishedAt) : "Chưa phát hành"}</dd></div>
           <div><dt>Nền tảng</dt><dd>{release.package.buildTarget}</dd></div>
@@ -177,11 +185,12 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
         <p className="ver-note">Phiên bản này chưa có bản phát hành. Cần nội dung đã được Chuyên viên PCCC thẩm định đạt và gói đã chốt; hệ thống kiểm tra lại khi tạo.</p>
         <form className="ops-stack" onSubmit={build} noValidate>
           <dl className="ver-meta">
-            <div><dt>Gói đã chốt</dt><dd>{confirmationId ? "Đã chốt" : "Chưa chốt (tab Kiểm tra)"}<span className="ver-sr" data-testid="release-confirmation">{confirmationId ?? "Chưa có"}</span></dd></div>
-            <div><dt>Gói phát hành</dt><dd>{artifactId ? "Đã dựng, kiểm tra đạt" : "Chưa có gói kiểm tra đạt"}<span className="ver-sr" data-testid="release-artifact">{artifactId ?? "Chưa có"}</span></dd></div>
+            <div><dt>Gói đã chốt</dt><dd>{confirmationId ? "Đã chốt" : "Chưa chốt (tab Kiểm tra)"}<span data-testid="release-confirmation" data-id={confirmationId ?? ""} /></dd></div>
+            <div><dt>Gói phát hành</dt><dd>{artifactId ? "Đã dựng, kiểm tra đạt" : "Chưa có gói kiểm tra đạt"}<span data-testid="release-artifact" data-id={artifactId ?? ""} /></dd></div>
             <div><dt>Thẩm định nội dung</dt><dd>{approvalGate(version.reviewStatus, version.rejectReason).label}</dd></div>
             <div><dt>Phiên bản</dt><dd>v{version.versionNumber}</dd></div>
           </dl>
+          <SupportCode detail={confirmationId || artifactId ? `gói đã chốt ${confirmationId ?? "chưa có"}; gói phát hành ${artifactId ?? "chưa có"}` : undefined} />
           {readiness.error !== undefined && !state && <Alert tone="danger" title="Không đọc được điều kiện phát hành" action={<Button type="button" size="sm" variant="secondary" className="mt-3" onClick={readiness.reload}>Thử lại</Button>}>{describeError(readiness.error).message}</Alert>}
           {state && state.missing.length > 0 && <ul className="ver-list" data-testid="release-missing">{state.missing.map((code) => <li key={code} data-code={code}>{missingText(code)}</li>)}</ul>}
           {!approved && version.reviewStatus && <p className="ver-note">Phiên bản chưa đạt thẩm định nội dung nên chưa tạo được bản phát hành.</p>}
@@ -204,7 +213,7 @@ export function ReleasePanel({ accessToken, buildingId, version, readiness, view
           {trainings.loading && !trainings.data && <TableMessage colSpan={4}><SkeletonRows rows={2} label="Đang tải bài huấn luyện…" /></TableMessage>}
           {(trainings.data ?? []).map((training) => <tr key={training.id}>
             <td className="ops-cell-primary">{training.name}</td>
-            <td><StatusBadge tone={training.status.toLowerCase() === "active" ? "success" : "neutral"}>{TRAINING_STATUS[training.status.toLowerCase()] ?? "Khác"}</StatusBadge></td>
+            <td><TrainingStatusBadge training={training} /></td>
             <td>{training.releaseStatus ? RELEASE_STATUS[training.releaseStatus.toLowerCase()] ?? "Khác" : "Đã tạo"}<SupportCode id={training.releaseId} /></td>
             <td>{training.scenarioVersionId === version.id ? "Phiên bản này" : "Phiên bản khác"}</td>
           </tr>)}

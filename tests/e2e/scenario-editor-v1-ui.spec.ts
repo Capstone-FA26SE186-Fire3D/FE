@@ -61,10 +61,10 @@ test("opens a fet3d.editor/1 draft: six kinds, pinned Geometry, floor-local coor
   await expect.poll(() => page.evaluate(() => window.__fire3dEditorScene?.markerPosition("object", 3))).toEqual([1, 3.5, 2]);
 
   // layers come from the semantic mapping (IFC type -> node names) and exist only because matching glTF nodes were found;
-  // they sit in a collapsed "Lớp hiển thị" box and show the Vietnamese name of the IFC type (IfcWall -> "Tường").
+  // they sit in a collapsed "Lớp hiển thị" box and show the Vietnamese name of the IFC type (IfcWall -> "Tường"), never the IFC name.
   await page.getByText("Lớp hiển thị", { exact: true }).click();
   const walls = page.getByRole("button", { name: "Tường", exact: true });
-  await expect(walls).toHaveAttribute("title", /IfcWall/);
+  await expect(walls).toHaveAttribute("title", "Ẩn lớp Tường");
   await expect(walls).toHaveAttribute("aria-pressed", "true");
   await walls.click();
   await expect(walls).toHaveAttribute("aria-pressed", "false");
@@ -95,10 +95,10 @@ test("new draft from the entry screen: stable Idempotency-Key across a retry, fi
   expect(mock.createDraftCalls).toHaveLength(2);
   expect(mock.createDraftCalls[1].key).toBe(mock.createDraftCalls[0].key);
   expect(mock.createDraftCalls[0].body).toEqual({ revisionId: REVISION_ID, infrastructureId: "77777777-7777-4777-8777-777777777777" });
-  // PUT: only the document that declares schemaVersion + the pinned Geometry; ETag of the fresh draft.
+  // PUT: only the document that declares schemaVersion + the pinned Geometry, named after the scenario; ETag of the fresh draft.
   expect(mock.puts).toHaveLength(1);
   expect(mock.puts[0]).toMatchObject({ draftId: NEW_DRAFT_ID, ifMatch: '"1"' });
-  expect(mock.puts[0].body).toEqual({ schemaVersion: "fet3d.editor/1", geometry: { artifactId: ARTIFACT_ID, sha256Hash: GEOMETRY_HASH } });
+  expect(mock.puts[0].body).toEqual({ name: "Thoát hiểm tầng một", schemaVersion: "fet3d.editor/1", geometry: { artifactId: ARTIFACT_ID, sha256Hash: GEOMETRY_HASH } });
   await expect(page.getByTestId("list-Spawn").getByRole("button")).toHaveCount(0);
   await expect(status(page)).toHaveText("Đã lưu");
 });
@@ -441,7 +441,7 @@ test("runtime without a capability for a kind: the object form names the runtime
   const mock = v1Mock({ catalog: onlyFire });
   await openV1(page, mock);
   await item(page, 3).click(); // the NPC of the fixture
-  await expect(page.getByTestId("no-capability")).toContainText("chưa hỗ trợ NPC");
+  await expect(page.getByTestId("no-capability")).toContainText("chưa hỗ trợ người trong tòa nhà");
   await expect(page.getByTestId("field-capability")).toHaveCount(0);
   await tab(page, "Khả dụng").click();
   await expect(kinds(page).locator('[data-kind="Npc"]')).toHaveAttribute("data-state", "no-capability");
@@ -675,7 +675,7 @@ test("empty draft ({}): the first PUT is a document that declares schemaVersion 
   await page.getByTestId("initialize-draft").click();
   await expect(page.getByTestId("scenario-editor")).toHaveAttribute("data-draft-mode", "v1");
   expect(mock.puts).toHaveLength(1);
-  expect(mock.puts[0].body).toEqual({ schemaVersion: "fet3d.editor/1", geometry: { artifactId: ARTIFACT_ID, sha256Hash: GEOMETRY_HASH } });
+  expect(mock.puts[0].body).toEqual({ name: "Thoát hiểm tầng một", schemaVersion: "fet3d.editor/1", geometry: { artifactId: ARTIFACT_ID, sha256Hash: GEOMETRY_HASH } });
   expect(mock.puts[0].ifMatch).toBe('"1"');
 });
 
@@ -720,7 +720,7 @@ test("legacy draft: banner, edits stay in the old shape and no v1 PUT ever reach
   expect(mock.createDraftCalls[0].key).toBeTruthy();
   expect(mock.puts).toHaveLength(1);
   expect(mock.puts[0]).toMatchObject({ draftId: NEW_DRAFT_ID, ifMatch: '"1"' });
-  expect(mock.puts[0].body).toEqual({ learnerInstructions: original.learnerInstructions, timeLimitSeconds: 300, schemaVersion: "fet3d.editor/1", geometry: { artifactId: ARTIFACT_ID, sha256Hash: GEOMETRY_HASH } });
+  expect(mock.puts[0].body).toEqual({ name: "Thoát hiểm tầng một", learnerInstructions: original.learnerInstructions, timeLimitSeconds: 300, schemaVersion: "fet3d.editor/1", geometry: { artifactId: ARTIFACT_ID, sha256Hash: GEOMETRY_HASH } });
   expect(JSON.stringify(mock.puts[0].body)).not.toMatch(/spawnPoints|hazards|"x"|"rotation"/);
   expect(mock.state).toEqual(original); // the legacy draft was neither converted nor overwritten
   await dialog.getByTestId("open-new-draft").click();

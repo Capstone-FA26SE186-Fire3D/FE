@@ -21,10 +21,11 @@ import { SupportCode } from "@/components/ui/support-code";
 import { useToast } from "@/components/ui/toast";
 import { routes } from "@/configs/routes";
 import type { DraftValidationIssue } from "@/features/scenario-editor/api";
-import { categoryOf, itemsToObjects, type InfrastructureCategory } from "@/features/scenario-editor/v1/scope";
-import { readObjects } from "@/features/scenario-editor/v1/state";
+import { parameterIssueText } from "@/features/scenario-editor/v1/object-name";
+import { categoryOf, itemPathToObjectPath, itemsToObjects, type InfrastructureCategory } from "@/features/scenario-editor/v1/scope";
+import { readObjects, type ObjectView } from "@/features/scenario-editor/v1/state";
 
-import { fireInfrastructureApi, INFRASTRUCTURE_STATUS, type FireInfrastructure } from "../api";
+import { addSeededExitGoals, fireInfrastructureApi, INFRASTRUCTURE_STATUS, type FireInfrastructure } from "../api";
 
 const CATEGORY_LABEL: Record<InfrastructureCategory, string> = { Exit: "lối thoát", AssemblyPoint: "điểm tập kết", Equipment: "thiết bị cố định", WaterSource: "nguồn nước" };
 const CATEGORY_ORDER: InfrastructureCategory[] = ["Exit", "AssemblyPoint", "Equipment", "WaterSource"];
@@ -41,7 +42,12 @@ export function summarizeItems(items: unknown): string {
 }
 
 /** Vietnamese for the submit checks the server reports in English; unknown codes fall back to a neutral sentence. */
-function issueText(issue: DraftValidationIssue): string {
+function issueText(issue: DraftValidationIssue, objects: readonly ObjectView[]): string {
+  // A missing parameter names the object and the field ("Bình chữa cháy xách tay #1: chưa điền Loại chất chữa cháy").
+  if (issue.code === "FIELD_REQUIRED") {
+    const named = parameterIssueText({ ...issue, path: itemPathToObjectPath(issue.path) }, objects);
+    if (named) return `${named}.`;
+  }
   switch (issue.code) {
     case "EXIT_REQUIRED": return "Cần ít nhất một lối thoát nạn.";
     case "FIELD_REQUIRED": return issue.path.startsWith("$.geometry") ? "Chưa gắn mô hình 3D của bản IFC. Mở trình soạn rồi lưu lại." : issue.path.startsWith("$.runtimeVersion") ? "Chưa chọn phiên bản ứng dụng. Mở trình soạn rồi lưu lại." : "Một mục còn thiếu thông tin bắt buộc.";
@@ -82,6 +88,8 @@ export function InfrastructurePanel({ accessToken, buildingId, revisionId, readO
     try {
       const created = await fireInfrastructureApi.create(accessToken, revisionId, createKey.keyFor({ revisionId, after: items[0]?.id ?? null }));
       createKey.done();
+      // Seeded exit doors become exits before the editor opens; a failed save just opens the draft as created.
+      if (created.status === "Draft") await addSeededExitGoals(accessToken, created);
       router.push(editorHref(created.id));
     } catch (error) {
       // Someone else opened a version meanwhile: the list is the truth.
@@ -142,6 +150,7 @@ export function InfrastructurePanel({ accessToken, buildingId, revisionId, readO
             {items.map((item) => {
               const status = INFRASTRUCTURE_STATUS[item.status] ?? { label: "Không rõ", tone: "neutral" as const };
               const result = checked?.id === item.id ? checked : null;
+              const objects = result ? readObjects({ objects: itemsToObjects(item.items) }) : [];
               return <li key={item.id} className="ops-panel" data-testid={`infrastructure-${item.version}`} data-status={item.status}>
                 <div className="ops-panel-body ops-stack">
                   <div className="ops-actions" style={{ justifyContent: "space-between", alignItems: "center" }}>
@@ -161,7 +170,7 @@ export function InfrastructurePanel({ accessToken, buildingId, revisionId, readO
                   {result && (result.isValid
                     ? <Alert tone="success" title="Đủ điều kiện gửi thẩm định">Không còn vấn đề nào chặn.</Alert>
                     : <Alert tone="warning" title={`Còn ${result.issues.length} vấn đề cần sửa`}>
-                      <ul style={{ margin: "4px 0 0", paddingLeft: 18 }} data-testid="infrastructure-issues">{result.issues.slice(0, 10).map((issue, index) => <li key={index}>{issueText(issue)}<SupportCode code={issue.code} detail={issue.path} /></li>)}</ul>
+                      <ul style={{ margin: "4px 0 0", paddingLeft: 18 }} data-testid="infrastructure-issues">{result.issues.slice(0, 10).map((issue, index) => <li key={index}>{issueText(issue, objects)}<SupportCode code={issue.code} detail={issue.path} /></li>)}</ul>
                     </Alert>)}
                 </div>
               </li>;

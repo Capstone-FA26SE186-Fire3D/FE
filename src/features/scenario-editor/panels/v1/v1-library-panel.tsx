@@ -55,7 +55,8 @@ function GroupCard({ group, action, onChoose }: { group: ApplyGroup; action: App
   </fieldset>;
 }
 
-function Preview({ version, draft, object, runtimeVersion, runtimes, rubric, applied, canUndoLast, onUndo, onApply, onBack, choices, onChoices, situation }: {
+function Preview({ version, draft, object, runtimeVersion, runtimes, rubric, applied, canUndoLast, onUndo, onApply, onBack, choices, onChoices, situation, scenarioName }: {
+  scenarioName: string | undefined;
   /** The open draft is a situation on a fire infrastructure: a template may fill its PC06 fields. */
   situation: boolean;
   version: LibraryVersion;
@@ -80,7 +81,8 @@ function Preview({ version, draft, object, runtimeVersion, runtimes, rubric, app
     object: object ? { index: object.index, kind: object.kind, id: object.id, label: object.label, capability: object.capability } : null,
     runtimeCapabilities: runtime ? runtime.capabilities : null,
     situation,
-  }), [version, draft, rubric, object, runtime, situation]);
+    scenarioName,
+  }), [version, draft, rubric, object, runtime, situation, scenarioName]);
   const changes = changesFor(plan, choices);
   const summary = summarizeChoices(plan, choices);
   const label = `Áp dụng ${version.code} v${version.versionNumber}`;
@@ -130,8 +132,10 @@ function Preview({ version, draft, object, runtimeVersion, runtimes, rubric, app
  * decide per field group (fill / replace / merge / keep) and apply it as one undoable command. Nothing is written silently and
  * a field that already has content defaults to "keep". Only non-spatial fields are ever filled.
  */
-export function V1LibraryPanel({ accessToken, ui, onUi, draft, selectedObject, runtimeVersion, runtimes, rubric, applied, canUndoLast, onUndo, onApply, situation = false }: {
+export function V1LibraryPanel({ accessToken, ui, onUi, draft, scenarioName, selectedObject, runtimeVersion, runtimes, rubric, applied, canUndoLast, onUndo, onApply, situation = false }: {
   situation?: boolean;
+  /** Name of the scenario: a draft with no name of its own counts as named so (a template's name is then not filled over it). */
+  scenarioName?: string;
   accessToken: string;
   ui: LibraryUi;
   onUi: (update: (ui: LibraryUi) => LibraryUi) => void;
@@ -190,7 +194,7 @@ export function V1LibraryPanel({ accessToken, ui, onUi, draft, selectedObject, r
       <div><Button type="button" variant="quiet" size="sm" onClick={() => { setChosen(null); list.reload(); }}><ArrowLeft size={14} aria-hidden="true" /> Chọn mẫu khác</Button></div>
     </div>}
     {current && !current.latestPublished && <Alert tone="warning" title="Mẫu chưa có phiên bản đã xuất bản">Chỉ phiên bản đã xuất bản mới áp dụng được.</Alert>}
-    {current?.latestPublished && <Preview key={current.latestPublished.id} version={current.latestPublished} draft={draft} situation={situation} object={selectedObject} runtimeVersion={runtimeVersion} runtimes={runtimes} rubric={rubric} applied={applied} canUndoLast={canUndoLast} onUndo={onUndo} onApply={onApply} onBack={() => setChosen(null)} choices={ui.choices} onChoices={(update) => onUi((current) => ({ ...current, choices: update(current.choices) }))} />}
+    {current?.latestPublished && <Preview key={current.latestPublished.id} version={current.latestPublished} draft={draft} situation={situation} scenarioName={scenarioName} object={selectedObject} runtimeVersion={runtimeVersion} runtimes={runtimes} rubric={rubric} applied={applied} canUndoLast={canUndoLast} onUndo={onUndo} onApply={onApply} onBack={() => setChosen(null)} choices={ui.choices} onChoices={(update) => onUi((current) => ({ ...current, choices: update(current.choices) }))} />}
 
     {chosen && current?.latestPublished && <details>
       <summary style={{ cursor: "pointer", minHeight: 44, display: "flex", alignItems: "center", fontSize: 13 }}>Toàn bộ nội dung phiên bản này</summary>

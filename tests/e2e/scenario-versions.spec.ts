@@ -220,7 +220,7 @@ test.describe("snapshot", () => {
     await page.getByRole("button", { name: "Tạo phiên bản mới" }).first().click();
     await expect(page.getByLabel("Bản nháp", { exact: true })).toHaveValue(IDS.draft);
     // The draft loads on its own: no extra "Tải draft" click before "Tạo snapshot" is usable.
-    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toContainText('"12"');
+    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toHaveAttribute("data-etag", '"12"');
     await page.getByRole("button", { name: "Kiểm tra bản nháp" }).click();
     await expect(page.getByRole("list", { name: "Vấn đề của bản nháp" })).toContainText("SPAWN_REQUIRED");
     await page.getByRole("button", { name: "Tạo phiên bản", exact: true }).click();
@@ -247,10 +247,10 @@ test.describe("snapshot", () => {
     await expect(page.getByLabel("Bản nháp", { exact: true })).toHaveValue(IDS.draft2);
     await expect(page.getByLabel("Bản nháp", { exact: true }).getByRole("option")).toHaveCount(2);
     await expect(page.getByLabel("Bản nháp", { exact: true }).getByRole("option").first()).toContainText("hiện tại");
-    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toContainText('"4"');
+    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toHaveAttribute("data-etag", '"4"');
     await page.getByLabel("Bản nháp", { exact: true }).selectOption(IDS.draft);
     // Picking another draft loads that one (the summary never shows the previous draft's ETag for it).
-    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toContainText('"12"');
+    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toHaveAttribute("data-etag", '"12"');
   });
 
   test("a scenario without drafts points to the editor instead of asking for an id", async ({ page }) => {
@@ -271,17 +271,17 @@ test.describe("snapshot", () => {
     await setup(page, mock);
     await page.goto(`${base}?draft=${IDS.draft}`);
     await page.getByRole("button", { name: "Tạo phiên bản mới" }).first().click();
-    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toContainText('"12"');
+    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toHaveAttribute("data-etag", '"12"');
     await page.getByRole("button", { name: "Tạo phiên bản", exact: true }).click();
     await expect(page.getByText("Bản nháp đã thay đổi từ lần bạn tải")).toBeVisible();
-    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toContainText('"12"');
+    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toHaveAttribute("data-etag", '"12"');
     await page.getByRole("button", { name: "Tải bản mới để đối chiếu" }).click();
-    await expect(page.getByLabel("Bản mới", { exact: true })).toContainText('"13"');
-    await expect(page.getByLabel("Bản cũ", { exact: true })).toContainText('"12"');
+    await expect(page.getByLabel("Bản mới", { exact: true })).toHaveAttribute("data-etag", '"13"');
+    await expect(page.getByLabel("Bản cũ", { exact: true })).toHaveAttribute("data-etag", '"12"');
     await expect(page.getByRole("button", { name: "Tạo phiên bản", exact: true })).toBeDisabled();
     await expect(page.getByRole("status").filter({ hasText: "Chọn bản nháp để dùng ở phần đối chiếu trước." })).toBeVisible();
     await page.getByRole("button", { name: "Dùng bản mới" }).click();
-    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toContainText('"13"');
+    await expect(page.getByLabel("Tóm tắt bản nháp đang xem")).toHaveAttribute("data-etag", '"13"');
     await expect(page.getByRole("button", { name: "Tạo phiên bản", exact: true })).toBeEnabled();
   });
 });
@@ -438,7 +438,7 @@ test.describe("review and release", () => {
     await page.getByRole("button", { name: "Gửi thẩm định", exact: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Gửi thẩm định", exact: true }).click();
     await expect(page.getByTestId("review-id")).toHaveText(IDS.review);
-    await expect(page.getByTestId("review-status")).toHaveText("Submitted");
+    await expect(page.getByTestId("review-status")).toHaveAttribute("data-status", "Submitted");
     expect(mock.submitCalls).toHaveLength(1);
     expect(mock.submitCalls[0].key).toBeTruthy();
     await expect(page.locator("[data-gate=approval]")).toContainText("Đã gửi, chờ thẩm định");
@@ -483,10 +483,10 @@ test.describe("review and release", () => {
     const mock = newMock({ jobList: [job()], qa: { runs: [passedRun], issues: [] }, confirmed: IDS.confirm, reviewStatus: "Approved", reviewId: IDS.review, publishResponses: [503, 200] });
     await setup(page, mock);
     await page.goto(`${base}?tab=release`);
-    await expect(page.getByTestId("release-confirmation")).toHaveText(IDS.confirm);
-    await expect(page.getByTestId("release-artifact")).toHaveText(IDS.artifact);
+    await expect(page.getByTestId("release-confirmation")).toHaveAttribute("data-id", IDS.confirm);
+    await expect(page.getByTestId("release-artifact")).toHaveAttribute("data-id", IDS.artifact);
     await page.getByRole("button", { name: "Tạo bản phát hành" }).click();
-    await expect(page.getByTestId("release-status")).toHaveText("Built");
+    await expect(page.getByTestId("release-status")).toHaveAttribute("data-status", "Built");
     expect(mock.releaseCalls[0].body).toEqual({ revisionId: IDS.revision, scenarioVersionId: IDS.version, confirmationReviewId: IDS.confirm, candidateArtifactId: IDS.artifact });
     expect(mock.releaseCalls[0].key).toBeTruthy();
     await expect(page.locator("[data-gate=release]")).toContainText("Đã tạo, chưa phát hành");
@@ -494,14 +494,14 @@ test.describe("review and release", () => {
 
     // Survives a reload: the release is found again from the server list, not from the browser.
     await page.reload();
-    await expect(page.getByTestId("release-status")).toHaveText("Built");
+    await expect(page.getByTestId("release-status")).toHaveAttribute("data-status", "Built");
 
     await page.getByRole("button", { name: "Phát hành", exact: true }).click();
     await expect(page.getByText("Hệ thống chưa mở chức năng phát hành").first()).toBeVisible();
-    await expect(page.getByTestId("release-status")).toHaveText("Built");
+    await expect(page.getByTestId("release-status")).toHaveAttribute("data-status", "Built");
     await expect(page.getByText("Published", { exact: true })).toHaveCount(0);
     await page.getByRole("button", { name: "Thử lại phát hành" }).click();
-    await expect(page.getByTestId("release-status")).toHaveText("Published");
+    await expect(page.getByTestId("release-status")).toHaveAttribute("data-status", "Published");
     await expect(page.locator("[data-gate=release]")).toContainText("Đã phát hành");
     expect(mock.publishCalls).toHaveLength(2);
     expect(mock.publishCalls[0].key).toBeTruthy();
@@ -512,17 +512,17 @@ test.describe("review and release", () => {
     const mock = newMock({ jobList: [job()], qa: { runs: [passedRun], issues: [] }, confirmed: IDS.confirm, reviewStatus: "Approved", reviewId: IDS.review, release: { status: "Built" }, publishResponses: [409] });
     await setup(page, mock);
     await page.goto(`${base}?tab=release`);
-    await expect(page.getByTestId("release-status")).toHaveText("Built");
+    await expect(page.getByTestId("release-status")).toHaveAttribute("data-status", "Built");
     await page.getByRole("button", { name: "Phát hành", exact: true }).click();
     await expect(page.getByText("Công trình chưa có dịch vụ trả phí còn hiệu lực")).toBeVisible();
-    await expect(page.getByTestId("release-status")).toHaveText("Built");
+    await expect(page.getByTestId("release-status")).toHaveAttribute("data-status", "Built");
   });
 
   test("without confirmation or QA the release tab lists what is missing and cannot build", async ({ page }) => {
     const mock = newMock();
     await setup(page, mock);
     await page.goto(`${base}?tab=release`);
-    await expect(page.getByTestId("release-confirmation")).toContainText("Chưa có");
+    await expect(page.getByTestId("release-confirmation")).toHaveAttribute("data-id", "");
     await expect(page.getByTestId("release-missing").locator('[data-code="PACKAGE_VALIDATION_REQUIRED"]')).toHaveCount(1);
     await expect(page.getByRole("button", { name: "Tạo bản phát hành" })).toBeDisabled();
     expect(mock.releaseCalls).toHaveLength(0);
@@ -533,11 +533,21 @@ test.describe("review and release", () => {
     await setup(page, mock);
     await page.goto(`${base}?tab=release`);
     await expect(page.getByTestId("release-id")).toHaveText(IDS.release);
-    await expect(page.getByTestId("release-status")).toHaveText("Published");
+    await expect(page.getByTestId("release-status")).toHaveAttribute("data-status", "Published");
     await expect(page.locator("[data-gate=release]")).toContainText("Đã phát hành");
     await expect(page.locator("[data-gate=approval]")).toContainText("Đạt thẩm định");
     await expect(page.locator("[data-gate=technical]")).toContainText("Đã chốt gói");
     await expect(page.getByRole("button", { name: "Phát hành", exact: true })).toHaveCount(0);
+  });
+
+  test("a training whose release is still Built reads Chưa phát hành, not Đang dùng", async ({ page }) => {
+    const mock = newMock({ jobList: [job()], qa: { runs: [passedRun], issues: [] }, confirmed: IDS.confirm, reviewStatus: "Approved", reviewId: IDS.review, release: { status: "Built" } });
+    await setup(page, mock);
+    await page.route("**/api/buildings/building-1/trainings", (route) => route.fulfill({ json: [{ id: "t1", releaseId: IDS.release, name: "Bài thoát nạn", description: null, status: "active", startDate: null, endDate: null, allowedModes: [], createdAt: "2026-10-10T00:00:00Z", releaseStatus: "Built", scenarioVersionId: IDS.version, reviewStatus: "Approved" }] }));
+    await page.goto(`${base}?tab=release`);
+    const row = page.getByRole("row", { name: /Bài thoát nạn/ });
+    await expect(row).toContainText("Chưa phát hành");
+    await expect(row).not.toContainText("Đang dùng");
   });
 });
 

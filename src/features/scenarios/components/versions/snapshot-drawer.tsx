@@ -25,9 +25,8 @@ function DraftSummary({ loaded, label }: { loaded: LoadedDraft; label: string })
   const state = (loaded.draft.state && typeof loaded.draft.state === "object" ? loaded.draft.state : {}) as Record<string, unknown>;
   const criteria = (state.rubric as { criteria?: unknown[] } | undefined)?.criteria;
   const objectives = state.learningObjectives;
-  return <dl className="ver-dl" aria-label={label}>
+  return <dl className="ver-dl" aria-label={label} data-etag={loaded.eTag}>
     <dt>Bản nháp</dt><dd>#{loaded.draft.draftNumber}</dd>
-    <dt>Lần lưu</dt><dd>{loaded.eTag.replace(/"/g, "")}<span className="ver-sr">{loaded.eTag}</span></dd>
     <dt>Cập nhật</dt><dd>{formatDateTime(loaded.draft.updatedAt)}</dd>
     <dt>Tiêu chí chấm</dt><dd>{Array.isArray(criteria) ? `${criteria.length} tiêu chí` : "Chưa có"}</dd>
     <dt>Mục tiêu</dt><dd>{Array.isArray(objectives) ? `${objectives.length} mục` : "Chưa có"}</dd>

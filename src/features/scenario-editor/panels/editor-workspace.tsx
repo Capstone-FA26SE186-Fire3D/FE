@@ -190,7 +190,7 @@ export function EditorWorkspace({ accessToken, buildingId, scenarioId, editor }:
         : <Button type="button" size="sm" variant="secondary" onClick={() => void onSave()}>Thử lại</Button>}</div>} />
     : null;
 
-  const legacyBanner = <LegacyBanner accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} revisionId={meta?.revisionId} draft={state.draft} dirty={dirty} />;
+  const legacyBanner = <LegacyBanner accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} scenarioName={scenario.data?.name} revisionId={meta?.revisionId} draft={state.draft} dirty={dirty} />;
 
   return <div className="se-root" data-mobile-tab={mobileTab} data-testid="scenario-editor" data-draft-mode="legacy">
     <header className="se-header">

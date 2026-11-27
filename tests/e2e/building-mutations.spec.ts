@@ -49,9 +49,11 @@ test.describe("Building mutations: Idempotency-Key and If-Match", () => {
     await page.goto("/workspace/buildings");
     await page.getByRole("button", { name: "Thêm công trình", exact: true }).click();
     await createDialog(page).getByLabel("Tên công trình", { exact: true }).fill("Công trình mới");
+    await expect(createDialog(page).getByText("Trường học: từ tiểu học trở lên.")).toHaveCount(0); // the school hint is for schools only
     await createDialog(page).getByRole("combobox", { name: "Loại công trình" }).click();
     await page.getByRole("option", { name: "Trường học" }).click();
     await createDialog(page).getByRole("button", { name: "Tạo công trình", exact: true }).click();
+    await expect(createDialog(page).getByText("Trường học: từ tiểu học trở lên.")).toBeVisible();
     await expect(createDialog(page).getByText(/Nội dung bạn nhập vẫn được giữ lại/)).toBeVisible();
     await createDialog(page).getByRole("button", { name: "Tạo công trình", exact: true }).click();
     await expect(page).toHaveURL(/\/workspace\/buildings\/building-1\?tab=ifc$/); // straight to the IFC tab after creating

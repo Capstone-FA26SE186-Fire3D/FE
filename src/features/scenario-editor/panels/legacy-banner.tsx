@@ -15,6 +15,7 @@ import { carryOverCandidates, carryOverExtras, type CarryKey } from "../v1/carry
 import { LockedInfrastructureNote, useLockedInfrastructure } from "@/features/fire-infrastructure/locked";
 
 import { createDraftV1 } from "../v1/create-draft";
+import { scenarioNameExtras } from "../v1/state";
 import { useRevisionFloors } from "../v1/use-revision-floors";
 import { FloorsStatus, ReprocessGuide } from "./geometry-status";
 import { describeApiError } from "@/api/describe-error";
@@ -24,7 +25,7 @@ import { describeApiError } from "@/api/describe-error";
  * never converted to v1 and no coordinate is reinterpreted (its positions have no declared frame or unit). A NEW draft in
  * `fet3d.editor/1` can be created when the revision has valid Geometry; only non-spatial fields can be copied, on request.
  */
-export function LegacyBanner({ accessToken, buildingId, scenarioId, revisionId, draft, dirty }: { accessToken: string; buildingId: string; scenarioId: string; revisionId: string | undefined; draft: JsonObject; dirty: boolean }) {
+export function LegacyBanner({ accessToken, buildingId, scenarioId, scenarioName, revisionId, draft, dirty }: { accessToken: string; buildingId: string; scenarioId: string; /** Becomes the new draft's name. */ scenarioName?: string; revisionId: string | undefined; draft: JsonObject; dirty: boolean }) {
   const floors = useRevisionFloors(accessToken, revisionId);
   const [open, setOpen] = useState(false);
   const reading = floors.reading;
@@ -46,13 +47,13 @@ export function LegacyBanner({ accessToken, buildingId, scenarioId, revisionId, 
       </div>
     </div>
     {open && reading?.kind === "valid" && revisionId && locked && (
-      <ConvertDialog infrastructureId={locked.id} accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} revisionId={revisionId} pin={reading.pin} draft={draft} dirty={dirty} onClose={() => setOpen(false)} />
+      <ConvertDialog scenarioName={scenarioName} infrastructureId={locked.id} accessToken={accessToken} buildingId={buildingId} scenarioId={scenarioId} revisionId={revisionId} pin={reading.pin} draft={draft} dirty={dirty} onClose={() => setOpen(false)} />
     )}
   </Alert>;
 }
 
-function ConvertDialog({ accessToken, buildingId, scenarioId, revisionId, infrastructureId, pin, draft, dirty, onClose }: {
-  infrastructureId: string; accessToken: string; buildingId: string; scenarioId: string; revisionId: string; pin: { artifactId: string; sha256Hash: string }; draft: JsonObject; dirty: boolean; onClose: () => void;
+function ConvertDialog({ accessToken, buildingId, scenarioId, scenarioName, revisionId, infrastructureId, pin, draft, dirty, onClose }: {
+  scenarioName: string | undefined; infrastructureId: string; accessToken: string; buildingId: string; scenarioId: string; revisionId: string; pin: { artifactId: string; sha256Hash: string }; draft: JsonObject; dirty: boolean; onClose: () => void;
 }) {
   const items = useMemo(() => carryOverCandidates(draft), [draft]);
   const [chosen, setChosen] = useState<Set<CarryKey>>(() => new Set());
@@ -72,7 +73,7 @@ function ConvertDialog({ accessToken, buildingId, scenarioId, revisionId, infras
     setCreating(true);
     setError(null);
     try {
-      const extras = carryOverExtras(items, chosen);
+      const extras = { ...scenarioNameExtras(scenarioName), ...carryOverExtras(items, chosen) };
       // One key per intention (scenario + revision + what is copied): a retry after a lost response replays the same POST.
       const result = await createDraftV1(accessToken, { scenarioId, revisionId, infrastructureId, pin, extras, idempotencyKey: keyFor({ scenarioId, revisionId, infrastructureId, copy: [...chosen].sort() }) });
       done();
@@ -101,7 +102,7 @@ function ConvertDialog({ accessToken, buildingId, scenarioId, revisionId, infras
             <label className="se-check"><input type="checkbox" checked={chosen.has(item.key)} onChange={() => toggle(item.key)} data-testid={`carry-${item.key}`} /> {item.label} <small className="ops-field-hint">({item.summary})</small></label>
           </li>)}
         </ul>
-        <p className="ops-field-hint">Chỉ những mục đã đúng định dạng mới được đề nghị. Rubric cũ theo định dạng khác phải nhập lại.</p>
+        <p className="ops-field-hint">Chỉ những mục đã đúng định dạng mới được đề nghị. Tiêu chí chấm cũ theo định dạng khác phải nhập lại.</p>
       </fieldset>}
       {error && <Alert tone="danger" title="Tạo bản nháp thất bại">{error}</Alert>}
       {created && <Alert tone="success" title={created.initialized ? "Đã tạo bản nháp mới" : "Đã tạo bản nháp, chưa khởi tạo xong"}>
