@@ -42,6 +42,15 @@ function objectType(object: ObjectView): string {
   return category ? CATEGORY_LABEL[category] : object.kind ? KIND_META[object.kind].label : "Không rõ";
 }
 
+/** What the expert sees as its name: the label the organization typed, else what the device is (labels seeded from the IFC class, "IfcDoor", say nothing), else its kind. */
+function objectName(object: ObjectView): string {
+  if (object.label && !/^Ifc/.test(object.label)) return object.label;
+  if (object.capability) return capabilityLabel(object.capability.id);
+  return object.kind ? KIND_META[object.kind].label : "—";
+}
+
+const meters = (value: number) => `${Math.round(value * 100) / 100} m`;
+
 /**
  * The reviewed content on the building's 3D model, read-only: every object is a marker (nothing can be selected, moved
  * or placed), with a floor filter and the same list as a table for readers who cannot use the 3D view.
@@ -62,7 +71,12 @@ export function ReviewModel({ accessToken, detail }: { accessToken: string; deta
   const model: ModelRequest | null = preview.data?.downloadUrl && geometry
     ? { key: `${geometry.artifactId}:${preview.data.expiresAt ?? ""}`, url: preview.data.downloadUrl, expiresAt: preview.data.expiresAt, coordinateTransform: geometry.coordinateTransform, floors, semanticMapping: {}, applyTransform: false }
     : null;
-  const floorName = (id: string) => geometry?.floors.find((floor) => floor.id === id)?.name ?? "—";
+  // IFC storey names ("BT-A_0990_UG01_RDOK_0,000") mean nothing to a reader: "Tầng N" from the lowest up, the IFC name as a tooltip.
+  const floorLabels = useMemo(() => new Map(floors.map((floor, index) => {
+    const elevation = geometry?.floors.find((item) => item.id === floor.key)?.elevationMeters ?? floor.elevation;
+    return [floor.key, { label: `Tầng ${index + 1}`, elevation: elevation == null ? "" : meters(elevation), name: floor.name }];
+  })), [floors, geometry]);
+  const floorCell = (id: string) => { const info = floorLabels.get(id); return info ? <span title={info.name}>{info.label}{info.elevation && <small className="rev-cell-muted"> · {info.elevation}</small>}</span> : "—"; };
   const listed = floorChoice ? objects.filter((object) => object.floorId === floorChoice) : objects;
 
   return <Panel title="Vị trí trên mô hình 3D" description="Chỉ xem: kéo để xoay, cuộn để phóng to. Chọn tầng để xem từng tầng." bodyClassName="ops-stack" data-testid="review-model">
@@ -73,9 +87,9 @@ export function ReviewModel({ accessToken, detail }: { accessToken: string; deta
         : <>
           {floors.length > 1 && <ul className="se-chips" role="radiogroup" aria-label="Chọn tầng">
             <li role="none"><button type="button" role="radio" aria-checked={floorChoice === null} className="se-chip" onClick={() => setFloorChoice(null)}>Tất cả</button></li>
-            {floors.map((floor) => <li role="none" key={floor.key}><button type="button" role="radio" aria-checked={floorChoice === floor.key} className="se-chip" onClick={() => setFloorChoice(floor.key)}>{floor.name}</button></li>)}
+            {floors.map((floor) => { const info = floorLabels.get(floor.key); return <li role="none" key={floor.key}><button type="button" role="radio" aria-checked={floorChoice === floor.key} className="se-chip" title={floor.name} onClick={() => setFloorChoice(floor.key)}>{info?.label}{info?.elevation && <small>{info.elevation}</small>}</button></li>; })}
           </ul>}
-          <div style={{ display: "flex", height: 420 }}>
+          <div className="rev-model-stage">
             <EditorViewport markers={markers} selection={null} tool="select" placeKind="" gizmoEnabled={false} model={model} floors={floors} activeFloor={floorChoice} showModel layerVisibility={{}}
               onSelect={noop} onPlace={noop} onTransform={noop} onModelPick={noop} onModelStatus={noop} onUrlExpired={preview.reload} />
           </div>
@@ -86,8 +100,8 @@ export function ReviewModel({ accessToken, detail }: { accessToken: string; deta
         <thead><tr><th>Loại</th><th>Tên</th><th>Tầng</th></tr></thead>
         <tbody>{listed.map((object) => <tr key={object.index} data-testid="review-object">
           <td className="ops-cell-primary">{objectType(object)}</td>
-          <td>{object.label || (object.capability ? capabilityLabel(object.capability.id) : "—")}</td>
-          <td>{floorName(object.floorId)}</td>
+          <td>{objectName(object)}</td>
+          <td>{floorCell(object.floorId)}</td>
         </tr>)}</tbody>
       </Table>}
   </Panel>;

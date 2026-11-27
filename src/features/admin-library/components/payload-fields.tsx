@@ -80,7 +80,7 @@ function TemplateFields({ form, actions, issues, rubricCatalog }: { form: Versio
     else actions.setField(["modePolicy", "allowedModes"], [...next]);
   };
   return <>
-    <Alert tone="info" title="Kịch bản mẫu chỉ mang phần nội dung, không có vị trí">Tên, đối tượng luyện tập, thời gian xảy ra, giả định, mục tiêu, hướng dẫn, thời gian tối đa, chế độ và tiêu chí chấm điểm (rubric). Mẫu không tạo vị trí hay đối tượng trong công trình; tổ chức tự đặt đối tượng trên mô hình của mình.</Alert>
+    <Alert tone="info" title="Kịch bản mẫu chỉ mang phần nội dung, không có vị trí">Tên, đối tượng luyện tập, thời gian xảy ra, giả định, mục tiêu, hướng dẫn, thời gian tối đa, chế độ và tiêu chí chấm điểm. Mẫu không tạo vị trí hay đối tượng trong công trình; tổ chức tự đặt đối tượng trên mô hình của mình.</Alert>
     {ignored.length > 0 && <Alert tone="warning" title="Phiên bản này còn mang phần không chỉnh sửa được ở đây">Có {ignored.join(", ")} từ trước. Biểu mẫu này giữ nguyên chúng khi lưu nhưng tổ chức không nhận chúng khi áp dụng.</Alert>}
     {at("$") && <span className="ops-field-error" role="alert">{at("$")}</span>}
     <Group title="Thông tin kịch bản" testId="group-info">

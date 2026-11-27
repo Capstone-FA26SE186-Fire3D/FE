@@ -8,17 +8,19 @@ import { deepEqual, type JsonObject } from "../../src/features/scenario-editor/s
 import { compareDrafts, resolveMerge } from "../../src/features/scenario-editor/store/merge";
 import { capabilitiesForKind, findCapability, findRuntime, parseRubricCatalog, parseRuntimeCatalog, validateParameters } from "../../src/features/scenario-editor/v1/catalog";
 import { carryOverCandidates, carryOverExtras } from "../../src/features/scenario-editor/v1/carry-over";
-import { addItemCommand, addObjectCommand, moveObjectCommand, pinGeometryCommand, removeObjectCommand, rotateObjectCommand, setCapabilityCommand, setFloorCommand, setPathCommand } from "../../src/features/scenario-editor/v1/commands";
+import { addItemCommand, addObjectCommand, moveObjectCommand, pinGeometryCommand, removeObjectCommand, rotateObjectCommand, setCapabilityCommand, setFieldsCommand, setFloorCommand, setPathCommand } from "../../src/features/scenario-editor/v1/commands";
+import { KIND_META } from "../../src/features/scenario-editor/v1/contract";
+import { emptyParameterPeers, objectName, parameterCopyWrites, parameterIssueText } from "../../src/features/scenario-editor/v1/object-name";
 import { isV1Dirty, initialV1State, v1Reducer, type V1EditorState } from "../../src/features/scenario-editor/v1/editor-state";
 import { anchorsForFloor, parseFloorsResponse, parseGeometry } from "../../src/features/scenario-editor/v1/geometry";
 import { createHash } from "node:crypto";
 import { sha256Hex, stateHash } from "../../src/features/scenario-editor/v1/hash";
 import { combineIssues, objectIssues, targetOf, toIssues } from "../../src/features/scenario-editor/v1/issues";
 import { applyMatrix, glbToLocal, ifcToGlb, invertAffine, isUnitQuaternion, localToGlb, matrixProblem, near, quaternionToYaw, roundQuaternion, yawToQuaternion } from "../../src/features/scenario-editor/v1/matrix";
-import { completenessIssues, initialStateV1, isV1State, readObjects, shapeIssues } from "../../src/features/scenario-editor/v1/state";
+import { completenessIssues, initialStateV1, isV1State, readObjects, scenarioNameExtras, shapeIssues } from "../../src/features/scenario-editor/v1/state";
 import { kindAvailability, placementBlocked } from "../../src/features/scenario-editor/v1/availability";
 import { classifyDraft } from "../../src/features/scenario-editor/v1/mode";
-import { capabilityLabel, capabilityName } from "../../src/configs/capability-labels";
+import { capabilityLabel, capabilityName, parameterLabel } from "../../src/configs/capability-labels";
 import { metricName } from "../../src/configs/metric-labels";
 import { floorCeiling, parseFloors, parseLayers } from "../../src/features/scenario-editor/scene/preview-model";
 
@@ -567,4 +569,77 @@ test("the legacy viewport helpers also understand fet3d.editor/1 metadata (eleva
   const layers = parseLayers(meta.semanticMapping);
   expect(layers.map((layer) => layer.key).sort()).toEqual(["IfcDoor", "IfcSpace", "IfcStair"]);
   expect(layers.find((layer) => layer.key === "IfcDoor")!.nodeNames).toEqual(["door_101", "door_102"]);
+});
+
+// ───────── names the author reads (UAT 27/11) ─────────
+
+const seeded = (id: string, capability: string, extra: JsonObject = {}): JsonObject => ({
+  id, kind: "Equipment", label: "IfcBuildingElementProxy", capability: { id: capability, version: "1.0.0" },
+  placement: { floorId: "L1", position: { x: 1, y: 0, z: 1 }, rotation: { x: 0, y: 0, z: 0, w: 1 } }, ...extra,
+});
+
+test("object name: an empty label or an IFC class is no name; the capability names it, then the kind, never the raw id", () => {
+  const [proxy, own, blank, unknown, bare] = readObjects({ objects: [
+    seeded("infra-eq-1", "extinguisher.portable"),
+    seeded("infra-eq-2", "extinguisher.portable", { label: "Bình ở sảnh" }),
+    { id: "goal-1", kind: "Goal", label: "  ", placement: { floorId: "L1", position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0, w: 1 } }, capability: { id: "exit.final", version: "1.0.0" } },
+    seeded("infra-eq-3", "no.such.capability"),
+    { id: "npc-7", kind: "Npc", placement: { floorId: "L1", position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0, w: 1 } } },
+  ] });
+  expect(objectName(proxy)).toBe(capabilityLabel("extinguisher.portable"));
+  expect(objectName(proxy)).not.toMatch(/^Ifc/);
+  expect(objectName(own)).toBe("Bình ở sảnh");
+  expect(objectName(blank)).toBe(capabilityLabel("exit.final"));
+  expect(objectName(unknown)).toBe("Thiết bị");
+  expect(objectName(bare)).toBe("Người trong tòa nhà");
+  expect(objectName(bare)).not.toContain("npc-7");
+});
+
+test("plain words for scenario people and the scoring criteria: no NPC or rubric in the text the author reads", () => {
+  expect(KIND_META.Npc).toMatchObject({ label: "Người trong tòa nhà", lower: "người trong tòa nhà", plural: "Người trong tòa nhà" });
+  const missing = completenessIssues(initialStateV1({ artifactId: ARTIFACT, sha256Hash: HASH }), { geometry: null, runtimes: null, metrics: null });
+  expect(missing.find((issue) => issue.path === "$.rubric")?.message).toBe("Cần tiêu chí chấm điểm.");
+  for (const issue of missing) expect(issue.message).not.toMatch(/rubric|NPC/i);
+});
+
+test("a missing parameter names the object, its floor and the field; other paths are left to the plain message", () => {
+  const objects = readObjects({ objects: [seeded("spawn-x", "extinguisher.portable"), seeded("infra-eq-2", "extinguisher.portable")] });
+  const floor = (id: string) => (id === "L1" ? "Tầng 1" : undefined);
+  const required = { code: "FIELD_REQUIRED", path: "$.objects[1].parameters.agentType", message: "Cần điền ô này." };
+  expect(parameterIssueText(required, objects, floor)).toBe(`${capabilityLabel("extinguisher.portable")} #2 (Tầng 1): chưa điền ${parameterLabel("agentType")}`);
+  expect(parameterIssueText(required, objects)).toBe(`${capabilityLabel("extinguisher.portable")} #2: chưa điền ${parameterLabel("agentType")}`);
+  expect(parameterIssueText({ code: "PARAMETER_OUT_OF_RANGE", path: "$.objects[0].parameters.intensity", message: "Phải từ 0 đến 10." }, objects, floor))
+    .toBe(`${capabilityLabel("extinguisher.portable")} #1 (Tầng 1), ${parameterLabel("intensity")}: Phải từ 0 đến 10.`);
+  expect(parameterIssueText({ code: "CAPABILITY_REQUIRED", path: "$.objects[0].capability", message: "x" }, objects)).toBeNull();
+  expect(parameterIssueText({ code: "FIELD_REQUIRED", path: "$.objects[9].parameters.agentType", message: "x" }, objects)).toBeNull();
+  expect(parameterIssueText({ code: "FIELD_REQUIRED", path: "$.rubric", message: "x" }, objects)).toBeNull();
+});
+
+test("bulk fill: copies one value only to empty same-capability objects, never over a filled one, as ONE undoable step", () => {
+  const draft: JsonObject = { schemaVersion: "fet3d.editor/1", objects: [
+    seeded("a", "extinguisher.portable", { parameters: { agentType: "CO2" } }),
+    seeded("b", "extinguisher.portable"),
+    seeded("c", "extinguisher.portable", { parameters: { agentType: "Powder" } }),
+    seeded("d", "hose.reel"),
+    seeded("e", "extinguisher.portable", { parameters: {} }),
+  ] };
+  const objects = readObjects(draft);
+  const peers = emptyParameterPeers(objects, 0, "agentType");
+  expect(peers).toEqual([1, 4]);
+  expect(emptyParameterPeers(objects, 3, "agentType")).toEqual([]);
+  const command = setFieldsCommand(draft, nextId(), parameterCopyWrites(peers, "agentType", "CO2"), { label: "Áp dụng tham số cho nhiều đối tượng", at: 1, selection: { kind: "object", index: 0 } })!;
+  const after = applyCommand(draft, command);
+  expect(readObjects(after).map((object) => object.parameters.agentType)).toEqual(["CO2", "CO2", "Powder", undefined, "CO2"]);
+  expect(deepEqual(revertCommand(after, command), draft)).toBe(true);
+  expect(shapeIssues(after)).toEqual([]);
+});
+
+test("a new draft is named after its scenario; a name the schema would refuse is left out", () => {
+  expect(scenarioNameExtras("  Thoát hiểm tầng một ")).toEqual({ name: "Thoát hiểm tầng một" });
+  expect(scenarioNameExtras("")).toEqual({});
+  expect(scenarioNameExtras(undefined)).toEqual({});
+  expect(scenarioNameExtras("x".repeat(256))).toEqual({});
+  const created = initialStateV1({ artifactId: ARTIFACT, sha256Hash: HASH }, scenarioNameExtras("Thoát hiểm tầng một"));
+  expect(created.name).toBe("Thoát hiểm tầng một");
+  expect(shapeIssues(created)).toEqual([]);
 });

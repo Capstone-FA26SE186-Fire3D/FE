@@ -180,7 +180,7 @@ export const templateFieldLabel: Record<TemplateField, string> = {
   learnerInstructions: "Hướng dẫn cho người học",
   timeLimitSeconds: "Thời gian tối đa",
   modePolicy: "Chế độ huấn luyện",
-  rubric: "Tiêu chí chấm điểm (rubric)",
+  rubric: "Tiêu chí chấm điểm",
 };
 
 /** Spatial or runtime parts a stored template state carries that this UI neither edits nor applies. */

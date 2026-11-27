@@ -75,7 +75,7 @@ export function ReviewDrawer({ open, reviewId, accessToken, summary, onClose }: 
               <summary>Thông tin cho bộ phận hỗ trợ</summary>
               <dl className="rev-dl">
                 <dt>Mã nội dung kịch bản</dt><dd><HashValue value={data.review.contentHash} label="Mã nội dung kịch bản" /></dd>
-                <dt>Mã nội dung tiêu chí chấm</dt><dd><HashValue value={data.review.rubricHash} label="Mã nội dung tiêu chí chấm (rubric)" /></dd>
+                <dt>Mã nội dung tiêu chí chấm</dt><dd><HashValue value={data.review.rubricHash} label="Mã nội dung tiêu chí chấm" /></dd>
                 <dt>Mã phiên bản</dt><dd className="rev-hash" title={data.review.scenarioVersionId}>{shortId(data.review.scenarioVersionId)}</dd>
                 <dt>Mã bản gửi</dt><dd className="rev-hash" title={data.review.reviewId}>{shortId(data.review.reviewId)}</dd>
                 <dt>Tài khoản gửi</dt><dd className="rev-hash">{data.review.submittedBy ?? "—"}</dd>

@@ -1,6 +1,6 @@
 "use client";
 
-import { capabilityLabel, ifcTypeLabel } from "@/configs/capability-labels";
+import { ifcTypeLabel } from "@/configs/capability-labels";
 import { ChevronLeft, Lock } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -36,6 +36,7 @@ import { findRuntime, parseRubricCatalog, parseRuntimeCatalog } from "../../v1/c
 import type { ObjectKind } from "../../v1/contract";
 import { parseGeometry, type GeometryInfo } from "../../v1/geometry";
 import { targetOf } from "../../v1/issues";
+import { objectName } from "../../v1/object-name";
 import { isWallNormal, mountedY, mountingOf, shapeOf, yawFacing } from "../../v1/equipment-mounting";
 import { applyMatrix, glbToLocal, localToGlb, round3, isUnitQuaternion, yawToQuaternion } from "../../v1/matrix";
 import { setFieldsCommand } from "../../v1/commands";
@@ -362,7 +363,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
       {locked.error !== undefined && !locked.data && <p className="se-note" role="status">Chưa tải được danh sách hạ tầng. <Button type="button" variant="quiet" size="sm" onClick={locked.reload}>Thử lại</Button></p>}
       <ul className="se-objects">
         {lockedObjects.map((object) => <li key={object.index}><span className="se-object" aria-disabled="true">
-          <Lock size={16} aria-hidden="true" /><span>{object.label || (object.capability ? capabilityLabel(object.capability.id) : object.kind === "Goal" ? "Lối thoát" : "Thiết bị")}</span>
+          <Lock size={16} aria-hidden="true" /><span>{objectName(object)}</span>
           <small>{geometry?.floors.find((floor) => floor.id === object.floorId)?.name ?? ""}</small>
         </span></li>)}
       </ul>
@@ -458,10 +459,10 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
             <TabsTrigger value="kinds" data-testid="tab-kinds">Khả dụng</TabsTrigger>
           </TabsList>
           <div className="se-panel-scroll">
-            <TabsContent value="object"><V1ObjectForm object={selectedObject} issues={issues} actions={actions} geometry={geometry} catalog={catalogView} runtimeVersion={runtimeVersion} pick={pick} onOpenScenario={() => setPanelTab("scenario")} scope={scope} onMount={mountObject} wallGap={wallGap} /></TabsContent>
+            <TabsContent value="object"><V1ObjectForm object={selectedObject} objects={objects} issues={issues} actions={actions} geometry={geometry} catalog={catalogView} runtimeVersion={runtimeVersion} pick={pick} onOpenScenario={() => setPanelTab("scenario")} scope={scope} onMount={mountObject} wallGap={wallGap} /></TabsContent>
             <TabsContent value="scenario"><V1ScenarioForm draft={state.draft} issues={issues} actions={actions} catalog={catalogView} rubricCatalog={rubricState} situation={scope === "scenario-on-infrastructure"} /></TabsContent>
-            <TabsContent value="library"><V1LibraryPanel accessToken={accessToken} ui={libraryUi} onUi={setLibraryUi} draft={state.draft} situation={scope === "scenario-on-infrastructure"} selectedObject={selectedObject} runtimeVersion={runtimeVersion} runtimes={runtimes} rubric={rubricView} applied={applied} canUndoLast={(label) => lastPast?.label === label} onUndo={() => dispatch({ type: "undo" })} onApply={onApplySample} /></TabsContent>
-            <TabsContent value="issues"><V1IssuesPanel issues={issues} shapeProblems={editor.shapeProblems} report={editor.report} reportStale={editor.reportStale} validating={editor.validating} validateError={editor.validateError} dirty={dirty} onValidate={() => void onValidate()} onJump={onJump} /></TabsContent>
+            <TabsContent value="library"><V1LibraryPanel accessToken={accessToken} ui={libraryUi} onUi={setLibraryUi} draft={state.draft} scenarioName={scenario.data?.name} situation={scope === "scenario-on-infrastructure"} selectedObject={selectedObject} runtimeVersion={runtimeVersion} runtimes={runtimes} rubric={rubricView} applied={applied} canUndoLast={(label) => lastPast?.label === label} onUndo={() => dispatch({ type: "undo" })} onApply={onApplySample} /></TabsContent>
+            <TabsContent value="issues"><V1IssuesPanel objects={objects} floors={geometry?.floors ?? []} issues={issues} shapeProblems={editor.shapeProblems} report={editor.report} reportStale={editor.reportStale} validating={editor.validating} validateError={editor.validateError} dirty={dirty} onValidate={() => void onValidate()} onJump={onJump} /></TabsContent>
             <TabsContent value="geometry"><V1GeometryPanel reading={reading} preview={preview} pin={pin} buildingId={buildingId} revisionId={revisionId} onRepin={actions.pinGeometry} modelSummary={modelSummary} /></TabsContent>
             <TabsContent value="kinds"><KindAvailability statuses={kindStatus} onRetryCatalog={catalogQuery.reload} /></TabsContent>
           </div>

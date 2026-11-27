@@ -88,6 +88,18 @@ test.describe("IFC progress view", () => {
     await expect(next(page).getByRole("button")).toHaveCount(0);
   });
 
+  test("an unknown processing step keeps the attempt text and leaves the step name out", async ({ page }) => {
+    await open(page, {
+      revisions: [rev("Uploaded")],
+      jobStatus: "Running",
+      attemptNumber: 1,
+      logs: [{ id: "l1", revisionId: "rev-2", jobId: "job-1", step: "SomethingNew", status: "Started", message: null, durationMs: null, attemptNumber: 1, loggedAt: "2026-10-02T01:03:00Z" }],
+    });
+    await expect(step(page, "geometry")).toContainText("Đang xử lý · lượt xử lý thứ 1");
+    await expect(step(page, "geometry")).not.toContainText("bước");
+    await expect(step(page, "geometry")).not.toContainText("Bước khác");
+  });
+
   test("Failed job: the geometry step is in error and the call to action opens the existing retry dialog", async ({ page }) => {
     await open(page, { revisions: [rev("Uploaded")], jobStatus: "Failed" });
     await expect(step(page, "geometry")).toHaveAttribute("data-state", "error");

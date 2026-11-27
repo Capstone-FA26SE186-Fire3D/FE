@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { usePolling } from "@/api/use-polling";
 
@@ -83,6 +83,19 @@ export function useVersionJobs({ accessToken, revisionId, versionId, preferredJo
   }, [restartPolling, versionId]);
 
   const snapshot = polling.data && polling.data.detail.job.id === selectedJobId ? polling.data : undefined;
+
+  // The job list is read once; when a job watched while running turns final, read it again so its row shows the end state
+  // without a page reload. A job already final when the page opened adds no extra read.
+  const running = useRef<string | null>(null);
+  const { reload: reloadJobList } = jobsQuery;
+  useEffect(() => {
+    if (!snapshot) return;
+    const { id, status } = snapshot.detail.job;
+    if (!isJobTerminal(status)) { running.current = id; return; }
+    if (running.current !== id) return;
+    running.current = null;
+    reloadJobList();
+  }, [snapshot, reloadJobList]);
   const verdict = snapshot && isJobSucceeded(snapshot.detail.job.status) && snapshot.qa
     ? qaVerdict(snapshot.qa.validationRuns.items, snapshot.issues?.items ?? [])
     : undefined;

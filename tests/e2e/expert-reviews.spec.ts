@@ -52,14 +52,14 @@ async function install(page: Page, server: Server, user: object = expert) {
     return route.fulfill({ headers: { ...EXPOSED, ETag: `"${review.revision}"` }, json: {
       review,
       content: infrastructure
-        ? { geometry: null, runtimeVersion: "2.5.0", items: [{ id: "exit-1", kind: "Goal", label: "Cửa thoát phía Đông", category: "Exit", placement: placement("f1") }, { id: "ext-1", kind: "Equipment", category: "Equipment", capability: { id: "extinguisher.portable", version: "1.0.0" }, placement: placement("f1") }] }
+        ? { geometry: null, runtimeVersion: "2.5.0", items: [{ id: "exit-1", kind: "Goal", label: "Cửa thoát phía Đông", category: "Exit", placement: placement("f1") }, { id: "ext-1", kind: "Equipment", label: "IfcBuildingElementProxy", category: "Equipment", capability: { id: "extinguisher.portable", version: "1.0.0" }, placement: placement("f1") }] }
         : { schemaVersion: "fet3d.editor/1", objects: [{ id: "spawn-1", kind: "Spawn", label: "Phòng 301", placement: placement("f1") }, { id: "exit-1", kind: "Goal", label: "Cửa thoát phía Đông", placement: placement("f1") }] },
       rubric: infrastructure ? null : { pass_threshold: 70, criteria: [{ id: "evac_time", metric: "evacuation_time_seconds", operator: "lte", threshold: 180, weight: 1, mandatory: true }] },
       learningObjectives: infrastructure ? null : ["Thoát ra ngoài an toàn."],
       learnerInstructions: infrastructure ? null : "Bạn đang ở phòng 301 khi có khói.",
     } });
   });
-  // No accepted Geometry in this mock: the drawer must still list the objects.
+  // No accepted Geometry in this mock: the page must still list the objects.
   await page.route((url) => /^\/api\/expert\/reviews\/[^/]+\/preview$/.test(url.pathname), (route) => problem(route, 404, { title: "No preview.", code: "NOT_FOUND" }));
   await page.route((url) => /^\/api\/expert\/reviews\/[^/]+\/(approve|reject)$/.test(url.pathname), (route) => {
     const parts = new URL(route.request().url()).pathname.split("/");
@@ -81,7 +81,7 @@ async function install(page: Page, server: Server, user: object = expert) {
 }
 
 const rows = (page: Page) => page.getByTestId("expert-review-table").locator("tbody tr, li.ops-dt-card");
-const drawer = (page: Page) => page.getByTestId("expert-review-drawer");
+const detail = (page: Page) => page.getByTestId("expert-review-page");
 
 test("an expert signs in by role name, sees the waiting queue and calls nothing outside the expert API", async ({ page }) => {
   const server = new Server();
@@ -105,55 +105,75 @@ test("the kind and status filters live in the URL and drive the query", async ({
   const query = server.listQueries.at(-1) as URLSearchParams;
   expect([query.get("kind"), query.get("status")]).toEqual(["Scenario", "Rejected"]);
   await rows(page).first().click();
-  await expect(drawer(page).getByTestId("expert-reason")).toContainText("Thiếu lối thoát thứ hai ở tầng 2.");
-  await expect(drawer(page).getByTestId("expert-approve")).toHaveCount(0);
+  await expect(page).toHaveURL(/\/expert\/reviews\/review-3$/);
+  await expect(detail(page).getByTestId("expert-reason")).toContainText("Thiếu lối thoát thứ hai ở tầng 2.");
+  await expect(detail(page).getByTestId("expert-approve")).toHaveCount(0);
 });
 
-test("approving an infrastructure pins the revision read and locks it", async ({ page }) => {
+test("a row opens the review on its own page; approving an infrastructure pins the revision read and locks it", async ({ page }) => {
   const server = new Server();
   await install(page, server);
   await page.goto("/expert/reviews");
   await rows(page).first().click();
-  await expect(page).toHaveURL(/review=infra-1/);
+  await expect(page).toHaveURL(/\/expert\/reviews\/infra-1$/);
+  await expect(page.getByRole("heading", { name: "Hạ tầng PCCC · Nhà A" })).toBeVisible();
   // The 3D model is unavailable in this mock; the objects are still listed by category.
-  await expect(drawer(page).getByTestId("review-object")).toHaveCount(2);
-  await expect(drawer(page).getByTestId("review-object").first()).toContainText("Lối thoát nạn");
-  await expect(drawer(page).getByTestId("review-object").nth(1)).toContainText("Bình chữa cháy xách tay");
-  await drawer(page).getByTestId("expert-approve").click();
+  await expect(detail(page).getByTestId("review-object")).toHaveCount(2);
+  await expect(detail(page).getByTestId("review-object").first()).toContainText("Lối thoát nạn");
+  // The backend seeds the label with the IFC class: the expert reads what the device is instead.
+  await expect(detail(page).getByTestId("review-object").nth(1)).toContainText("Bình chữa cháy xách tay");
+  await expect(detail(page).getByTestId("review-object").nth(1)).not.toContainText("IfcBuildingElementProxy");
+  await detail(page).getByTestId("expert-approve").click();
   await page.getByTestId("expert-confirm").click();
-  await expect(drawer(page).getByTestId("expert-result")).toContainText("đã khoá");
+  await expect(detail(page).getByTestId("expert-result")).toContainText("đã khoá");
   expect(server.decisions).toHaveLength(1);
   expect(server.decisions[0]).toMatchObject({ id: "infra-1", action: "approve", ifMatch: '"4"', body: null });
   expect(server.decisions[0].key).toBeTruthy();
+  await expect(detail(page).getByTestId("expert-approve")).toHaveCount(0);
+  await detail(page).getByRole("link", { name: "Hàng chờ thẩm định" }).click();
+  await expect(page).toHaveURL(/\/expert\/reviews$/);
   await expect(rows(page)).toHaveCount(1); // the queue reloaded: only the scenario still waits
 });
 
 test("rejecting needs a reason and sends it trimmed", async ({ page }) => {
   const server = new Server();
   await install(page, server);
-  await page.goto("/expert/reviews?review=review-2");
-  await expect(drawer(page).getByTestId("review-instructions")).toContainText("phòng 301");
-  await drawer(page).getByTestId("expert-reject").click();
+  await page.goto("/expert/reviews/review-2");
+  await expect(detail(page).getByTestId("review-instructions")).toContainText("phòng 301");
+  // Plain words only: the threshold as a percentage, field names in Vietnamese, the format version hidden.
+  await expect(detail(page).getByText("70%", { exact: true })).toBeVisible();
+  await expect(detail(page).getByText("Đối tượng trên mô hình", { exact: true })).toBeVisible();
+  await expect(detail(page).getByText("schemaVersion")).toHaveCount(0);
+  await detail(page).getByTestId("expert-reject").click();
   await page.getByTestId("expert-confirm").click();
   await expect(page.getByText("Nhập lý do chưa đạt (1–2000 ký tự).")).toBeVisible();
   expect(server.decisions).toHaveLength(0);
   await page.getByTestId("expert-reason-input").fill("  Chưa có điểm tập kết ngoài nhà.  ");
   await page.getByTestId("expert-confirm").click();
-  await expect(drawer(page).getByTestId("expert-reason")).toContainText("Chưa có điểm tập kết ngoài nhà.");
+  await expect(detail(page).getByTestId("expert-reason")).toContainText("Chưa có điểm tập kết ngoài nhà.");
   expect(server.decisions[0]).toMatchObject({ id: "review-2", action: "reject", ifMatch: '"1"', body: { reason: "Chưa có điểm tập kết ngoài nhà." } });
 });
 
 test("when another expert decided first, the 412 reloads and shows their result", async ({ page }) => {
   const server = new Server();
   await install(page, server);
-  await page.goto("/expert/reviews?review=review-2");
-  await drawer(page).getByTestId("expert-approve").click();
+  await page.goto("/expert/reviews/review-2");
+  await detail(page).getByTestId("expert-approve").click();
   server.raceNext = true;
   await page.getByTestId("expert-confirm").click();
-  await expect(drawer(page).getByText("Một Chuyên viên PCCC khác vừa thẩm định mục này trước bạn.", { exact: false })).toBeVisible();
-  await expect(drawer(page).getByTestId("expert-result")).toContainText("Tình huống đạt thẩm định.");
-  await expect(drawer(page).getByText("Chuyên viên khác")).toBeVisible();
-  await expect(drawer(page).getByTestId("expert-approve")).toHaveCount(0);
+  await expect(detail(page).getByText("Một Chuyên viên PCCC khác vừa thẩm định mục này trước bạn.", { exact: false })).toBeVisible();
+  await expect(detail(page).getByTestId("expert-result")).toContainText("Tình huống đạt thẩm định.");
+  await expect(detail(page).getByText("Chuyên viên khác")).toBeVisible();
+  await expect(detail(page).getByTestId("expert-approve")).toHaveCount(0);
+});
+
+test("an old ?review= link is sent to the review page", async ({ page }) => {
+  const server = new Server();
+  await install(page, server);
+  await page.goto("/expert/reviews?review=review-2");
+  await expect(page).toHaveURL(/\/expert\/reviews\/review-2$/);
+  await expect(detail(page).getByTestId("expert-review-detail")).toBeVisible();
+  await expect(detail(page).getByTestId("expert-approve")).toBeVisible();
 });
 
 test("an organization account is refused and the queue is never requested", async ({ page }) => {

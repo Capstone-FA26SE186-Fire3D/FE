@@ -214,7 +214,7 @@ export function derivePipelineProgress({ revision, pipeline, currentIssues, load
 
   let geometry: PipelineStep = { id: "geometry", label: "Dựng mô hình 3D", state: "todo", detail: source && quarantine !== "Rejected" && !job ? "Chưa chạy xử lý" : "" };
   if (job?.status === "Queued") geometry = { ...geometry, state: "active", detail: attempt ? `Đang chờ máy xử lý · ${attemptText}` : "Đang chờ máy xử lý nhận tệp" };
-  else if (job?.status === "Running") geometry = { ...geometry, state: "active", detail: ["Đang xử lý", attemptText, log ? `bước ${processingStepLabel(log.step)}` : ""].filter(Boolean).join(" · ") };
+  else if (job?.status === "Running") geometry = { ...geometry, state: "active", detail: ["Đang xử lý", attemptText, log && STEP_LABELS[log.step] ? `bước ${STEP_LABELS[log.step]}` : ""].filter(Boolean).join(" · ") };
   else if (job?.status === "Succeeded") geometry = { ...geometry, state: "done", detail: attemptText };
   else if (job?.status === "Failed") geometry = { ...geometry, state: "error", detail: attemptText ? `Lỗi ở ${attemptText}` : "Xử lý bị lỗi" };
   else if (job?.status === "Cancelled") geometry = { ...geometry, state: "error", detail: "Đã hủy" };

@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ApiError } from "@/api/types/common";
 import { useAsyncData, type AsyncData } from "@/api/use-async-data";
 
+import { isJobTerminal } from "./version-readiness";
 import type { Release, ReleaseSummary, ScenarioVersionSummary, VersionReadiness, VersionReview } from "./version-types";
 import { scenarioVersionsApi } from "./versions-api";
 
@@ -30,6 +31,39 @@ export type VersionServerState = {
 };
 
 const RELEASE_PAGE_SIZE = 100;
+
+/** Waits (ms) between re-reads of readiness after a build ends: about 10 s in all, then it stops. */
+export const READINESS_CATCH_UP_DELAYS: readonly number[] = [2000, 2500, 2500, 3000];
+
+/** True once readiness reports the build `jobId` in a final state. */
+export const readinessCaughtUp = (readiness: VersionReadiness | undefined, jobId: string): boolean =>
+  readiness?.packageJob?.jobId === jobId && isJobTerminal(readiness.packageJob.status);
+
+/**
+ * The server's readiness can lag the build job it describes: read right after the job ends, it may still say "running".
+ * `follow(jobId)` reads it now and again after each of READINESS_CATCH_UP_DELAYS until it shows that job as final, then
+ * stops. Never polls forever; timers stop on unmount or when another job is followed.
+ */
+export function useReadinessCatchUp(readiness: AsyncData<VersionReadiness>): (jobId: string) => void {
+  const latest = useRef(readiness.data);
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => { latest.current = readiness.data; });
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const { reload } = readiness;
+  return useCallback((jobId: string) => {
+    window.clearTimeout(timer.current);
+    reload();
+    const step = (attempt: number) => {
+      if (attempt >= READINESS_CATCH_UP_DELAYS.length) return;
+      timer.current = window.setTimeout(() => {
+        if (readinessCaughtUp(latest.current, jobId)) return;
+        reload();
+        step(attempt + 1);
+      }, READINESS_CATCH_UP_DELAYS[attempt]);
+    };
+    step(0);
+  }, [reload]);
+}
 
 /** A Built or Published release wins over a Revoked one; within a group the newest (list order) wins. */
 function pickRelease(items: ReleaseSummary[], versionId: string): ReleaseSummary | undefined {

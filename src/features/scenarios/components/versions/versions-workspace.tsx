@@ -22,7 +22,7 @@ import { usePlaytestPackage } from "@/features/playtest/use-playtest-package";
 import "./versions.css";
 import type { JourneyInput } from "../../journey";
 import { useVersionJobs } from "../../use-version-jobs";
-import { useVersionServerState } from "../../use-version-server-state";
+import { useReadinessCatchUp, useVersionServerState } from "../../use-version-server-state";
 import { approvalGate, describeError, isJobTerminal, releaseGate, shortHash, technicalGate } from "../../version-readiness";
 import type { ContentReviewSubmission, ScenarioDetail, ScenarioVersionDetail, ScenarioVersionSummary } from "../../version-types";
 import { scenarioVersionsApi } from "../../versions-api";
@@ -105,13 +105,15 @@ function Workbench({ accessToken, buildingId, scenario, versionCount, editorHref
   // read them again so "Còn thiếu gì" never keeps saying the package is missing after it passed.
   const outcomeKey = `${jobs.detail?.job.status ?? ""}:${jobs.verdict?.kind ?? ""}`;
   const lastOutcome = useRef(outcomeKey);
-  const { reload: reloadReadiness } = server.readiness;
+  // Readiness is re-read a few times until it shows the build as final too (its projection can lag the job).
+  const followReadiness = useReadinessCatchUp(server.readiness);
   const { reload: reloadPlaytestPackage } = playtestPackage;
+  const finishedJobId = isJobTerminal(jobs.detail?.job.status) ? jobs.detail?.job.id : undefined;
   useEffect(() => {
     if (lastOutcome.current === outcomeKey) return;
     lastOutcome.current = outcomeKey;
-    if (isJobTerminal(jobs.detail?.job.status)) { reloadReadiness(); reloadPlaytestPackage(); }
-  }, [outcomeKey, jobs.detail?.job.status, reloadReadiness, reloadPlaytestPackage]);
+    if (finishedJobId) { followReadiness(finishedJobId); reloadPlaytestPackage(); }
+  }, [outcomeKey, finishedJobId, followReadiness, reloadPlaytestPackage]);
   // The journey sits above the tabs: after switching (or when already on the right tab) bring the work into view.
   const goToTab = (next: TabId, focus?: "monitor") => {
     onTab(next);

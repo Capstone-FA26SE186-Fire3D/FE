@@ -22,6 +22,15 @@ export function initialStateV1(pin: GeometryPin, extras: JsonObject = {}): JsonO
   return { ...extras, schemaVersion: SCHEMA_VERSION, geometry: { artifactId: pin.artifactId, sha256Hash: pin.sha256Hash } };
 }
 
+/**
+ * The scenario's own name as the `name` of a new draft, so the draft is not nameless and a template applied later keeps it
+ * instead of writing its own. Nothing when the name would be refused by the schema (blank, too long, control characters).
+ */
+export function scenarioNameExtras(name: string | null | undefined): JsonObject {
+  const trimmed = name?.trim();
+  return trimmed && printable(trimmed, LIMITS.nameMax) ? { name: trimmed } : {};
+}
+
 // ───────── lenient read model ─────────
 
 export type ObjectView = {
@@ -305,11 +314,11 @@ export function completenessIssues(draft: JsonObject, context: ReferenceContext)
   need("learningObjectives", Array.isArray(draft.learningObjectives) && draft.learningObjectives.length > 0, "Nhập ít nhất một mục tiêu học tập.");
   need("learnerInstructions", typeof draft.learnerInstructions === "string", "Nhập hướng dẫn cho người học.");
   const rubric = draft.rubric;
-  if (!isObject(rubric)) out.push(issue("FIELD_REQUIRED", "$.rubric", "Cần rubric chấm điểm."));
+  if (!isObject(rubric)) out.push(issue("FIELD_REQUIRED", "$.rubric", "Cần tiêu chí chấm điểm."));
   else if (Array.isArray(rubric.criteria)) {
     if (rubric.criteria.length === 0) out.push(issue("FIELD_REQUIRED", "$.rubric.criteria", "Cần ít nhất một tiêu chí."));
     rubric.criteria.forEach((criterion, index) => {
-      if (context.metrics && isObject(criterion) && typeof criterion.metric === "string" && !context.metrics.has(criterion.metric)) out.push(issue("RUBRIC_METRIC_UNSUPPORTED", `$.rubric.criteria[${index}].metric`, "Chọn chỉ số có trong danh mục rubric của hệ thống."));
+      if (context.metrics && isObject(criterion) && typeof criterion.metric === "string" && !context.metrics.has(criterion.metric)) out.push(issue("RUBRIC_METRIC_UNSUPPORTED", `$.rubric.criteria[${index}].metric`, "Chọn chỉ số có trong danh mục tiêu chí chấm của hệ thống."));
     });
   }
 

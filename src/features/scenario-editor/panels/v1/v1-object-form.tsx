@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field, Input, Select } from "@/components/ui/field";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { SupportCode } from "@/components/ui/support-code";
 import { capabilityDescription, capabilityName, ifcTypeLabel, parameterHint, parameterLabel, parameterOptionLabel } from "@/configs/capability-labels";
 
 import type { Issue } from "../../store/validation";
@@ -16,6 +17,7 @@ import { capabilitiesForKind, findCapability, findRuntime, rangeMessage, type Ca
 import { CAPABILITY_REQUIRED_KINDS, KIND_META, type ObjectKind } from "../../v1/contract";
 import { anchorsForFloor, floorOf, type GeometryInfo } from "../../v1/geometry";
 import { messageAt, objectIssues } from "../../v1/issues";
+import { emptyParameterPeers, objectName } from "../../v1/object-name";
 import { MOUNT_LABEL, WALL_HINT, heightProblem, heightText, mountingOf, sizeText, type Mounting } from "../../v1/equipment-mounting";
 import { localToGlb, quaternionToYaw, round3 } from "../../v1/matrix";
 import type { ObjectView } from "../../v1/state";
@@ -26,7 +28,9 @@ const MAX_ANCHOR_OPTIONS = 200;
 
 export type CatalogView = { loading: boolean; error: boolean; reload: () => void; runtimes: RuntimeOption[] };
 
-export function V1ObjectForm({ object, issues, actions, geometry, catalog, runtimeVersion, pick, onOpenScenario, scope = "scenario", onMount, wallGap }: {
+export function V1ObjectForm({ object, objects = [], issues, actions, geometry, catalog, runtimeVersion, pick, onOpenScenario, scope = "scenario", onMount, wallGap }: {
+  /** Every object of the draft: where a parameter value can also be copied to (same capability, still empty). */
+  objects?: ObjectView[];
   /** Puts the object the way its capability is mounted (onto the closest wall, at the right height). */
   onMount?: (index: number, capabilityId?: string) => void;
   /** Metres from a wall item to the closest wall; null when no wall is within reach; undefined when it does not apply. */
@@ -58,14 +62,14 @@ export function V1ObjectForm({ object, issues, actions, geometry, catalog, runti
   return <div className="se-form" data-testid="object-form" data-kind={kind ?? ""}>
     <div className="se-form-head">
       <div>
-        <h3>{meta ? meta.label : "Đối tượng"} #{index + 1} <StatusBadge>{kind ?? "?"}</StatusBadge></h3>
+        <h3>{objectName(object)} #{index + 1}</h3>
         <p>{meta?.description}</p>
       </div>
       <Button type="button" variant="quiet" size="sm" onClick={() => actions.removeObject(index)} data-testid="delete-object"><Trash2 size={14} aria-hidden="true" /> Xóa</Button>
     </div>
 
     {unplaced.length > 0 && <Alert tone="danger" title="Vấn đề của đối tượng này">
-      <ul className="ops-stack" style={{ margin: 0, paddingLeft: 18 }}>{unplaced.map((item) => <li key={`${item.code}${item.path}`}><code>{item.code}</code> {item.message}</li>)}</ul>
+      <ul className="ops-stack" style={{ margin: 0, paddingLeft: 18 }}>{unplaced.map((item) => <li key={`${item.code}${item.path}`}>{item.message}<SupportCode code={item.code} id={item.path} /></li>)}</ul>
     </Alert>}
 
     <fieldset className="ops-fieldset">
@@ -102,7 +106,7 @@ export function V1ObjectForm({ object, issues, actions, geometry, catalog, runti
 
     {kind === "Equipment" && mountingOf(object.capability?.id) && <MountingField object={object} mounting={mountingOf(object.capability?.id) as Mounting} wallGap={wallGap} onMount={onMount} />}
     {kind && <AnchorField object={object} kind={kind} geometry={geometry} error={messageAt(issues, `${base}.anchorId`)} actions={actions} pick={pick} />}
-    {kind && <CapabilityField object={object} kind={kind} catalog={catalog} runtimeVersion={runtimeVersion} issues={issues} actions={actions} onOpenScenario={onOpenScenario} scope={scope} onChosen={onMount ? (capabilityId) => onMount(object.index, capabilityId) : undefined} />}
+    {kind && <CapabilityField object={object} objects={objects} kind={kind} catalog={catalog} runtimeVersion={runtimeVersion} issues={issues} actions={actions} onOpenScenario={onOpenScenario} scope={scope} onChosen={onMount ? (capabilityId) => onMount(object.index, capabilityId) : undefined} />}
   </div>;
 }
 
@@ -179,7 +183,7 @@ function MountingField({ object, mounting, wallGap, onMount }: { object: ObjectV
   </fieldset>;
 }
 
-function CapabilityField({ object, kind, catalog, runtimeVersion, issues, actions, onOpenScenario, scope, onChosen }: { object: ObjectView; kind: ObjectKind; catalog: CatalogView; scope: EditorScope; runtimeVersion: string | undefined; issues: Issue[]; actions: V1Actions; onOpenScenario: () => void; onChosen?: (capabilityId: string) => void }) {
+function CapabilityField({ object, objects, kind, catalog, runtimeVersion, issues, actions, onOpenScenario, scope, onChosen }: { object: ObjectView; objects: ObjectView[]; kind: ObjectKind; catalog: CatalogView; scope: EditorScope; runtimeVersion: string | undefined; issues: Issue[]; actions: V1Actions; onOpenScenario: () => void; onChosen?: (capabilityId: string) => void }) {
   const required = (CAPABILITY_REQUIRED_KINDS as readonly ObjectKind[]).includes(kind);
   const base = `$.objects[${object.index}]`;
   const runtime = findRuntime(catalog.runtimes, runtimeVersion);
@@ -217,15 +221,15 @@ function CapabilityField({ object, kind, catalog, runtimeVersion, issues, action
       <Alert tone="warning" title="Phiên bản khả năng khác với ứng dụng">Đối tượng dùng v{object.capability.version}, ứng dụng đang có v{selected.version}.</Alert>
       <div><Button type="button" size="sm" variant="secondary" data-testid="update-capability-version" onClick={() => actions.setCapability(object.index, { id: selected.id, version: selected.version })}>Cập nhật lên v{selected.version}</Button></div>
     </div>}
-    {selected && <ParameterFields capability={selected} object={object} issues={issues} actions={actions} />}
+    {selected && <ParameterFields capability={selected} object={object} objects={objects} issues={issues} actions={actions} />}
     {!selected && !object.capability && Object.keys(object.parameters).length > 0 && <p className="ops-field-hint">Có tham số nhưng chưa chọn khả năng; khi không chọn khả năng thì phải bỏ hết tham số.</p>}
   </fieldset>;
 }
 
-function ParameterFields({ capability, object, issues, actions }: { capability: CapabilityOption; object: ObjectView; issues: Issue[]; actions: V1Actions }) {
+function ParameterFields({ capability, object, objects, issues, actions }: { capability: CapabilityOption; object: ObjectView; objects: ObjectView[]; issues: Issue[]; actions: V1Actions }) {
   if (capability.fields.length === 0) return <p className="ops-field-hint" data-testid="no-parameters">Khả năng này không cần điền thêm gì.</p>;
   return <div className="se-form" data-testid="parameter-fields">
-    {capability.fields.map((field) => <ParameterInput key={`${object.index}-${capability.id}-${field.name}`} field={field} object={object} issues={issues} actions={actions} />)}
+    {capability.fields.map((field) => <ParameterInput key={`${object.index}-${capability.id}-${field.name}`} field={field} object={object} objects={objects} issues={issues} actions={actions} />)}
   </div>;
 }
 
@@ -238,9 +242,24 @@ function hintOf(field: ParameterField): string | undefined {
   return parts.join(" ") || undefined;
 }
 
-function ParameterInput({ field, object, issues, actions }: { field: ParameterField; object: ObjectView; issues: Issue[]; actions: V1Actions }) {
+/** "bình chữa cháy xách tay", keeping acronyms ("họng nước PCCC"). */
+const inSentence = (text: string) => text.charAt(0).toLocaleLowerCase("vi-VN") + text.slice(1);
+
+function ParameterInput({ field, object, objects, issues, actions }: { field: ParameterField; object: ObjectView; objects: ObjectView[]; issues: Issue[]; actions: V1Actions }) {
   const value = object.parameters[field.name];
   const error = messageAt(issues, `$.objects[${object.index}].parameters.${field.name}`);
+  // Once this required value is set (and valid), it can be copied to the other objects of the same kind that still lack it.
+  // Nothing is pre-filled: the fire-safety expert reviews these values, so the author copies them on purpose.
+  const peers = field.required && value !== undefined && !error ? emptyParameterPeers(objects, object.index, field.name) : [];
+  const bulk = peers.length > 0 && value !== undefined && object.capability
+    ? <div><Button type="button" variant="quiet" size="sm" data-testid={`param-${field.name}-copy`} onClick={() => actions.setParameterMany(peers, field.name, value)}>
+      Áp dụng cho {peers.length} {inSentence(capabilityName(object.capability.id))} còn trống
+    </Button></div>
+    : null;
+  return <>{parameterControl(field, object, value, error, actions)}{bulk}</>;
+}
+
+function parameterControl(field: ParameterField, object: ObjectView, value: ObjectView["parameters"][string], error: string | undefined, actions: V1Actions) {
   const set = (next: Parameters<V1Actions["setParameter"]>[2], typing: boolean) => actions.setParameter(object.index, field.name, next, typing);
   const label = field.required ? parameterLabel(field.name) : `${parameterLabel(field.name)} (tùy chọn)`;
 

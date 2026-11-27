@@ -1,11 +1,14 @@
 import { apiClient } from "@/api/client";
-import type { DraftValidationIssue, LoadedDraft } from "@/features/scenario-editor/api";
+import { scenarioEditorApi, type DraftValidationIssue, type LoadedDraft } from "@/features/scenario-editor/api";
 import { draftEtag, normalizeEtag } from "@/features/scenario-editor/store/etag";
 import { isObject, type JsonObject } from "@/features/scenario-editor/store/json";
+import { findCapability, findRuntime, parseRuntimeCatalog } from "@/features/scenario-editor/v1/catalog";
 import { SCHEMA_VERSION } from "@/features/scenario-editor/v1/contract";
 import { stateHash } from "@/features/scenario-editor/v1/hash";
 import { itemPathToObjectPath, itemsToObjects, objectsToItems } from "@/features/scenario-editor/v1/scope";
 import type { EditorBackend } from "@/features/scenario-editor/v1/use-editor-v1";
+
+import { FINAL_EXIT_CAPABILITY, withExitGoals } from "./exit-goals";
 
 const auth = (accessToken: string): HeadersInit => ({ Authorization: `Bearer ${accessToken}` });
 
@@ -94,6 +97,26 @@ export function toLoadedDraft({ infrastructure, etag }: LoadedInfrastructure): L
       createdAt: infrastructure.createdAt, updatedAt: infrastructure.updatedAt, version: infrastructure.revision,
     },
   };
+}
+
+/**
+ * Once, right after "Lập hạ tầng PCCC": every seeded exit door gets its exit Goal (`withExitGoals`), saved with If-Match on
+ * the revision the server just returned. The capability version is the runtime catalog's, as in the editor; without
+ * `exit.final` in that runtime nothing is added. Any failure leaves the draft as created and the editor opens anyway.
+ */
+export async function addSeededExitGoals(accessToken: string, created: FireInfrastructure): Promise<boolean> {
+  try {
+    const state = toEditorState(created);
+    const runtime = findRuntime(parseRuntimeCatalog(await scenarioEditorApi.catalog(accessToken)), created.runtimeVersion ?? undefined);
+    const exit = findCapability(runtime, FINAL_EXIT_CAPABILITY);
+    if (!exit || !exit.objectKinds.includes("Goal")) return false;
+    const objects = withExitGoals(Array.isArray(state.objects) ? state.objects : [], exit);
+    if (!objects) return false;
+    await fireInfrastructureApi.update(accessToken, created.id, toUpdateBody({ ...state, objects }), `"${created.revision}"`);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Storage of the 3D editor for one infrastructure version (`useEditorV1`). */

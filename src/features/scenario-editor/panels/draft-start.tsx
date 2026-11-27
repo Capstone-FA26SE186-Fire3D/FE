@@ -17,6 +17,7 @@ import { LockedInfrastructureNote, useLockedInfrastructure } from "@/features/fi
 import { scenarioVersionsApi } from "@/features/scenarios/versions-api";
 
 import { createDraftV1 } from "../v1/create-draft";
+import { scenarioNameExtras } from "../v1/state";
 import { useRevisionFloors } from "../v1/use-revision-floors";
 import { FloorsStatus, RevisionStatusNote } from "./geometry-status";
 import { describeApiError } from "@/api/describe-error";
@@ -49,7 +50,7 @@ export function DraftStart({ accessToken, buildingId, scenarioId, onOpen }: { ac
     setCreating(true);
     setError(null);
     try {
-      const created = await createDraftV1(accessToken, { scenarioId, revisionId: selected, infrastructureId: locked.id, pin: geometry.pin, idempotencyKey: keyFor({ scenarioId, revisionId: selected, infrastructureId: locked.id }) });
+      const created = await createDraftV1(accessToken, { scenarioId, revisionId: selected, infrastructureId: locked.id, pin: geometry.pin, extras: scenarioNameExtras(scenario.data?.name), idempotencyKey: keyFor({ scenarioId, revisionId: selected, infrastructureId: locked.id }) });
       done();
       onOpen(created.id);
     } catch (cause) {
@@ -87,7 +88,7 @@ export function DraftStart({ accessToken, buildingId, scenarioId, onOpen }: { ac
               {selected && <FloorsStatus reading={geometry} loading={floors.loading} error={floors.error} reload={floors.reload} buildingId={buildingId} revisionId={selected} />}
               {selected && geometry?.kind === "valid" && <LockedInfrastructureNote state={infrastructure} buildingId={buildingId} revisionId={selected} />}
               {error && <Alert tone="danger" title="Tạo bản nháp thất bại">{error}</Alert>}
-              <div><Button type="submit" disabled={creating || geometry?.kind !== "valid" || !locked} data-testid="create-draft" title={geometry?.kind === "valid" ? undefined : "Cần mô hình 3D hợp lệ của bản IFC này"}>{creating ? "Đang tạo…" : "Tạo bản nháp"}</Button></div>
+              <div><Button type="submit" disabled={creating || scenario.loading || geometry?.kind !== "valid" || !locked} data-testid="create-draft" title={geometry?.kind === "valid" ? undefined : "Cần mô hình 3D hợp lệ của bản IFC này"}>{creating ? "Đang tạo…" : "Tạo bản nháp"}</Button></div>
             </form>}
     </Panel>
   </div>;
