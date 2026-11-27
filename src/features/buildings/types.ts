@@ -151,6 +151,10 @@ export type ProcessingAttempt = {
   startedAt: string;
   finishedAt: string | null;
   outputHash: string | null;
+  /** Worker text about the run; shown only when it is Vietnamese. Optional: older responses lack it. */
+  message?: string | null;
+  /** Completed | WorkerFailed | LeaseExpired, derived from `status`; null while running. Optional: older responses lack it. */
+  endReason?: string | null;
 };
 
 export type ProcessingJobDetail = {
@@ -158,6 +162,8 @@ export type ProcessingJobDetail = {
   inputHash: string;
   currentAttemptId: string | null;
   currentAttempt: ProcessingAttempt | null;
+  /** The run before the current one, so people see why the job is on its second run. Optional: older responses lack it. */
+  previousAttempt?: ProcessingAttempt | null;
 };
 
 export type ValidationRun = {
@@ -261,6 +267,8 @@ export type ProcessingLog = {
   durationMs: number | null;
   attemptNumber: number;
   loggedAt: string;
+  /** Why this run ended (see `ProcessingAttempt.endReason`). Optional: older responses lack it. */
+  endReason?: string | null;
 };
 
 export type BimFact = {

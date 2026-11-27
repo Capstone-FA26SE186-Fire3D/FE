@@ -52,6 +52,8 @@ type Mock = {
   retryResponses: number[];
   jobSequence: string[]; // job status per poll, last repeats
   jobPolls: number;
+  attemptPatch: Record<string, unknown>; // overrides of the current attempt in GET /api/processing-jobs/{id} (attemptNumber, message, endReason…)
+  previousAttempt: Record<string, unknown> | null; // the attempt before the current one, as the BE reports it
   qa: { runs: unknown[]; issues: unknown[] };
   confirmBody: unknown;
   submitCalls: Array<{ key: string | null }>;
@@ -75,7 +77,7 @@ type Mock = {
 
 function newMock(patch: Partial<Mock> = {}): Mock {
   return {
-    snapshotCalls: [], snapshotResponses: [201], buildCalls: [], buildResponses: [202], retryCalls: [], retryResponses: [202], jobSequence: ["Succeeded"], jobPolls: 0,
+    snapshotCalls: [], snapshotResponses: [201], buildCalls: [], buildResponses: [202], retryCalls: [], retryResponses: [202], jobSequence: ["Succeeded"], jobPolls: 0, attemptPatch: {}, previousAttempt: null,
     qa: { runs: [], issues: [] }, confirmBody: null, submitCalls: [], releaseCalls: [], publishCalls: [], publishResponses: [503], draftEtag: '"12"', draftEtags: [], jobList: [],
     reviewStatus: "NotSubmitted", reviewId: null, rejectReason: null, confirmed: null, release: null,
     drafts: [{ id: IDS.draft, draftNumber: 2, version: 12, updatedAt: "2026-10-10T01:00:00Z", lastEditedByName: "Nguyễn Văn A" }], currentDraftId: IDS.draft, readinessCalls: 0, reviewReads: 0,
@@ -169,7 +171,7 @@ async function setup(page: Page, mock: Mock, role = 1) {
     if (url.includes("/qa")) return route.fulfill({ json: { jobId, currentAttemptId: "att-1", validationRuns: { items: mock.qa.runs, totalCount: mock.qa.runs.length, page: 1, pageSize: 20 } } });
     const status = mock.jobSequence[Math.min(mock.jobPolls, mock.jobSequence.length - 1)];
     mock.jobPolls += 1;
-    return route.fulfill({ json: { job: job(status, jobId), inputHash: "c".repeat(64), currentAttemptId: status === "Queued" ? null : "att-1", currentAttempt: status === "Queued" ? null : { id: "att-1", attemptNumber: 1, status, toolchainVersion: "tc-1", startedAt: "2026-10-10T02:01:00Z", finishedAt: status === "Succeeded" || status === "Failed" ? "2026-10-10T02:05:00Z" : null, outputHash: null } } });
+    return route.fulfill({ json: { job: job(status, jobId), inputHash: "c".repeat(64), currentAttemptId: status === "Queued" ? null : "att-1", currentAttempt: status === "Queued" ? null : { id: "att-1", attemptNumber: 1, status, toolchainVersion: "tc-1", startedAt: "2026-10-10T02:01:00Z", finishedAt: status === "Succeeded" || status === "Failed" ? "2026-10-10T02:05:00Z" : null, outputHash: null, message: null, endReason: status === "Succeeded" ? "Completed" : status === "Failed" ? "WorkerFailed" : null, ...mock.attemptPatch }, previousAttempt: mock.previousAttempt } });
   });
   await page.route("**/api/processing-jobs/*/retry", (route) => {
     const body = route.request().postDataJSON() as { requestId: string };
@@ -342,6 +344,43 @@ test.describe("package build and technical readiness", () => {
     await page.getByRole("button", { name: "Xem lượt dựng lỗi" }).click();
     await expect(page.locator("#ver-job-monitor")).toBeInViewport();
     await expect(page.getByRole("button", { name: "Dựng lại", exact: true })).toBeVisible();
+  });
+
+  test("a failed build shows why the worker stopped (its Vietnamese message) instead of saying no reason was sent", async ({ page }) => {
+    const mock = newMock({ jobSequence: ["Failed"], jobList: [job("Failed")], attemptPatch: { status: "Failed", endReason: "WorkerFailed", message: "Không tìm thấy tệp mô hình của phiên bản." } });
+    await setup(page, mock);
+    await page.goto(`${base}?tab=build`);
+    const alert = page.getByRole("alert").filter({ has: page.getByText("Dựng gói bị lỗi", { exact: true }) });
+    await expect(alert).toBeVisible();
+    await expect(alert).toContainText("Máy dựng báo lỗi.");
+    await expect(alert).toContainText("Không tìm thấy tệp mô hình của phiên bản.");
+    await expect(alert).toContainText("Bấm Dựng lại");
+    await expect(page.getByText("chưa gửi lý do chi tiết")).toHaveCount(0);
+  });
+
+  test("an English worker message stays in the support details, not in the alert text", async ({ page }) => {
+    const mock = newMock({ jobSequence: ["Failed"], jobList: [job("Failed")], attemptPatch: { status: "Failed", endReason: "WorkerFailed", message: "Unity exited with code 1" } });
+    await setup(page, mock);
+    await page.goto(`${base}?tab=build`);
+    const alert = page.getByRole("alert").filter({ has: page.getByText("Dựng gói bị lỗi", { exact: true }) });
+    await expect(alert).toContainText("Máy dựng báo lỗi.");
+    await expect(alert.locator("details.support-code")).toContainText("Unity exited with code 1");
+    await expect(alert.locator("details.support-code")).not.toHaveAttribute("open", "");
+    await expect(alert.getByText("Unity exited with code 1")).not.toBeVisible();
+  });
+
+  test("a build handed out again after the machine dropped says why the first run ended, and never shows the raw status", async ({ page }) => {
+    const mock = newMock({
+      jobSequence: ["Running"], jobList: [job("Running")],
+      attemptPatch: { id: "att-2", attemptNumber: 2 },
+      previousAttempt: { id: "att-1", attemptNumber: 1, status: "Expired", toolchainVersion: "tc-1", startedAt: "2026-10-10T02:01:00Z", finishedAt: "2026-10-10T02:20:00Z", outputHash: null, message: null, endReason: "LeaseExpired" },
+    });
+    await setup(page, mock);
+    await page.goto(`${base}?tab=build`);
+    await expect(page.getByText("Lần dựng trước: Máy dựng bị ngắt giữa chừng")).toBeVisible();
+    await expect(page.getByText("nên hệ thống đã giao lại việc.", { exact: false })).toBeVisible();
+    await expect(page.getByText("Đã nhận (lần 2)")).toBeVisible();
+    await expect(page.locator("body")).not.toContainText("Expired");
   });
 
   test("journey buttons bring the work into view instead of looking dead", async ({ page }) => {

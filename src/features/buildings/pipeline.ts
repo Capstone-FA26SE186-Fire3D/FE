@@ -1,6 +1,8 @@
+import { isVietnamese } from "@/api/error-text";
 import type { Tone } from "@/components/ui/status-badge";
+import { attemptEndReasonText } from "@/configs/processing-end-reason";
 import type { ValidationRunWithOutcome } from "./ifc-types";
-import type { BuildingRevision, IssueSeverity, JobQa, ProcessingJob, ProcessingJobDetail, ProcessingLog, RevisionIssue, ValidationRun } from "./types";
+import type { BuildingRevision, IssueSeverity, JobQa, ProcessingAttempt, ProcessingJob, ProcessingJobDetail, ProcessingLog, RevisionIssue, ValidationRun } from "./types";
 
 /** Everything the UI knows about the newest processing job of one revision. */
 export type RevisionPipeline = {
@@ -34,6 +36,8 @@ export function jobLabel(status: string | undefined | null): { label: string; to
     case "Succeeded": return { label: "Đã xử lý xong", tone: "info" };
     case "Failed": return { label: "Xử lý thất bại", tone: "danger" };
     case "Cancelled": return { label: "Đã hủy", tone: "neutral" };
+    // A run whose machine stopped reporting; the job itself is handed out again.
+    case "Expired": return { label: "Bị ngắt giữa chừng", tone: "warning" };
     default: return { label: status ? "Không rõ trạng thái" : "Chưa xử lý", tone: "neutral" };
   }
 }
@@ -147,7 +151,15 @@ const STEP_LABELS: Record<string, string> = {
 };
 
 export function processingStepLabel(step: string) {
+  // Log rows are one per run now, with the job kind as `step`.
+  if (step === "Geometry" || step === "Package" || step === "PackageBuild") return jobKindLabel(step);
   return STEP_LABELS[step] ?? "Bước khác";
+}
+
+/** Why a run ended, for people: the end-reason sentence plus the worker's own text when it is Vietnamese ("" if none). */
+export function attemptReasonText(attempt: Pick<ProcessingAttempt, "endReason" | "message"> | null | undefined) {
+  if (!attempt) return "";
+  return [attemptEndReasonText(attempt.endReason, "xử lý"), isVietnamese(attempt.message) ? attempt.message : null].filter(Boolean).join(" ");
 }
 
 /** Kind of a processing job (`Geometry` for IFC, package builds otherwise). */
@@ -201,6 +213,11 @@ export function derivePipelineProgress({ revision, pipeline, currentIssues, load
   const ready = status === "ReadyForScenario" || status === "ConfirmedForTraining";
   const attemptText = attempt ? `lượt xử lý thứ ${attempt.attemptNumber}` : "";
   const log = job?.status === "Running" ? pipeline.latestLog : null;
+  // Why the current run ended (Failed job), or why the job runs again: the current run if it already ended, else the one before.
+  const failedReason = job?.status === "Failed" ? attemptReasonText(attempt) : "";
+  const rerunReason = job?.status === "Queued" || job?.status === "Running"
+    ? attemptReasonText(attempt?.endReason ? attempt : pipeline.detail?.previousAttempt)
+    : "";
 
   const upload: PipelineStep = source
     ? { id: "upload", label: "Tải lên", state: "done", detail: source.originalFilename }
@@ -216,7 +233,7 @@ export function derivePipelineProgress({ revision, pipeline, currentIssues, load
   if (job?.status === "Queued") geometry = { ...geometry, state: "active", detail: attempt ? `Đang chờ máy xử lý · ${attemptText}` : "Đang chờ máy xử lý nhận tệp" };
   else if (job?.status === "Running") geometry = { ...geometry, state: "active", detail: ["Đang xử lý", attemptText, log && STEP_LABELS[log.step] ? `bước ${STEP_LABELS[log.step]}` : ""].filter(Boolean).join(" · ") };
   else if (job?.status === "Succeeded") geometry = { ...geometry, state: "done", detail: attemptText };
-  else if (job?.status === "Failed") geometry = { ...geometry, state: "error", detail: attemptText ? `Lỗi ở ${attemptText}` : "Xử lý bị lỗi" };
+  else if (job?.status === "Failed") geometry = { ...geometry, state: "error", detail: [attemptText ? `Lỗi ở ${attemptText}` : "Xử lý bị lỗi", failedReason].filter(Boolean).join(" · ") };
   else if (job?.status === "Cancelled") geometry = { ...geometry, state: "error", detail: "Đã hủy" };
 
   let qa: PipelineStep = { id: "qa", label: "Kiểm tra tự động", state: "todo", detail: "" };
@@ -253,7 +270,7 @@ export function derivePipelineProgress({ revision, pipeline, currentIssues, load
     if (!source) return { tone: "info", title: "Chưa hoàn tất tải lên", guidance: "Bản IFC này chưa có tệp tải lên hoàn chỉnh. Bấm “Tải IFC” để tải tệp lên.", actions: ["upload"] };
     if (!loaded) return { tone: "info", title: "Đang tải trạng thái xử lý…", guidance: "", actions: [] };
     if (job?.status === "Failed") {
-      return { tone: "danger", title: "Xử lý IFC thất bại", guidance: `Máy xử lý không dựng được mô hình 3D${attemptText ? ` ở ${attemptText}` : ""}. Bấm chạy lại (cần nhập lý do); nếu vẫn lỗi, kiểm tra tệp rồi tải lên IFC mới.`, actions: ["retry", "upload"] };
+      return { tone: "danger", title: "Xử lý IFC thất bại", guidance: `Máy xử lý không dựng được mô hình 3D${attemptText ? ` ở ${attemptText}` : ""}.${failedReason ? ` ${failedReason}` : ""} Bấm chạy lại (cần nhập lý do); nếu vẫn lỗi, kiểm tra tệp rồi tải lên IFC mới.`, actions: ["retry", "upload"] };
     }
     if (job?.status === "Cancelled") return { tone: "danger", title: "Lượt xử lý đã bị hủy", guidance: "Chỉ lượt xử lý bị lỗi mới chạy lại được. Tải lên IFC mới để xử lý lại.", actions: ["upload"] };
     if (status === "Failed") return { tone: "danger", title: "Xử lý thất bại", guidance: "Bản IFC này bị lỗi khi xử lý và không chạy lại được. Tải lên IFC mới.", actions: ["upload"] };
@@ -263,7 +280,7 @@ export function derivePipelineProgress({ revision, pipeline, currentIssues, load
         : { tone: "info", title: revisionLabel(status).label, guidance: "Bản IFC này chưa được xử lý.", actions: [] };
     }
     if (job.status === "Queued" || job.status === "Running") {
-      return { tone: "info", title: "Đang dựng mô hình 3D", guidance: "Máy xử lý đang làm việc; trang tự cập nhật, bạn không cần thao tác. Kết quả kiểm tra có sau khi xử lý xong.", actions: [] };
+      return { tone: "info", title: "Đang dựng mô hình 3D", guidance: `${rerunReason ? `Lần chạy trước dừng lại: ${rerunReason} ` : ""}Máy xử lý đang làm việc; trang tự cập nhật, bạn không cần thao tác. Kết quả kiểm tra có sau khi xử lý xong.`, actions: [] };
     }
     if (pipeline.qaError !== undefined) return { tone: "danger", title: "Không tải được kết quả kiểm tra", guidance: "Chưa biết mô hình có đạt kiểm tra hay không. Tải lại để thử lần nữa.", actions: ["refresh"] };
     if (ready) {

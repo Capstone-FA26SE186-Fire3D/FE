@@ -25,7 +25,7 @@ import { parameterIssueText } from "@/features/scenario-editor/v1/object-name";
 import { categoryOf, itemPathToObjectPath, itemsToObjects, type InfrastructureCategory } from "@/features/scenario-editor/v1/scope";
 import { readObjects, type ObjectView } from "@/features/scenario-editor/v1/state";
 
-import { addSeededExitGoals, fireInfrastructureApi, INFRASTRUCTURE_STATUS, type FireInfrastructure } from "../api";
+import { fireInfrastructureApi, INFRASTRUCTURE_STATUS, type FireInfrastructure } from "../api";
 
 const CATEGORY_LABEL: Record<InfrastructureCategory, string> = { Exit: "lối thoát", AssemblyPoint: "điểm tập kết", Equipment: "thiết bị cố định", WaterSource: "nguồn nước" };
 const CATEGORY_ORDER: InfrastructureCategory[] = ["Exit", "AssemblyPoint", "Equipment", "WaterSource"];
@@ -88,8 +88,6 @@ export function InfrastructurePanel({ accessToken, buildingId, revisionId, readO
     try {
       const created = await fireInfrastructureApi.create(accessToken, revisionId, createKey.keyFor({ revisionId, after: items[0]?.id ?? null }));
       createKey.done();
-      // Seeded exit doors become exits before the editor opens; a failed save just opens the draft as created.
-      if (created.status === "Draft") await addSeededExitGoals(accessToken, created);
       router.push(editorHref(created.id));
     } catch (error) {
       // Someone else opened a version meanwhile: the list is the truth.

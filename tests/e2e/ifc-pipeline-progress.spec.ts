@@ -24,6 +24,8 @@ type Mock = {
   revision?: () => unknown;
   jobStatus?: string;
   attemptNumber?: number;
+  /** Replaces the `GET /api/processing-jobs/job-1` body (attempt end reasons, previous attempt). */
+  detail?: () => unknown;
   qa?: { status: number; body: unknown };
   issues?: unknown[];
   logs?: unknown[];
@@ -43,7 +45,7 @@ async function open(page: Page, mock: Mock, url = "/workspace/buildings/building
   await page.route("**/api/buildings/building-1/scenarios?*", (route) => route.fulfill({ json: page1([]) }));
   await page.route("**/api/revisions/*", (route) => { calls.revision++; return route.fulfill({ json: mock.revision?.() ?? mock.revisions.find((item) => (item as { id: string }).id === route.request().url().split("/").pop()) }); });
   await page.route("**/api/revisions/*/processing-jobs?*", (route) => route.fulfill({ json: page1(mock.jobStatus ? [job(mock.jobStatus)] : []) }));
-  await page.route("**/api/processing-jobs/job-1", (route) => route.fulfill({ json: detail(mock.jobStatus ?? "Queued", mock.attemptNumber) }));
+  await page.route("**/api/processing-jobs/job-1", (route) => route.fulfill({ json: mock.detail?.() ?? detail(mock.jobStatus ?? "Queued", mock.attemptNumber) }));
   await page.route("**/api/processing-jobs/job-1/qa?*", (route) => route.fulfill(mock.qa ? { status: mock.qa.status, json: mock.qa.body } : { json: { jobId: "job-1", currentAttemptId: "att-1", validationRuns: page1([run("Passed")]) } }));
   await page.route("**/api/revisions/*/issues?*", (route) => route.fulfill({ json: page1(mock.issues ?? []) }));
   await page.route("**/api/revisions/*/processing-logs?*", (route) => { calls.logs++; return route.fulfill({ json: page1(mock.logs ?? []) }); });
@@ -116,6 +118,55 @@ test.describe("IFC progress view", () => {
     await page.getByTestId("ifc-sub-technical").click();
     await expect(page.getByTestId("details-tab-issues")).toBeVisible();
     await expect(page.getByTestId("qa-criteria")).toHaveCount(0);
+  });
+
+  test("a job on its second run after the first was cut off says why the first run ended", async ({ page }) => {
+    const expired = { id: "att-0", attemptNumber: 1, status: "Expired", toolchainVersion: "ifc-2.1", startedAt: "2026-10-02T00:50:00Z", finishedAt: "2026-10-02T00:58:00Z", outputHash: null, message: null, endReason: "LeaseExpired" };
+    await open(page, {
+      revisions: [rev("Uploaded")],
+      jobStatus: "Running",
+      detail: () => ({ ...detail("Running", 2), previousAttempt: expired }),
+    });
+    await expect(step(page, "geometry")).toContainText("lượt xử lý thứ 2");
+    await expect(next(page)).toContainText("Lần chạy trước dừng lại: Máy xử lý bị ngắt giữa chừng (khởi động lại hoặc mất kết nối) nên hệ thống đã giao lại việc.");
+    await expect(page.getByTestId("previous-attempt")).toContainText("Lần thứ 1 · Máy xử lý bị ngắt giữa chừng");
+    await expect(page.getByText("LeaseExpired")).toHaveCount(0);
+  });
+
+  test("a Failed job shows why its run failed, with the worker's Vietnamese message", async ({ page }) => {
+    const base = detail("Failed", 1);
+    await open(page, {
+      revisions: [rev("Uploaded")],
+      jobStatus: "Failed",
+      detail: () => ({ ...base, currentAttempt: { ...base.currentAttempt, status: "Failed", message: "Tệp IFC không có tầng nào.", endReason: "WorkerFailed" }, previousAttempt: null }),
+    });
+    await expect(step(page, "geometry")).toHaveAttribute("data-state", "error");
+    await expect(step(page, "geometry")).toContainText("Máy xử lý báo lỗi. Tệp IFC không có tầng nào.");
+    await expect(next(page)).toContainText("Máy xử lý báo lỗi. Tệp IFC không có tầng nào.");
+    await expect(page.getByTestId("previous-attempt")).toHaveCount(0);
+    await expect(page.getByText("WorkerFailed")).toHaveCount(0);
+  });
+
+  test("a log row of a run that was cut off reads “Bị ngắt” with the reason", async ({ page }) => {
+    await open(page, {
+      revisions: [rev("Uploaded")],
+      jobStatus: "Running",
+      attemptNumber: 2,
+      logs: [
+        { id: "l1", revisionId: "rev-2", jobId: "job-1", step: "Geometry", status: "Expired", message: null, durationMs: null, attemptNumber: 1, loggedAt: "2026-10-02T00:58:00Z", endReason: "LeaseExpired" },
+        { id: "l2", revisionId: "rev-2", jobId: "job-1", step: "Geometry", status: "Running", message: null, durationMs: null, attemptNumber: 2, loggedAt: "2026-10-02T01:01:00Z", endReason: null },
+      ],
+    });
+    await page.getByTestId("ifc-sub-technical").click();
+    await page.getByRole("button", { name: "Nhật ký", exact: true }).click();
+    const table = page.getByRole("table", { name: "Nhật ký xử lý" });
+    const expiredRow = table.getByRole("row").filter({ hasText: "Lần 1" });
+    await expect(expiredRow).toContainText("Bị ngắt");
+    await expect(expiredRow).toContainText("Dựng mô hình 3D");
+    await expect(expiredRow).toContainText("Máy xử lý bị ngắt giữa chừng (khởi động lại hoặc mất kết nối) nên hệ thống đã giao lại việc.");
+    await expect(table.getByRole("row").filter({ hasText: "Lần 2" })).toContainText("Đang chạy");
+    await expect(table).not.toContainText("Ghi nhận");
+    await expect(table).not.toContainText("Expired");
   });
 
   test("NeedsFix with IFC_EXIT_UNKNOWN: QA done, the exit step blocks and its action goes to the exit door choice", async ({ page }) => {

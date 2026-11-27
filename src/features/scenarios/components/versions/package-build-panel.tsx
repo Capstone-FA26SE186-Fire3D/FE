@@ -4,6 +4,7 @@ import { Hammer, RefreshCw, RotateCcw } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 
 import { useIdempotencyKey } from "@/api";
+import { isVietnamese } from "@/api/error-text";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/dialog";
@@ -14,6 +15,7 @@ import { SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge, type Tone } from "@/components/ui/status-badge";
 import { Table, TableMessage } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { attemptEndReasonText } from "@/configs/processing-end-reason";
 
 import type { VersionJobs } from "../../use-version-jobs";
 import { describeError, isJobSucceeded, isJobTerminal, shortHash, type DescribedError } from "../../version-readiness";
@@ -44,7 +46,7 @@ export function jobTone(status: string | undefined): Tone {
   }
 }
 
-const jobStatusLabel: Record<string, string> = { queued: "Đang chờ máy dựng", running: "Đang dựng", succeeded: "Dựng xong", failed: "Dựng lỗi", cancelled: "Đã hủy" };
+const jobStatusLabel: Record<string, string> = { queued: "Đang chờ máy dựng", running: "Đang dựng", succeeded: "Dựng xong", failed: "Dựng lỗi", cancelled: "Đã hủy", expired: "Bị ngắt giữa chừng" };
 export const jobStatusText = (status: string | undefined) => (status ? jobStatusLabel[status.toLowerCase()] ?? status : "—");
 
 function JobTimeline({ status }: { status: string }) {
@@ -150,6 +152,11 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
 
   const detail = jobs.detail;
   const attempt = detail?.currentAttempt;
+  // `message` and `endReason` (and `previousAttempt`) are missing on older servers, so every read tolerates undefined.
+  const endReason = attemptEndReasonText(attempt?.endReason, "dựng");
+  const workerMessage = attempt?.message?.trim() || undefined;
+  const previous = detail?.previousAttempt;
+  const previousReason = previous && attempt && attempt.attemptNumber >= 2 ? attemptEndReasonText(previous.endReason, "dựng") : null;
 
   return <div className="ops-stack">
     <Panel title="Dựng gói" description="Hệ thống dựng gói mô phỏng từ phiên bản này để ứng dụng Android tải về, rồi tự kiểm tra gói." bodyClassName="ops-stack">
@@ -249,12 +256,14 @@ export function PackageBuildPanel({ accessToken, version, jobs, canAct, onStarte
           {attempt?.outputHash && <span>Đầu ra: <code className="ver-hash">{shortHash(attempt.outputHash, 20)}</code></span>}
         </details>
         {!isJobTerminal(detail.job.status) && <Alert tone="info" title="Đang chờ kết quả">Gói chưa dựng xong. Trang tự cập nhật khi xong.</Alert>}
+        {!isJobTerminal(detail.job.status) && previousReason && <p className="ver-note">Lần dựng trước: {previousReason}</p>}
         {detail.job.status.toLowerCase() === "queued" && !attempt && now - Date.parse(detail.job.createdAt) > WORKER_WAIT_MS && <Alert tone="warning" title="Chưa có máy dựng nhận">
           Đã chờ hơn {Math.round(WORKER_WAIT_MS / 60000)} phút mà chưa có máy dựng nào nhận. Máy dựng có thể đang tắt: bật máy rồi trang sẽ tự cập nhật.
         </Alert>}
         {isJobSucceeded(detail.job.status) && <Alert tone="info" title="Gói đã dựng xong">Hệ thống tự kiểm tra gói. Xem kết quả và chốt gói ở tab &quot;Kiểm tra&quot;.</Alert>}
         {failedJob && <Alert tone="danger" title="Dựng gói bị lỗi" action={canAct ? <Button size="sm" variant="secondary" className="mt-3" onClick={() => { setRetryError(null); setRetrying(true); }}><RotateCcw size={14} aria-hidden="true" />Dựng lại</Button> : undefined}>
-          Máy dựng chưa gửi lý do chi tiết. Bấm Dựng lại để thử một lần mới; nếu vẫn lỗi, gửi phần &quot;Thông tin cho bộ phận hỗ trợ&quot; cho đội kỹ thuật.
+          {endReason || workerMessage ? [endReason, isVietnamese(workerMessage) ? workerMessage : null].filter(Boolean).join(" ") : "Máy dựng chưa gửi lý do chi tiết."} Bấm Dựng lại để thử một lần mới; nếu vẫn lỗi, gửi phần &quot;Thông tin cho bộ phận hỗ trợ&quot; cho đội kỹ thuật.
+          {workerMessage && !isVietnamese(workerMessage) && <SupportCode detail={workerMessage} />}
         </Alert>}
       </>}
     </Panel>}
