@@ -37,6 +37,10 @@ type TopUpForm = { policyVersionId: string; quotaUnits: string; amount: string; 
 
 const emptyLine: LineForm = { startsAt: "", learnerLimit: "", oneTimePrice: "", additionalQuotaUnits: "", aiPolicyVersionId: "" };
 const isWhole = (value: string) => /^\d+$/.test(value.trim());
+/** Smallest bank transfer PayOS accepts; a quote below it can never be paid (UAT 27/11, BE#241). */
+const MIN_TOTAL_VND = 2000;
+/** Acceptance deadline must close this long before the earliest service start, so a payment credited a few seconds late still activates. */
+const START_MARGIN_MS = 15 * 60_000;
 
 function policyLabel(policy: QuotaPolicy) {
   return `${quotaUnitLabel(policy.quotaUnit)} · áp dụng từ ${formatDateTime(policy.effectiveFrom)}`;
@@ -46,7 +50,8 @@ function policyLabel(policy: QuotaPolicy) {
  * Admin issue: explicit tax, terms and a future expiry freeze the snapshot. Building lines need their fixed UTC
  * service start (New; Renewal may continue the committed period); Upgrade lines need effective time, the new
  * learner limit and the one-time fee; a top-up needs the policy, quota units, amount and interval. Totals shown
- * afterwards are the BE's; the form never computes a price.
+ * afterwards are the BE's; the form only previews subtotal − discount (or top-up amount) + tax to refuse a total below
+ * the 2.000 ₫ bank minimum, and refuses a deadline closer than 15 minutes to the earliest start (BE#241).
  */
 function IssueForm({ accessToken, quotation, etag, onIssued, onStale }: { accessToken: string; quotation: Quotation; etag: string | null; onIssued: (next: WithEtag<Quotation>) => void; onStale: () => void }) {
   const toast = useToast();
@@ -67,6 +72,30 @@ function IssueForm({ accessToken, quotation, etag, onIssued, onStale }: { access
   const line = (id: string): LineForm => lines[id] ?? emptyLine;
   const setLine = (id: string, patch: Partial<LineForm>) => setLines((state) => ({ ...state, [id]: { ...(state[id] ?? emptyLine), ...patch } }));
 
+  // Expected total as the BE will freeze it: building quotes subtotal − discount + tax, a top-up its amount + tax. An
+  // Upgrade line is priced by the one-time fee typed here (no discount), so its draft estimate is swapped for that fee.
+  const taxValue = /^\d+$/.test(tax.trim()) ? Number(tax) : 0;
+  const upgradeAdjustment = quotation.items.reduce((sum, item) => {
+    if (item.purchaseAction !== "Upgrade") return sum;
+    const fee = line(item.id).oneTimePrice;
+    return sum - (item.subtotalAmount - item.discountAmount) + (isWhole(fee) ? Number(fee) : 0);
+  }, 0);
+  const expectedTotal = isTopUp
+    ? (isWhole(topUp.amount) ? Number(topUp.amount) : 0) + taxValue
+    : quotation.subtotalAmount - quotation.discountAmount + upgradeAdjustment + taxValue;
+  /** Earliest service start typed on any building line (New "Bắt đầu dịch vụ", Upgrade "Hiệu lực từ", a Renewal with a date). */
+  const earliestStart = (): number | null => {
+    if (isTopUp) return null;
+    let earliest: number | null = null;
+    for (const item of quotation.items) {
+      const iso = localInputToIso(line(item.id).startsAt);
+      if (!iso) continue;
+      const time = new Date(iso).getTime();
+      if (earliest === null || time < earliest) earliest = time;
+    }
+    return earliest;
+  };
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (lock.current) return;
@@ -75,6 +104,10 @@ function IssueForm({ accessToken, quotation, etag, onIssued, onStale }: { access
     if (!terms.trim() || terms.trim().length > 10000) found.terms = "Nhập điều khoản (1–10.000 ký tự).";
     const iso = localInputToIso(validUntil);
     if (!iso || new Date(iso) <= new Date()) found.validUntil = "Chọn thời hạn chấp nhận trong tương lai.";
+    else {
+      const earliest = earliestStart();
+      if (earliest !== null && new Date(iso).getTime() > earliest - START_MARGIN_MS) found.validUntil = `Hạn chấp nhận phải sớm hơn ngày bắt đầu sớm nhất ít nhất 15 phút (muộn nhất ${formatDateTime(new Date(earliest - START_MARGIN_MS).toISOString())}), để khoản thanh toán đến trễ vài giây vẫn kích hoạt được.`;
+    }
 
     const input: IssueQuotationInput = { taxAmount: Number(tax), terms: terms.trim(), validUntil: iso as string };
     if (isTopUp) {
@@ -110,6 +143,9 @@ function IssueForm({ accessToken, quotation, etag, onIssued, onStale }: { access
       }
       input.items = items;
     }
+    // Checked once every amount the total depends on is valid, so a missing fee is not reported as a too-small total.
+    const amountMissing = Object.keys(found).some((key) => key === "taxAmount" || key === "topUpAmount" || key.endsWith(":oneTimePrice"));
+    if (!amountMissing && expectedTotal < MIN_TOTAL_VND) found.taxAmount = `Tổng thanh toán tối thiểu là 2.000 ₫ (mức chuyển khoản nhỏ nhất); báo giá này đang là ${formatVnd(expectedTotal)}.`;
     setErrors(found);
     if (Object.keys(found).length) return;
     lock.current = true; setSaving(true); setError(null);
@@ -159,11 +195,12 @@ function IssueForm({ accessToken, quotation, etag, onIssued, onStale }: { access
     <fieldset className="ops-fieldset"><legend>Giá và điều khoản</legend>
       <div className="ops-form-grid">
         <Field label="Thuế (VND)" required error={errors.taxAmount}>{(p) => <Input {...p} inputMode="numeric" value={tax} onChange={(event) => setTax(event.target.value)} />}</Field>
-        <Field label="Hạn chấp nhận" required error={errors.validUntil} hint="Theo giờ địa phương; không muộn hơn ngày bắt đầu sớm nhất.">{(p) => <Input {...p} type="datetime-local" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} />}</Field>
+        <Field label="Hạn chấp nhận" required error={errors.validUntil} hint="Theo giờ địa phương; sớm hơn ngày bắt đầu sớm nhất ít nhất 15 phút.">{(p) => <Input {...p} type="datetime-local" value={validUntil} onChange={(event) => setValidUntil(event.target.value)} />}</Field>
         <Field label="Điều khoản" required className="ops-span-all" error={errors.terms}>{(p) => <Textarea {...p} maxLength={10000} value={terms} onChange={(event) => setTerms(event.target.value)} />}</Field>
       </div>
     </fieldset>
     {error && <Alert tone="danger" title="Chưa phát hành được">{error.message}{error.details.length > 0 && <>{" "}{error.details.join(" ")}</>}</Alert>}
+    <p className="bill-muted" data-testid="issue-expected-total" style={{ margin: 0, textAlign: "right" }}>Tổng thanh toán dự kiến: <strong>{formatVnd(expectedTotal)}</strong></p>
     <div className="ops-actions" style={{ justifyContent: "flex-end" }}><Button type="submit" disabled={saving}><Send size={16} aria-hidden="true" />{saving ? "Đang phát hành…" : "Phát hành báo giá"}</Button></div>
   </form>;
 }
@@ -257,7 +294,7 @@ export function QuotationsSection({ accessToken }: { accessToken: string }) {
         {checkouts.error !== undefined && <Alert tone="danger" title="Không tải được lịch sử thanh toán" action={<Button size="sm" variant="secondary" className="mt-3" onClick={checkouts.reload}>Thử lại</Button>}>{billingErrorText(checkouts.error)}</Alert>}
         <CheckoutHistory rows={checkouts.data?.items ?? []} />
         {(checkouts.data?.items ?? []).some((row) => row.paymentStatus === "Paid") && <StatusBadge tone="success">Đã có tiền: không hủy được báo giá này</StatusBadge>}
-        <QuotationCancel accessToken={accessToken} scope="admin" quotation={current.data} etag={current.etag} onChanged={(next) => { setOverride(next); list.reload(); }} onStale={() => { setOverride(null); detail.reload(); }} />
+        <QuotationCancel accessToken={accessToken} scope="admin" quotation={current.data} etag={current.etag} paid={(checkouts.data?.items ?? []).some((row) => row.paymentStatus === "Paid")} onChanged={(next) => { setOverride(next); list.reload(); }} onStale={() => { setOverride(null); detail.reload(); }} />
       </div>}
     </Drawer>
   </div>;

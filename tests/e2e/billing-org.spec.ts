@@ -363,6 +363,31 @@ test.describe("organization billing workspace (mock)", () => {
     expect(mock.calls.filter((call) => call.path.includes("/billing/"))).toHaveLength(0);
   });
 
+  test("a PlatformAdmin opening the organization billing page sees the denied state with a link to commerce and loads no billing data", async ({ page }) => {
+    const mock = newMock();
+    await signIn(page, admin);
+    await mockBilling(page, mock);
+    await page.goto("/workspace/billing");
+    await expect(page.getByText("Không có quyền truy cập").first()).toBeVisible();
+    await expect(page.getByText("Khu này dành cho tài khoản tổ chức.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Xem dịch vụ và thanh toán của mọi tổ chức" })).toHaveAttribute("href", "/admin/commerce");
+    await expect(page.getByText(/Dữ liệu chưa hợp lệ/)).toHaveCount(0);
+    expect(callsTo(mock, "GET", "/api/organizations/me/ai-quota")).toHaveLength(0);
+    expect(mock.calls.filter((call) => call.path.startsWith("/api/billing/"))).toHaveLength(0);
+  });
+
+  test("organization view of a paid quotation offers no cancel button", async ({ page }) => {
+    const mock = newMock();
+    mock.quotations[ids.quote] = quotationFixture({ status: "Accepted", acceptedAt: iso(-0.1), revision: 5 });
+    seedCheckout(mock, { checkoutStatus: "Completed" }, { paymentStatus: "Paid", provisioningStatus: "Succeeded", items: [{ quotationItemId: ids.line, buildingId: "b-1", status: "Succeeded", entitlementId: "ent-1", errorCode: null }] });
+    await signIn(page, owner);
+    await mockBilling(page, mock);
+    await page.goto(`/workspace/billing?quotation=${ids.quote}`);
+    await expect(page.getByTestId("checkout-history")).toBeVisible();
+    await expect(page.getByTestId("payment-status")).toHaveAttribute("data-payment-status", "Paid");
+    await expect(page.getByRole("button", { name: "Hủy báo giá" })).toHaveCount(0);
+  });
+
   test("no 'Chờ BE' block or sample data for upgrade/seats/quota/top-up in this build", async ({ page }) => {
     const mock = newMock();
     await signIn(page, owner);

@@ -16,6 +16,10 @@ const ORG_2 = "22222222-2222-4222-8222-222222222222";
 const SUBMITTER = "aaaaaaaa-0000-4000-8000-000000000001";
 const ADMIN_ID = "bbbbbbbb-0000-4000-8000-000000000002";
 const hex = (seed: string) => (seed.repeat(64)).slice(0, 64);
+const expertAccount = (id: string, fullName: string, isActive = true) => ({ id, email: `${id}@fire3d.test`, fullName, role: "FireSafetyExpert", organizationId: null, isActive, lastLoginAt: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" });
+const EXPERT_A = expertAccount("expert-a", "Chuyên viên Lê Văn T");
+const EXPERT_B = expertAccount("expert-b", "Chuyên viên Trần Thị B");
+const EXPERTS = [EXPERT_A, EXPERT_B, expertAccount("expert-c", "Chuyên viên đã nghỉ", false)];
 
 type Status = "Submitted" | "Approved" | "Rejected";
 type Seed = { n: number; status?: Status; org?: string; scenarioName?: string; versionNumber?: number; reason?: string | null; ready?: boolean; legacy?: boolean; instructions?: string };
@@ -68,8 +72,23 @@ class ReviewServer {
   applied: Array<{ action: string; versionId: string }> = [];
   private receipts = new Map<string, { fingerprint: string; response: Record<string, unknown> }>();
 
+  /**
+   * BE#242 round-robin assignment. Undefined = today's server (no `assignedTo` at all). Otherwise reviewId → holder
+   * (null = not assigned) and `POST /api/admin/reviews/{id}/reassign` works on waiting items.
+   */
+  assignments?: Record<string, { id: string; fullName: string } | null>;
+  reassignRequests: Array<{ id: string; body: Record<string, unknown> }> = [];
+  /** Answer the next reassign with this error code without applying it. */
+  reassignFailNext?: { status: number; code: string };
+
   constructor(seeds: Seed[]) {
     this.reviews = seeds.map(buildReview);
+  }
+
+  view(summary: ReviewRecord["summary"]) {
+    if (!this.assignments) return summary;
+    const holder = this.assignments[summary.reviewId] ?? null;
+    return { ...summary, assignedTo: holder, assignedAt: holder ? "2026-10-01T09:00:00Z" : null };
   }
 
   byId(id: string) { return this.reviews.find((review) => review.summary.reviewId === id); }
@@ -85,7 +104,7 @@ class ReviewServer {
     const pageSize = Number(query.get("pageSize") ?? 20);
     const filtered = this.reviews
       .filter((review) => (!status || review.summary.status === status) && (!organizationId || review.summary.organizationId === organizationId))
-      .map((review) => review.summary)
+      .map((review) => this.view(review.summary))
       .sort((a, b) => (a.submittedAt === b.submittedAt ? (a.reviewId < b.reviewId ? 1 : -1) : a.submittedAt < b.submittedAt ? 1 : -1));
     return { status: 200, body: { items: filtered.slice((page - 1) * pageSize, page * pageSize), totalCount: filtered.length, page, pageSize } };
   }
@@ -145,6 +164,25 @@ async function install(page: Page, server: ReviewServer, user: object = admin) {
     if (!review) return problem(route, 404, { title: "Not found.", code: "NOT_FOUND" });
     const { summary, content, rubric, learningObjectives, learnerInstructions, readiness } = review;
     return route.fulfill({ json: { review: summary, content, rubric, learningObjectives, learnerInstructions, readiness } });
+  });
+  // Active Chuyên viên PCCC for the "Gán lại" picker (admin accounts API, role + status filters).
+  await page.route((url) => url.pathname === "/api/accounts", (route) => {
+    const query = new URL(route.request().url()).searchParams;
+    const items = EXPERTS.filter((account) => (!query.get("role") || account.role === query.get("role")) && (query.get("isActive") !== "true" || account.isActive));
+    return route.fulfill({ json: { items, totalCount: items.length, page: 1, pageSize: 100 } });
+  });
+  await page.route((url) => /^\/api\/admin\/reviews\/[^/]+\/reassign$/.test(url.pathname), (route) => {
+    const id = new URL(route.request().url()).pathname.split("/").at(-2) as string;
+    const body = route.request().postDataJSON() as Record<string, unknown>;
+    server.reassignRequests.push({ id, body });
+    if (server.reassignFailNext) { const fail = server.reassignFailNext; server.reassignFailNext = undefined; return problem(route, fail.status, { title: "Injected error.", code: fail.code }); }
+    const review = server.byId(id);
+    if (!review || !server.assignments) return problem(route, 404, { title: "Not found.", code: "NOT_FOUND" });
+    if (review.summary.status !== "Submitted") return problem(route, 409, { title: "Not pending.", code: "REVIEW_NOT_PENDING" });
+    const target = EXPERTS.find((account) => account.id === body.expertId && account.isActive);
+    if (!target) return problem(route, 400, { title: "Expert not available.", code: "EXPERT_NOT_AVAILABLE" });
+    server.assignments[id] = { id: target.id, fullName: target.fullName };
+    return route.fulfill({ json: server.view(review.summary) });
   });
   await page.route((url) => /^\/api\/admin\/scenario-versions\/[^/]+\/(approve|reject)$/.test(url.pathname), (route) => {
     const parts = new URL(route.request().url()).pathname.split("/");
@@ -414,6 +452,92 @@ test("the admin screen is read-only since BE#211: no decision buttons and no dec
   await expect(dialog.getByTestId("review-readonly")).toContainText("Chuyên viên PCCC thẩm định nội dung này.");
   await expect(dialog.getByRole("button", { name: /thẩm định|chưa đạt|từ chối|duyệt/i })).toHaveCount(0);
   expect(server.decisionRequests).toHaveLength(0);
+});
+
+test.describe("assignment (BE#242)", () => {
+  const openReassign = async (page: Page, name: string) => {
+    await row(page, name).getByRole("button", { name: "Thao tác" }).click();
+    await page.getByRole("menuitem", { name: "Gán lại" }).click();
+    return page.getByRole("dialog", { name: "Gán lại cho Chuyên viên khác" });
+  };
+
+  test("without assignment fields the queue has no assignee column and no Gán lại", async ({ page }) => {
+    const server = new ReviewServer(baseSeeds());
+    await install(page, server);
+    await page.goto("/admin/reviews");
+    await expect(rows(page)).toHaveCount(2);
+    await expect(page.getByTestId("review-table").getByText("Người được giao")).toHaveCount(0);
+    await row(page, "Sơ tán giờ ra chơi").getByRole("button", { name: "Thao tác" }).click();
+    await expect(page.getByRole("menuitem", { name: "Mở chi tiết" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Gán lại" })).toHaveCount(0);
+  });
+
+  test("shows Người được giao and reassigns a waiting item with a reason", async ({ page }) => {
+    const server = new ReviewServer(baseSeeds());
+    const [first, second] = server.reviews.map((review) => review.summary.reviewId);
+    server.assignments = { [first]: { id: EXPERT_A.id, fullName: EXPERT_A.fullName }, [second]: null };
+    await install(page, server);
+    await page.goto("/admin/reviews");
+    await expect(page.getByTestId("review-table").getByRole("columnheader", { name: "Người được giao" })).toBeVisible();
+    await expect(row(page, "Sơ tán giờ ra chơi")).toContainText("Chuyên viên Lê Văn T");
+    await expect(row(page, "Cháy kho hàng giờ cao điểm")).toContainText("Chưa giao");
+
+    const dialog = await openReassign(page, "Sơ tán giờ ra chơi");
+    await dialog.getByTestId("reassign-submit").click();
+    await expect(dialog.getByText("Chọn Chuyên viên PCCC nhận mục này.")).toBeVisible();
+    await expect(dialog.getByText("Nhập lý do gán lại (1–500 ký tự).")).toBeVisible();
+    expect(server.reassignRequests).toHaveLength(0);
+
+    await dialog.getByRole("combobox", { name: "Chuyên viên PCCC" }).click();
+    // The current holder and inactive experts are not offered.
+    await expect(page.getByRole("option", { name: /Chuyên viên Lê Văn T/ })).toHaveCount(0);
+    await expect(page.getByRole("option", { name: /Chuyên viên đã nghỉ/ })).toHaveCount(0);
+    await page.getByRole("option", { name: /Chuyên viên Trần Thị B/ }).click();
+    await dialog.getByTestId("reassign-reason").fill("  Chuyên viên T nghỉ phép tuần này.  ");
+    await dialog.getByTestId("reassign-submit").click();
+    await expect(dialog).toHaveCount(0);
+    expect(server.reassignRequests).toEqual([{ id: first, body: { expertId: EXPERT_B.id, reason: "Chuyên viên T nghỉ phép tuần này." } }]);
+    await expect(row(page, "Sơ tán giờ ra chơi")).toContainText("Chuyên viên Trần Thị B");
+  });
+
+  test("decided items offer no Gán lại", async ({ page }) => {
+    const server = new ReviewServer(baseSeeds());
+    server.assignments = Object.fromEntries(server.reviews.map((review) => [review.summary.reviewId, { id: EXPERT_A.id, fullName: EXPERT_A.fullName }]));
+    await install(page, server);
+    await page.goto("/admin/reviews?status=Approved");
+    await expect(rows(page)).toHaveCount(1);
+    await row(page, "Mất điện và khói").getByRole("button", { name: "Thao tác" }).click();
+    await expect(page.getByRole("menuitem", { name: "Mở chi tiết" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Gán lại" })).toHaveCount(0);
+  });
+
+  test("EXPERT_NOT_AVAILABLE keeps the dialog open with its sentence; REVIEW_NOT_PENDING closes and reloads", async ({ page }) => {
+    const server = new ReviewServer(baseSeeds());
+    const [first] = server.reviews.map((review) => review.summary.reviewId);
+    server.assignments = { [first]: { id: EXPERT_A.id, fullName: EXPERT_A.fullName } };
+    await install(page, server);
+    await page.goto("/admin/reviews");
+
+    let dialog = await openReassign(page, "Sơ tán giờ ra chơi");
+    await dialog.getByRole("combobox", { name: "Chuyên viên PCCC" }).click();
+    await page.getByRole("option", { name: /Chuyên viên Trần Thị B/ }).click();
+    await dialog.getByTestId("reassign-reason").fill("Cân bằng khối lượng việc.");
+    server.reassignFailNext = { status: 400, code: "EXPERT_NOT_AVAILABLE" };
+    await dialog.getByTestId("reassign-submit").click();
+    await expect(dialog.getByText("Chuyên viên này không còn nhận thẩm định được (tài khoản đã khóa hoặc không còn là Chuyên viên PCCC). Hãy chọn người khác.")).toBeVisible();
+    await expect(dialog.getByTestId("reassign-reason")).toHaveValue("Cân bằng khối lượng việc.");
+
+    server.reassignFailNext = { status: 409, code: "REVIEW_NOT_PENDING" };
+    const listsBefore = server.listQueries.length;
+    await dialog.getByTestId("reassign-submit").click();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByText("Mục này đã có kết quả thẩm định nên không gán lại được. Danh sách đã được tải lại.")).toBeVisible();
+    await expect.poll(() => server.listQueries.length).toBeGreaterThan(listsBefore);
+    expect(server.reassignRequests).toHaveLength(2);
+    expect(server.assignments[first]?.id).toBe(EXPERT_A.id);
+    dialog = page.getByRole("dialog", { name: "Gán lại cho Chuyên viên khác" });
+    await expect(dialog).toHaveCount(0);
+  });
 });
 
 for (const width of [1440, 375]) {

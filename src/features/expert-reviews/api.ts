@@ -11,12 +11,19 @@ export type ExpertAction = "approve" | "reject";
 export const REASON_MAX = 2000;
 
 /**
- * BE `ExpertReviewItem` (BE#211, BE#213). One shared queue for every FireSafetyExpert: no assignment, the first decision
- * wins. `revision` is the ETag number; `revisionId` is the IFC revision. For kind Infrastructure, `reviewId` is the
+ * BE `ExpertReviewItem` (BE#211, BE#213). Today one shared queue for every FireSafetyExpert: no assignment, the first
+ * decision wins. BE#242 adds round-robin assignment (optional fields below). `revision` is the ETag number; `revisionId` is the IFC revision. For kind Infrastructure, `reviewId` is the
  * infrastructure id and the scenario fields are null.
  */
 export type ExpertReviewItem = {
   reviewId: string;
+  /**
+   * BE#242 (round-robin assignment, not built yet). All three are ABSENT on today's server: `assignedTo === undefined`
+   * means "no assignment" and the page keeps the shared queue. `null` means the server assigns but nobody holds the item.
+   */
+  assignedTo?: ExpertAssignee | null;
+  assignedAt?: string | null;
+  assignedToMe?: boolean;
   kind: ExpertReviewKind | string;
   status: ExpertReviewStatus | string;
   revision: number;
@@ -40,16 +47,38 @@ export type ExpertReviewItem = {
 };
 
 /** Scenario: `content` is the frozen merged document (scenario objects + infrastructure items). Infrastructure: `{geometry, runtimeVersion, items}`. */
+export type ExpertAssignee = { id: string; fullName: string | null };
+/** BE#242: `assignmentEnabled` is true on every list page while assignment is on, even an empty one. Absent today. */
+export type ExpertReviewPage = PageResponse<ExpertReviewItem> & { assignmentEnabled?: boolean };
+/** Assignment is on when the page says so, or (fallback) when an item carries the assignment fields. */
+export const pageHasAssignment = (page: ExpertReviewPage) => page.assignmentEnabled === true || page.items.some(hasAssignment);
+/** `assignee` query of BE#242: `me` (the server's default) or `all`. Sent only once the server showed it assigns. */
+export type ExpertAssigneeFilter = "me" | "all";
+
+/** True when this item came from a server that assigns reviews (BE#242): the field is present, even as null. */
+export const hasAssignment = (item: Pick<ExpertReviewItem, "assignedTo"> | null | undefined) => item != null && item.assignedTo !== undefined;
+export const assigneeName = (assignee: ExpertAssignee) => assignee.fullName?.trim() || "Chuyên viên PCCC";
+
+const ASSIGNMENT_KEY = "fire3d-expert-assignment";
+/** Remembers, for this tab, that the server assigns reviews: after that the queue opens on "Được giao cho bạn" with its query. */
+export function rememberAssignment() {
+  try { sessionStorage.setItem(ASSIGNMENT_KEY, "1"); } catch { /* storage unavailable: detection repeats on the next list */ }
+}
+export function knownAssignment(): boolean {
+  try { return sessionStorage.getItem(ASSIGNMENT_KEY) === "1"; } catch { return false; }
+}
+
 export type ExpertReviewDetail = { review: ExpertReviewItem; content: unknown | null; rubric: unknown | null; learningObjectives: unknown | null; learnerInstructions: string | null };
 export type LoadedExpertReview = { detail: ExpertReviewDetail; etag: string | null };
-export type ExpertReviewQuery = { kind?: ExpertReviewKind; status?: ExpertReviewStatus; page: number; pageSize: number };
+export type ExpertReviewQuery = { kind?: ExpertReviewKind; status?: ExpertReviewStatus; assignee?: ExpertAssigneeFilter; page: number; pageSize: number };
 
 export const expertReviewsApi = {
   list(accessToken: string, query: ExpertReviewQuery, signal?: AbortSignal) {
-    return apiClient.request<PageResponse<ExpertReviewItem>>("/api/expert/reviews", { headers: auth(accessToken), query, signal });
+    return apiClient.request<ExpertReviewPage>("/api/expert/reviews", { headers: auth(accessToken), query, signal });
   },
   async detail(accessToken: string, reviewId: string, signal?: AbortSignal): Promise<LoadedExpertReview> {
     const response = await apiClient.requestWithMeta<ExpertReviewDetail>(`/api/expert/reviews/${encodeURIComponent(reviewId)}`, { headers: auth(accessToken), signal });
+    if (hasAssignment(response.data.review)) rememberAssignment();
     return { detail: response.data, etag: draftEtag(response.headers, response.data.review.revision) };
   },
   /** The 3D model of the reviewed revision (same shape as the editor preview), signed for a short time. */
@@ -86,6 +115,7 @@ export function describeDecisionError(error: unknown): DecisionFailure {
   if (code === "CONTENT_REVIEW_NOT_PENDING" || code === "FIRE_INFRASTRUCTURE_NOT_PENDING") return { kind: "reload", code, message: "Mục này đã có kết quả thẩm định và kết quả không đổi được. Đang tải lại." };
   if (code === "CONTENT_HASH_MISMATCH") return { kind: "reload", code, message: "Nội dung đã thay đổi so với bản bạn đang xem. Đang tải lại; hãy xem lại rồi thẩm định." };
   if (code === "IDEMPOTENCY_KEY_CONFLICT" || error.status === 409 || error.status === 428) return { kind: "reload", code, message: "Kết quả không ghi được ở trạng thái hiện tại. Đang tải lại để hiển thị trạng thái đúng." };
+  if (code === "REVIEW_NOT_ASSIGNED") return { kind: "reload", code, message: "Mục này đã giao cho Chuyên viên khác nên bạn không quyết định được. Tải lại để xem người đang giữ." };
   if (error.status === 401) return { kind: "reload", code, message: "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại; chưa có kết quả nào được ghi." };
   if (error.status === 403) return { kind: "reload", code, message: "Chỉ Chuyên viên PCCC thẩm định được mục này." };
   if (error.status === 404) return { kind: "reload", code, message: "Không tìm thấy mục này. Có thể tổ chức hoặc công trình đã bị vô hiệu hóa." };

@@ -48,6 +48,8 @@ const CODE_MESSAGES: Record<string, string> = {
   PAYOS_EVENT_CONFLICT: "Sự kiện thanh toán không khớp với dữ liệu đã ghi. Hãy liên hệ hỗ trợ kèm mã giao dịch.",
   QUOTATION_EXPIRED: "Báo giá đã quá hạn hiệu lực nên không hủy hoặc thanh toán được; trạng thái được giữ nguyên.",
   QUOTATION_CHECKOUT_UNRESOLVED: "Báo giá còn thanh toán chưa kết thúc. Hủy thanh toán (hoặc chờ PayOS xác nhận hết hạn) rồi hủy báo giá.",
+  QUOTATION_TOTAL_BELOW_MINIMUM: "Tổng thanh toán dưới 2.000 ₫, mức chuyển khoản nhỏ nhất. Tăng thuế hoặc chọn gói khác.",
+  QUOTATION_START_TOO_CLOSE: "Hạn chấp nhận quá sát ngày bắt đầu dịch vụ. Để hạn chấp nhận sớm hơn ngày bắt đầu ít nhất 15 phút.",
   QUOTATION_V7_REQUIRED: "Báo giá theo mẫu cũ không thể phát hành hoặc thanh toán. Hãy tạo báo giá mới.",
   PACKAGE_NOT_PURCHASABLE: "Gói chưa cấu hình đủ (6/12 tháng, số học viên, hạn mức AI và chính sách) nên chưa bán được. Quản trị FET3D cần hoàn tất cấu hình gói.",
   QUOTE_REQUIRES_APPROVED_SCENARIO: "Công trình cần có ít nhất một tình huống đạt thẩm định trước khi xin báo giá. Hãy lập Hạ tầng PCCC, soạn tình huống và gửi Chuyên viên PCCC thẩm định trước.",

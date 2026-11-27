@@ -30,7 +30,19 @@ export type ReviewSummary = {
   versionNumber: number;
   submittedByName?: string | null;
   decidedByName?: string | null;
+  /**
+   * BE#242 (round-robin assignment, not built yet). ABSENT on today's server: `undefined` keeps the page as it is; `null`
+   * means the server assigns but nobody holds the item.
+   */
+  assignedTo?: ReviewAssignee | null;
+  assignedAt?: string | null;
 };
+
+export type ReviewAssignee = { id: string; fullName: string | null };
+
+/** Body of `POST /api/admin/reviews/{id}/reassign` (BE#242): `reason` 1–500 characters. Answers 200 with the updated item. */
+export type ReassignReviewRequest = { expertId: string; reason: string };
+export const REASSIGN_REASON_MAX = 500;
 
 export type ReviewPage = PageResponse<ReviewSummary>;
 

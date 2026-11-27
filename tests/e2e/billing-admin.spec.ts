@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { admin, callsTo, etagOf, grant, ids, mockBilling, newMock, owner, packageFixture, queue, quotationFixture, serviceView, signIn } from "./billing-mock";
+import { admin, callsTo, etagOf, grant, ids, iso, mockBilling, newMock, owner, packageFixture, queue, quotationFixture, seedCheckout, serviceView, signIn } from "./billing-mock";
 
 // Route-mock evidence only (not the real BE).
 
@@ -222,6 +222,73 @@ test.describe("admin commerce (mock)", () => {
     expect(issue.body).toMatchObject({ topUp: { policyVersionId: ids.policy, quotaUnits: 500, amount: 200000 } });
     expect((issue.body as { items?: unknown }).items).toBeUndefined();
     await expect(page.getByTestId("topup-snapshot")).toContainText("500 tokens");
+  });
+
+  test("issue refuses a total below the 2.000 ₫ bank minimum and sends nothing; raising the tax to reach 2.000 ₫ issues it", async ({ page }) => {
+    const mock = newMock();
+    const lineId = "bbbbbbbb-0000-0000-0000-000000000002";
+    mock.quotations[ids.quoteDraft] = quotationFixture({
+      id: ids.quoteDraft, quotationNumber: "FET-Q-0002", status: "Draft", revision: 1, taxAmount: null, terms: null, subtotalAmount: 1200, discountAmount: 0, totalAmount: 1200, pricingStatus: "Estimated", issuedAt: null,
+      items: [{ ...quotationFixture().items[0], id: lineId, unitPrice: 100, subtotalAmount: 1200, discountAmount: 0, totalAmount: 1200, startsAt: null, endsAt: null }],
+    });
+    await signIn(page, admin);
+    await mockBilling(page, mock);
+    await page.goto(`/admin/commerce?tab=quotes&quotation=${ids.quoteDraft}`);
+    await page.getByLabel("Điều khoản").fill("Điều khoản thử");
+    await page.getByLabel("Bắt đầu dịch vụ").fill("2027-01-05T08:00");
+    await expect(page.getByTestId("issue-expected-total")).toContainText(/Tổng thanh toán dự kiến: 1\.200/);
+    await page.getByRole("button", { name: "Phát hành báo giá" }).click();
+    await expect(page.getByText(/Tổng thanh toán tối thiểu là 2\.000 ₫ \(mức chuyển khoản nhỏ nhất\); báo giá này đang là 1\.200/)).toBeVisible();
+    expect(callsTo(mock, "POST", `/api/admin/quotations/${ids.quoteDraft}/issue`)).toHaveLength(0);
+    await page.getByLabel("Thuế (VND)").fill("800");
+    await expect(page.getByTestId("issue-expected-total")).toContainText(/Tổng thanh toán dự kiến: 2\.000/);
+    await page.getByRole("button", { name: "Phát hành báo giá" }).click();
+    await expect(page.getByTestId("quotation-total")).toHaveText(/2\.000/);
+    const issues = callsTo(mock, "POST", `/api/admin/quotations/${ids.quoteDraft}/issue`);
+    expect(issues).toHaveLength(1);
+    expect(issues[0].body).toMatchObject({ taxAmount: 800 });
+  });
+
+  test("issue refuses an acceptance deadline less than 15 minutes before the earliest service start", async ({ page }) => {
+    const mock = newMock();
+    await signIn(page, admin);
+    await mockBilling(page, mock);
+    await page.goto(`/admin/commerce?tab=quotes&quotation=${ids.quoteDraft}`);
+    await page.getByLabel("Điều khoản").fill("Điều khoản thử");
+    await page.getByLabel("Bắt đầu dịch vụ").fill("2027-01-05T08:00");
+    await page.getByLabel("Hạn chấp nhận").fill("2027-01-05T08:00");
+    await page.getByRole("button", { name: "Phát hành báo giá" }).click();
+    await expect(page.getByText(/Hạn chấp nhận phải sớm hơn ngày bắt đầu sớm nhất ít nhất 15 phút \(muộn nhất .+\), để khoản thanh toán đến trễ vài giây vẫn kích hoạt được\./)).toBeVisible();
+    expect(callsTo(mock, "POST", `/api/admin/quotations/${ids.quoteDraft}/issue`)).toHaveLength(0);
+    // Exactly 15 minutes earlier is accepted.
+    await page.getByLabel("Hạn chấp nhận").fill("2027-01-05T07:45");
+    await page.getByRole("button", { name: "Phát hành báo giá" }).click();
+    await expect(page.getByTestId("quotation-total")).toBeVisible();
+    expect(callsTo(mock, "POST", `/api/admin/quotations/${ids.quoteDraft}/issue`)).toHaveLength(1);
+  });
+
+  test("issue rejected by the BE with QUOTATION_START_TOO_CLOSE shows the Vietnamese reason", async ({ page }) => {
+    const mock = newMock();
+    await signIn(page, admin);
+    await mockBilling(page, mock);
+    queue(mock, `POST /api/admin/quotations/${ids.quoteDraft}/issue`, { status: 400, json: { code: "QUOTATION_START_TOO_CLOSE", title: "Quotation validity must end at least 15 minutes before the earliest service start." } });
+    await page.goto(`/admin/commerce?tab=quotes&quotation=${ids.quoteDraft}`);
+    await page.getByLabel("Điều khoản").fill("Điều khoản thử");
+    await page.getByLabel("Bắt đầu dịch vụ").fill("2027-01-05T08:00");
+    await page.getByRole("button", { name: "Phát hành báo giá" }).click();
+    await expect(page.getByText("Hạn chấp nhận quá sát ngày bắt đầu dịch vụ. Để hạn chấp nhận sớm hơn ngày bắt đầu ít nhất 15 phút.")).toBeVisible();
+    await expect(page.getByText(/Quotation validity/)).toHaveCount(0);
+  });
+
+  test("a paid quotation offers no cancel button, only the paid badge", async ({ page }) => {
+    const mock = newMock();
+    mock.quotations[ids.quote] = quotationFixture({ status: "Accepted", acceptedAt: iso(-0.1), revision: 5 });
+    seedCheckout(mock, { checkoutStatus: "Completed" }, { paymentStatus: "Paid", provisioningStatus: "Succeeded" });
+    await signIn(page, admin);
+    await mockBilling(page, mock);
+    await page.goto(`/admin/commerce?tab=quotes&quotation=${ids.quote}`);
+    await expect(page.getByText("Đã có tiền: không hủy được báo giá này")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Hủy báo giá" })).toHaveCount(0);
   });
 
   test("admin can cancel an unpaid quotation with a reason; a paid one is refused", async ({ page }) => {
