@@ -152,7 +152,7 @@ const STEP_LABELS: Record<string, string> = {
 
 export function processingStepLabel(step: string) {
   // Log rows are one per run now, with the job kind as `step`.
-  if (step === "Geometry" || step === "Package" || step === "PackageBuild") return jobKindLabel(step);
+  if (step === "Geometry" || step === "PlaytestPackage" || step === "ReleasePackage") return jobKindLabel(step);
   return STEP_LABELS[step] ?? "Bước khác";
 }
 
@@ -165,7 +165,9 @@ export function attemptReasonText(attempt: Pick<ProcessingAttempt, "endReason" |
 /** Kind of a processing job (`Geometry` for IFC, package builds otherwise). */
 export function jobKindLabel(kind: string | undefined | null) {
   if (kind === "Geometry") return "Dựng mô hình 3D";
-  if (kind === "Package" || kind === "PackageBuild") return "Dựng gói";
+  // Same words as the operations report ("Gói chạy thử", "Gói phát hành").
+  if (kind === "PlaytestPackage") return "Dựng gói chạy thử";
+  if (kind === "ReleasePackage") return "Dựng gói phát hành";
   return "Xử lý";
 }
 
