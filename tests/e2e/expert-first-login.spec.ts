@@ -59,7 +59,7 @@ test.describe("first sign-in of an expert account", () => {
     await step.getByRole("button", { name: "Xác minh", exact: true }).click();
 
     // The workspace of the role shows only the password step; no expert data is requested behind it.
-    await expect(page).toHaveURL(/\/expert\/reviews/);
+    await expect(page).toHaveURL(/\/expert\/overview/);
     const change = page.getByTestId("first-password-change");
     await expect(change.getByRole("heading", { name: "Đổi mật khẩu ban đầu" })).toBeVisible();
     await expect(change).toContainText("chuyenvien@fire3d.test");

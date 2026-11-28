@@ -22,7 +22,7 @@ export function SiteHeader() {
   const { logout, user } = useAuthSession();
   const [accountOpen, setAccountOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
-  const navigation = user?.role === 0 ? [...links, { href: routes.adminOverview, label: "Quản trị" }] : user?.role === 3 ? [...links, { href: routes.expertReviews, label: "Thẩm định" }] : links;
+  const navigation = user?.role === 0 ? [...links, { href: routes.adminOverview, label: "Quản trị" }] : user?.role === 3 ? [...links, { href: routes.expertOverview, label: "Thẩm định" }] : links;
 
   useEffect(() => {
     const closeOnOutsideClick = (event: MouseEvent) => {

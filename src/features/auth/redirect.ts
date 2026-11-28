@@ -5,7 +5,7 @@ import type { AuthUser } from "./types";
 export function dashboardRouteFor(user: Pick<AuthUser, "role"> | null | undefined) {
   if (user?.role === 0) return "/admin/overview";
   if (user?.role === 1) return "/workspace/buildings";
-  if (user?.role === 3) return "/expert/reviews";
+  if (user?.role === 3) return "/expert/overview";
   if (user?.role === 2) return "/learning-hub";
   return "/learning-hub";
 }

@@ -45,7 +45,7 @@ export const organizationArea: OperationsArea = {
   secondaryLink: { href: routes.learn, label: "Khám phá bài học", icon: BookOpen },
 };
 
-/** FireSafetyExpert: the API allows this role only /api/expert, /api/auth and /api/me, so the area holds the review queue and nothing else. */
+/** FireSafetyExpert: the API allows this role only /api/expert, /api/auth and /api/me, so the area holds an overview built from the review list, and the review queue. */
 export const expertArea: OperationsArea = {
   id: "expert",
   label: "Thẩm định PCCC",
@@ -57,6 +57,7 @@ export const expertArea: OperationsArea = {
   deniedHref: routes.home,
   deniedLabel: "Về trang chủ",
   nav: [
+    { href: routes.expertOverview, label: "Tổng quan", icon: LayoutDashboard, group: "Thẩm định" },
     { href: routes.expertReviews, label: "Hàng chờ thẩm định", icon: ClipboardCheck, group: "Thẩm định" },
     { href: routes.account, label: "Tài khoản", icon: UserRound, group: "Cá nhân" },
   ],
