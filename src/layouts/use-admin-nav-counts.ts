@@ -13,7 +13,8 @@ export function useAdminNavCounts(accessToken: string | null, enabled: boolean):
     "admin-nav-counts",
     async (signal) => {
       const [reviews, tickets] = await Promise.all([
-        reviewsApi.list(accessToken as string, { status: "Submitted", page: 1, pageSize: 1 }, signal).catch(() => null),
+        // Both kinds waiting (tình huống + hạ tầng PCCC), the same source as the two tabs of Theo dõi thẩm định.
+        reviewsApi.assignments(accessToken as string, { status: "Submitted", page: 1, pageSize: 1 }, signal).catch(() => null),
         supportApi.listTickets("admin", accessToken as string, { status: "Open", page: 1, pageSize: 1 }, signal).catch(() => null),
       ]);
       return { "/admin/reviews": reviews?.totalCount, "/admin/support": tickets?.total } as Record<string, number | undefined>;
