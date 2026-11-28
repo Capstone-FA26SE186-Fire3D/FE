@@ -28,7 +28,7 @@ import { describeApiError } from "@/api/describe-error";
  * (Idempotency-Key, stable per scenario+revision).
  */
 export function DraftStart({ accessToken, buildingId, scenarioId, onOpen }: { accessToken: string; buildingId: string; scenarioId: string; onOpen: (draftId: string) => void }) {
-  const revisions = useAsyncData(`editor-revisions:${buildingId}`, () => buildingsApi.listRevisions(accessToken, buildingId, 1, 50));
+  const revisions = useAsyncData(`editor-revisions:${buildingId}`, (signal) => buildingsApi.listRevisions(accessToken, buildingId, 1, 50, signal));
   const drafts = useAsyncData(`editor-drafts:${scenarioId}`, (signal) => scenarioVersionsApi.listDrafts(accessToken, scenarioId, 1, 50, signal));
   const scenario = useAsyncData(`editor-scenario:${scenarioId}`, (signal) => scenarioVersionsApi.getScenario(accessToken, scenarioId, signal));
   const { keyFor, done } = useIdempotencyKey();

@@ -271,7 +271,7 @@ export function EnterpriseAdminSection({ accessToken }: { accessToken: string })
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const requestId = get("request");
   const list = useAsyncData(`commerce:enterprise:${page}`, (signal) => billingApi.listEnterpriseRequests(accessToken, page, PAGE_SIZE, "admin", signal));
-  const organizations = useAsyncData("commerce:orgs", () => organizationsApi.list(accessToken, { page: 1, pageSize: 100 }));
+  const organizations = useAsyncData("commerce:orgs", (signal) => organizationsApi.list(accessToken, { page: 1, pageSize: 100 }, signal));
   const orgName = useMemo(() => Object.fromEntries((organizations.data?.items ?? []).map((item) => [item.id, item.name])), [organizations.data]);
   // Assignee names and the "Giao cho người khác" choices. If this list fails, assignees fall back to a neutral label.
   const adminList = useAsyncData("commerce:enterprise:admins", (signal) => billingApi.listPlatformAdmins(accessToken, signal));

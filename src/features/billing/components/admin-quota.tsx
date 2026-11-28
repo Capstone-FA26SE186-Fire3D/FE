@@ -17,7 +17,7 @@ import "../billing.css";
 export function AdminQuotaSection({ accessToken }: { accessToken: string }) {
   const { get, setParams } = useUrlParams();
   const organizationId = get("org");
-  const organizations = useAsyncData("commerce:orgs", () => organizationsApi.list(accessToken, { page: 1, pageSize: 100 }));
+  const organizations = useAsyncData("commerce:orgs", (signal) => organizationsApi.list(accessToken, { page: 1, pageSize: 100 }, signal));
   const items = organizations.data?.items ?? [];
 
   return <div className="ops-stack">

@@ -58,7 +58,7 @@ export function BuildingServicesTab({ buildingId }: { buildingId: string }) {
   const canPurchase = user?.role === 1;
   const token = accessToken as string;
 
-  const building = useAsyncData(`billing:building:${buildingId}`, () => buildingsApi.get(token, buildingId), enabled);
+  const building = useAsyncData(`billing:building:${buildingId}`, (signal) => buildingsApi.get(token, buildingId, signal), enabled);
   const entitlements = useAsyncData(`billing:entitlements:${buildingId}`, (signal) => billingApi.listEntitlements(token, { buildingId, pageSize: 50 }, signal), enabled);
   const quotations = useAsyncData(`billing:quotations:${buildingId}`, (signal) => billingApi.listQuotations(token, 1, 50, signal), enabled);
 

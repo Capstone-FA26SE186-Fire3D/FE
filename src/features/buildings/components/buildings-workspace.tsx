@@ -125,12 +125,12 @@ export function BuildingsWorkspace({ organizationId: organizationIdProp }: { org
   );
   const organizations = useAsyncData(
     "buildings:org-picker",
-    () => organizationsApi.list(accessToken as string, { pageSize: 100, page: 1 }),
+    (signal) => organizationsApi.list(accessToken as string, { pageSize: 100, page: 1 }, signal),
     Boolean(accessToken) && ready && isAdmin && !organizationIdProp,
   );
   const organization = useAsyncData(
     `buildings:org:${scopedOrgId}`,
-    () => organizationsApi.get(accessToken as string, scopedOrgId as string),
+    (signal) => organizationsApi.get(accessToken as string, scopedOrgId as string, signal),
     Boolean(accessToken) && ready && isAdmin && Boolean(scopedOrgId),
     { keepPrevious: false },
   );
