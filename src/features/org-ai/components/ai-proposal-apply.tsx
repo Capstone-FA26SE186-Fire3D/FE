@@ -32,12 +32,14 @@ function show(value: Json | undefined): string {
  * URL or memory), shown as a preview next to what the draft has now, and applied only after an explicit confirmation as ONE
  * editor command: one Undo reverts all of it, and nothing is saved, validated or published by this step.
  */
-export function AiProposalApply<S>({ accessToken, requestId, draft, floorIds, scope, onApply, onClose }: {
+export function AiProposalApply<S>({ accessToken, requestId, draft, floorIds, floorNames, scope, onApply, onClose }: {
   accessToken: string;
   requestId: string;
   draft: JsonObject;
   /** Floors of the draft's own Geometry; null while it is not available. */
   floorIds: Set<string> | null;
+  /** Display name per floor id of the draft's model (Tầng trệt, Tầng 1, Hầm 1). */
+  floorNames: ReadonlyMap<string, string>;
   /** What the open draft may hold; on a PC06 situation the proposal's exits and fixed equipment are not offered. */
   scope?: EditorScope;
   onApply: (build: (draft: JsonObject, id: number, selection: S, now: number) => Command<S> | null) => void;
@@ -111,7 +113,7 @@ export function AiProposalApply<S>({ accessToken, requestId, draft, floorIds, sc
           <ul className={styles.list}>
             {plan.objects.map((object) => <li key={object.index} className={styles.item} data-muted={!object.eligible} data-testid="ai-object">
               <span className={styles.itemTitle}>{object.id || "?"} · {KIND_META[object.kind as ObjectKind]?.label ?? "Đối tượng khác"}{object.label ? ` · ${object.label}` : ""}</span>
-              <span className={styles.dim}>Tầng {object.floorId || "?"}{object.anchorId ? ` · gắn phần tử IFC ${object.anchorId}` : ""} · {object.eligible ? "có thể thêm" : `chỉ xem: ${object.reason}`}</span>
+              <span className={styles.dim}>{object.floorId ? floorNames.get(object.floorId) ?? "Tầng không có trong mô hình" : "Chưa chọn tầng"}{object.anchorId ? ` · gắn phần tử IFC ${object.anchorId}` : ""} · {object.eligible ? "có thể thêm" : `chỉ xem: ${object.reason}`}</span>
             </li>)}
           </ul>
         </section>

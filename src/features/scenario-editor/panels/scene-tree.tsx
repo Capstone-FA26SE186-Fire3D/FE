@@ -21,8 +21,10 @@ const fmt = (value: number) => (Math.round(value * 100) / 100).toString();
 
 export type LayerState = Record<string, boolean>;
 
-export function SceneTree({ floors, floorsNote, activeFloor, onFloor, spawns, hazards, selection, issues, onSelect, onAdd, modelLayers, layerVisibility, onLayer, modelVisible, onModelVisible, hasModel }: {
+export function SceneTree({ floorNames, floors, floorsNote, activeFloor, onFloor, spawns, hazards, selection, issues, onSelect, onAdd, modelLayers, layerVisibility, onLayer, modelVisible, onModelVisible, hasModel }: {
   floors: FloorInfo[];
+  /** Display name per floor key (Tầng trệt, Tầng 1, Hầm 1); the name from the model stays as a tooltip. */
+  floorNames: ReadonlyMap<string, string>;
   floorsNote: string | null;
   activeFloor: string | null;
   onFloor: (key: string | null) => void;
@@ -56,8 +58,8 @@ export function SceneTree({ floors, floorsNote, activeFloor, onFloor, spawns, ha
         : <ul className="se-chips" role="radiogroup" aria-label="Chọn tầng">
           <li role="none"><button type="button" role="radio" aria-checked={activeFloor === null} className="se-chip" onClick={() => onFloor(null)}>Tất cả</button></li>
           {floors.map((floor) => <li role="none" key={floor.key}>
-            <button type="button" role="radio" aria-checked={activeFloor === floor.key} className="se-chip" onClick={() => onFloor(floor.key)} title={floor.elevation !== null ? `Cao độ ${fmt(floor.elevation)} m` : undefined}>
-              {floor.name}{floor.elevation !== null && <small>{fmt(floor.elevation)} m</small>}
+            <button type="button" role="radio" aria-checked={activeFloor === floor.key} className="se-chip" onClick={() => onFloor(floor.key)} title={floor.elevation !== null ? `${floor.name} · cao độ ${fmt(floor.elevation)} m` : floor.name}>
+              {floorNames.get(floor.key) ?? floor.name}{floor.elevation !== null && <small>{fmt(floor.elevation)} m</small>}
             </button>
           </li>)}
         </ul>}

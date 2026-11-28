@@ -34,6 +34,7 @@ import { useEditorPreview } from "../../use-editor-preview";
 import { kindAvailability, type GeometryState } from "../../v1/availability";
 import { findRuntime, parseRubricCatalog, parseRuntimeCatalog } from "../../v1/catalog";
 import type { ObjectKind } from "../../v1/contract";
+import { exitsOf, floorLabel, floorNames as nameFloors } from "../../v1/floor-names";
 import { parseGeometry, type GeometryInfo } from "../../v1/geometry";
 import { targetOf } from "../../v1/issues";
 import { objectName } from "../../v1/object-name";
@@ -168,6 +169,8 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
     return [{ kind: "object", index: object.index, variant: object.kind, layer: object.kind, position: localToGlb(floor.transform, object.position), quaternion: isUnitQuaternion(object.rotation, 0.5) ? object.rotation : undefined, shape: shapeFor(object) }];
   }), [objects, geometry]);
   const lockedObjects = useMemo(() => (locked.data ? readObjects({ objects: itemsToObjects(locked.data.infrastructure.items) }) : []), [locked.data]);
+  // The ground storey is where the exits are: those of the locked infrastructure and the ones this draft places.
+  const floorNames = useMemo(() => nameFloors((geometry?.floors ?? []).map((floor) => ({ key: floor.id, name: floor.name, elevation: floor.elevationMeters })), exitsOf([...objects, ...lockedObjects])), [geometry, objects, lockedObjects]);
   // Kind "locked" is never a selection (`onSelect` and `onTransform` act on kind "object" only), so these cannot be moved or deleted here.
   const sceneMarkers = useMemo<MarkerInput[]>(() => [...markers, ...lockedObjects.flatMap((object): MarkerInput[] => {
     const floor = geometry?.floors.find((item) => item.id === object.floorId);
@@ -364,13 +367,13 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
       <ul className="se-objects">
         {lockedObjects.map((object) => <li key={object.index}><span className="se-object" aria-disabled="true">
           <Lock size={16} aria-hidden="true" /><span>{objectName(object)}</span>
-          <small>{geometry?.floors.find((floor) => floor.id === object.floorId)?.name ?? ""}</small>
+          <small title={geometry?.floors.find((floor) => floor.id === object.floorId)?.name}>{floorNames.get(object.floorId) ?? ""}</small>
         </span></li>)}
       </ul>
     </section>
     : null;
 
-  const tree = <V1Tree floors={geometry?.floors ?? []} geometryNote={reading.kind === "reprocess" ? "Cần xử lý lại IFC; chưa có dữ liệu tầng." : reading.kind === "invalid" ? reading.reason : null}
+  const tree = <V1Tree floors={geometry?.floors ?? []} floorNames={floorNames} geometryNote={reading.kind === "reprocess" ? "Cần xử lý lại IFC; chưa có dữ liệu tầng." : reading.kind === "invalid" ? reading.reason : null}
     activeFloor={activeFloor} onFloor={setFloorChoice} objects={objects} selected={selectedIndex} issues={issues}
     onSelect={(index) => { selectObject(index); setTreeOpen(false); if (isMobile) setMobileTab("props"); }}
     onAdd={(kind) => { addAtCentre(kind); setTreeOpen(false); }} kindStatus={kindStatus} addDisabledReason={placeDisabledReason} kinds={kinds}
@@ -411,7 +414,7 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
         : <Button asChild variant="secondary" size="sm"><Link href={listHref} aria-label="Về danh sách kịch bản"><ChevronLeft size={16} aria-hidden="true" />Kịch bản</Link></Button>}
       <div className="se-title">
         <h1>{infrastructure ? "Hạ tầng PCCC" : readString(state.draft, "name") || scenario.data?.name || "Soạn kịch bản"}</h1>
-        <p>{infrastructure ? `Phiên bản ${meta.draftNumber}` : `Bản nháp #${meta.draftNumber}`} · <StatusBadge tone="info" data-testid="schema-badge">Soạn trên mô hình 3D</StatusBadge>{activeFloorV1 ? <> · <span data-testid="active-floor">Tầng đang soạn: {activeFloorV1.name}</span></> : null}</p>
+        <p>{infrastructure ? `Phiên bản ${meta.draftNumber}` : `Bản nháp #${meta.draftNumber}`} · <StatusBadge tone="info" data-testid="schema-badge">Soạn trên mô hình 3D</StatusBadge>{activeFloorV1 ? <> · <span data-testid="active-floor" title={activeFloorV1.name}>Tầng đang soạn: {floorLabel(floorNames.get(activeFloorV1.id) ?? activeFloorV1.name, activeFloorV1.elevationMeters)}</span></> : null}</p>
       </div>
       <V1Actions status={status} saveBlockedReason={saveBlockedReason} onSave={() => void onSave()} onValidate={() => void onValidate()} validating={editor.validating} versionsHref={versionsHref}
         exit={infrastructure ? { href: infrastructure.backHref, label: "Xong, về danh sách", title: "Lưu trước, rồi gửi thẩm định ở danh sách phiên bản" } : undefined} />
@@ -459,11 +462,11 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
             <TabsTrigger value="kinds" data-testid="tab-kinds">Khả dụng</TabsTrigger>
           </TabsList>
           <div className="se-panel-scroll">
-            <TabsContent value="object"><V1ObjectForm object={selectedObject} objects={objects} issues={issues} actions={actions} geometry={geometry} catalog={catalogView} runtimeVersion={runtimeVersion} pick={pick} onOpenScenario={() => setPanelTab("scenario")} scope={scope} onMount={mountObject} wallGap={wallGap} /></TabsContent>
+            <TabsContent value="object"><V1ObjectForm object={selectedObject} objects={objects} issues={issues} actions={actions} geometry={geometry} floorNames={floorNames} catalog={catalogView} runtimeVersion={runtimeVersion} pick={pick} onOpenScenario={() => setPanelTab("scenario")} scope={scope} onMount={mountObject} wallGap={wallGap} /></TabsContent>
             <TabsContent value="scenario"><V1ScenarioForm draft={state.draft} issues={issues} actions={actions} catalog={catalogView} rubricCatalog={rubricState} situation={scope === "scenario-on-infrastructure"} /></TabsContent>
             <TabsContent value="library"><V1LibraryPanel accessToken={accessToken} ui={libraryUi} onUi={setLibraryUi} draft={state.draft} scenarioName={scenario.data?.name} situation={scope === "scenario-on-infrastructure"} selectedObject={selectedObject} runtimeVersion={runtimeVersion} runtimes={runtimes} rubric={rubricView} applied={applied} canUndoLast={(label) => lastPast?.label === label} onUndo={() => dispatch({ type: "undo" })} onApply={onApplySample} /></TabsContent>
-            <TabsContent value="issues"><V1IssuesPanel objects={objects} floors={geometry?.floors ?? []} issues={issues} shapeProblems={editor.shapeProblems} report={editor.report} reportStale={editor.reportStale} validating={editor.validating} validateError={editor.validateError} dirty={dirty} onValidate={() => void onValidate()} onJump={onJump} /></TabsContent>
-            <TabsContent value="geometry"><V1GeometryPanel reading={reading} preview={preview} pin={pin} buildingId={buildingId} revisionId={revisionId} onRepin={actions.pinGeometry} modelSummary={modelSummary} /></TabsContent>
+            <TabsContent value="issues"><V1IssuesPanel objects={objects} floors={geometry?.floors ?? []} floorNames={floorNames} issues={issues} shapeProblems={editor.shapeProblems} report={editor.report} reportStale={editor.reportStale} validating={editor.validating} validateError={editor.validateError} dirty={dirty} onValidate={() => void onValidate()} onJump={onJump} /></TabsContent>
+            <TabsContent value="geometry"><V1GeometryPanel floorNames={floorNames} reading={reading} preview={preview} pin={pin} buildingId={buildingId} revisionId={revisionId} onRepin={actions.pinGeometry} modelSummary={modelSummary} /></TabsContent>
             <TabsContent value="kinds"><KindAvailability statuses={kindStatus} onRetryCatalog={catalogQuery.reload} /></TabsContent>
           </div>
         </Tabs>
@@ -478,9 +481,9 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
       onClose={() => { setConflictOpen(false); editor.closeConflict(); }} />
 
     {importOpen && <V1EquipmentImport accessToken={accessToken} buildingId={buildingId} revisionId={revisionId} draft={state.draft} runtime={findRuntime(runtimes ?? [], runtimeVersion)}
-      runtimeVersion={runtimeVersion} geometry={geometry} onApply={edit} onClose={() => setImportOpen(false)} />}
+      runtimeVersion={runtimeVersion} geometry={geometry} floorNames={floorNames} onApply={edit} onClose={() => setImportOpen(false)} />}
 
-    {aiRequestId && !aiDismissed && !infrastructure && <AiProposalApply key={aiRequestId} accessToken={accessToken} requestId={aiRequestId} draft={state.draft} floorIds={aiFloorIds} scope={scope} onApply={edit} onClose={closeAiProposal} />}
+    {aiRequestId && !aiDismissed && !infrastructure && <AiProposalApply key={aiRequestId} accessToken={accessToken} requestId={aiRequestId} draft={state.draft} floorIds={aiFloorIds} floorNames={floorNames} scope={scope} onApply={edit} onClose={closeAiProposal} />}
 
     <Modal open={guard.pending} onOpenChange={(open) => { if (!open) guard.stay(); }} title="Rời khỏi trình soạn thảo?"
       description="Bạn có thay đổi chưa lưu. Nếu rời đi bây giờ, các thay đổi này sẽ mất."

@@ -26,10 +26,10 @@ import type { GeometryInfo } from "../../v1/geometry";
 
 const fmt = (value: number) => (Math.round(value * 100) / 100).toString();
 
-function where(row: ImportRow, geometry: GeometryInfo | null) {
+function where(row: ImportRow, geometry: GeometryInfo | null, floorNames: ReadonlyMap<string, string>) {
   const position = row.candidate.position ?? [];
   const floorId = row.status === "add" ? row.floorId : row.candidate.floorId;
-  const floor = floorId ? geometry?.floors.find((item) => item.id === floorId)?.name ?? floorId : "?";
+  const floor = floorId ? floorNames.get(floorId) ?? geometry?.floors.find((item) => item.id === floorId)?.name ?? floorId : "?";
   return `${floor} · ${position.length === 3 ? position.map((value) => (typeof value === "number" ? fmt(value) : "?")).join(", ") : "?"}`;
 }
 
@@ -37,7 +37,7 @@ function where(row: ImportRow, geometry: GeometryInfo | null) {
  * "Thêm thiết bị đã xác nhận": reads the revision's equipment decisions, previews which become Equipment objects and why the
  * others are skipped, and adds them only after confirmation as ONE undoable command. Nothing is saved or validated here.
  */
-export function V1EquipmentImport({ accessToken, buildingId, revisionId, draft, runtime, runtimeVersion, geometry, onApply, onClose }: {
+export function V1EquipmentImport({ accessToken, buildingId, revisionId, draft, runtime, runtimeVersion, geometry, floorNames, onApply, onClose }: {
   accessToken: string;
   buildingId: string;
   revisionId: string;
@@ -45,6 +45,8 @@ export function V1EquipmentImport({ accessToken, buildingId, revisionId, draft, 
   runtime: RuntimeOption | undefined;
   runtimeVersion: string | undefined;
   geometry: GeometryInfo | null;
+  /** Display name per floor id (Tầng trệt, Tầng 1, Hầm 1). */
+  floorNames: ReadonlyMap<string, string>;
   onApply: (build: (draft: JsonObject, id: number, selection: V1Selection, now: number) => V1Command | null) => void;
   onClose: () => void;
 }) {
@@ -95,7 +97,7 @@ export function V1EquipmentImport({ accessToken, buildingId, revisionId, draft, 
           <tbody>{toAdd.map((row) => <tr key={row.candidate.id} data-testid="equipment-import-row">
             <td>{capabilityName(row.catalogKey)}<SupportCode code={row.catalogKey} />{row.candidate.decision?.decision === "Retyped" && <> <StatusBadge tone="info">Đã đổi loại</StatusBadge></>}</td>
             <td>{ifcTypeLabel(row.candidate.ifcClass ?? "")}<SupportCode id={row.candidate.ifcGlobalId} /></td>
-            <td>{where(row, geometry)}</td>
+            <td>{where(row, geometry, floorNames)}</td>
             <td>{row.requiredParameters.length > 0 ? <StatusBadge tone="warning">{row.requiredParameters.map(parameterLabel).join(", ")}</StatusBadge> : "—"}</td>
           </tr>)}</tbody>
         </Table>}

@@ -6,6 +6,7 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 import { EXPOSED } from "./api-headers";
+import { v1Preview } from "../fixtures/scenario-editor/v1-fixtures";
 
 const expert = { id: "expert-1", email: "expert@fire3d.test", fullName: "Chuyên viên Lê Văn T", role: "FireSafetyExpert", organizationId: null, profileRevision: 1 };
 const owner = { id: "owner-1", email: "owner@fire3d.test", fullName: "Nguyễn Văn A", role: 1, organizationId: "org-1", profileRevision: 1 };
@@ -283,4 +284,22 @@ test("an organization account is refused and the queue is never requested", asyn
   await page.goto("/expert/reviews");
   await expect(page.getByText("Khu này chỉ dành cho Chuyên viên PCCC.")).toBeVisible();
   expect(server.listQueries).toHaveLength(0);
+});
+
+test("floors are named like the game's minimap, from where the exits are, with the IFC name as a tooltip", async ({ page }) => {
+  const server = new Server();
+  await install(page, server);
+  const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0];
+  const floor = (id: string, name: string, elevationMeters: number) => ({ id, name, elevationMeters, transform: [...identity.slice(0, 12), 0, elevationMeters, 0, 1] });
+  // A basement, the entrance storey and one above; the exit (and the extinguisher) of the infrastructure stand on "f1" (0 m).
+  const floors = [floor("f0", "BT-A_0990_UG01_RDOK_-3,000", -3), floor("f1", "BT-A_1000_EG_RDOK_0,000", 0), floor("f2", "BT-A_1010_OG01_RDOK_3,000", 3)];
+  await page.route((url) => /^\/api\/expert\/reviews\/[^/]+\/preview$/.test(url.pathname), (route) => route.fulfill({ json: v1Preview({ floors, semanticMapping: [] }) }));
+  await page.goto("/expert/reviews/infra-1");
+  const chips = page.getByTestId("review-model").getByRole("radiogroup", { name: "Chọn tầng" });
+  await expect(chips.getByRole("radio")).toHaveText(["Tất cả", "Hầm 1-3 m", "Tầng trệt0 m", "Tầng 13 m"]);
+  await expect(chips.getByRole("radio", { name: /Tầng trệt/ })).toHaveAttribute("title", "BT-A_1000_EG_RDOK_0,000");
+  const cells = page.getByTestId("review-object").locator("td:nth-child(3)");
+  await expect(cells.first()).toHaveText("Tầng trệt · 0 m");
+  await expect(cells.first().locator("span")).toHaveAttribute("title", "BT-A_1000_EG_RDOK_0,000");
+  await expect(page.getByTestId("review-model")).not.toContainText("BT-A_");
 });

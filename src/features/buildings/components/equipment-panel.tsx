@@ -16,6 +16,8 @@ import { Table, TableMessage } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { scenarioEditorApi } from "@/features/scenario-editor/api";
 import { parseRuntimeCatalog } from "@/features/scenario-editor/v1/catalog";
+import { floorNames } from "@/features/scenario-editor/v1/floor-names";
+import { useRevisionFloors } from "@/features/scenario-editor/v1/use-revision-floors";
 import { SupportCode } from "@/components/ui/support-code";
 import { capabilityLabel } from "@/configs/capability-labels";
 
@@ -29,8 +31,6 @@ const isDoor = (candidate: EquipmentCandidate) => (candidate.ifcClass ?? "").sta
 /** IFC classes the worker proposes, as people call them. */
 const IFC_CLASS: Array<[string, string]> = [["IfcDoor", "Cửa"], ["IfcWindow", "Cửa sổ"], ["IfcTransportElement", "Thang máy"], ["IfcSanitaryTerminal", "Thiết bị vệ sinh"], ["IfcFlowTerminal", "Thiết bị cấp nước"], ["IfcAlarm", "Thiết bị báo cháy"], ["IfcFireSuppressionTerminal", "Thiết bị chữa cháy"], ["IfcFurnishingElement", "Đồ nội thất"]];
 const classLabel = (ifcClass: string | null | undefined) => IFC_CLASS.find(([name]) => (ifcClass ?? "").startsWith(name))?.[1] ?? "Cấu kiện";
-/** "F02" / "L3" / "2" → "tầng 2"; any other floor id is shown as given. */
-const floorLabel = (floorId: string) => { const number = /(-?\d+)$/.exec(floorId)?.[1]; return `tầng ${number !== undefined ? Number(number) : floorId}`; };
 
 type Draft = { decision: EquipmentDecisionKind; catalogKey: string };
 
@@ -79,6 +79,15 @@ export function EquipmentPanel({ accessToken, revisionId, onChanged, onHighlight
     return [...keys].sort();
   }, [catalog.data]);
   const exitAllowed = equipmentKeys.includes(EXIT_KEY);
+  // A floor is named like the game's minimap (Tầng trệt, Tầng 1, Hầm 1): the ground storey is the one the exit doors stand on.
+  // Without the model's floors no name is guessed from the floor id; the row says only that a floor is meant.
+  const revisionFloors = useRevisionFloors(accessToken, revisionId).reading;
+  const floorNameOf = useMemo(() => {
+    if (revisionFloors?.kind !== "valid") return null;
+    const exits = (data?.items ?? []).filter((candidate) => isDoor(candidate) && effectiveKey(candidate, drafts[candidate.id]) === EXIT_KEY).map((candidate) => ({ floorKey: candidate.floorId }));
+    return floorNames(revisionFloors.floors.map((floor) => ({ key: floor.id, name: floor.name, elevation: floor.elevationMeters })), exits);
+  }, [revisionFloors, data, drafts]);
+  const floorLabel = (floorId: string) => floorNameOf?.get(floorId) ?? "một tầng của mô hình";
   const doors = (data?.items ?? []).filter(isDoor);
   const pending = Object.entries(drafts);
   const exitChosen = (data?.items ?? []).some((candidate) => isDoor(candidate) && effectiveKey(candidate, drafts[candidate.id]) === EXIT_KEY);

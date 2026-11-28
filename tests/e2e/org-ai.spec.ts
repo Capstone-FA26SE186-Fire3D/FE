@@ -191,7 +191,8 @@ test.describe("Organization AI page: saved proposals", () => {
     await expect(preview).toContainText("Sơ tán do báo cháy tầng 2");
     await expect(preview).toContainText("Nhận biết tín hiệu báo cháy");
     await expect(page.getByTestId("ai-draft-notes")).toContainText("Cần kiểm tra lại vị trí");
-    await expect(page.getByTestId("ai-draft-objects")).toContainText("Tầng 1 · gắn vào cấu kiện IFC");
+    await expect(page.getByTestId("ai-draft-objects")).toContainText("Đã chọn tầng · gắn vào cấu kiện IFC"); // the proposal has no floors, so no number is invented
+    await expect(page.getByTestId("ai-draft-objects")).not.toContainText(/Tầng \d/);
     await expect(page.getByTestId("ai-status")).toHaveText("Hoàn tất");
     await expect(page.getByText("Cần bạn chỉnh sửa trước khi dùng")).toBeVisible();
     await expect(page.getByTestId("ai-citation")).toContainText("QCVN 06:2022/BXD");

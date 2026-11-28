@@ -18,6 +18,7 @@ import { plainLimitation } from "../../src/features/org-ai/labels";
 import { scenarioDraftBody } from "../../src/features/org-ai/scenario-draft-body";
 import type { JsonObject } from "../../src/features/scenario-editor/store/json";
 import { MOUNTED_CAPABILITIES, heightProblem, heightText, isWallNormal, mountedY, mountingOf, shapeOf, sizeText, yawFacing } from "../../src/features/scenario-editor/v1/equipment-mounting";
+import { exitsOf, floorLabel, floorNames, groundElevation } from "../../src/features/scenario-editor/v1/floor-names";
 import { yawToQuaternion } from "../../src/features/scenario-editor/v1/matrix";
 import { capabilityAllowed, categoryOf, isInfrastructureObject, itemPathToObjectPath, itemsToObjects, objectsToItems, scopeKinds } from "../../src/features/scenario-editor/v1/scope";
 import { completenessIssues, shapeIssues, situationIssues } from "../../src/features/scenario-editor/v1/state";
@@ -421,5 +422,65 @@ test.describe("AI proposal on a PC06 situation (BE#213, BE#215)", () => {
     expect(plan.fields.find((field) => field.key === "assumption")).toMatchObject({ selectable: true, defaultOn: true });
     expect(plan.fields.find((field) => field.key === "audience")).toMatchObject({ selectable: true, defaultOn: false });
     expect(plan.ignoredKeys).not.toContain("audience");
+  });
+});
+
+test.describe("floor names (same rule as the game's minimap)", () => {
+  const floorsAt = (...levels: Array<number | null>) => levels.map((elevation, index) => ({ key: `f${index}`, name: `BT-A_${index}_RDOK`, elevation }));
+  const named = (levels: Array<number | null>, exits: Array<{ floorKey?: string; elevation?: number }>) => [...floorNames(floorsAt(...levels), exits).values()];
+
+  test("exits on the lowest storey (0 m): Tầng trệt, then Tầng 1, 2, 3", () => {
+    expect(named([0, 3, 6, 9], [{ floorKey: "f0" }])).toEqual(["Tầng trệt", "Tầng 1", "Tầng 2", "Tầng 3"]);
+  });
+
+  test("a basement: Hầm 1, Tầng trệt, Tầng 1", () => {
+    expect(named([-3, 0, 3], [{ floorKey: "f1" }])).toEqual(["Hầm 1", "Tầng trệt", "Tầng 1"]);
+  });
+
+  test("two basements count down from the one just under the ground", () => {
+    expect(named([-6, -3, 0, 3], [{ floorKey: "f2" }])).toEqual(["Hầm 2", "Hầm 1", "Tầng trệt", "Tầng 1"]);
+  });
+
+  test("exits upstairs move the ground there; what is below it becomes Hầm", () => {
+    expect(named([0, 3, 6], [{ floorKey: "f1" }, { floorKey: "f1" }])).toEqual(["Hầm 1", "Tầng trệt", "Tầng 1"]);
+    expect(groundElevation(floorsAt(0, 3, 6), [{ floorKey: "f1" }])).toBe(3);
+  });
+
+  test("most votes win; a tie goes to the storey nearest 0 m; no exits means the storey nearest 0 m", () => {
+    expect(named([0, 3, 6], [{ floorKey: "f1" }, { floorKey: "f1" }, { floorKey: "f0" }])[1]).toBe("Tầng trệt");
+    expect(groundElevation(floorsAt(0, 3, 6), [{ floorKey: "f1" }, { floorKey: "f2" }])).toBe(3);
+    expect(groundElevation(floorsAt(-6, 3, 6), [{ floorKey: "f1" }, { floorKey: "f0" }])).toBe(3);
+    expect(named([3.2, 6.4, 9.6], [])).toEqual(["Tầng trệt", "Tầng 1", "Tầng 2"]);
+    expect(named([-3, 0, 3], [])).toEqual(["Hầm 1", "Tầng trệt", "Tầng 1"]);
+  });
+
+  test("an exit known only by its position votes for the nearest storey", () => {
+    expect(groundElevation(floorsAt(0, 3, 6), [{ elevation: 5.4 }])).toBe(6);
+    expect(groundElevation(floorsAt(0, 3, 6), [{ floorKey: "gone", elevation: 2.8 }])).toBe(3);
+    expect(groundElevation(floorsAt(0, 3, 6), [{ floorKey: "gone" }])).toBe(0);
+  });
+
+  test("storeys within 1 m of the ground share its name; the order of the input does not matter", () => {
+    expect(named([0, 0.5, 3], [{ floorKey: "f0" }])).toEqual(["Tầng trệt", "Tầng trệt", "Tầng 1"]);
+    expect(named([6, 0, 3], [{ floorKey: "f1" }])).toEqual(["Tầng 2", "Tầng trệt", "Tầng 1"]);
+  });
+
+  test("a storey without an elevation keeps its own name", () => {
+    expect(named([0, null, 3], [{ floorKey: "f0" }])).toEqual(["Tầng trệt", "BT-A_1_RDOK", "Tầng 1"]);
+    expect(named([null, null], [])).toEqual(["BT-A_0_RDOK", "BT-A_1_RDOK"]);
+    expect(groundElevation(floorsAt(null), [])).toBeNull();
+  });
+
+  test("exits are the Goal objects that are not assembly points; the elevation reads next to the name", () => {
+    const objects = [
+      { kind: "Goal", floorId: "f1" },
+      { kind: "Goal", capability: { id: "assembly.point" }, floorId: "f0" },
+      { kind: "Equipment", capability: { id: "extinguisher.portable" }, floorId: "f0" },
+      { kind: null, floorId: "f0" },
+    ];
+    expect(exitsOf(objects)).toEqual([{ floorKey: "f1" }]);
+    expect(floorLabel("Tầng 1", 3)).toBe("Tầng 1 · 3 m");
+    expect(floorLabel("Hầm 1", -3.2)).toBe("Hầm 1 · -3.2 m");
+    expect(floorLabel("BT-A_RDOK", null)).toBe("BT-A_RDOK");
   });
 });

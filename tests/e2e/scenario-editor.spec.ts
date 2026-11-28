@@ -36,9 +36,9 @@ test("loads the draft and model: floors, layers, selection by list and by canvas
   // floors: choosing a floor clips the model above it; "Tất cả" removes the clip
   const radios = page.getByRole("radiogroup", { name: "Chọn tầng" });
   await expect(radios.getByRole("radio")).toHaveCount(3);
-  await radios.getByRole("radio", { name: /Tầng 1/ }).click();
+  await radios.getByRole("radio", { name: /Tầng trệt/ }).click();
   await expect.poll(() => page.evaluate(() => window.__fire3dEditorScene?.clipConstant())).toBeCloseTo(3.18, 2);
-  await radios.getByRole("radio", { name: /Tầng 2/ }).click();
+  await radios.getByRole("radio", { name: /Tầng 1/ }).click();
   await expect.poll(() => page.evaluate(() => window.__fire3dEditorScene?.clipConstant())).toBeGreaterThan(1e6);
   await radios.getByRole("radio", { name: "Tất cả" }).click();
 
