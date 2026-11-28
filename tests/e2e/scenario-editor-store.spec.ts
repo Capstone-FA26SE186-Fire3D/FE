@@ -251,12 +251,13 @@ test("coordinate transform: assumptions are explicit; malformed or non-affine in
 
 test("floors/semanticMapping: parse what is recognisable, degrade to nothing otherwise", () => {
   const floors = parseFloors(FIXTURE_FLOORS);
-  expect(floors.map((f) => [f.name, f.elevation])).toEqual([["Tầng 1", 0], ["Tầng 2", 3.2]]);
+  expect(floors.map((f) => [f.name, f.elevation])).toEqual([["Tầng 1", 0], ["Tầng 2", 3.2]]); // the model's own names are kept; the tree shows the rule names
   expect(floorCeiling(floors, "storey-0")).toBe(3.2);
   expect(floorCeiling(floors, "storey-1")).toBeNull();
+  expect(parseFloors([{ id: "x" }]).map((f) => f.name)).toEqual(["Tầng chưa rõ"]); // no name, no elevation: no number from the list position
   expect(parseFloors(null)).toEqual([]);
   expect(parseFloors({ not: "an array" })).toEqual([]);
-  expect(parseFloors([{ name: "T3", level: 6.4 }, { name: "T1", elevation: 0 }, 7, "Mái"]).map((f) => f.name)).toEqual(["T1", "T3", "Tầng 3", "Mái"]); // ordered by elevation, unknown last
+  expect(parseFloors([{ name: "T3", level: 6.4 }, { name: "T1", elevation: 0 }, 7, "Mái"]).map((f) => f.name)).toEqual(["T1", "T3", "Tầng 2", "Mái"]); // ordered by elevation, unknown last; the nameless 7 m floor is named by the rule (above the ground 0 m, after T3), not by its place in the list
   const layers = parseLayers(FIXTURE_SEMANTIC_MAPPING);
   expect(layers.map((l) => l.key)).toEqual(["Tường", "Cầu thang"]);
   expect(parseLayers(null)).toEqual([]);

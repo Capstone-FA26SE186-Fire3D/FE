@@ -31,10 +31,12 @@ const time = (at: number) => new Date(at).toLocaleTimeString("vi-VN", { hour: "2
  * Validation of the document being edited. `validate-state` checks the UNSAVED body; its answer is tied to the hash of what
  * was sent. After any further edit the answer is shown as stale and no longer drives per-object markers.
  */
-export function V1IssuesPanel({ objects = [], floors = [], issues, shapeProblems, report, reportStale, validating, validateError, dirty, onValidate, onJump }: {
+export function V1IssuesPanel({ objects = [], floors = [], floorNames, issues, shapeProblems, report, reportStale, validating, validateError, dirty, onValidate, onJump }: {
   /** The document being edited, so a parameter issue says which object and field ("Bình chữa cháy xách tay #1 (Tầng 1): chưa điền …"). */
   objects?: ObjectView[];
   floors?: FloorV1[];
+  /** Display name per floor id (Tầng trệt, Tầng 1, Hầm 1). */
+  floorNames?: ReadonlyMap<string, string>;
   issues: Issue[];
   shapeProblems: Issue[];
   report: ServerReport | null;
@@ -49,7 +51,7 @@ export function V1IssuesPanel({ objects = [], floors = [], issues, shapeProblems
   const live = issues.filter((issue) => !shapePaths.has(`${issue.code}|${issue.path}`));
   const server = live.filter((issue) => issue.source === "server");
   const client = live.filter((issue) => issue.source === "client");
-  const describe = (issue: Issue) => parameterIssueText(issue, objects, (floorId) => floors.find((floor) => floor.id === floorId)?.name);
+  const describe = (issue: Issue) => parameterIssueText(issue, objects, (floorId) => floorNames?.get(floorId) ?? floors.find((floor) => floor.id === floorId)?.name);
   return <div className="se-form" data-testid="issues-panel">
     <div className="se-form-head se-validation-head">
       <div><h3>Kiểm tra bản nháp</h3><p>Nút Kiểm tra gửi đúng nội dung đang sửa (kể cả chưa lưu) để hệ thống kiểm tra; không lưu và không đổi phiên bản. Lỗi cấu trúc và thiếu sót hiện ngay trong trình duyệt.</p></div>

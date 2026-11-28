@@ -18,6 +18,7 @@ import type { MarkerInput } from "@/features/scenario-editor/scene/scene-control
 import type { EditorPreviewV1 } from "@/features/scenario-editor/api";
 import { isObject } from "@/features/scenario-editor/store/json";
 import { KIND_META } from "@/features/scenario-editor/v1/contract";
+import { exitsOf, floorNames, formatMeters } from "@/features/scenario-editor/v1/floor-names";
 import { parseGeometry } from "@/features/scenario-editor/v1/geometry";
 import { applyMatrix, isUnitQuaternion, localToGlb } from "@/features/scenario-editor/v1/matrix";
 import { categoryOf, itemsToObjects, type InfrastructureCategory } from "@/features/scenario-editor/v1/scope";
@@ -50,8 +51,6 @@ function objectName(object: ObjectView): string {
   return object.kind ? KIND_META[object.kind].label : "—";
 }
 
-const meters = (value: number) => `${Math.round(value * 100) / 100} m`;
-
 /**
  * The reviewed content on the building's 3D model, read-only: every object is a marker (nothing can be selected, moved
  * or placed), with a floor filter and the same list as a table for readers who cannot use the 3D view.
@@ -78,11 +77,14 @@ export function ReviewModel({ accessToken, detail, loadPreview, previewKey = "ex
   const model: ModelRequest | null = preview.data?.downloadUrl && geometry
     ? { key: `${geometry.artifactId}:${preview.data.expiresAt ?? ""}`, url: preview.data.downloadUrl, expiresAt: preview.data.expiresAt, coordinateTransform: geometry.coordinateTransform, floors, semanticMapping: {}, applyTransform: false }
     : null;
-  // IFC storey names ("BT-A_0990_UG01_RDOK_0,000") mean nothing to a reader: "Tầng N" from the lowest up, the IFC name as a tooltip.
-  const floorLabels = useMemo(() => new Map(floors.map((floor, index) => {
-    const elevation = geometry?.floors.find((item) => item.id === floor.key)?.elevationMeters ?? floor.elevation;
-    return [floor.key, { label: `Tầng ${index + 1}`, elevation: elevation == null ? "" : meters(elevation), name: floor.name }];
-  })), [floors, geometry]);
+  // IFC storey names ("BT-A_0990_UG01_RDOK_0,000") mean nothing to a reader: the game's names (Tầng trệt, Tầng 1, Hầm 1) with the IFC name as a tooltip.
+  const floorLabels = useMemo(() => {
+    const names = floorNames((geometry?.floors ?? []).map((floor) => ({ key: floor.id, name: floor.name, elevation: floor.elevationMeters })), exitsOf(objects));
+    return new Map(floors.map((floor) => {
+      const elevation = geometry?.floors.find((item) => item.id === floor.key)?.elevationMeters ?? floor.elevation;
+      return [floor.key, { label: names.get(floor.key) ?? floor.name, elevation: elevation == null ? "" : formatMeters(elevation), name: floor.name }];
+    }));
+  }, [floors, geometry, objects]);
   const floorCell = (id: string) => { const info = floorLabels.get(id); return info ? <span title={info.name}>{info.label}{info.elevation && <small className="rev-cell-muted"> · {info.elevation}</small>}</span> : "—"; };
   const listed = floorChoice ? objects.filter((object) => object.floorId === floorChoice) : objects;
 

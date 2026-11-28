@@ -14,8 +14,8 @@ export const gid = (seed: string) => `${seed}0000000000000000000000`.slice(0, 22
 /** IFC mm / Z-up → GLB m / Y-up: IFC (1000, 2000, 3000) → GLB (-9, 3, 3). */
 export const V1_COORDINATE_TRANSFORM = [0.001, 0, 0, 0, 0, 0, -0.001, 0, 0, 0.001, 0, 0, -10, 0, 5, 1];
 export const V1_FLOORS = [
-  { id: "L1", name: "Tầng 1", elevationMeters: 0, ifcGlobalId: "0BTBFw6f90Nfh9rP1dlXrb", transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] },
-  { id: "L2", name: "Tầng 2", elevationMeters: 3.5, ifcGlobalId: "0BTBFw6f90Nfh9rP1dlXrc", transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 3.5, 0, 1] },
+  { id: "L1", name: "BT-A_1000_EG_RDOK_0,000", elevationMeters: 0, ifcGlobalId: "0BTBFw6f90Nfh9rP1dlXrb", transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1] },
+  { id: "L2", name: "BT-A_1010_OG01_RDOK_3,500", elevationMeters: 3.5, ifcGlobalId: "0BTBFw6f90Nfh9rP1dlXrc", transform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 3.5, 0, 1] },
 ];
 export const V1_SEMANTIC_MAPPING = [
   { ifcGlobalId: "1hOSvn6df7F8_7GcBWlRGQ", nodeId: "door_101", floorId: "L1", semanticType: "IfcDoor" },

@@ -80,7 +80,7 @@ test("previews decided equipment, adds it as ONE undoable step with anchor, capa
   await expect(dialog.getByTestId("equipment-import-row").nth(0)).toContainText("Cửa thoát");
   await expect(dialog.getByTestId("equipment-import-row").nth(0)).toContainText("door.exit");
   await expect(dialog.getByTestId("equipment-import-row").nth(0)).toContainText("Đã đổi loại");
-  await expect(dialog.getByTestId("equipment-import-row").nth(0)).toContainText("Tầng 1 · 12.5, 0, 1");
+  await expect(dialog.getByTestId("equipment-import-row").nth(0)).toContainText("Tầng trệt · 12.5, 0, 1");
   await expect(dialog.getByTestId("equipment-import-row").nth(1)).toContainText("Tình trạng");
   await expect(dialog).toContainText("Cần điền thêm thông tin");
   const skipped = dialog.getByTestId("equipment-import-skip-row");

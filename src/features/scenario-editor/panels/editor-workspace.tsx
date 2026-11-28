@@ -19,6 +19,7 @@ import { scenarioEditorApi } from "../api";
 import { useEditorPreview } from "../use-editor-preview";
 import type { useScenarioEditor } from "../use-scenario-editor";
 import { parseFloors } from "../scene/preview-model";
+import { floorNames as nameFloors } from "../v1/floor-names";
 import type { ModelRequest, ModelStatus, ViewportHandle } from "../scene/editor-viewport";
 import type { MarkerInput, MarkerRef, Point3, TransformResult } from "../scene/scene-controller";
 import type { Tool } from "../store/editor-store";
@@ -75,6 +76,8 @@ export function EditorWorkspace({ accessToken, buildingId, scenarioId, editor }:
   const spawns = useMemo(() => readSpawns(state.draft), [state.draft]);
   const hazards = useMemo(() => readHazards(state.draft), [state.draft]);
   const floors = useMemo(() => parseFloors(preview.preview?.floors), [preview.preview?.floors]);
+  // A fet3d.editor/0 draft has no exits to vote with: the ground is the storey nearest 0 m.
+  const floorNames = useMemo(() => nameFloors(floors, []), [floors]);
   const modelLayers = modelStatus.phase === "loaded" ? modelStatus.info.layers : [];
   const modelInfo = modelStatus.phase === "loaded" ? modelStatus.info : null;
   const floorsNote = modelInfo?.floorsOutsideModel ? "Cao độ tầng nằm ngoài khung của mô hình nên không cắt theo tầng." : null;
@@ -169,7 +172,7 @@ export function EditorWorkspace({ accessToken, buildingId, scenarioId, editor }:
   const listHref = `${routes.workspaceBuildings}/${buildingId}/scenarios`;
   const selectedHazard = state.selection?.kind === "hazard" ? state.selection.index : null;
 
-  const tree = <SceneTree floors={floors} floorsNote={floorsNote} activeFloor={activeFloor} onFloor={setActiveFloor} spawns={spawns} hazards={hazards}
+  const tree = <SceneTree floors={floors} floorNames={floorNames} floorsNote={floorsNote} activeFloor={activeFloor} onFloor={setActiveFloor} spawns={spawns} hazards={hazards}
     selection={state.selection} issues={issues} onSelect={(selection) => { onSelect(selection); setTreeOpen(false); if (isMobile) setMobileTab("props"); }} onAdd={(kind) => { addAtCentre(kind); setTreeOpen(false); }}
     modelLayers={modelLayers} layerVisibility={layerVisibility} onLayer={(key, visible) => setLayerVisibility((current) => ({ ...current, [key]: visible }))}
     modelVisible={modelVisible} onModelVisible={setModelVisible} hasModel={modelStatus.phase === "loaded"} />;

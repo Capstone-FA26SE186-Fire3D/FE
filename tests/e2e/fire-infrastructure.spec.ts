@@ -38,6 +38,9 @@ test("an infrastructure version is edited in the 3D editor: only exits and equip
   await expect(page.getByTestId("scenario-editor")).toBeVisible();
   await expect(page.getByRole("heading", { level: 1, name: "Hạ tầng PCCC" })).toBeVisible();
   await expect(page.getByText("Phiên bản 2", { exact: true })).toBeVisible();
+  // Floors are named like the game's minimap here too: no exit yet, so the storey nearest 0 m is the ground; then Tầng 1 above it.
+  await expect(page.getByRole("radiogroup", { name: "Chọn tầng" }).getByRole("radio")).toHaveText(["Tất cả", "Tầng trệt0 m", "Tầng 13.5 m"]);
+  await expect(page.getByTestId("active-floor")).toHaveText("Tầng đang soạn: Tầng trệt · 0 m");
 
   // Only the kinds an infrastructure owns; no scenario tabs, no playtest or versions links.
   await expect(page.getByTestId("list-Goal")).toHaveCount(1);
@@ -87,6 +90,11 @@ test("a scenario draft on a locked infrastructure shows its items read-only and 
   const locked = page.getByTestId("locked-infrastructure");
   await expect(locked).toContainText("Hạ tầng PCCC đã khoá");
   await expect(locked).toContainText("Cửa thoát phía Đông");
+  // The locked exit stands on L1, so L1 is the ground storey: the list and the tree name it "Tầng trệt", never by its IFC name.
+  await expect(locked).toContainText("Tầng trệt");
+  await expect(locked.locator("small")).toHaveAttribute("title", "BT-A_1000_EG_RDOK_0,000");
+  await expect(page.getByTestId("active-floor")).toHaveText("Tầng đang soạn: Tầng trệt · 0 m");
+  await expect(page.getByTestId("v1-tree")).not.toContainText("BT-A_");
   await expect(locked.getByRole("button")).toHaveCount(0); // listed, never selectable
   await expect(page.getByTestId("import-equipment")).toHaveCount(0);
   // The exit comes from the infrastructure, so the draft is not told to add one.

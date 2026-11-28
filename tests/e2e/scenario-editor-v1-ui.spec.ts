@@ -73,8 +73,12 @@ test("opens a fet3d.editor/1 draft: six kinds, pinned Geometry, floor-local coor
   // Geometry tab: pin matches the current artifact, floors from the server, IFC -> GLB check (display only).
   await tab(page, "Mô hình").click();
   await expect(page.getByTestId("geometry-panel")).toContainText("Khớp");
-  await expect(page.getByTestId("floor-list")).toContainText("Tầng 2");
+  // Floors carry the game's names (Tầng trệt, Tầng 1), not the IFC storey names the fixture gives them.
+  await expect(page.getByTestId("floor-list")).toContainText("Tầng trệt");
+  await expect(page.getByTestId("floor-list")).toContainText("Tầng 1");
   await expect(page.getByTestId("floor-list")).toContainText("3.5 m");
+  await expect(page.getByTestId("floor-list")).not.toContainText("BT-A_");
+  await expect(page.getByTestId("floor-list").getByRole("listitem").nth(1)).toHaveAttribute("title", "BT-A_1010_OG01_RDOK_3,500");
   await page.getByTestId("ifc-x").fill("1000");
   await page.getByTestId("ifc-y").fill("2000");
   await page.getByTestId("ifc-z").fill("3000");
@@ -214,11 +218,28 @@ test("places all six kinds, fills capability/parameter forms from the catalog, s
   expect(log.relevant()).toEqual([]);
 });
 
+test("floors take the game's names from where the exits are: with the exit upstairs the lower storey is Hầm 1; the IFC name stays a tooltip and never shows", async ({ page }) => {
+  const state = v1State() as { objects: Array<Record<string, any>> }; // eslint-disable-line @typescript-eslint/no-explicit-any
+  state.objects[1] = { ...state.objects[1], placement: { ...state.objects[1].placement, floorId: "L2" } }; // the exit (Goal) moves to L2, 3.5 m
+  const mock = v1Mock({ state });
+  await openV1(page, mock);
+  const radios = page.getByRole("radiogroup", { name: "Chọn tầng" });
+  await expect(radios.getByRole("radio")).toHaveText(["Tất cả", "Hầm 10 m", "Tầng trệt3.5 m"]);
+  await expect(radios.getByRole("radio", { name: /Hầm 1/ })).toHaveAttribute("title", /BT-A_1000_EG_RDOK_0,000/);
+  await expect(page.getByTestId("active-floor")).toHaveText("Tầng đang soạn: Hầm 1 · 0 m");
+  await expect(page.getByTestId("active-floor")).toHaveAttribute("title", "BT-A_1000_EG_RDOK_0,000");
+  await item(page, 1).click();
+  await expect(page.getByTestId("field-floor").locator("option")).toHaveText(["Hầm 1 · 0 m", "Tầng trệt · 3.5 m"]);
+  await expect(page.getByTestId("field-floor").locator("option").nth(1)).toHaveAttribute("title", "BT-A_1010_OG01_RDOK_3,500");
+  await expect(page.getByTestId("v1-tree")).toContainText("Tầng trệt · ");
+  await expect(page.locator("body")).not.toContainText("BT-A_");
+});
+
 test("canvas placement stores floor-local coordinates: the marker lands where the pointer hit, through the inverse of the floor transform", async ({ page }) => {
   const mock = v1Mock();
   const log = await openV1(page, mock);
   const radios = page.getByRole("radiogroup", { name: "Chọn tầng" });
-  await radios.getByRole("radio", { name: /Tầng 2/ }).click();
+  await radios.getByRole("radio", { name: /Tầng 1/ }).click(); // L2, 3.5 m: the first storey above the ground
   await page.getByTestId("place-Spawn").click();
   const box = (await page.locator(".se-canvas-host").boundingBox())!;
   await page.mouse.click(box.x + box.width * 0.42, box.y + box.height * 0.62);
@@ -274,7 +295,7 @@ test("grab and drag with the select tool: a floor object slides at its height, a
   state.objects[5] = { ...state.objects[5], capability: { id: "extinguisher.hose_reel", version: "1.0.0" }, parameters: undefined, placement: { ...state.objects[5].placement, position: { x: 4, y: 0, z: -5.7 }, rotation: { x: 0, y: 1, z: 0, w: 0 } } };
   const mock = v1Mock({ state });
   const log = await openV1(page, mock);
-  await page.getByRole("radiogroup", { name: "Chọn tầng" }).getByRole("radio", { name: /Tầng 1/ }).click();
+  await page.getByRole("radiogroup", { name: "Chọn tầng" }).getByRole("radio", { name: /Tầng trệt/ }).click();
   const screen = (kind: string, index: number) => page.evaluate(([k, i]) => window.__fire3dEditorScene?.project(k as string, i as number) ?? null, [kind, index] as const);
   const drag = async (from: { x: number; y: number }, to: { x: number; y: number }) => {
     await page.mouse.move(from.x, from.y);
@@ -283,7 +304,7 @@ test("grab and drag with the select tool: a floor object slides at its height, a
     await page.mouse.up();
   };
 
-  // The spawn point stands on the floor of Tầng 1 at (2, 0, 3): dragging it moves x and z, never its height.
+  // The spawn point stands on the floor of Tầng trệt at (2, 0, 3): dragging it moves x and z, never its height.
   const spawn = (await screen("object", 0))!;
   await drag(spawn, { x: spawn.x + 90, y: spawn.y + 30 });
   await expect(item(page, 0)).toHaveAttribute("aria-pressed", "true");
@@ -635,7 +656,7 @@ test("the pinned Geometry differs from the revision's current artifact: banner, 
 test("a wall picked on the model can be used as the anchor of an object on the same floor (the pick is matched through the semantic mapping)", async ({ page }) => {
   const mock = v1Mock();
   await openV1(page, mock);
-  await page.getByRole("radiogroup", { name: "Chọn tầng" }).getByRole("radio", { name: /Tầng 1/ }).click();
+  await page.getByRole("radiogroup", { name: "Chọn tầng" }).getByRole("radio", { name: /Tầng trệt/ }).click();
   await item(page, 4).click(); // blocked element on L1, anchored to door_102
   const point = await page.evaluate(() => window.__fire3dEditorScene?.projectNode("Floor_0_WallN"));
   expect(point).toBeTruthy();
