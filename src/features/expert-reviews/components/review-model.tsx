@@ -15,6 +15,7 @@ import "@/features/scenario-editor/panels/editor.css";
 import type { ModelRequest } from "@/features/scenario-editor/scene/editor-viewport";
 import type { FloorInfo } from "@/features/scenario-editor/scene/preview-model";
 import type { MarkerInput } from "@/features/scenario-editor/scene/scene-controller";
+import type { EditorPreviewV1 } from "@/features/scenario-editor/api";
 import { isObject } from "@/features/scenario-editor/store/json";
 import { KIND_META } from "@/features/scenario-editor/v1/contract";
 import { parseGeometry } from "@/features/scenario-editor/v1/geometry";
@@ -55,9 +56,15 @@ const meters = (value: number) => `${Math.round(value * 100) / 100} m`;
  * The reviewed content on the building's 3D model, read-only: every object is a marker (nothing can be selected, moved
  * or placed), with a floor filter and the same list as a table for readers who cannot use the 3D view.
  */
-export function ReviewModel({ accessToken, detail }: { accessToken: string; detail: ExpertReviewDetail }) {
+export function ReviewModel({ accessToken, detail, loadPreview, previewKey = "expert-preview" }: {
+  accessToken: string;
+  detail: ExpertReviewDetail;
+  /** The admin reads the same preview through `/api/admin/reviews/{id}/preview` (BE#247); the expert's endpoint by default. */
+  loadPreview?: (signal: AbortSignal) => Promise<EditorPreviewV1>;
+  previewKey?: string;
+}) {
   const reviewId = detail.review.reviewId;
-  const preview = useAsyncData(`expert-preview:${reviewId}`, (signal) => expertReviewsApi.preview(accessToken, reviewId, signal));
+  const preview = useAsyncData(`${previewKey}:${reviewId}`, (signal) => (loadPreview ? loadPreview(signal) : expertReviewsApi.preview(accessToken, reviewId, signal)));
   const [floorChoice, setFloorChoice] = useState<string | null>(null);
   const reading = useMemo(() => parseGeometry(preview.data), [preview.data]);
   const geometry = reading.kind === "valid" ? reading.info : null;

@@ -82,6 +82,8 @@ class ReviewServer {
   /** Hạ tầng PCCC items (BE#213) for the admin reviews list: `reviewId = infrastructureId`, scenario fields null. */
   infrastructures: Array<{ reviewId: string; status: Status; buildingName: string; organizationName: string; versionNumber: number; submittedAt: string }> = [];
   assignmentQueries: URLSearchParams[] = [];
+  /** Ids read through BE#247 `GET /api/admin/reviews/{id}`. */
+  detailQueries: string[] = [];
   reassignRequests: Array<{ id: string; body: Record<string, unknown> }> = [];
   /** Answer the next reassign with this error code without applying it. */
   reassignFailNext?: { status: number; code: string };
@@ -121,12 +123,13 @@ class ReviewServer {
     const status = query.get("status") ?? "Submitted";
     const kind = query.get("kind");
     const assigneeId = query.get("assigneeId");
+    const organizationId = query.get("organizationId");
     const page = Number(query.get("page") ?? 1);
     const pageSize = Number(query.get("pageSize") ?? 20);
     const ids = [
       ...(kind === "Infrastructure" ? [] : this.reviews.filter((review) => review.summary.status === status).map((review) => ({ id: review.summary.reviewId, at: review.summary.submittedAt }))),
       ...(kind === "Scenario" ? [] : this.infrastructures.filter((entry) => entry.status === status).map((entry) => ({ id: entry.reviewId, at: entry.submittedAt }))),
-    ].filter(({ id }) => !assigneeId || this.assignments[id]?.id === assigneeId)
+    ].filter(({ id }) => (!assigneeId || this.assignments[id]?.id === assigneeId) && (!organizationId || this.item(id)?.organizationId === organizationId))
       .sort((a, b) => (status === "Submitted" ? (a.at < b.at ? -1 : 1) : (a.at < b.at ? 1 : -1)));
     return { items: ids.slice((page - 1) * pageSize, page * pageSize).map(({ id }) => this.item(id)), totalCount: ids.length, page, pageSize };
   }
@@ -214,6 +217,21 @@ async function install(page: Page, server: ReviewServer, user: object = admin) {
     return route.fulfill({ json: { items, totalCount: items.length, page: 1, pageSize: 100 } });
   });
   // BE#242 AdminExpertReviewsController: both kinds with their assignee, then reassign (400/404/409/422 as documented).
+  // BE#247: one item read-only (expert detail shape) and its 3D preview (none in this mock: the drawer still lists the items).
+  await page.route((url) => /^\/api\/admin\/reviews\/[^/]+$/.test(url.pathname), (route) => {
+    const id = new URL(route.request().url()).pathname.split("/").pop() as string;
+    server.detailQueries.push(id);
+    const item = server.item(id);
+    if (!item) return problem(route, 404, { title: "Not found.", code: "NOT_FOUND" });
+    const infrastructure = item.kind === "Infrastructure";
+    const placement = { floorId: "f1", position: { x: 1, y: 0, z: 2 }, rotation: { x: 0, y: 0, z: 0, w: 1 } };
+    return route.fulfill({ json: {
+      review: item,
+      content: infrastructure ? { geometry: null, runtimeVersion: "2.5.0", items: [{ id: "exit-1", kind: "Goal", label: "Cửa thoát phía Đông", category: "Exit", placement }, { id: "ap-1", kind: "Goal", label: "Điểm tập kết sân trước", category: "AssemblyPoint", placement }] } : { schemaVersion: "fet3d.editor/1", objects: [] },
+      rubric: null, learningObjectives: null, learnerInstructions: null,
+    } });
+  });
+  await page.route((url) => /^\/api\/admin\/reviews\/[^/]+\/preview$/.test(url.pathname), (route) => problem(route, 404, { title: "No preview.", code: "NOT_FOUND" }));
   await page.route((url) => url.pathname === "/api/admin/reviews", (route) => {
     const url = new URL(route.request().url());
     if (server.faults.listStatus && url.searchParams.get("pageSize") !== "1") return problem(route, server.faults.listStatus, { title: "Injected list failure.", code: server.faults.listStatus === 500 ? "INTERNAL_ERROR" : "FORBIDDEN" });
@@ -598,7 +616,7 @@ test.describe("assignment (BE#242)", () => {
     await expect(heldRow(page, "Nhà B")).toContainText("Chuyên viên Lê Văn T");
 
     await heldRow(page, "Nhà B").getByRole("button", { name: "Thao tác" }).click();
-    await expect(page.getByRole("menuitem", { name: "Mở chi tiết" })).toHaveCount(0);
+    await expect(page.getByRole("menuitem", { name: "Mở chi tiết" })).toBeVisible(); // BE#247: infrastructure has a detail too
     await page.getByRole("menuitem", { name: "Gán lại" }).click();
     const dialog = page.getByRole("dialog", { name: "Gán lại cho Chuyên viên khác" });
     await expect(dialog).toContainText("Hạ tầng PCCC · Nhà B");
@@ -637,6 +655,60 @@ test.describe("assignment (BE#242)", () => {
     expect(server.assignments[first]?.id).toBe(EXPERT_A.id);
     dialog = page.getByRole("dialog", { name: "Gán lại cho Chuyên viên khác" });
     await expect(dialog).toHaveCount(0);
+  });
+});
+
+test.describe("admin detail and organization filter (BE#247)", () => {
+  test("an infrastructure row opens a read-only drawer with its items; a rejected one shows the expert's reason", async ({ page }) => {
+    const server = withInfrastructure(new ReviewServer(baseSeeds()));
+    server.infrastructures.push({ reviewId: "cccccccc-0000-4000-8000-000000000011", status: "Rejected", buildingName: "Nhà D", organizationName: "Trường THPT Lê Quý Đôn", versionNumber: 2, submittedAt: "2026-09-02T07:00:00Z" });
+    server.assignments = { [INFRA_ID]: { id: EXPERT_A.id, fullName: EXPERT_A.fullName } };
+    await install(page, server);
+    await page.goto("/admin/reviews?kind=infrastructure");
+    await row(page, "Nhà B").click();
+    await expect(page).toHaveURL(new RegExp(`review=${INFRA_ID}`));
+    const drawer = page.getByTestId("infrastructure-review-drawer");
+    await expect(drawer.getByRole("heading", { name: "Hạ tầng PCCC · Nhà B" })).toBeVisible();
+    await expect(drawer.getByTestId("infrastructure-review-detail")).toHaveAttribute("data-review-status", "Submitted");
+    await expect(drawer).toContainText("Chuyên viên Lê Văn T"); // the holder of a waiting item
+    await expect(drawer).toContainText("Cửa thoát phía Đông");
+    await expect(drawer).toContainText("Điểm tập kết sân trước");
+    expect(server.detailQueries).toEqual([INFRA_ID]);
+    await expect(drawer.getByRole("button", { name: /Đạt|Chưa đạt|duyệt/ })).toHaveCount(0); // the admin never decides (BE#245)
+    await drawer.getByRole("button", { name: "Đóng", exact: true }).last().click();
+    await expect(page).not.toHaveURL(/review=/);
+
+    await pick(page, "Trạng thái", { value: "Rejected" });
+    await row(page, "Nhà D").click();
+    await expect(page.getByTestId("infrastructure-review-drawer").getByText("Thiếu lối thoát thứ hai.")).toBeVisible();
+    await expect(page.getByTestId("infrastructure-review-drawer")).toContainText("Chuyên viên Trần Thị B");
+  });
+
+  test("a scenario row still opens the scenario drawer", async ({ page }) => {
+    const server = new ReviewServer(baseSeeds());
+    await install(page, server);
+    await page.goto("/admin/reviews");
+    await row(page, "Sơ tán giờ ra chơi").click();
+    await expect(drawer(page).getByTestId("review-detail")).toBeVisible();
+    await expect(page.getByTestId("infrastructure-review-drawer")).toHaveCount(0);
+  });
+
+  test("the organization filter lives in the URL and is sent to the server", async ({ page }) => {
+    const server = new ReviewServer(baseSeeds());
+    await install(page, server);
+    await page.goto("/admin/reviews");
+    await expect(rows(page)).toHaveCount(2);
+    await page.getByRole("combobox", { name: "Tổ chức" }).click();
+    await page.getByRole("option", { name: "Công ty Sao Mai" }).click();
+    await expect(page).toHaveURL(new RegExp(`organizationId=${ORG_2}`));
+    expect(server.assignmentQueries.at(-1)?.get("organizationId")).toBe(ORG_2);
+    await expect(rows(page)).toHaveCount(1);
+    await expect(rows(page).first()).toContainText("Cháy kho hàng giờ cao điểm");
+    await page.reload();
+    await expect(page.getByRole("combobox", { name: "Tổ chức" })).toContainText("Công ty Sao Mai");
+    await page.getByRole("button", { name: "Về mặc định (chờ thẩm định)" }).click();
+    await expect(page).not.toHaveURL(/organizationId=/);
+    await expect(rows(page)).toHaveCount(2);
   });
 });
 
