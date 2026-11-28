@@ -39,8 +39,8 @@ export type ReviewSummary = {
  */
 export type AssignedReview = ExpertReviewItem;
 export type AssignedReviewPage = PageResponse<AssignedReview>;
-/** Query of `GET /api/admin/reviews`: status Submitted by default; `assigneeId` narrows to one expert. */
-export type AssignedReviewQuery = { kind?: "Scenario" | "Infrastructure"; status?: ReviewStatus; assigneeId?: string; page: number; pageSize: number };
+/** Query of `GET /api/admin/reviews`: status Submitted by default; `assigneeId` narrows to one expert, `organizationId` to one organization (BE#247). */
+export type AssignedReviewQuery = { kind?: "Scenario" | "Infrastructure"; status?: ReviewStatus; assigneeId?: string; /** BE#247 */ organizationId?: string; page: number; pageSize: number };
 
 /** Body of `POST /api/admin/reviews/{id}/reassign` (BE#242): `reason` 1–500 characters. Answers 200 with the updated item. */
 export type ReassignReviewRequest = { expertId: string; reason: string };

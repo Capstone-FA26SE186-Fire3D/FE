@@ -17,6 +17,7 @@ import { LoadingBlock } from "@/components/ui/spinner";
 import { SubTabs } from "@/components/ui/sub-tabs";
 import { routes } from "@/configs/routes";
 import { accountsApi } from "@/features/accounts/api";
+import { organizationsApi } from "@/features/organizations/api";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { formatCount } from "@/features/admin-overview/format";
 import { assigneeLabel } from "@/features/expert-reviews/api";
@@ -24,6 +25,7 @@ import { formatDateTime } from "@/utils/date-range";
 import { describeReadError, REVIEW_ASSIGNMENT_TAG, REVIEW_QUEUE_TAG, reviewsApi } from "../api";
 import { statusLabel } from "../format";
 import type { AssignedReview, ReviewStatus } from "../types";
+import { InfrastructureReviewDrawer } from "./infrastructure-review-drawer";
 import { ReassignDialog } from "./reassign-dialog";
 import { ReviewDrawer } from "./review-detail";
 import "./reviews.css";
@@ -69,7 +71,8 @@ function QueueKpi({ label, value, loading, hint, testId }: { label: string; valu
  * kind + status + assigneeId), so the tiles, the tab counts and the table always agree. Waiting rows show the expert
  * holding them and offer "Gán lại"; scenario rows open the frozen content drawer (`/api/admin/scenario-reviews/{id}`,
  * same reviewId). The admin never decides (BE#245). Kind, status, expert, page and the open review live in the URL;
- * the server has no organization filter or search (BE#247), so the search box narrows the page on the client.
+ * organization is a server filter too (BE#247); the search box narrows the page on the client. Infrastructure rows open a
+ * read-only drawer with the items on the 3D model (`/api/admin/reviews/{id}` + `/preview`, BE#247).
  */
 export function ReviewsModule() {
   const { accessToken, ready, user } = useAuthSession();
@@ -77,18 +80,20 @@ export function ReviewsModule() {
   const kind = parseKind(get("kind"));
   const status = parseStatus(get("status"));
   const assigneeId = get("assigneeId");
+  const organizationId = get("organizationId");
   const reviewId = get("review");
   const [search, setSearch] = useState("");
   const [reassigning, setReassigning] = useState<AssignedReview | null>(null);
 
   const enabled = ready && user?.role === 0 && Boolean(accessToken);
   const list = useAsyncData(
-    `reviews:list:${kind}:${status}:${assigneeId}:${page}`,
-    (signal) => reviewsApi.assignments(accessToken as string, { kind, status, assigneeId: assigneeId || undefined, page, pageSize: PAGE_SIZE }, signal),
+    `reviews:list:${kind}:${status}:${assigneeId}:${organizationId}:${page}`,
+    (signal) => reviewsApi.assignments(accessToken as string, { kind, status, assigneeId: assigneeId || undefined, organizationId: organizationId || undefined, page, pageSize: PAGE_SIZE }, signal),
     enabled,
     { tags: [REVIEW_ASSIGNMENT_TAG] },
   );
   const experts = useAsyncData("reviews:experts", (signal) => accountsApi.list(accessToken as string, { role: EXPERT_ROLE, page: 1, pageSize: 100, sort: "fullName" }, signal), enabled);
+  const organizations = useAsyncData("reviews:organizations", () => organizationsApi.list(accessToken as string, { page: 1, pageSize: 100, isActive: true }), enabled);
   const waitingScenario = useTotal("Scenario", "Submitted", accessToken, enabled);
   const waitingInfrastructure = useTotal("Infrastructure", "Submitted", accessToken, enabled);
   const approved = useTotal(kind, "Approved", accessToken, enabled);
@@ -104,6 +109,12 @@ export function ReviewsModule() {
     if (assigneeId && !options.some((option) => option.value === assigneeId)) options.unshift({ value: assigneeId, label: "Chuyên viên đang lọc", hint: "", keywords: [] });
     return options;
   }, [experts.data, assigneeId]);
+  const orgOptions = useMemo<ComboboxOption[]>(() => {
+    const options: ComboboxOption[] = (organizations.data?.items ?? []).map((organization) => ({ value: organization.id, label: organization.name }));
+    // A deep-linked id outside the first 100 active organizations keeps its value so the filter is not silently dropped.
+    if (organizationId && !options.some((option) => option.value === organizationId)) options.unshift({ value: organizationId, label: "Tổ chức đang lọc" });
+    return options;
+  }, [organizations.data, organizationId]);
   const needle = stripAccents(search.trim());
   const visible = useMemo(() => (needle ? items.filter((item) => stripAccents(`${item.scenarioName ?? ""} ${item.organizationName} ${item.buildingName}`).includes(needle)) : items), [items, needle]);
 
@@ -113,7 +124,7 @@ export function ReviewsModule() {
   const text = KIND_TEXT[kind];
   const waitingView = status === "Submitted";
   const totalCount = list.data?.totalCount ?? 0;
-  const filtering = status !== "Submitted" || Boolean(assigneeId);
+  const filtering = status !== "Submitted" || Boolean(assigneeId) || Boolean(organizationId);
   const failure = list.error !== undefined ? describeReadError(list.error, "queue") : null;
   const open = (id: string) => setParams({ review: id, page });
   const close = () => setParams({ review: null, page });
@@ -139,7 +150,7 @@ export function ReviewsModule() {
     : <EmptyState
       icon={filtering ? Search : ClipboardCheck}
       title={page > 1 && totalCount > 0 ? "Trang này không còn mục nào." : filtering ? "Không có mục nào phù hợp." : `Không có ${text.noun} nào chờ thẩm định`}
-      description={page > 1 && totalCount > 0 ? "Danh sách đã thay đổi kể từ lần tải trước." : filtering ? "Thử đổi trạng thái hoặc Chuyên viên, hoặc về bộ lọc mặc định." : text.emptyWaiting}
+      description={page > 1 && totalCount > 0 ? "Danh sách đã thay đổi kể từ lần tải trước." : filtering ? "Thử đổi trạng thái, Chuyên viên hoặc tổ chức, hoặc về bộ lọc mặc định." : text.emptyWaiting}
       action={page > 1 && totalCount > 0 ? <Button variant="secondary" onClick={() => setPage(1)}>Về trang 1</Button> : undefined}
     />;
 
@@ -171,9 +182,9 @@ export function ReviewsModule() {
       columns={columns}
       rows={visible}
       rowKey={(row) => `${row.kind}:${row.reviewId}`}
-      onRowClick={kind === "Scenario" ? (row) => open(row.reviewId) : undefined}
+      onRowClick={(row) => open(row.reviewId)}
       rowMenu={(row) => [
-        ...(kind === "Scenario" ? [{ label: "Mở chi tiết", icon: Eye, onSelect: () => open(row.reviewId) }] : []),
+        { label: "Mở chi tiết", icon: Eye, onSelect: () => open(row.reviewId) },
         ...(row.status === "Submitted" ? [{ label: "Gán lại", icon: UserRoundCog, onSelect: () => setReassigning(row) }] : []),
       ]}
       loading={list.loading && !list.data}
@@ -203,15 +214,30 @@ export function ReviewsModule() {
             loading={experts.loading && !experts.data}
             clearable
           />
+          <Combobox
+            aria-label="Tổ chức"
+            className="rev-org-filter"
+            value={organizationId}
+            onChange={(value) => setParams({ organizationId: value || null, page: 1 })}
+            options={orgOptions}
+            placeholder="Tổ chức: tất cả"
+            searchPlaceholder="Tìm tổ chức…"
+            emptyText="Không có tổ chức nào khớp"
+            groupLabel="Tổ chức đang hoạt động"
+            loading={organizations.loading && !organizations.data}
+            clearable
+          />
         </FilterChips>
-        {filtering && <Button size="sm" variant="quiet" onClick={() => setParams({ status: null, assigneeId: null, page: 1 })}>Về mặc định (chờ thẩm định)</Button>}
+        {filtering && <Button size="sm" variant="quiet" onClick={() => setParams({ status: null, assigneeId: null, organizationId: null, page: 1 })}>Về mặc định (chờ thẩm định)</Button>}
       </>}
       pagination={totalCount > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount, onPageChange: setPage } : undefined}
     />
-    {list.data && totalCount > 0 && <p className="adm-note" role="status">Hiển thị {visible.length} trên {formatCount(totalCount)} · trạng thái và Chuyên viên lọc toàn bộ danh sách; ô tìm chỉ lọc trang đang xem.</p>}
+    {list.data && totalCount > 0 && <p className="adm-note" role="status">Hiển thị {visible.length} trên {formatCount(totalCount)} · trạng thái, Chuyên viên và tổ chức lọc toàn bộ danh sách; ô tìm chỉ lọc trang đang xem.</p>}
 
     {reassigning && accessToken && <ReassignDialog key={`${reassigning.kind}:${reassigning.reviewId}`} review={reassigning} accessToken={accessToken} onClose={() => setReassigning(null)} onChanged={reloadAll} />}
 
-    <ReviewDrawer key={reviewId} open={Boolean(reviewId)} reviewId={reviewId} accessToken={accessToken} onClose={close} />
+    {kind === "Infrastructure"
+      ? <InfrastructureReviewDrawer key={reviewId} open={Boolean(reviewId)} reviewId={reviewId} accessToken={accessToken} summary={items.find((item) => item.reviewId === reviewId)} onClose={close} />
+      : <ReviewDrawer key={reviewId} open={Boolean(reviewId)} reviewId={reviewId} accessToken={accessToken} onClose={close} />}
   </>;
 }

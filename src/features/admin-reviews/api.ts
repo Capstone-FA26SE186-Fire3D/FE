@@ -1,5 +1,7 @@
 import { apiClient } from "@/api/client";
 import { ApiError } from "@/api/types/common";
+import type { ExpertReviewDetail } from "@/features/expert-reviews/api";
+import type { EditorPreviewV1 } from "@/features/scenario-editor/api";
 import type { AssignedReview, AssignedReviewPage, AssignedReviewQuery, ReassignReviewRequest, ReviewDetail, ReviewListQuery, ReviewPage } from "./types";
 
 function headers(accessToken: string): HeadersInit {
@@ -21,6 +23,14 @@ export const reviewsApi = {
   /** BE#242 (`AdminExpertReviewsController`): Scenario and Infrastructure items with their assignee, Submitted by default. */
   assignments(accessToken: string, query: AssignedReviewQuery, signal?: AbortSignal) {
     return apiClient.request<AssignedReviewPage>("/api/admin/reviews", { headers: headers(accessToken), query, signal });
+  },
+  /** BE#247: one item of either kind, read-only, in the shape the expert reads (`GET /api/expert/reviews/{id}`). */
+  reviewDetail(accessToken: string, reviewId: string, signal?: AbortSignal) {
+    return apiClient.request<ExpertReviewDetail>(`/api/admin/reviews/${encodeURIComponent(reviewId)}`, { headers: headers(accessToken), signal });
+  },
+  /** BE#247: the 3D model of the revision the item uses (signed GLB, floors), same shape as the expert preview. */
+  reviewPreview(accessToken: string, reviewId: string, signal?: AbortSignal) {
+    return apiClient.request<EditorPreviewV1>(`/api/admin/reviews/${encodeURIComponent(reviewId)}/preview`, { headers: headers(accessToken), signal });
   },
   /**
    * BE#242: hand a waiting item (either kind) to another available FireSafetyExpert. 400 VALIDATION_ERROR, 404,
