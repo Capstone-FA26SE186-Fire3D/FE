@@ -97,7 +97,8 @@ export function AdminOverview() {
   const enabled = ready && user?.role === 0 && Boolean(accessToken);
   const token = accessToken as string;
 
-  const reviews = useTotal("overview:reviews", (signal) => reviewsApi.list(token, { status: "Submitted", page: 1, pageSize: 1 }, signal).then((page) => page.totalCount), enabled);
+  // Both kinds (tình huống + hạ tầng PCCC) waiting for an expert: the same source as the two tabs of Theo dõi thẩm định.
+  const reviews = useTotal("overview:reviews", (signal) => reviewsApi.assignments(token, { status: "Submitted", page: 1, pageSize: 1 }, signal).then((page) => page.totalCount), enabled);
   const tickets = useTotal("overview:tickets-open", (signal) => supportApi.listTickets("admin", token, { status: "Open", page: 1, pageSize: 1 }, signal).then((page) => page.total), enabled);
   const urgent = useTotal("overview:tickets-urgent", (signal) => supportApi.listTickets("admin", token, { status: "Open", priority: "Urgent", page: 1, pageSize: 1 }, signal).then((page) => page.total), enabled);
   const reconcile = useTotal("overview:reconcile", (signal) => billingApi.listLedger(token, "checkouts", { status: "NeedsReconcile", page: 1, pageSize: 1 }, signal).then((page) => page.totalCount), enabled);

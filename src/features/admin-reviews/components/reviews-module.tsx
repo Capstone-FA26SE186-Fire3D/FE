@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, ClipboardCheck, Eye, RefreshCw, Search } from "lucide-react";
+import { ClipboardCheck, Eye, RefreshCw, Search, UserRoundCog } from "lucide-react";
 import { useMemo, useState } from "react";
 import { invalidateAsyncData, useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
@@ -13,31 +13,40 @@ import { FilterChip, FilterChips } from "@/components/ui/filter-chip";
 import { NumberPop } from "@/components/ui/number-pop";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { LoadingBlock } from "@/components/ui/spinner";
+import { SubTabs } from "@/components/ui/sub-tabs";
 import { routes } from "@/configs/routes";
+import { accountsApi } from "@/features/accounts/api";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { formatCount } from "@/features/admin-overview/format";
-import { organizationsApi } from "@/features/organizations/api";
+import { assigneeLabel } from "@/features/expert-reviews/api";
 import { formatDateTime } from "@/utils/date-range";
-import { describeReadError, REVIEW_ASSIGNMENT_TAG, reviewsApi } from "../api";
-import { parseStatusParam, statusLabel, statusTone } from "../format";
-import type { ReviewStatus, ReviewSummary } from "../types";
-import { AssignmentPanel } from "./assignment-panel";
+import { describeReadError, REVIEW_ASSIGNMENT_TAG, REVIEW_QUEUE_TAG, reviewsApi } from "../api";
+import { statusLabel } from "../format";
+import type { AssignedReview, ReviewStatus } from "../types";
+import { ReassignDialog } from "./reassign-dialog";
 import { ReviewDrawer } from "./review-detail";
 import "./reviews.css";
-import { LoadingBlock } from "@/components/ui/spinner";
 
 const PAGE_SIZE = 20;
+const EXPERT_ROLE = 3;
+type Kind = "Scenario" | "Infrastructure";
 const STATUSES: ReviewStatus[] = ["Submitted", "Approved", "Rejected"];
 const chipLabel: Record<ReviewStatus, string> = { Submitted: "Chờ thẩm định", Approved: "Đạt thẩm định", Rejected: "Chưa đạt" };
+const KIND_TEXT: Record<Kind, { tab: string; noun: string; search: string; emptyWaiting: string }> = {
+  Scenario: { tab: "Tình huống", noun: "tình huống", search: "Tìm tình huống, tổ chức hoặc công trình", emptyWaiting: "Khi một tổ chức gửi thẩm định phiên bản tình huống, mục đó được giao cho một Chuyên viên PCCC và hiện ở đây." },
+  Infrastructure: { tab: "Hạ tầng PCCC", noun: "hạ tầng PCCC", search: "Tìm tổ chức hoặc công trình", emptyWaiting: "Khi một tổ chức gửi thẩm định hạ tầng PCCC của bản IFC, mục đó được giao cho một Chuyên viên PCCC và hiện ở đây." },
+};
+const parseKind = (value: string): Kind => (value === "infrastructure" ? "Infrastructure" : "Scenario");
+const parseStatus = (value: string): ReviewStatus => ((STATUSES as string[]).includes(value) ? (value as ReviewStatus) : "Submitted");
 
-/** "23/10 10:50": the queue column is narrow; the full timestamp is the cell's title. */
+/** "23/10 10:50": the time column is narrow; the full timestamp is the cell's title. */
 const shortDateTime = (iso: string) => new Date(iso).toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
-/** Total of one status across the whole system (page size 1: only `totalCount` is used). Null when it cannot be read. */
-function useStatusTotal(status: ReviewStatus, token: string | null, enabled: boolean) {
-  const result = useAsyncData(`reviews:total:${status}`, (signal) => reviewsApi.list(token as string, { status, page: 1, pageSize: 1 }, signal), enabled);
-  return { value: result.data ? result.data.totalCount : null, loading: result.loading && !result.data && result.error === undefined, reload: result.reload };
+/** Server total of one kind + status (page size 1: only `totalCount` is used). Null when it cannot be read. */
+function useTotal(kind: Kind, status: ReviewStatus, token: string | null, enabled: boolean) {
+  const result = useAsyncData(`reviews:total:${kind}:${status}`, (signal) => reviewsApi.assignments(token as string, { kind, status, page: 1, pageSize: 1 }, signal), enabled, { tags: [REVIEW_ASSIGNMENT_TAG] });
+  return { value: result.data ? result.data.totalCount : null, loading: result.loading && !result.data && result.error === undefined };
 }
 
 /** KPI tile on the chart kit's `.ops-kpi`; null prints an em dash (the server total could not be read). */
@@ -54,67 +63,83 @@ function QueueKpi({ label, value, loading, hint, testId }: { label: string; valu
 }
 
 /**
- * `/admin/reviews` (Figma "Admin v2 · Theo dõi thẩm định"): totals per status, the queue as a DataTable, and a 720px drawer
- * with the frozen content, hashes, readiness and the decision. Status, organization, page and the open review live in
- * the URL. The API filters by status and organizationId only (no search, no sort): the search box narrows the page on
- * the client and says so.
+ * `/admin/reviews`: thẩm định is watched per kind, because the two are different jobs. "Hạ tầng PCCC" (exits, assembly
+ * points, fixed equipment of one IFC revision) is reviewed first and locked for every scenario; "Tình huống" (a scenario
+ * version with objectives and a rubric) is reviewed on top of it. Each tab reads only `GET /api/admin/reviews` (BE#242,
+ * kind + status + assigneeId), so the tiles, the tab counts and the table always agree. Waiting rows show the expert
+ * holding them and offer "Gán lại"; scenario rows open the frozen content drawer (`/api/admin/scenario-reviews/{id}`,
+ * same reviewId). The admin never decides (BE#245). Kind, status, expert, page and the open review live in the URL;
+ * the server has no organization filter or search (BE#247), so the search box narrows the page on the client.
  */
 export function ReviewsModule() {
   const { accessToken, ready, user } = useAuthSession();
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
-  const statusFilter = parseStatusParam(get("status"));
-  const organizationId = get("organizationId");
+  const kind = parseKind(get("kind"));
+  const status = parseStatus(get("status"));
+  const assigneeId = get("assigneeId");
   const reviewId = get("review");
   const [search, setSearch] = useState("");
+  const [reassigning, setReassigning] = useState<AssignedReview | null>(null);
 
   const enabled = ready && user?.role === 0 && Boolean(accessToken);
-  const status: ReviewStatus | undefined = statusFilter === "all" ? undefined : statusFilter;
   const list = useAsyncData(
-    `reviews:${page}:${statusFilter}:${organizationId}`,
-    (signal) => reviewsApi.list(accessToken as string, { status, organizationId: organizationId || undefined, page, pageSize: PAGE_SIZE }, signal),
+    `reviews:list:${kind}:${status}:${assigneeId}:${page}`,
+    (signal) => reviewsApi.assignments(accessToken as string, { kind, status, assigneeId: assigneeId || undefined, page, pageSize: PAGE_SIZE }, signal),
     enabled,
+    { tags: [REVIEW_ASSIGNMENT_TAG] },
   );
-  const organizations = useAsyncData("reviews:organizations", () => organizationsApi.list(accessToken as string, { page: 1, pageSize: 100, isActive: true }), enabled);
-  const submitted = useStatusTotal("Submitted", accessToken, enabled);
-  const approved = useStatusTotal("Approved", accessToken, enabled);
-  const rejected = useStatusTotal("Rejected", accessToken, enabled);
-  const reloadAll = () => { list.reload(); submitted.reload(); approved.reload(); rejected.reload(); invalidateAsyncData(REVIEW_ASSIGNMENT_TAG); };
-  const totals: Record<ReviewStatus, number | null> = { Submitted: submitted.value, Approved: approved.value, Rejected: rejected.value };
+  const experts = useAsyncData("reviews:experts", (signal) => accountsApi.list(accessToken as string, { role: EXPERT_ROLE, page: 1, pageSize: 100, sort: "fullName" }, signal), enabled);
+  const waitingScenario = useTotal("Scenario", "Submitted", accessToken, enabled);
+  const waitingInfrastructure = useTotal("Infrastructure", "Submitted", accessToken, enabled);
+  const approved = useTotal(kind, "Approved", accessToken, enabled);
+  const rejected = useTotal(kind, "Rejected", accessToken, enabled);
+  const waiting = kind === "Scenario" ? waitingScenario : waitingInfrastructure;
+  const totals: Record<ReviewStatus, number | null> = { Submitted: waiting.value, Approved: approved.value, Rejected: rejected.value };
+  // Tiles, tab counts, the table and the sidebar badge (REVIEW_QUEUE_TAG) re-read together.
+  const reloadAll = () => invalidateAsyncData(REVIEW_ASSIGNMENT_TAG, REVIEW_QUEUE_TAG);
 
   const items = useMemo(() => list.data?.items ?? [], [list.data]);
-  const orgItems = useMemo(() => organizations.data?.items ?? [], [organizations.data]);
-  const orgOptions = useMemo<ComboboxOption[]>(() => {
-    const options = orgItems.map((organization) => ({ value: organization.id, label: organization.name }));
-    // A deep-linked id outside the first 100 active organizations keeps its value so the filter is not silently dropped.
-    if (organizationId && !orgItems.some((organization) => organization.id === organizationId)) options.unshift({ value: organizationId, label: "Tổ chức đang lọc" });
+  const expertOptions = useMemo<ComboboxOption[]>(() => {
+    const options = (experts.data?.items ?? []).map((account) => ({ value: account.id, label: account.fullName?.trim() || account.email, hint: account.email, keywords: [account.email] }));
+    if (assigneeId && !options.some((option) => option.value === assigneeId)) options.unshift({ value: assigneeId, label: "Chuyên viên đang lọc", hint: "", keywords: [] });
     return options;
-  }, [orgItems, organizationId]);
+  }, [experts.data, assigneeId]);
   const needle = stripAccents(search.trim());
-  const visible = useMemo(() => (needle ? items.filter((item) => stripAccents(`${item.scenarioName} ${item.organizationName} ${item.buildingName}`).includes(needle)) : items), [items, needle]);
+  const visible = useMemo(() => (needle ? items.filter((item) => stripAccents(`${item.scenarioName ?? ""} ${item.organizationName} ${item.buildingName}`).includes(needle)) : items), [items, needle]);
 
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (user?.role !== 0) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ quản trị FET3D xem được danh sách thẩm định.</Alert>;
 
+  const text = KIND_TEXT[kind];
+  const waitingView = status === "Submitted";
   const totalCount = list.data?.totalCount ?? 0;
-  const filtering = statusFilter !== "Submitted" || Boolean(organizationId);
+  const filtering = status !== "Submitted" || Boolean(assigneeId);
   const failure = list.error !== undefined ? describeReadError(list.error, "queue") : null;
   const open = (id: string) => setParams({ review: id, page });
   const close = () => setParams({ review: null, page });
   const withCount = (value: ReviewStatus) => { const total = formatCount(totals[value]); return total === null ? chipLabel[value] : `${chipLabel[value]} · ${total}`; };
+  const decider = (row: AssignedReview) => row.decidedByName?.trim() || (row.decidedBy ? "Chuyên viên PCCC" : "—");
 
-  const columns: DataColumn<ReviewSummary>[] = [
-    { key: "scenario", header: "Kịch bản", primary: true, render: (row) => <CellTitle title={row.scenarioName} sub={`v${row.versionNumber}`} /> },
-    { key: "organization", header: "Tổ chức · Công trình", hideBelow: 900, render: (row) => <span className="rev-cell-muted">{row.organizationName} · {row.buildingName}</span> },
-    { key: "submitted", header: "Gửi lúc", width: 140, render: (row) => <time className="rev-cell-muted" dateTime={row.submittedAt} title={formatDateTime(row.submittedAt)}>{shortDateTime(row.submittedAt)}</time> },
-    { key: "status", header: "Trạng thái", width: 170, render: (row) => <StatusBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</StatusBadge> },
+  const columns: DataColumn<AssignedReview>[] = [
+    { key: "title", header: "Nội dung", primary: true, render: (row) => kind === "Scenario"
+      ? <CellTitle title={row.scenarioName ?? "Tình huống"} sub={`Phiên bản ${row.versionNumber}`} />
+      : <CellTitle title={row.buildingName} sub={`Hạ tầng PCCC · phiên bản ${row.versionNumber}`} /> },
+    { key: "organization", header: kind === "Scenario" ? "Tổ chức · Công trình" : "Tổ chức", hideBelow: 900, render: (row) => <span className="rev-cell-muted">{kind === "Scenario" ? `${row.organizationName} · ${row.buildingName}` : row.organizationName}</span> },
+    { key: "expert", header: waitingView ? "Người được giao" : "Người thẩm định", width: 200, render: (row) => waitingView
+      ? row.assigneeId ? <span title={row.assignedAt ? `Giao lúc ${formatDateTime(row.assignedAt)}` : undefined}>{assigneeLabel(row)}</span> : <span className="rev-cell-muted">Chưa giao</span>
+      : <span title={row.reason ? `Lý do: ${row.reason}` : undefined}><CellTitle title={decider(row)} sub={statusLabel(row.status)} /></span> },
+    { key: "time", header: waitingView ? "Gửi lúc" : "Kết quả lúc", width: 130, render: (row) => {
+      const at = waitingView ? row.submittedAt : row.decidedAt ?? row.submittedAt;
+      return <time className="rev-cell-muted" dateTime={at} title={formatDateTime(at)}>{shortDateTime(at)}</time>;
+    } },
   ];
 
   const empty = failure ? null : needle
-    ? <EmptyState icon={Search} title="Không có hàng nào khớp trên trang này" description="Ô tìm chỉ lọc trang đang xem. Xóa từ khóa hoặc đổi trạng thái / tổ chức để tìm trong toàn bộ hàng chờ." action={<Button variant="secondary" onClick={() => setSearch("")}>Xóa từ khóa</Button>} />
+    ? <EmptyState icon={Search} title="Không có hàng nào khớp trên trang này" description="Ô tìm chỉ lọc trang đang xem. Xóa từ khóa hoặc đổi bộ lọc để tìm trong toàn bộ danh sách." action={<Button variant="secondary" onClick={() => setSearch("")}>Xóa từ khóa</Button>} />
     : <EmptyState
       icon={filtering ? Search : ClipboardCheck}
-      title={page > 1 && totalCount > 0 ? "Trang này không còn mục nào." : filtering ? "Không có mục nào phù hợp." : "Chưa có tình huống nào chờ thẩm định"}
-      description={page > 1 && totalCount > 0 ? "Hàng chờ đã thay đổi kể từ lần tải trước." : filtering ? "Thử đổi trạng thái hoặc tổ chức, hoặc về bộ lọc mặc định." : "Khi một tổ chức gửi thẩm định phiên bản kịch bản, bản đó sẽ xuất hiện ở đây."}
+      title={page > 1 && totalCount > 0 ? "Trang này không còn mục nào." : filtering ? "Không có mục nào phù hợp." : `Không có ${text.noun} nào chờ thẩm định`}
+      description={page > 1 && totalCount > 0 ? "Danh sách đã thay đổi kể từ lần tải trước." : filtering ? "Thử đổi trạng thái hoặc Chuyên viên, hoặc về bộ lọc mặc định." : text.emptyWaiting}
       action={page > 1 && totalCount > 0 ? <Button variant="secondary" onClick={() => setPage(1)}>Về trang 1</Button> : undefined}
     />;
 
@@ -122,71 +147,71 @@ export function ReviewsModule() {
     <PageHeader
       eyebrow="Xử lý công việc"
       title="Theo dõi thẩm định"
-      description="Chuyên viên PCCC thẩm định tình huống; quản trị FET3D theo dõi ở đây. Bấm một hàng để xem nội dung đã khóa và kết quả."
+      description="Chuyên viên PCCC thẩm định hạ tầng PCCC của công trình trước, rồi tới từng tình huống. Quản trị theo dõi, xem nội dung đã khóa và gán lại mục đang chờ; chỉ người được giao mới cho Đạt hoặc Chưa đạt."
       breadcrumbs={[{ label: "Quản trị", href: routes.adminOverview }, { label: "Theo dõi thẩm định" }]}
       actions={<Button variant="quiet" onClick={reloadAll} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />{list.loading ? "Đang tải…" : "Tải lại"}</Button>}
     />
 
-    <div className="adm-okpis adm-okpis--3" role="group" aria-label="Tổng theo trạng thái">
-      <QueueKpi testId="kpi-submitted" label="Chờ thẩm định" value={submitted.value} loading={submitted.loading} hint="Đã gửi, chưa quyết định" />
+    <SubTabs label="Loại thẩm định" value={kind === "Scenario" ? "scenario" : "infrastructure"} className="mb-4" data-testid="review-kind-tabs"
+      items={[
+        { value: "scenario", label: "Tình huống", count: waitingScenario.value ?? undefined, "data-testid": "review-tab-scenario" },
+        { value: "infrastructure", label: "Hạ tầng PCCC", count: waitingInfrastructure.value ?? undefined, "data-testid": "review-tab-infrastructure" },
+      ]}
+      onValueChange={(value) => { setSearch(""); setParams({ kind: value === "infrastructure" ? "infrastructure" : null, review: null, page: 1 }); }} />
+
+    <div className="adm-okpis adm-okpis--3" role="group" aria-label={`Tổng theo trạng thái · ${text.tab}`}>
+      <QueueKpi testId="kpi-submitted" label="Chờ thẩm định" value={waiting.value} loading={waiting.loading} hint={`${text.tab} đã gửi, chưa có kết quả`} />
       <QueueKpi testId="kpi-approved" label="Đạt thẩm định" value={approved.value} loading={approved.loading} hint="Tổng mọi thời điểm" />
-      <QueueKpi testId="kpi-rejected" label="Chưa đạt" value={rejected.value} loading={rejected.loading} hint="Kèm lý do bắt buộc" />
+      <QueueKpi testId="kpi-rejected" label="Chưa đạt" value={rejected.value} loading={rejected.loading} hint="Kèm lý do của Chuyên viên" />
     </div>
 
     <DataTable
       data-testid="review-table"
-      caption="Danh sách thẩm định tình huống"
+      caption={`Danh sách thẩm định ${text.noun}`}
       columns={columns}
       rows={visible}
-      rowKey={(row) => row.reviewId}
-      onRowClick={(row) => open(row.reviewId)}
+      rowKey={(row) => `${row.kind}:${row.reviewId}`}
+      onRowClick={kind === "Scenario" ? (row) => open(row.reviewId) : undefined}
       rowMenu={(row) => [
-        { label: "Mở chi tiết", icon: Eye, onSelect: () => open(row.reviewId) },
-        { label: "Chỉ xem tổ chức này", icon: Building2, onSelect: () => setParams({ organizationId: row.organizationId, page: 1 }), disabled: organizationId === row.organizationId, hint: organizationId === row.organizationId ? "Đang lọc theo tổ chức này" : undefined },      ]}
+        ...(kind === "Scenario" ? [{ label: "Mở chi tiết", icon: Eye, onSelect: () => open(row.reviewId) }] : []),
+        ...(row.status === "Submitted" ? [{ label: "Gán lại", icon: UserRoundCog, onSelect: () => setReassigning(row) }] : []),
+      ]}
       loading={list.loading && !list.data}
       error={failure && <Alert tone="danger" title={failure.title} action={failure.denied ? undefined : <Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{failure.message}</Alert>}
       empty={empty}
       toolbar={<>
-        <TableSearch value={search} onChange={setSearch} placeholder="Tìm kịch bản hoặc tổ chức" label="Tìm trong trang đang xem" />
-        <FilterChips label="Bộ lọc hàng chờ">
+        <TableSearch value={search} onChange={setSearch} placeholder={text.search} label="Tìm trong trang đang xem" />
+        <FilterChips label="Bộ lọc thẩm định">
+          {/* The server has no "every status" view: the chip's first option is the default, waiting items. */}
           <FilterChip
             label="Trạng thái"
-            value={statusFilter === "all" ? "" : statusFilter}
-            options={STATUSES.map((value) => ({ value, label: withCount(value) }))}
-            allLabel="Tất cả"
-            onChange={(value) => setParams({ status: value === "" ? "all" : value === "Submitted" ? null : value, page: 1 })}
+            value={status === "Submitted" ? "" : status}
+            allLabel={withCount("Submitted")}
+            options={STATUSES.filter((value) => value !== "Submitted").map((value) => ({ value, label: withCount(value) }))}
+            onChange={(value) => setParams({ status: value || null, page: 1 })}
           />
           <Combobox
-            aria-label="Tổ chức"
+            aria-label="Chuyên viên PCCC"
             className="rev-org-filter"
-            value={organizationId}
-            onChange={(value) => setParams({ organizationId: value || null, page: 1 })}
-            options={orgOptions}
-            placeholder="Tổ chức: tất cả"
-            searchPlaceholder="Tìm tổ chức…"
-            emptyText="Không có tổ chức nào khớp"
-            groupLabel="Tổ chức đang hoạt động"
-            loading={organizations.loading && !organizations.data}
+            value={assigneeId}
+            onChange={(value) => setParams({ assigneeId: value || null, page: 1 })}
+            options={expertOptions}
+            placeholder="Chuyên viên: tất cả"
+            searchPlaceholder="Tìm theo tên hoặc email…"
+            emptyText="Không có Chuyên viên nào khớp"
+            groupLabel="Chuyên viên PCCC"
+            loading={experts.loading && !experts.data}
             clearable
           />
         </FilterChips>
-        {filtering && <Button size="sm" variant="quiet" onClick={() => setParams({ status: null, organizationId: null, page: 1 })}>Về mặc định (chờ thẩm định)</Button>}
+        {filtering && <Button size="sm" variant="quiet" onClick={() => setParams({ status: null, assigneeId: null, page: 1 })}>Về mặc định (chờ thẩm định)</Button>}
       </>}
       pagination={totalCount > PAGE_SIZE ? { page, pageSize: PAGE_SIZE, totalCount, onPageChange: setPage } : undefined}
     />
-    {organizations.error !== undefined && <p className="rev-note" role="status" style={{ marginTop: 8 }}>Không tải được danh sách tổ chức nên bộ lọc tổ chức chỉ giữ giá trị hiện tại. <Button size="sm" variant="quiet" onClick={organizations.reload}>Tải lại danh sách</Button></p>}
-    {list.data && totalCount > 0 && <p className="adm-note" role="status">Hiển thị {visible.length} trên {formatCount(totalCount)} · trạng thái và tổ chức lọc toàn bộ hàng chờ; ô tìm chỉ lọc trang đang xem.</p>}
+    {list.data && totalCount > 0 && <p className="adm-note" role="status">Hiển thị {visible.length} trên {formatCount(totalCount)} · trạng thái và Chuyên viên lọc toàn bộ danh sách; ô tìm chỉ lọc trang đang xem.</p>}
 
-    <AssignmentPanel accessToken={accessToken} enabled={enabled} onOpenScenario={open} onChanged={reloadAll} />
+    {reassigning && accessToken && <ReassignDialog key={`${reassigning.kind}:${reassigning.reviewId}`} review={reassigning} accessToken={accessToken} onClose={() => setReassigning(null)} onChanged={reloadAll} />}
 
-    <ReviewDrawer
-      key={reviewId}
-      open={Boolean(reviewId)}
-      reviewId={reviewId}
-      accessToken={accessToken}
-      summary={items.find((item) => item.reviewId === reviewId)}
-
-      onClose={close}
-    />
+    <ReviewDrawer key={reviewId} open={Boolean(reviewId)} reviewId={reviewId} accessToken={accessToken} onClose={close} />
   </>;
 }
