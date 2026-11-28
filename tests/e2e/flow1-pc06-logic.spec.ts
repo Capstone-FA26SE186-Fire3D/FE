@@ -39,10 +39,10 @@ test.describe("role FireSafetyExpert (BE#211)", () => {
   });
 
   test("an expert lands on the review queue and cannot be sent into another area", () => {
-    expect(dashboardRouteFor({ role: 3 })).toBe("/expert/reviews");
+    expect(dashboardRouteFor({ role: 3 })).toBe("/expert/overview");
     expect(postLoginRoute({ role: 3 }, "/expert/reviews?status=Approved")).toBe("/expert/reviews?status=Approved");
-    expect(postLoginRoute({ role: 3 }, "/admin/overview")).toBe("/expert/reviews");
-    expect(postLoginRoute({ role: 3 }, "/workspace/buildings")).toBe("/expert/reviews");
+    expect(postLoginRoute({ role: 3 }, "/admin/overview")).toBe("/expert/overview");
+    expect(postLoginRoute({ role: 3 }, "/workspace/buildings")).toBe("/expert/overview");
     expect(postLoginRoute({ role: 1 }, "/expert/reviews")).toBe("/workspace/buildings");
   });
 });

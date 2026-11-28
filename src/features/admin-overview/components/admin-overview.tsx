@@ -40,7 +40,7 @@ function Unavailable() {
  * "Việc cần xử lý" tile (Figma Admin v2 · Tổng quan): icon tile, big number, hint and a chevron. The whole tile is the
  * link to the queue it counts.
  */
-function ActionTile({ href, icon: Icon, tone, label, value, hint, loading, testId }: {
+export function ActionTile({ href, icon: Icon, tone, label, value, hint, loading, testId }: {
   href: string;
   icon: LucideIcon;
   tone: "warning" | "danger" | "success" | "info";
@@ -64,7 +64,7 @@ function ActionTile({ href, icon: Icon, tone, label, value, hint, loading, testI
 }
 
 /** System KPI tile on the chart kit's `.ops-kpi` (label, counted-up number, optional sparkline, hint). */
-function SystemKpi({ label, value, hint, spark, sparkColor, loading, testId }: {
+export function SystemKpi({ label, value, hint, spark, sparkColor, loading, testId }: {
   label: string;
   value: number | null;
   hint?: ReactNode;
