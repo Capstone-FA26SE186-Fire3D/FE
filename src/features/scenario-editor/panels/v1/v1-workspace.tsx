@@ -5,7 +5,7 @@ import { ChevronLeft, Lock } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAsyncData } from "@/api/use-async-data";
 import { libraryRefChange, type Change } from "@/features/library/apply";
@@ -193,15 +193,17 @@ export function V1Workspace({ accessToken, buildingId, scenarioId, draftId, init
   const selectedIndex = state.selection?.index ?? null;
   const selectedObject = selectedIndex === null ? undefined : objects[selectedIndex];
   // Distance from the selected wall item to the closest wall: undefined = not a wall item (or no model), null = no wall within reach.
+  // Measured for the object at low priority: a drag changes it on every pointer move and one measure is 16 raycasts.
   const [wallGap, setWallGap] = useState<number | null | undefined>(undefined);
+  const measuredObject = useDeferredValue(selectedObject);
   useEffect(() => {
-    const floor = geometry?.floors.find((item) => item.id === selectedObject?.floorId);
-    const wallItem = selectedObject?.kind === "Equipment" && !selectedObject.anchorId && mountingOf(selectedObject.capability?.id)?.mount === "wall";
+    const floor = geometry?.floors.find((item) => item.id === measuredObject?.floorId);
+    const wallItem = measuredObject?.kind === "Equipment" && !measuredObject.anchorId && mountingOf(measuredObject.capability?.id)?.mount === "wall";
     const next = wallItem && floor && modelStatus.phase === "loaded"
-      ? viewportRef.current?.nearestWall(localToGlb(floor.transform, { ...selectedObject.position, y: 0 }))?.distance ?? null
+      ? viewportRef.current?.nearestWall(localToGlb(floor.transform, { ...measuredObject.position, y: 0 }))?.distance ?? null
       : undefined;
     setWallGap(next);
-  }, [selectedObject, geometry, modelStatus.phase]);
+  }, [measuredObject, geometry, modelStatus.phase]);
   /**
    * A library sample becomes ONE undoable command: the copied fields plus the `libraryRefs[]` entry that records the source
    * version in the draft (kept when another sample is applied, never duplicated). Undo removes both.

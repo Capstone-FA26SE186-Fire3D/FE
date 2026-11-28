@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
 import { ApiError } from "@/api/types/common";
 
@@ -112,8 +112,12 @@ export function useEditorV1({ accessToken, draftId, initial, context, backend: g
   }, []);
 
   const dirty = isV1Dirty(state);
-  const shapeProblems = useMemo(() => shapeIssues(state.draft), [state.draft]);
-  const advisory = useMemo(() => completenessIssues(state.draft, context), [state.draft, context]);
+  // Display-only derivations (issue lists, the "report is stale" hash) follow the draft at low priority: a gizmo drag edits
+  // the draft on every pointer move, and checking + hashing the whole document each time blocked the move. They catch up
+  // as soon as the input pauses, with the same result. `save` and `validate` read the live draft (`stateRef`), never these.
+  const settledDraft = useDeferredValue(state.draft);
+  const shapeProblems = useMemo(() => shapeIssues(settledDraft), [settledDraft]);
+  const advisory = useMemo(() => completenessIssues(settledDraft, context), [settledDraft, context]);
 
   const save = useCallback(async (): Promise<SaveResultV1> => {
     const current = stateRef.current;
@@ -186,7 +190,7 @@ export function useEditorV1({ accessToken, draftId, initial, context, backend: g
     }
   }, [accessToken, backend, draftId]);
 
-  const currentHash = useMemo(() => (report ? stateHash(state.draft) : null), [report, state.draft]);
+  const currentHash = useMemo(() => (report ? stateHash(settledDraft) : null), [report, settledDraft]);
   const reportStale = report !== null && currentHash !== report.hash;
   /** Server issues are mapped onto objects and fields only while they describe the current document (paths are indices into the sent body). */
   const serverIssues = useMemo(() => (report && !reportStale ? report.issues : []), [report, reportStale]);
