@@ -37,14 +37,14 @@ export function ConfirmTrainingPanel({ accessToken, buildingId, revision, pipeli
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
 
+  const confirmed = revision.status === "ConfirmedForTraining";
   const versions = useAsyncData<ScenarioVersionSummary[]>(`confirm-versions:${buildingId}:${revision.id}`, async (signal) => {
     const scenarios = await buildingsApi.listScenarios(accessToken, buildingId, 1, 20, signal);
     const pages = await Promise.all(scenarios.items.map((scenario) => buildingsApi.listScenarioVersions(accessToken, scenario.id, 1, 20, signal)));
     return pages.flatMap((page) => page.items).filter((version) => version.revisionId === revision.id);
-  });
+  }, !confirmed); // a confirmed revision shows no version picker: skip the 1 + N reads (one per scenario)
   const options = versions.data ?? [];
   const selected = options.find((version) => version.id === versionId) ?? null;
-  const confirmed = revision.status === "ConfirmedForTraining";
   const verdict = deriveQaVerdict(pipeline, issues?.filter((issue) => issue.isCurrentAttempt));
   const qaPassed = verdict.state === "passed";
   const ready = !confirmed && qaPassed && options.length > 0;

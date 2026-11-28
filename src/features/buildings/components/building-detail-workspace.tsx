@@ -57,6 +57,8 @@ const ifcSubLabels: Record<IfcSub, string> = { progress: "Tiến trình", previe
 const SCENARIO_PAGE_SIZE = 20;
 // After a Succeeded job the revision is re-read until QA moved it out of Uploaded/Processing; ~1 minute at most.
 const MAX_SETTLE_POLLS = 20;
+/** Polls without any model-building job before the page stops asking (about one minute); see idlePolls. */
+const MAX_IDLE_POLLS = 20;
 /** Job list paging while looking for the Geometry job behind newer package builds. */
 const JOB_PAGE_SIZE = 20;
 const MAX_JOB_PAGES = 5;
@@ -152,6 +154,9 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
   const listedStatus = listedRevision?.status;
   const latestRevision = useMemo(() => [...(revisionItems ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null, [revisionItems]);
   const settlePolls = useRef({ revisionId: "", count: 0 });
+  // Polls that found no model-building job yet. "Uploaded" without a job is also where a revision rests until the user starts
+  // processing, and polling it forever cost one request every 3 s on every tab; refresh() (after "process") polls again.
+  const idlePolls = useRef({ revisionId: "", count: 0 });
 
   // --- Processing job of the selected revision (polled) ---
   const pollEnabled = enabled && Boolean(revisionId);
@@ -171,7 +176,12 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
       }
       // Every kind stays in `jobs` (confirm-for-training looks up the package job of a scenario version).
       const jobs = [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-      if (!newest) return { revisionId, jobs, pipeline: emptyPipeline };
+      if (!newest) {
+        if (idlePolls.current.revisionId !== revisionId) idlePolls.current = { revisionId, count: 0 };
+        idlePolls.current.count += 1;
+        return { revisionId, jobs, pipeline: emptyPipeline };
+      }
+      idlePolls.current = { revisionId, count: 0 };
       const detail = await buildingsApi.getJob(token, newest.id, signal);
       const pipeline: RevisionPipeline = { job: detail.job, detail, qa: null };
       if (detail.job.status === "Running") {
@@ -195,7 +205,12 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
       const job = snapshot.pipeline.job;
       const status = snapshot.revision?.status ?? listedStatus;
       // No job yet: keep polling only while the revision is waiting for one to appear.
-      if (!job) return !isUnsettledRevision(status);
+      if (!job) {
+        if (!isUnsettledRevision(status)) return true;
+        if (idlePolls.current.count < MAX_IDLE_POLLS) return false;
+        idlePolls.current = { revisionId, count: 0 }; // a later refresh() gets a full round of polls again
+        return true;
+      }
       if (!isTerminalJob(job.status)) return false;
       // A failed job leaves the revision Uploaded on the BE, so only a Succeeded job waits for the status to settle.
       if (job.status !== "Succeeded" || snapshot.pipeline.qaError !== undefined) return true;
@@ -211,7 +226,8 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
   const reloadKey = `${jobStatus}:${pipeline.detail?.currentAttemptId ?? ""}`;
   const pollError = pipelineState.data?.revisionId === revisionId || pipelineState.data === undefined ? pipelineState.error : undefined;
 
-  const issues = useAsyncData(`issues:${revisionId}:${reloadKey}`, (signal) => buildingsApi.listIssues(token, revisionId, 1, 100, signal), pollEnabled && (tab === "ifc" || tab === "journey"));
+  // Wait for the first poll: reloadKey is ":" before it and "<status>:<attempt>" after, which sent this 100-row read twice per load.
+  const issues = useAsyncData(`issues:${revisionId}:${reloadKey}`, (signal) => buildingsApi.listIssues(token, revisionId, 1, 100, signal), pollEnabled && snapshot !== undefined && (tab === "ifc" || tab === "journey"));
 
   // When the worker finishes, the revision status changes on the server: refresh the list once, and again whenever a
   // fresh read of the revision disagrees with the list.

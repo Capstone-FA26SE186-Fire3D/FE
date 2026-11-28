@@ -62,7 +62,7 @@ function detailHref(id: string, step?: BuildingStep["action"]) {
 
 /** "Bước hiện tại" chip: two light reads per row, resolved lazily; the row never waits for them. */
 function StepCell({ accessToken, building, enabled }: { accessToken: string; building: BuildingSummary; enabled: boolean }) {
-  const step = useBuildingStep(accessToken, building.id, enabled);
+  const step = useBuildingStep(accessToken, building.id, enabled && building.isActive);
   if (!building.isActive) return <StatusBadge tone="neutral">Đã lưu trữ</StatusBadge>;
   if (!step.data) return step.error !== undefined ? <span className="ops-muted">—</span> : <Skeleton style={{ height: 22, width: 110, borderRadius: 999 }} />;
   return <StatusBadge tone={step.data.tone} data-testid="building-step">{step.data.label}</StatusBadge>;
@@ -70,7 +70,7 @@ function StepCell({ accessToken, building, enabled }: { accessToken: string; bui
 
 /** "Việc tiếp theo" button: the one action that moves this building forward (Figma list column). */
 function NextActionCell({ accessToken, building, enabled }: { accessToken: string; building: BuildingSummary; enabled: boolean }) {
-  const step = useBuildingStep(accessToken, building.id, enabled);
+  const step = useBuildingStep(accessToken, building.id, enabled && building.isActive);
   if (!building.isActive) return null;
   const action = step.data?.action ?? (step.error !== undefined ? { label: "Mở công trình", icon: "open" as const, tab: "journey" as const } : null);
   if (!action) return <Skeleton style={{ height: 36, width: 120 }} />;
