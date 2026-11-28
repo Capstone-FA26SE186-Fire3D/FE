@@ -38,7 +38,8 @@ export function ReassignDialog({ review, accessToken, onClose, onChanged }: { re
   const holder = review.assigneeId;
   const title = reviewTitle(review);
   const options = useMemo<ComboboxOption[]>(() => (experts.data?.items ?? [])
-    .filter((account) => account.isActive && account.role === EXPERT_ROLE && account.id !== holder)
+    // BE#245: an expert still on the email-verification step cannot take reviews (the server answers 422 EXPERT_NOT_AVAILABLE).
+    .filter((account) => account.isActive && account.role === EXPERT_ROLE && account.id !== holder && account.firstLoginStep !== "VerifyEmail")
     .map((account) => ({ value: account.id, label: account.fullName?.trim() || account.email, hint: account.email, keywords: [account.email] })), [experts.data, holder]);
 
   const submit = async (event: FormEvent) => {
