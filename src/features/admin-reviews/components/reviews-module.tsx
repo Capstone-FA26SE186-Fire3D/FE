@@ -1,8 +1,8 @@
 "use client";
 
-import { Building2, ClipboardCheck, Eye, RefreshCw, Search, UserRoundCog } from "lucide-react";
+import { Building2, ClipboardCheck, Eye, RefreshCw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useAsyncData } from "@/api/use-async-data";
+import { invalidateAsyncData, useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -19,10 +19,10 @@ import { useAuthSession } from "@/features/auth/auth-session";
 import { formatCount } from "@/features/admin-overview/format";
 import { organizationsApi } from "@/features/organizations/api";
 import { formatDateTime } from "@/utils/date-range";
-import { describeReadError, hasAssignment, reviewsApi } from "../api";
+import { describeReadError, REVIEW_ASSIGNMENT_TAG, reviewsApi } from "../api";
 import { parseStatusParam, statusLabel, statusTone } from "../format";
 import type { ReviewStatus, ReviewSummary } from "../types";
-import { ReassignDialog } from "./reassign-dialog";
+import { AssignmentPanel } from "./assignment-panel";
 import { ReviewDrawer } from "./review-detail";
 import "./reviews.css";
 import { LoadingBlock } from "@/components/ui/spinner";
@@ -66,7 +66,6 @@ export function ReviewsModule() {
   const organizationId = get("organizationId");
   const reviewId = get("review");
   const [search, setSearch] = useState("");
-  const [reassigning, setReassigning] = useState<ReviewSummary | null>(null);
 
   const enabled = ready && user?.role === 0 && Boolean(accessToken);
   const status: ReviewStatus | undefined = statusFilter === "all" ? undefined : statusFilter;
@@ -79,7 +78,7 @@ export function ReviewsModule() {
   const submitted = useStatusTotal("Submitted", accessToken, enabled);
   const approved = useStatusTotal("Approved", accessToken, enabled);
   const rejected = useStatusTotal("Rejected", accessToken, enabled);
-  const reloadAll = () => { list.reload(); submitted.reload(); approved.reload(); rejected.reload(); };
+  const reloadAll = () => { list.reload(); submitted.reload(); approved.reload(); rejected.reload(); invalidateAsyncData(REVIEW_ASSIGNMENT_TAG); };
   const totals: Record<ReviewStatus, number | null> = { Submitted: submitted.value, Approved: approved.value, Rejected: rejected.value };
 
   const items = useMemo(() => list.data?.items ?? [], [list.data]);
@@ -103,14 +102,9 @@ export function ReviewsModule() {
   const close = () => setParams({ review: null, page });
   const withCount = (value: ReviewStatus) => { const total = formatCount(totals[value]); return total === null ? chipLabel[value] : `${chipLabel[value]} · ${total}`; };
 
-  // BE#242: the assignment column and "Gán lại" appear only when the server sends `assignedTo` (even null).
-  const assigns = items.some(hasAssignment);
   const columns: DataColumn<ReviewSummary>[] = [
     { key: "scenario", header: "Kịch bản", primary: true, render: (row) => <CellTitle title={row.scenarioName} sub={`v${row.versionNumber}`} /> },
     { key: "organization", header: "Tổ chức · Công trình", hideBelow: 900, render: (row) => <span className="rev-cell-muted">{row.organizationName} · {row.buildingName}</span> },
-    ...(assigns ? [{ key: "assignee", header: "Người được giao", width: 180, render: (row: ReviewSummary) => row.assignedTo
-      ? <span title={row.assignedAt ? `Giao lúc ${formatDateTime(row.assignedAt)}` : undefined}>{row.assignedTo.fullName?.trim() || "Chuyên viên PCCC"}</span>
-      : <span className="rev-cell-muted">Chưa giao</span> }] : []),
     { key: "submitted", header: "Gửi lúc", width: 140, render: (row) => <time className="rev-cell-muted" dateTime={row.submittedAt} title={formatDateTime(row.submittedAt)}>{shortDateTime(row.submittedAt)}</time> },
     { key: "status", header: "Trạng thái", width: 170, render: (row) => <StatusBadge tone={statusTone(row.status)}>{statusLabel(row.status)}</StatusBadge> },
   ];
@@ -148,9 +142,7 @@ export function ReviewsModule() {
       onRowClick={(row) => open(row.reviewId)}
       rowMenu={(row) => [
         { label: "Mở chi tiết", icon: Eye, onSelect: () => open(row.reviewId) },
-        { label: "Chỉ xem tổ chức này", icon: Building2, onSelect: () => setParams({ organizationId: row.organizationId, page: 1 }), disabled: organizationId === row.organizationId, hint: organizationId === row.organizationId ? "Đang lọc theo tổ chức này" : undefined },
-        ...(hasAssignment(row) && row.status === "Submitted" ? [{ label: "Gán lại", icon: UserRoundCog, onSelect: () => setReassigning(row) }] : []),
-      ]}
+        { label: "Chỉ xem tổ chức này", icon: Building2, onSelect: () => setParams({ organizationId: row.organizationId, page: 1 }), disabled: organizationId === row.organizationId, hint: organizationId === row.organizationId ? "Đang lọc theo tổ chức này" : undefined },      ]}
       loading={list.loading && !list.data}
       error={failure && <Alert tone="danger" title={failure.title} action={failure.denied ? undefined : <Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{failure.message}</Alert>}
       empty={empty}
@@ -185,6 +177,8 @@ export function ReviewsModule() {
     {organizations.error !== undefined && <p className="rev-note" role="status" style={{ marginTop: 8 }}>Không tải được danh sách tổ chức nên bộ lọc tổ chức chỉ giữ giá trị hiện tại. <Button size="sm" variant="quiet" onClick={organizations.reload}>Tải lại danh sách</Button></p>}
     {list.data && totalCount > 0 && <p className="adm-note" role="status">Hiển thị {visible.length} trên {formatCount(totalCount)} · trạng thái và tổ chức lọc toàn bộ hàng chờ; ô tìm chỉ lọc trang đang xem.</p>}
 
+    <AssignmentPanel accessToken={accessToken} enabled={enabled} onOpenScenario={open} onChanged={reloadAll} />
+
     <ReviewDrawer
       key={reviewId}
       open={Boolean(reviewId)}
@@ -194,6 +188,5 @@ export function ReviewsModule() {
 
       onClose={close}
     />
-    {reassigning && accessToken && <ReassignDialog key={reassigning.reviewId} review={reassigning} accessToken={accessToken} onClose={() => setReassigning(null)} onChanged={reloadAll} />}
   </>;
 }

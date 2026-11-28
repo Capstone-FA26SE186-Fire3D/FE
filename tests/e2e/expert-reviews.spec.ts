@@ -1,7 +1,7 @@
 /**
  * Chuyên viên PCCC review queue (/expert/reviews): list, detail, thẩm định with If-Match + Idempotency-Key.
  * Evidence level: Playwright route mocks that keep SERVER STATE (status, ETag revision) and follow the BE contract
- * (ExpertReviewsController, BE main @ 3786664). Not an integration test against the real API.
+ * (ExpertReviewsController + BE#242 assignment, BE docs/expert-review.md). Not an integration test against the real API.
  */
 import { expect, test, type Page, type Route } from "@playwright/test";
 
@@ -11,6 +11,9 @@ const expert = { id: "expert-1", email: "expert@fire3d.test", fullName: "Chuyên
 const owner = { id: "owner-1", email: "owner@fire3d.test", fullName: "Nguyễn Văn A", role: 1, organizationId: "org-1", profileRevision: 1 };
 
 const placement = (floorId: string) => ({ floorId, position: { x: 1, y: 0, z: 2 }, rotation: { x: 0, y: 0, z: 0, w: 1 } });
+const ME = { id: "expert-1", fullName: "Chuyên viên Lê Văn T" };
+const OTHER = { id: "expert-2", fullName: "Chuyên viên Trần Thị B" };
+
 type Review = { reviewId: string; kind: "Scenario" | "Infrastructure"; status: string; revision: number; reason: string | null; decidedBy: string | null; decidedByName: string | null; decidedAt: string | null } & Record<string, unknown>;
 
 function seed(): Review[] {
@@ -30,22 +33,16 @@ class Server {
   raceNext = false;
   calls: string[] = [];
   /**
-   * BE#242 round-robin assignment. Undefined = today's server (no assignment fields at all). Otherwise reviewId → holder
-   * (null = not assigned); every item then carries `assignedTo`, `assignedAt`, `assignedToMe`, the list honours
-   * `assignee=me|all` (default me) and a decision on an item not held by `expert-1` answers 403 REVIEW_NOT_ASSIGNED.
+   * BE#242 round-robin assignment (always on): reviewId → holder (null = no expert was available). Every item carries flat
+   * `assigneeId`, `assigneeName`, `assignedAt`; the list honours `assignee=me|all` (default me) and a decision on a waiting
+   * item not held by `expert-1` answers 403 REVIEW_NOT_ASSIGNED_TO_YOU. By default every item is mine.
    */
-  assignments?: Record<string, { id: string; fullName: string } | null>;
-  /** Send the page-level `assignmentEnabled: true` (BE#242). Off by default so the other tests cover the per-item fallback. */
-  pageFlag = false;
+  assignments: Record<string, { id: string; fullName: string } | null> = { "infra-1": ME, "review-2": ME, "review-3": ME };
   view(review: Review): Review {
-    if (!this.assignments) return review;
     const holder = this.assignments[review.reviewId] ?? null;
-    return { ...review, assignedTo: holder, assignedAt: holder ? "2026-11-24T02:05:00Z" : null, assignedToMe: holder?.id === expert.id };
+    return { ...review, assigneeId: holder?.id ?? null, assigneeName: holder?.fullName ?? null, assignedAt: holder ? "2026-11-24T02:05:00Z" : null };
   }
 }
-
-const ME = { id: "expert-1", fullName: "Chuyên viên Lê Văn T" };
-const OTHER = { id: "expert-2", fullName: "Chuyên viên Trần Thị B" };
 
 const problem = (route: Route, status: number, body: Record<string, unknown>) => route.fulfill({ status, headers: { "Content-Type": "application/problem+json" }, body: JSON.stringify({ status, ...body }) });
 
@@ -58,10 +55,10 @@ async function install(page: Page, server: Server, user: object = expert) {
     server.listQueries.push(query);
     const status = query.get("status") ?? "Submitted";
     const kind = query.get("kind");
-    const mineOnly = Boolean(server.assignments) && (query.get("assignee") ?? "me") === "me";
+    const mineOnly = (query.get("assignee") ?? "me") === "me";
     const items = server.reviews.filter((review) => review.status === status && (!kind || review.kind === kind)).map((review) => server.view(review))
-      .filter((review) => !mineOnly || review.assignedToMe === true);
-    return route.fulfill({ json: { items, totalCount: items.length, page: 1, pageSize: 20, ...(server.assignments && server.pageFlag ? { assignmentEnabled: true } : {}) } });
+      .filter((review) => !mineOnly || review.assigneeId === expert.id);
+    return route.fulfill({ json: { items, totalCount: items.length, page: 1, pageSize: 20 } });
   });
   await page.route((url) => /^\/api\/expert\/reviews\/[^/]+$/.test(url.pathname), (route) => {
     const review = server.reviews.find((item) => item.reviewId === new URL(route.request().url()).pathname.split("/").pop());
@@ -88,7 +85,7 @@ async function install(page: Page, server: Server, user: object = expert) {
     server.decisions.push({ id, action, ifMatch: headers["if-match"] ?? null, key: headers["idempotency-key"] ?? null, body });
     const review = server.reviews.find((item) => item.reviewId === id);
     if (!review) return problem(route, 404, { title: "Not found.", code: "NOT_FOUND" });
-    if (server.assignments && server.assignments[id]?.id !== expert.id) return problem(route, 403, { title: "Review not assigned to you.", code: "REVIEW_NOT_ASSIGNED" });
+    if (review.status === "Submitted" && server.assignments[id]?.id !== expert.id) return problem(route, 403, { title: "Review not assigned to you.", code: "REVIEW_NOT_ASSIGNED_TO_YOU" });
     if (server.raceNext) {
       server.raceNext = false;
       Object.assign(review, { status: "Approved", revision: review.revision + 1, decidedBy: "expert-9", decidedByName: "Chuyên viên khác", decidedAt: "2026-11-24T04:00:00Z" });
@@ -111,11 +108,8 @@ test("an expert signs in by role name, sees the waiting queue and calls nothing 
   await expect(rows(page).first()).toContainText("Hạ tầng PCCC · Nhà A");
   await expect(rows(page).nth(1)).toContainText("Cháy bếp tầng 3");
   expect(server.listQueries[0].get("status")).toBe("Submitted");
-  // Today's server sends no assignment fields: the shared queue stays as it was and `assignee` is never sent.
-  await expect(page.getByTestId("expert-assignee-tabs")).toHaveCount(0);
-  await expect(rows(page).first()).not.toContainText("Giao cho");
-  await expect(rows(page).first()).not.toContainText("Chưa giao");
-  expect(server.listQueries.some((query) => query.has("assignee"))).toBe(false);
+  expect(server.listQueries[0].get("assignee")).toBe("me");
+  await expect(rows(page).first()).toContainText("Giao cho bạn");
   // The API answers 403 to this role everywhere else (ExpertRouteGuard): the area must not even ask.
   expect(server.calls.filter((path) => !path.startsWith("/api/expert") && !path.startsWith("/api/auth") && !path.startsWith("/api/me"))).toEqual([]);
 });
@@ -192,7 +186,7 @@ test("when another expert decided first, the 412 reloads and shows their result"
 });
 
 test.describe("round-robin assignment (BE#242)", () => {
-  test("once the server assigns, the queue opens on items given to me and Tất cả shows the holders", async ({ page }) => {
+  test("the queue opens on items given to me (assignee=me) and Tất cả shows every holder", async ({ page }) => {
     const server = new Server();
     server.assignments = { "infra-1": ME, "review-2": OTHER };
     await install(page, server);
@@ -200,10 +194,8 @@ test.describe("round-robin assignment (BE#242)", () => {
     await expect(page.getByTestId("expert-tab-mine")).toHaveAttribute("aria-selected", "true");
     await expect(rows(page)).toHaveCount(1);
     await expect(rows(page).first()).toContainText("Hạ tầng PCCC · Nhà A");
-    await expect(rows(page).first()).toContainText("Giao cho: Chuyên viên Lê Văn T");
-    // The first request is today's (no `assignee`); the query is added only after the response proved the server assigns.
-    expect(server.listQueries[0].has("assignee")).toBe(false);
-    expect(server.listQueries.at(-1)?.get("assignee")).toBe("me");
+    await expect(rows(page).first()).toContainText("Giao cho bạn");
+    expect(server.listQueries.every((query) => query.get("assignee") === "me")).toBe(true);
 
     await page.getByTestId("expert-tab-all").click();
     await expect(page).toHaveURL(/assignee=all/);
@@ -212,17 +204,15 @@ test.describe("round-robin assignment (BE#242)", () => {
     await expect(rows(page).filter({ hasText: "Cháy bếp tầng 3" })).toContainText("Giao cho: Chuyên viên Trần Thị B");
   });
 
-  test("an empty first page with assignmentEnabled still shows the tabs and Tất cả reaches the shared items", async ({ page }) => {
+  test("with nothing given to me the tabs stay and Tất cả reaches the other items", async ({ page }) => {
     const server = new Server();
     server.assignments = { "infra-1": OTHER, "review-2": OTHER };
-    server.pageFlag = true;
     await install(page, server);
     await page.goto("/expert/reviews");
     await expect(page.getByTestId("expert-assignee-tabs")).toBeVisible();
     await expect(page.getByTestId("expert-tab-mine")).toHaveAttribute("aria-selected", "true");
     await expect(rows(page)).toHaveCount(0);
     await expect(page.getByText("Chưa có mục nào giao cho bạn")).toBeVisible();
-    expect(server.listQueries[0].has("assignee")).toBe(false);
 
     await page.getByTestId("expert-tab-all").click();
     await expect(page).toHaveURL(/assignee=all/);
@@ -262,7 +252,7 @@ test.describe("round-robin assignment (BE#242)", () => {
     await expect(detail(page).getByTestId("expert-readonly")).toHaveCount(0);
   });
 
-  test("a 403 REVIEW_NOT_ASSIGNED on approve explains it and reloads to show the holder", async ({ page }) => {
+  test("a 403 REVIEW_NOT_ASSIGNED_TO_YOU on approve explains it and reloads to show the holder", async ({ page }) => {
     const server = new Server();
     server.assignments = { "infra-1": ME, "review-2": ME };
     await install(page, server);

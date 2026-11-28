@@ -23,7 +23,7 @@ import { ReviewContent } from "@/features/admin-reviews/components/review-conten
 import "@/features/admin-reviews/components/reviews.css";
 import { useAuthSession } from "@/features/auth/auth-session";
 
-import { assigneeName, describeDecisionError, expertReviewsApi, hasAssignment, KIND_LABEL, REASON_MAX, reviewTitle, statusOf, validateReason, type DecisionFailure, type ExpertAction } from "../api";
+import { assigneeLabel, describeDecisionError, expertReviewsApi, KIND_LABEL, REASON_MAX, reviewTitle, statusOf, validateReason, type DecisionFailure, type ExpertAction } from "../api";
 import { ReviewModel } from "./review-model";
 
 /**
@@ -36,10 +36,10 @@ export function ExpertReviewPage({ reviewId }: { reviewId: string }) {
   const { accessToken, ready, user } = useAuthSession();
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (user?.role !== 3) return <Alert tone="danger" title="Không có quyền truy cập">Chỉ Chuyên viên PCCC thẩm định được hạ tầng và tình huống.</Alert>;
-  return <ExpertReviewDetail key={reviewId} reviewId={reviewId} accessToken={accessToken} />;
+  return <ExpertReviewDetail key={reviewId} reviewId={reviewId} accessToken={accessToken} userId={user.id} />;
 }
 
-function ExpertReviewDetail({ reviewId, accessToken }: { reviewId: string; accessToken: string | null }) {
+function ExpertReviewDetail({ reviewId, accessToken, userId }: { reviewId: string; accessToken: string | null; userId: string }) {
   const toast = useToast();
   const { keyFor, done } = useIdempotencyKey();
   const loaded = useAsyncData(`expert-review:${reviewId}`, (signal) => expertReviewsApi.detail(accessToken as string, reviewId, signal), Boolean(accessToken));
@@ -54,9 +54,8 @@ function ExpertReviewDetail({ reviewId, accessToken }: { reviewId: string; acces
   const etag = loaded.data?.etag ?? null;
   const review = detail?.review ?? null;
   const pending = detail?.review.status === "Submitted";
-  // BE#242: an item assigned to another expert is read-only here. Absent fields (today's server) keep the shared queue.
-  const heldBy = review && hasAssignment(review) && review.assignedToMe === false ? review.assignedTo ?? null : undefined;
-  const readOnly = heldBy !== undefined;
+  // BE#242: only the assignee decides; an item held by another expert (or by nobody yet) is read-only here.
+  const readOnly = review !== null && review.assigneeId !== userId;
   const canDecide = Boolean(detail) && pending && !readOnly && Boolean(etag) && !loaded.loading && loaded.error === undefined;
   const isInfrastructure = review?.kind === "Infrastructure";
 
@@ -113,7 +112,7 @@ function ExpertReviewDetail({ reviewId, accessToken }: { reviewId: string; acces
         </p>
         {notice && <Alert tone="warning" title="Kết quả của bạn chưa được ghi">{notice}</Alert>}
         {loaded.error !== undefined && <Alert tone="warning" title="Dữ liệu có thể đã cũ" action={<Button size="sm" variant="secondary" className="mt-3" onClick={loaded.reload}>Thử lại</Button>}>{describeApiError(loaded.error, "Hãy thử lại sau.")} Các nút thẩm định bị khoá cho tới khi tải lại được.</Alert>}
-        {pending && readOnly && <div data-testid="expert-readonly"><Alert tone="info">{heldBy ? `Mục này đang giao cho ${assigneeName(heldBy)}. Bạn chỉ xem được.` : "Mục này chưa giao cho Chuyên viên nào. Bạn chỉ xem được."}</Alert></div>}
+        {pending && readOnly && <div data-testid="expert-readonly"><Alert tone="info">{detail.review.assigneeId ? `Mục này đang giao cho ${assigneeLabel(detail.review)}. Bạn chỉ xem được.` : "Mục này chưa giao cho Chuyên viên nào. Bạn chỉ xem được."}</Alert></div>}
         {pending && !readOnly && <p className="rev-note">Bạn thẩm định <strong>đúng nội dung đang xem</strong>. Kết quả không đổi được; nếu cần sửa, tổ chức tạo phiên bản mới và gửi lại. Thẩm định trên mô phỏng không thay việc người đứng đầu cơ sở phê duyệt phương án PC06.</p>}
 
         <ReviewModel accessToken={accessToken as string} detail={detail} />

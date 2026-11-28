@@ -1,7 +1,8 @@
 /**
  * Admin scenario reviews (/admin/reviews): queue and detail, read-only since BE#211 (a Chuyên viên PCCC decides in /expert/reviews).
  * Evidence level: Playwright route mocks that keep SERVER STATE (statuses, receipts by Idempotency-Key) and follow the
- * BE contract (ScenarioReviewQueriesController, ScenarioContentReviewsController, OpenAPI @1eaf988). Not an integration
+ * BE contract (ScenarioReviewQueriesController, ScenarioContentReviewsController, OpenAPI @1eaf988; BE#242
+ * AdminExpertReviewsController for the "người được giao" panel and Gán lại). Not an integration
  * test against the real API. Run against a production build (`NEXT_PUBLIC_API_BASE_URL=` empty so the mock is same-origin).
  */
 import { EXPOSED } from "./api-headers";
@@ -73,10 +74,14 @@ class ReviewServer {
   private receipts = new Map<string, { fingerprint: string; response: Record<string, unknown> }>();
 
   /**
-   * BE#242 round-robin assignment. Undefined = today's server (no `assignedTo` at all). Otherwise reviewId → holder
-   * (null = not assigned) and `POST /api/admin/reviews/{id}/reassign` works on waiting items.
+   * BE#242 round-robin assignment (always on), keyed by reviewId of either kind: holder, or null/absent = not assigned.
+   * `GET /api/admin/reviews` (AdminExpertReviewsController) lists waiting Scenario items (same reviewId as the scenario
+   * list) plus `infrastructures`, in the expert item shape with flat `assigneeId/assigneeName/assignedAt`.
    */
-  assignments?: Record<string, { id: string; fullName: string } | null>;
+  assignments: Record<string, { id: string; fullName: string } | null> = {};
+  /** Hạ tầng PCCC items (BE#213) for the admin reviews list: `reviewId = infrastructureId`, scenario fields null. */
+  infrastructures: Array<{ reviewId: string; status: Status; buildingName: string; organizationName: string; versionNumber: number; submittedAt: string }> = [];
+  assignmentQueries: URLSearchParams[] = [];
   reassignRequests: Array<{ id: string; body: Record<string, unknown> }> = [];
   /** Answer the next reassign with this error code without applying it. */
   reassignFailNext?: { status: number; code: string };
@@ -85,11 +90,40 @@ class ReviewServer {
     this.reviews = seeds.map(buildReview);
   }
 
-  view(summary: ReviewRecord["summary"]) {
-    if (!this.assignments) return summary;
-    const holder = this.assignments[summary.reviewId] ?? null;
-    return { ...summary, assignedTo: holder, assignedAt: holder ? "2026-10-01T09:00:00Z" : null };
+  private holder(id: string) {
+    const holder = this.assignments[id] ?? null;
+    return { assigneeId: holder?.id ?? null, assigneeName: holder?.fullName ?? null, assignedAt: holder ? "2026-10-01T09:00:00Z" : null };
   }
+
+  /** One item of `GET /api/admin/reviews` (expert item shape). */
+  item(id: string) {
+    const review = this.byId(id);
+    if (review) {
+      const s = review.summary;
+      return { ...s, kind: "Scenario", revision: s.status === "Submitted" ? 1 : 2, revisionId: "rev-1", infrastructureId: null, ...this.holder(id) };
+    }
+    const infra = this.infrastructures.find((entry) => entry.reviewId === id);
+    if (!infra) return null;
+    return {
+      reviewId: infra.reviewId, kind: "Infrastructure", status: infra.status, revision: 3, scenarioVersionId: null, revisionId: "rev-1", contentHash: hex("e"), rubricHash: null,
+      submittedBy: SUBMITTER, submittedByName: "Nguyễn Văn A (gửi)", submittedAt: infra.submittedAt, decidedBy: null, decidedByName: null, decidedAt: null, reason: null,
+      organizationId: ORG_1, organizationName: infra.organizationName, buildingId: "bld-11", buildingName: infra.buildingName,
+      scenarioId: null, scenarioName: null, versionNumber: infra.versionNumber, infrastructureId: infra.reviewId, ...this.holder(id),
+    };
+  }
+
+  assignmentList(url: URL) {
+    const query = url.searchParams;
+    this.assignmentQueries.push(query);
+    const status = query.get("status") ?? "Submitted";
+    const ids = [
+      ...this.reviews.filter((review) => review.summary.status === status).map((review) => ({ id: review.summary.reviewId, at: review.summary.submittedAt })),
+      ...this.infrastructures.filter((entry) => entry.status === status).map((entry) => ({ id: entry.reviewId, at: entry.submittedAt })),
+    ].sort((a, b) => (a.at < b.at ? -1 : 1)); // waiting items oldest first
+    return { items: ids.map(({ id }) => this.item(id)), totalCount: ids.length, page: 1, pageSize: 20 };
+  }
+
+  statusOf(id: string) { return this.byId(id)?.summary.status ?? this.infrastructures.find((entry) => entry.reviewId === id)?.status; }
 
   byId(id: string) { return this.reviews.find((review) => review.summary.reviewId === id); }
   byVersion(id: string) { return this.reviews.find((review) => review.summary.scenarioVersionId === id); }
@@ -104,7 +138,7 @@ class ReviewServer {
     const pageSize = Number(query.get("pageSize") ?? 20);
     const filtered = this.reviews
       .filter((review) => (!status || review.summary.status === status) && (!organizationId || review.summary.organizationId === organizationId))
-      .map((review) => this.view(review.summary))
+      .map((review) => review.summary)
       .sort((a, b) => (a.submittedAt === b.submittedAt ? (a.reviewId < b.reviewId ? 1 : -1) : a.submittedAt < b.submittedAt ? 1 : -1));
     return { status: 200, body: { items: filtered.slice((page - 1) * pageSize, page * pageSize), totalCount: filtered.length, page, pageSize } };
   }
@@ -171,18 +205,21 @@ async function install(page: Page, server: ReviewServer, user: object = admin) {
     const items = EXPERTS.filter((account) => (!query.get("role") || account.role === query.get("role")) && (query.get("isActive") !== "true" || account.isActive));
     return route.fulfill({ json: { items, totalCount: items.length, page: 1, pageSize: 100 } });
   });
+  // BE#242 AdminExpertReviewsController: both kinds with their assignee, then reassign (400/404/409/422 as documented).
+  await page.route((url) => url.pathname === "/api/admin/reviews", (route) => route.fulfill({ json: server.assignmentList(new URL(route.request().url())) }));
   await page.route((url) => /^\/api\/admin\/reviews\/[^/]+\/reassign$/.test(url.pathname), (route) => {
     const id = new URL(route.request().url()).pathname.split("/").at(-2) as string;
     const body = route.request().postDataJSON() as Record<string, unknown>;
     server.reassignRequests.push({ id, body });
     if (server.reassignFailNext) { const fail = server.reassignFailNext; server.reassignFailNext = undefined; return problem(route, fail.status, { title: "Injected error.", code: fail.code }); }
-    const review = server.byId(id);
-    if (!review || !server.assignments) return problem(route, 404, { title: "Not found.", code: "NOT_FOUND" });
-    if (review.summary.status !== "Submitted") return problem(route, 409, { title: "Not pending.", code: "REVIEW_NOT_PENDING" });
+    const status = server.statusOf(id);
+    if (!status) return problem(route, 404, { title: "Not found.", code: "NOT_FOUND" });
+    if (typeof body.reason !== "string" || !body.reason.trim() || body.reason.length > 500) return problem(route, 400, { title: "Validation failed.", code: "VALIDATION_ERROR", errors: { reason: ["Reason must be 1-500 characters."] } });
+    if (status !== "Submitted") return problem(route, 409, { title: "Not pending.", code: "REVIEW_NOT_PENDING" });
     const target = EXPERTS.find((account) => account.id === body.expertId && account.isActive);
-    if (!target) return problem(route, 400, { title: "Expert not available.", code: "EXPERT_NOT_AVAILABLE" });
+    if (!target) return problem(route, 422, { title: "Expert not available.", code: "EXPERT_NOT_AVAILABLE", errors: { expertId: ["Choose an active FireSafetyExpert whose email is verified."] } });
     server.assignments[id] = { id: target.id, fullName: target.fullName };
-    return route.fulfill({ json: server.view(review.summary) });
+    return route.fulfill({ json: server.item(id) });
   });
   await page.route((url) => /^\/api\/admin\/scenario-versions\/[^/]+\/(approve|reject)$/.test(url.pathname), (route) => {
     const parts = new URL(route.request().url()).pathname.split("/");
@@ -265,18 +302,18 @@ test.describe("queue", () => {
     await install(page, server);
     await page.goto("/admin/reviews");
     await expect(rows(page)).toHaveCount(20);
-    await expect(page.getByText("Trang 1/3")).toBeVisible();
-    await page.getByRole("button", { name: "Trang sau" }).click();
+    await expect(page.getByTestId("review-table").getByText("Trang 1/3")).toBeVisible();
+    await page.getByTestId("review-table").getByRole("button", { name: "Trang sau" }).click();
     await expect(page).toHaveURL(/page=2/);
-    await expect(page.getByText("Trang 2/3")).toBeVisible();
+    await expect(page.getByTestId("review-table").getByText("Trang 2/3")).toBeVisible();
     expect(server.listQueries.at(-1)?.get("page")).toBe("2");
     await page.reload();
-    await expect(page.getByText("Trang 2/3")).toBeVisible();
+    await expect(page.getByTestId("review-table").getByText("Trang 2/3")).toBeVisible();
     await expect(rows(page)).toHaveCount(20);
-    await page.getByRole("button", { name: "Trang sau" }).click();
+    await page.getByTestId("review-table").getByRole("button", { name: "Trang sau" }).click();
     await expect(rows(page)).toHaveCount(5);
     await page.goBack();
-    await expect(page.getByText("Trang 2/3")).toBeVisible();
+    await expect(page.getByTestId("review-table").getByText("Trang 2/3")).toBeVisible();
   });
 
   test("empty, error with retry, 403, 401 and organization users", async ({ page }) => {
@@ -317,6 +354,7 @@ test.describe("queue", () => {
     await expect(page.getByRole("heading", { name: "Không có quyền truy cập" })).toBeVisible();
     await expect(rows(page)).toHaveCount(0);
     expect(server.listQueries).toHaveLength(0);
+    expect(server.assignmentQueries).toHaveLength(0);
   });
 });
 
@@ -455,32 +493,52 @@ test("the admin screen is read-only since BE#211: no decision buttons and no dec
 });
 
 test.describe("assignment (BE#242)", () => {
+  /** Rows of the "Đang chờ thẩm định — người được giao" panel (`GET /api/admin/reviews`). */
+  const heldRows = (page: Page) => page.getByTestId("assignment-table").locator("tbody tr, li.ops-dt-card");
+  const heldRow = (page: Page, name: string) => heldRows(page).filter({ hasText: name });
   const openReassign = async (page: Page, name: string) => {
-    await row(page, name).getByRole("button", { name: "Thao tác" }).click();
+    await heldRow(page, name).getByRole("button", { name: "Thao tác" }).click();
     await page.getByRole("menuitem", { name: "Gán lại" }).click();
     return page.getByRole("dialog", { name: "Gán lại cho Chuyên viên khác" });
   };
+  const INFRA_ID = "cccccccc-0000-4000-8000-000000000009";
+  const withInfrastructure = (server: ReviewServer) => {
+    server.infrastructures = [{ reviewId: INFRA_ID, status: "Submitted", buildingName: "Nhà B", organizationName: "Trường THPT Lê Quý Đôn", versionNumber: 3, submittedAt: "2026-10-01T07:00:00Z" }];
+    return server;
+  };
 
-  test("without assignment fields the queue has no assignee column and no Gán lại", async ({ page }) => {
-    const server = new ReviewServer(baseSeeds());
+  test("the panel lists waiting items of both kinds with their holder; the scenario list stays without it", async ({ page }) => {
+    const server = withInfrastructure(new ReviewServer(baseSeeds()));
+    const [first, second] = server.reviews.map((review) => review.summary.reviewId);
+    server.assignments = { [first]: { id: EXPERT_A.id, fullName: EXPERT_A.fullName }, [second]: null, [INFRA_ID]: { id: EXPERT_B.id, fullName: EXPERT_B.fullName } };
     await install(page, server);
     await page.goto("/admin/reviews");
     await expect(rows(page)).toHaveCount(2);
     await expect(page.getByTestId("review-table").getByText("Người được giao")).toHaveCount(0);
-    await row(page, "Sơ tán giờ ra chơi").getByRole("button", { name: "Thao tác" }).click();
-    await expect(page.getByRole("menuitem", { name: "Mở chi tiết" })).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: "Gán lại" })).toHaveCount(0);
+
+    const panel = page.getByTestId("assignment-panel");
+    await expect(panel.getByRole("heading", { name: "Đang chờ thẩm định — người được giao" })).toBeVisible();
+    await expect(heldRows(page)).toHaveCount(3);
+    await expect(heldRow(page, "Hạ tầng PCCC · Nhà B")).toContainText("Chuyên viên Trần Thị B");
+    await expect(heldRow(page, "Sơ tán giờ ra chơi")).toContainText("Chuyên viên Lê Văn T");
+    await expect(heldRow(page, "Cháy kho hàng giờ cao điểm")).toContainText("Chưa giao");
+    // Only waiting items: the server's default status (Submitted) is used, decided items never appear.
+    expect(server.assignmentQueries.every((query) => (query.get("status") ?? "Submitted") === "Submitted")).toBe(true);
+    await expect(heldRow(page, "Mất điện và khói")).toHaveCount(0);
+
+    // A scenario row also opens the existing drawer (same reviewId); an infrastructure row offers Gán lại only.
+    await heldRow(page, "Sơ tán giờ ra chơi").getByRole("button", { name: "Thao tác" }).click();
+    await page.getByRole("menuitem", { name: "Mở chi tiết" }).click();
+    await expect(page).toHaveURL(new RegExp(`review=${first}`));
+    await expect(drawer(page).getByTestId("review-detail")).toBeVisible();
   });
 
-  test("shows Người được giao and reassigns a waiting item with a reason", async ({ page }) => {
+  test("reassigns a waiting scenario with a reason", async ({ page }) => {
     const server = new ReviewServer(baseSeeds());
     const [first, second] = server.reviews.map((review) => review.summary.reviewId);
     server.assignments = { [first]: { id: EXPERT_A.id, fullName: EXPERT_A.fullName }, [second]: null };
     await install(page, server);
     await page.goto("/admin/reviews");
-    await expect(page.getByTestId("review-table").getByRole("columnheader", { name: "Người được giao" })).toBeVisible();
-    await expect(row(page, "Sơ tán giờ ra chơi")).toContainText("Chuyên viên Lê Văn T");
-    await expect(row(page, "Cháy kho hàng giờ cao điểm")).toContainText("Chưa giao");
 
     const dialog = await openReassign(page, "Sơ tán giờ ra chơi");
     await dialog.getByTestId("reassign-submit").click();
@@ -497,21 +555,31 @@ test.describe("assignment (BE#242)", () => {
     await dialog.getByTestId("reassign-submit").click();
     await expect(dialog).toHaveCount(0);
     expect(server.reassignRequests).toEqual([{ id: first, body: { expertId: EXPERT_B.id, reason: "Chuyên viên T nghỉ phép tuần này." } }]);
-    await expect(row(page, "Sơ tán giờ ra chơi")).toContainText("Chuyên viên Trần Thị B");
+    await expect(heldRow(page, "Sơ tán giờ ra chơi")).toContainText("Chuyên viên Trần Thị B");
   });
 
-  test("decided items offer no Gán lại", async ({ page }) => {
-    const server = new ReviewServer(baseSeeds());
-    server.assignments = Object.fromEntries(server.reviews.map((review) => [review.summary.reviewId, { id: EXPERT_A.id, fullName: EXPERT_A.fullName }]));
+  test("reassigns a waiting infrastructure item", async ({ page }) => {
+    const server = withInfrastructure(new ReviewServer(baseSeeds()));
+    server.assignments = { [INFRA_ID]: { id: EXPERT_A.id, fullName: EXPERT_A.fullName } };
     await install(page, server);
-    await page.goto("/admin/reviews?status=Approved");
-    await expect(rows(page)).toHaveCount(1);
-    await row(page, "Mất điện và khói").getByRole("button", { name: "Thao tác" }).click();
-    await expect(page.getByRole("menuitem", { name: "Mở chi tiết" })).toBeVisible();
-    await expect(page.getByRole("menuitem", { name: "Gán lại" })).toHaveCount(0);
+    await page.goto("/admin/reviews");
+    await expect(heldRow(page, "Hạ tầng PCCC · Nhà B")).toContainText("Chuyên viên Lê Văn T");
+
+    await heldRow(page, "Hạ tầng PCCC · Nhà B").getByRole("button", { name: "Thao tác" }).click();
+    await expect(page.getByRole("menuitem", { name: "Mở chi tiết" })).toHaveCount(0);
+    await page.getByRole("menuitem", { name: "Gán lại" }).click();
+    const dialog = page.getByRole("dialog", { name: "Gán lại cho Chuyên viên khác" });
+    await expect(dialog).toContainText("Hạ tầng PCCC · Nhà B");
+    await dialog.getByRole("combobox", { name: "Chuyên viên PCCC" }).click();
+    await page.getByRole("option", { name: /Chuyên viên Trần Thị B/ }).click();
+    await dialog.getByTestId("reassign-reason").fill("Chia đều việc giữa hai Chuyên viên.");
+    await dialog.getByTestId("reassign-submit").click();
+    await expect(dialog).toHaveCount(0);
+    expect(server.reassignRequests).toEqual([{ id: INFRA_ID, body: { expertId: EXPERT_B.id, reason: "Chia đều việc giữa hai Chuyên viên." } }]);
+    await expect(heldRow(page, "Hạ tầng PCCC · Nhà B")).toContainText("Chuyên viên Trần Thị B");
   });
 
-  test("EXPERT_NOT_AVAILABLE keeps the dialog open with its sentence; REVIEW_NOT_PENDING closes and reloads", async ({ page }) => {
+  test("422 EXPERT_NOT_AVAILABLE keeps the dialog open with its sentence; 409 REVIEW_NOT_PENDING closes and reloads", async ({ page }) => {
     const server = new ReviewServer(baseSeeds());
     const [first] = server.reviews.map((review) => review.summary.reviewId);
     server.assignments = { [first]: { id: EXPERT_A.id, fullName: EXPERT_A.fullName } };
@@ -522,17 +590,19 @@ test.describe("assignment (BE#242)", () => {
     await dialog.getByRole("combobox", { name: "Chuyên viên PCCC" }).click();
     await page.getByRole("option", { name: /Chuyên viên Trần Thị B/ }).click();
     await dialog.getByTestId("reassign-reason").fill("Cân bằng khối lượng việc.");
-    server.reassignFailNext = { status: 400, code: "EXPERT_NOT_AVAILABLE" };
+    server.reassignFailNext = { status: 422, code: "EXPERT_NOT_AVAILABLE" };
     await dialog.getByTestId("reassign-submit").click();
-    await expect(dialog.getByText("Chuyên viên này không còn nhận thẩm định được (tài khoản đã khóa hoặc không còn là Chuyên viên PCCC). Hãy chọn người khác.")).toBeVisible();
+    await expect(dialog.getByText("Chuyên viên này chưa nhận thẩm định được (tài khoản đã khóa, đã xóa hoặc chưa xác minh email). Hãy chọn người khác.")).toBeVisible();
     await expect(dialog.getByTestId("reassign-reason")).toHaveValue("Cân bằng khối lượng việc.");
 
     server.reassignFailNext = { status: 409, code: "REVIEW_NOT_PENDING" };
     const listsBefore = server.listQueries.length;
+    const panelBefore = server.assignmentQueries.length;
     await dialog.getByTestId("reassign-submit").click();
     await expect(dialog).toHaveCount(0);
     await expect(page.getByText("Mục này đã có kết quả thẩm định nên không gán lại được. Danh sách đã được tải lại.")).toBeVisible();
     await expect.poll(() => server.listQueries.length).toBeGreaterThan(listsBefore);
+    await expect.poll(() => server.assignmentQueries.length).toBeGreaterThan(panelBefore);
     expect(server.reassignRequests).toHaveLength(2);
     expect(server.assignments[first]?.id).toBe(EXPERT_A.id);
     dialog = page.getByRole("dialog", { name: "Gán lại cho Chuyên viên khác" });

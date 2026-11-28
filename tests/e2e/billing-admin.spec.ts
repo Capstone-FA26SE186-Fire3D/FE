@@ -267,17 +267,17 @@ test.describe("admin commerce (mock)", () => {
     expect(callsTo(mock, "POST", `/api/admin/quotations/${ids.quoteDraft}/issue`)).toHaveLength(1);
   });
 
-  test("issue rejected by the BE with QUOTATION_START_TOO_CLOSE shows the Vietnamese reason", async ({ page }) => {
+  test("issue rejected by the BE with QUOTATION_TOTAL_BELOW_PAYOS_MINIMUM shows the Vietnamese reason", async ({ page }) => {
     const mock = newMock();
     await signIn(page, admin);
     await mockBilling(page, mock);
-    queue(mock, `POST /api/admin/quotations/${ids.quoteDraft}/issue`, { status: 400, json: { code: "QUOTATION_START_TOO_CLOSE", title: "Quotation validity must end at least 15 minutes before the earliest service start." } });
+    queue(mock, `POST /api/admin/quotations/${ids.quoteDraft}/issue`, { status: 409, json: { code: "QUOTATION_TOTAL_BELOW_PAYOS_MINIMUM", title: "The total to pay must be at least 2,000 VND, the smallest PayOS transfer." } });
     await page.goto(`/admin/commerce?tab=quotes&quotation=${ids.quoteDraft}`);
     await page.getByLabel("Điều khoản").fill("Điều khoản thử");
     await page.getByLabel("Bắt đầu dịch vụ").fill("2027-01-05T08:00");
     await page.getByRole("button", { name: "Phát hành báo giá" }).click();
-    await expect(page.getByText("Hạn chấp nhận quá sát ngày bắt đầu dịch vụ. Để hạn chấp nhận sớm hơn ngày bắt đầu ít nhất 15 phút.")).toBeVisible();
-    await expect(page.getByText(/Quotation validity/)).toHaveCount(0);
+    await expect(page.getByText("Tổng thanh toán dưới 2.000 ₫, mức chuyển khoản nhỏ nhất. Tăng thuế hoặc chọn gói khác.")).toBeVisible();
+    await expect(page.getByText(/smallest PayOS transfer/)).toHaveCount(0);
   });
 
   test("a paid quotation offers no cancel button, only the paid badge", async ({ page }) => {

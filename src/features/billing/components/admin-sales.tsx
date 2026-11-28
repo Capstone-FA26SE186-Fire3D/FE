@@ -3,6 +3,7 @@
 import { Eye, FileText, RefreshCw, Send } from "lucide-react";
 import { useMemo, useRef, useState, type FormEvent } from "react";
 import { ApiError } from "@/api";
+import { isVietnamese } from "@/api/error-text";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { ChartCard } from "@/components/charts/chart-card";
@@ -117,6 +118,9 @@ function IssueForm({ accessToken, quotation, etag, onIssued, onStale }: { access
       if (!isWhole(topUp.quotaUnits) || Number(topUp.quotaUnits) < 1) found.topUpUnits = "Số lượng hạn mức là số nguyên lớn hơn 0.";
       if (!isWhole(topUp.amount) || Number(topUp.amount) < 1) found.topUpAmount = "Số tiền là số nguyên VND lớn hơn 0.";
       if (!startsAt) found.topUpStart = "Chọn thời điểm bắt đầu hiệu lực hạn mức.";
+      // BE#241: the top-up also starts at least 15 minutes after the payment deadline.
+      else if (iso && new Date(startsAt).getTime() < new Date(iso).getTime() + START_MARGIN_MS)
+        found.topUpStart = `Hiệu lực phải bắt đầu sau hạn chấp nhận ít nhất 15 phút (sớm nhất ${formatDateTime(new Date(new Date(iso).getTime() + START_MARGIN_MS).toISOString())}).`;
       if (!endsAt || (startsAt && new Date(endsAt) <= new Date(startsAt))) found.topUpEnd = "Thời điểm kết thúc phải sau thời điểm bắt đầu.";
       if (!Object.keys(found).length) input.topUp = { policyVersionId: topUp.policyVersionId, quotaUnits: Number(topUp.quotaUnits), amount: Number(topUp.amount), startsAt: startsAt as string, endsAt: endsAt as string };
     } else {
@@ -154,7 +158,7 @@ function IssueForm({ accessToken, quotation, etag, onIssued, onStale }: { access
       toast.notify({ tone: "success", title: "Đã phát hành báo giá", description: `Tổng thanh toán ${formatVnd(next.data.totalAmount)} do hệ thống tính.` });
       onIssued(next);
     } catch (cause) {
-      setError({ message: billingErrorText(cause), details: cause instanceof ApiError ? cause.fieldErrors.map((item) => item.message) : [] });
+      setError({ message: billingErrorText(cause), details: cause instanceof ApiError ? cause.fieldErrors.map((item) => item.message).filter((message) => isVietnamese(message)) : [] });
       if (isStatus(cause, 412)) onStale();
     } finally { lock.current = false; setSaving(false); }
   };
@@ -172,7 +176,7 @@ function IssueForm({ accessToken, quotation, etag, onIssued, onStale }: { access
         <Field label="Chính sách hạn mức" required error={errors.topUpPolicy}>{(p) => policyPick(p, "Chính sách hạn mức", topUp.policyVersionId, (value) => setTopUp({ ...topUp, policyVersionId: value }))}</Field>
         <Field label="Số lượng hạn mức cấp" required error={errors.topUpUnits}>{(p) => <Input {...p} inputMode="numeric" value={topUp.quotaUnits} onChange={(event) => setTopUp({ ...topUp, quotaUnits: event.target.value })} />}</Field>
         <Field label="Số tiền (VND)" required error={errors.topUpAmount}>{(p) => <Input {...p} inputMode="numeric" value={topUp.amount} onChange={(event) => setTopUp({ ...topUp, amount: event.target.value })} />}</Field>
-        <Field label="Hiệu lực từ" required error={errors.topUpStart} hint="Không trước hạn thanh toán.">{(p) => <Input {...p} type="datetime-local" value={topUp.startsAt} onChange={(event) => setTopUp({ ...topUp, startsAt: event.target.value })} />}</Field>
+        <Field label="Hiệu lực từ" required error={errors.topUpStart} hint="Sau hạn chấp nhận ít nhất 15 phút.">{(p) => <Input {...p} type="datetime-local" value={topUp.startsAt} onChange={(event) => setTopUp({ ...topUp, startsAt: event.target.value })} />}</Field>
         <Field label="Hiệu lực đến" required error={errors.topUpEnd}>{(p) => <Input {...p} type="datetime-local" value={topUp.endsAt} onChange={(event) => setTopUp({ ...topUp, endsAt: event.target.value })} />}</Field>
       </div>
     </fieldset> : quotation.items.map((item) => {

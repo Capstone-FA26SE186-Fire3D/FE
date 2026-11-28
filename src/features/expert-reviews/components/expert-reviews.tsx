@@ -2,7 +2,7 @@
 
 import { ClipboardCheck, RefreshCw, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { describeApiError } from "@/api/describe-error";
 import { useAsyncData } from "@/api/use-async-data";
@@ -21,7 +21,7 @@ import { routes } from "@/configs/routes";
 import "@/features/admin-reviews/components/reviews.css";
 import { useAuthSession } from "@/features/auth/auth-session";
 
-import { assigneeName, expertReviewsApi, hasAssignment, KIND_LABEL, knownAssignment, pageHasAssignment, rememberAssignment, reviewTitle, statusOf, type ExpertAssigneeFilter, type ExpertReviewItem, type ExpertReviewKind, type ExpertReviewStatus } from "../api";
+import { assigneeLabel, expertReviewsApi, KIND_LABEL, reviewTitle, statusOf, type ExpertAssigneeFilter, type ExpertReviewItem, type ExpertReviewKind, type ExpertReviewStatus } from "../api";
 
 const PAGE_SIZE = 20;
 const STATUSES: ExpertReviewStatus[] = ["Submitted", "Approved", "Rejected"];
@@ -30,8 +30,8 @@ const parseStatus = (value: string): ExpertReviewStatus => ((STATUSES as string[
 const parseKind = (value: string): ExpertReviewKind | undefined => ((KINDS as string[]).includes(value) ? (value as ExpertReviewKind) : undefined);
 
 /**
- * `/expert/reviews`: the shared thẩm định queue of every Chuyên viên PCCC (BE#211, FR-PLAN-05). Kind, status and page live
- * in the URL; a row opens its own page (`/expert/reviews/[id]`), and an old `?review=` link is sent there.
+ * `/expert/reviews`: the thẩm định queue of a Chuyên viên PCCC (BE#211, FR-PLAN-05, BE#242 assignment). Assignee tab, kind,
+ * status and page live in the URL; a row opens its own page (`/expert/reviews/[id]`), and an old `?review=` link is sent there.
  * Waiting items come oldest first, decided ones newest first (the server's order).
  */
 export function ExpertReviews() {
@@ -43,17 +43,10 @@ export function ExpertReviews() {
   const reviewId = get("review");
   const enabled = ready && user?.role === 3 && Boolean(accessToken) && !reviewId;
   useEffect(() => { if (reviewId) router.replace(routes.expertReview(reviewId)); }, [reviewId, router]);
+  // BE#242: "Được giao cho bạn" (`assignee=me`, the default) or "Tất cả" (`assignee=all`, others' items read-only).
   const assignee: ExpertAssigneeFilter = get("assignee") === "all" ? "all" : "me";
-  // BE#242: the `assignee` query and the tabs exist only once a response proved the server assigns (`assignmentEnabled`
-  // on the page, or the fields on an item or a detail).
-  // Today's server never sends it, so the queue stays the shared one and the request is unchanged.
-  const [detected, setDetected] = useState(false);
-  const assigns = detected || (ready && knownAssignment());
-  const list = useAsyncData(`expert-reviews:${page}:${status}:${kind ?? ""}:${assigns ? assignee : ""}`, async (signal) => {
-    const result = await expertReviewsApi.list(accessToken as string, { kind, status, page, pageSize: PAGE_SIZE, ...(assigns ? { assignee } : {}) }, signal);
-    if (pageHasAssignment(result)) { rememberAssignment(); setDetected(true); }
-    return result;
-  }, enabled);
+  const list = useAsyncData(`expert-reviews:${page}:${status}:${kind ?? ""}:${assignee}`,
+    (signal) => expertReviewsApi.list(accessToken as string, { kind, status, assignee, page, pageSize: PAGE_SIZE }, signal), enabled);
 
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
   if (reviewId) return <LoadingBlock label="Đang mở mục thẩm định…" />;
@@ -62,9 +55,9 @@ export function ExpertReviews() {
   const items = list.data?.items ?? [];
   const totalCount = list.data?.totalCount ?? 0;
   const filtering = status !== "Submitted" || Boolean(kind);
-  const mineOnly = assigns && assignee === "me";
+  const mineOnly = assignee === "me";
   const open = (id: string) => router.push(routes.expertReview(id));
-  const assignment = (row: ExpertReviewItem) => (!hasAssignment(row) ? "" : row.assignedTo ? ` · Giao cho: ${assigneeName(row.assignedTo)}` : " · Chưa giao");
+  const assignment = (row: ExpertReviewItem) => (!row.assigneeId ? " · Chưa giao" : row.assigneeId === user.id ? " · Giao cho bạn" : ` · Giao cho: ${assigneeLabel(row)}`);
 
   const columns: DataColumn<ExpertReviewItem>[] = [
     { key: "title", header: "Nội dung", primary: true, render: (row) => <CellTitle title={reviewTitle(row)} sub={`${KIND_LABEL[row.kind] ?? "Nội dung"} · phiên bản ${row.versionNumber}${assignment(row)}`} /> },
@@ -75,14 +68,12 @@ export function ExpertReviews() {
 
   return <>
     <PageHeader eyebrow="Thẩm định" title="Hàng chờ thẩm định"
-      description={assigns
-        ? "Hạ tầng PCCC và tình huống do các tổ chức gửi. Mỗi mục được giao lần lượt cho một Chuyên viên PCCC; bạn cho Đạt hoặc Chưa đạt những mục giao cho mình, các mục khác chỉ xem được."
-        : "Hạ tầng PCCC và tình huống do các tổ chức gửi. Bấm một hàng để mở nội dung đã khoá trên mô hình 3D rồi cho Đạt hoặc Chưa đạt. Hàng chờ dùng chung: ai thẩm định trước thì kết quả của người đó được ghi."}
+      description="Hạ tầng PCCC và tình huống do các tổ chức gửi. Mỗi mục được giao lần lượt cho một Chuyên viên PCCC; bạn cho Đạt hoặc Chưa đạt những mục giao cho mình, các mục khác chỉ xem được."
       actions={<Button variant="quiet" onClick={list.reload} disabled={list.loading}><RefreshCw size={16} aria-hidden="true" />{list.loading ? "Đang tải…" : "Tải lại"}</Button>} />
 
-    {assigns && <SubTabs label="Mục được giao" value={assignee} className="mb-4" data-testid="expert-assignee-tabs"
+    <SubTabs label="Mục được giao" value={assignee} className="mb-4" data-testid="expert-assignee-tabs"
       items={[{ value: "me", label: "Được giao cho bạn", "data-testid": "expert-tab-mine" }, { value: "all", label: "Tất cả", "data-testid": "expert-tab-all" }]}
-      onValueChange={(value) => setParams({ assignee: value === "all" ? "all" : null, page: 1 })} />}
+      onValueChange={(value) => setParams({ assignee: value === "all" ? "all" : null, page: 1 })} />
 
     <DataTable data-testid="expert-review-table" caption="Hàng chờ thẩm định" columns={columns} rows={items} rowKey={(row) => row.reviewId} onRowClick={(row) => open(row.reviewId)}
       loading={list.loading && !list.data}

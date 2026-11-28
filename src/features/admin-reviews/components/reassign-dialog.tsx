@@ -13,19 +13,20 @@ import { SubmitButton } from "@/components/ui/spinner";
 import { SupportCode } from "@/components/ui/support-code";
 import { useToast } from "@/components/ui/toast";
 import { accountsApi } from "@/features/accounts/api";
+import { assigneeLabel, reviewTitle } from "@/features/expert-reviews/api";
 
 import { describeReassignError, reviewsApi } from "../api";
-import { REASSIGN_REASON_MAX, type ReviewSummary } from "../types";
+import { REASSIGN_REASON_MAX, type AssignedReview } from "../types";
 
 /** Role 3 = FireSafetyExpert (Chuyên viên PCCC). */
 const EXPERT_ROLE = 3;
 
 /**
- * "Gán lại" (BE#242): hand a waiting review to another active Chuyên viên PCCC with a reason. The choices come from the
+ * "Gán lại" (BE#242): hand a waiting item (tình huống or hạ tầng PCCC) to another active Chuyên viên PCCC with a reason. The choices come from the
  * admin accounts API (active experts only); the current holder is left out. After success, or when the server says the
  * item is no longer waiting, the caller re-reads the list.
  */
-export function ReassignDialog({ review, accessToken, onClose, onChanged }: { review: ReviewSummary; accessToken: string; onClose: () => void; onChanged: () => void }) {
+export function ReassignDialog({ review, accessToken, onClose, onChanged }: { review: AssignedReview; accessToken: string; onClose: () => void; onChanged: () => void }) {
   const toast = useToast();
   const formId = useId();
   const [expertId, setExpertId] = useState("");
@@ -34,7 +35,8 @@ export function ReassignDialog({ review, accessToken, onClose, onChanged }: { re
   const [failure, setFailure] = useState<{ message: string; code?: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const experts = useAsyncData("reviews:reassign-experts", (signal) => accountsApi.list(accessToken, { role: EXPERT_ROLE, isActive: true, page: 1, pageSize: 100, sort: "fullName" }, signal));
-  const holder = review.assignedTo?.id;
+  const holder = review.assigneeId;
+  const title = reviewTitle(review);
   const options = useMemo<ComboboxOption[]>(() => (experts.data?.items ?? [])
     .filter((account) => account.isActive && account.role === EXPERT_ROLE && account.id !== holder)
     .map((account) => ({ value: account.id, label: account.fullName?.trim() || account.email, hint: account.email, keywords: [account.email] })), [experts.data, holder]);
@@ -53,8 +55,8 @@ export function ReassignDialog({ review, accessToken, onClose, onChanged }: { re
     setFailure(null);
     try {
       const updated = await reviewsApi.reassign(accessToken, review.reviewId, { expertId, reason });
-      const name = updated?.assignedTo?.fullName ?? options.find((option) => option.value === expertId)?.label;
-      toast.notify({ tone: "success", title: "Đã gán lại", description: name ? `${review.scenarioName} · giao cho ${name}` : review.scenarioName });
+      const name = updated?.assigneeName?.trim() || options.find((option) => option.value === expertId)?.label;
+      toast.notify({ tone: "success", title: "Đã gán lại", description: name ? `${title} · giao cho ${name}` : title });
       onChanged();
       onClose();
     } catch (cause) {
@@ -74,13 +76,13 @@ export function ReassignDialog({ review, accessToken, onClose, onChanged }: { re
   };
 
   return <Modal open onOpenChange={(open) => { if (!open && !busy) onClose(); }} size="md" title="Gán lại cho Chuyên viên khác"
-    description={`${review.scenarioName} · ${review.organizationName}`}
+    description={`${title} · ${review.organizationName}`}
     footer={<>
       <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>Hủy</Button>
       <SubmitButton type="submit" form={formId} state={busy ? "busy" : "idle"} data-testid="reassign-submit">Gán lại</SubmitButton>
     </>}>
     <form id={formId} onSubmit={(event) => void submit(event)} noValidate className="ops-stack" data-testid="reassign-form">
-      <p className="rev-note">{review.assignedTo ? `Đang giao cho ${review.assignedTo.fullName?.trim() || "Chuyên viên PCCC"}.` : "Mục này chưa giao cho ai."} Người được chọn sẽ thẩm định mục này thay người đang giữ.</p>
+      <p className="rev-note">{review.assigneeId ? `Đang giao cho ${assigneeLabel(review)}.` : "Mục này chưa giao cho ai."} Người được chọn sẽ thẩm định mục này thay người đang giữ.</p>
       <Field label="Chuyên viên PCCC" required error={errors.expertId}>{(props) => <Combobox {...props} value={expertId} data-testid="reassign-expert"
         onChange={(value) => { setExpertId(value); if (errors.expertId) setErrors({ ...errors, expertId: undefined }); }}
         options={options} placeholder="Chọn Chuyên viên PCCC" searchPlaceholder="Tìm theo tên hoặc email…" groupLabel="Chuyên viên đang hoạt động"
