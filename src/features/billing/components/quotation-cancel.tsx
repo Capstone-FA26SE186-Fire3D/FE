@@ -21,11 +21,13 @@ const CANCELLABLE = ["Draft", "Issued", "Accepted"];
  * `QUOTATION_CHECKOUT_UNRESOLVED`); the screen explains the next step instead of retrying. One key per intent:
  * a retry of the same reason + revision replays the same cancellation.
  */
-export function QuotationCancel({ accessToken, scope, quotation, etag, onChanged, onStale }: {
+export function QuotationCancel({ accessToken, scope, quotation, etag, paid, onChanged, onStale }: {
   accessToken: string;
   scope: QuotationScope;
   quotation: Quotation;
   etag: string | null;
+  /** A payment for this quotation is already Paid: the BE refuses cancellation, so no button is offered. */
+  paid?: boolean;
   onChanged: (next: WithEtag<Quotation>) => void;
   /** Reload the quotation (412/409): the user's reason stays in the dialog. */
   onStale: () => void;
@@ -39,7 +41,7 @@ export function QuotationCancel({ accessToken, scope, quotation, etag, onChanged
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  if (!CANCELLABLE.includes(quotation.status)) return null;
+  if (paid || !CANCELLABLE.includes(quotation.status)) return null;
 
   const submit = async () => {
     if (lock.current) return;

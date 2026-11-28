@@ -468,6 +468,28 @@ test.describe("item activation", () => {
     await expect(table(page).getByRole("row").filter({ hasText: "BINH-CHUA-CHAY" })).toContainText("Ngừng dùng");
   });
 
+  test("a stopped item says organizations do not see it and never claims 'Tổ chức đang thấy'; an active item still does", async ({ page }) => {
+    await setup(page, (b) => {
+      b.seedItem("Equipment", "BINH-NGUNG", { isActive: false });
+      b.seedVersion("BINH-NGUNG", { name: "Bình đã ngừng", payload: { description: "Bình đã ngừng dùng." }, publish: true });
+      b.seedItem("Equipment", "BINH-DANG-DUNG");
+      b.seedVersion("BINH-DANG-DUNG", { name: "Bình đang dùng", payload: { description: "Bình đang dùng." }, publish: true });
+    });
+    await openItem(page, "BINH-NGUNG");
+    await expect(itemDialog(page)).toContainText("Tổ chức không thấy mục này (đang ngừng dùng)");
+    await expect(itemDialog(page)).toContainText("v1 · Bình đã ngừng");
+    await expect(page.getByTestId("version-row-1")).toContainText("Bản xuất bản mới nhất");
+    await expect(itemDialog(page)).not.toContainText("Tổ chức đang thấy");
+    await expect(itemDialog(page)).not.toContainText("Bản tổ chức đang thấy");
+    await itemDialog(page).getByRole("button", { name: "Đóng" }).first().click();
+    await expect(page).not.toHaveURL(/item=/);
+
+    await rowOf(page, "BINH-DANG-DUNG").click();
+    await expect(itemDialog(page)).toContainText("Bản tổ chức đang thấy");
+    await expect(page.getByTestId("version-row-1")).toContainText("Tổ chức đang thấy");
+    await expect(itemDialog(page)).not.toContainText("Bản xuất bản mới nhất");
+  });
+
   test("the row menu reactivates with the row's revision as If-Match", async ({ page }) => {
     const backend = await setup(page, (b) => { b.seedItem("Equipment", "BINH-CU", { isActive: false }); });
     await page.goto("/admin/library");

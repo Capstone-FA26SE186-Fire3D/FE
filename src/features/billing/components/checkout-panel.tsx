@@ -1,7 +1,7 @@
 "use client";
 
 import { CreditCard, ExternalLink, RefreshCw, ShieldCheck } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { useIdempotencyKey } from "@/api/idempotency";
 import { usePolling } from "@/api/use-polling";
@@ -59,13 +59,15 @@ type PanelProps = {
  */
 export function CheckoutPanel(props: PanelProps) {
   const { quotation, etag, accessToken, onQuotationChange, onReload } = props;
+  // The checkout history lives in CheckoutFlow; it reports whether money already arrived so no cancel is offered.
+  const [paid, setPaid] = useState(false);
   return <div className="ops-stack">
-    <CheckoutFlow {...props} />
-    <QuotationCancel accessToken={accessToken} scope="organization" quotation={quotation} etag={etag} onChanged={onQuotationChange} onStale={onReload} />
+    <CheckoutFlow {...props} onPaidChange={setPaid} />
+    <QuotationCancel accessToken={accessToken} scope="organization" quotation={quotation} etag={etag} paid={paid} onChanged={onQuotationChange} onStale={onReload} />
   </div>;
 }
 
-function CheckoutFlow({ accessToken, quotation, etag, canPurchase, returnTo, resumePaymentId, onQuotationChange, onReload, onSettled }: PanelProps) {
+function CheckoutFlow({ accessToken, quotation, etag, canPurchase, returnTo, resumePaymentId, onQuotationChange, onReload, onSettled, onPaidChange }: PanelProps & { onPaidChange: (paid: boolean) => void }) {
   const toast = useToast();
   const acceptLock = useRef(false);
   const createKey = useIdempotencyKey();
@@ -98,6 +100,8 @@ function CheckoutFlow({ accessToken, quotation, etag, canPurchase, returnTo, res
     isAccepted || quotation.status === "Cancelled",
   );
   const known = pickLedgerRow(history.data?.items ?? []);
+  const knownPaid = known?.paymentStatus === "Paid";
+  useEffect(() => { onPaidChange(knownPaid); }, [knownPaid, onPaidChange]);
   const knownCheckoutId = known?.checkoutId ?? pending?.checkoutId ?? null;
   const restored = useAsyncData(
     `checkout:${quotation.id}:${knownCheckoutId ?? ""}`,

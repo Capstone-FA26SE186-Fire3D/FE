@@ -11,12 +11,16 @@ export type ExpertAction = "approve" | "reject";
 export const REASON_MAX = 2000;
 
 /**
- * BE `ExpertReviewItem` (BE#211, BE#213). One shared queue for every FireSafetyExpert: no assignment, the first decision
- * wins. `revision` is the ETag number; `revisionId` is the IFC revision. For kind Infrastructure, `reviewId` is the
- * infrastructure id and the scenario fields are null.
+ * BE `ExpertReviewItem` (BE#211, BE#213, BE#242). Every item is assigned round-robin to one FireSafetyExpert; only that
+ * expert decides it. `revision` is the ETag number; `revisionId` is the IFC revision. For kind Infrastructure, `reviewId`
+ * is the infrastructure id and the scenario fields are null. Also the item shape of `GET /api/admin/reviews`.
  */
 export type ExpertReviewItem = {
   reviewId: string;
+  /** BE#242: the expert holding the item; all three null while no expert was available (the item waits unassigned). */
+  assigneeId: string | null;
+  assigneeName: string | null;
+  assignedAt: string | null;
   kind: ExpertReviewKind | string;
   status: ExpertReviewStatus | string;
   revision: number;
@@ -39,14 +43,21 @@ export type ExpertReviewItem = {
   infrastructureId: string | null;
 };
 
+export type ExpertReviewPage = PageResponse<ExpertReviewItem>;
+/** `assignee` query of BE#242: `me` (the server's default, the items assigned to the caller) or `all`. */
+export type ExpertAssigneeFilter = "me" | "all";
+
+/** Display name of the holder; an assigned item whose name is missing still reads as an expert. */
+export const assigneeLabel = (item: Pick<ExpertReviewItem, "assigneeName">) => item.assigneeName?.trim() || "Chuyên viên PCCC";
+
 /** Scenario: `content` is the frozen merged document (scenario objects + infrastructure items). Infrastructure: `{geometry, runtimeVersion, items}`. */
 export type ExpertReviewDetail = { review: ExpertReviewItem; content: unknown | null; rubric: unknown | null; learningObjectives: unknown | null; learnerInstructions: string | null };
 export type LoadedExpertReview = { detail: ExpertReviewDetail; etag: string | null };
-export type ExpertReviewQuery = { kind?: ExpertReviewKind; status?: ExpertReviewStatus; page: number; pageSize: number };
+export type ExpertReviewQuery = { kind?: ExpertReviewKind; status?: ExpertReviewStatus; assignee?: ExpertAssigneeFilter; page: number; pageSize: number };
 
 export const expertReviewsApi = {
   list(accessToken: string, query: ExpertReviewQuery, signal?: AbortSignal) {
-    return apiClient.request<PageResponse<ExpertReviewItem>>("/api/expert/reviews", { headers: auth(accessToken), query, signal });
+    return apiClient.request<ExpertReviewPage>("/api/expert/reviews", { headers: auth(accessToken), query, signal });
   },
   async detail(accessToken: string, reviewId: string, signal?: AbortSignal): Promise<LoadedExpertReview> {
     const response = await apiClient.requestWithMeta<ExpertReviewDetail>(`/api/expert/reviews/${encodeURIComponent(reviewId)}`, { headers: auth(accessToken), signal });
@@ -86,6 +97,7 @@ export function describeDecisionError(error: unknown): DecisionFailure {
   if (code === "CONTENT_REVIEW_NOT_PENDING" || code === "FIRE_INFRASTRUCTURE_NOT_PENDING") return { kind: "reload", code, message: "Mục này đã có kết quả thẩm định và kết quả không đổi được. Đang tải lại." };
   if (code === "CONTENT_HASH_MISMATCH") return { kind: "reload", code, message: "Nội dung đã thay đổi so với bản bạn đang xem. Đang tải lại; hãy xem lại rồi thẩm định." };
   if (code === "IDEMPOTENCY_KEY_CONFLICT" || error.status === 409 || error.status === 428) return { kind: "reload", code, message: "Kết quả không ghi được ở trạng thái hiện tại. Đang tải lại để hiển thị trạng thái đúng." };
+  if (code === "REVIEW_NOT_ASSIGNED_TO_YOU") return { kind: "reload", code, message: "Mục này đã giao cho Chuyên viên khác nên bạn không quyết định được. Tải lại để xem người đang giữ." };
   if (error.status === 401) return { kind: "reload", code, message: "Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại; chưa có kết quả nào được ghi." };
   if (error.status === 403) return { kind: "reload", code, message: "Chỉ Chuyên viên PCCC thẩm định được mục này." };
   if (error.status === 404) return { kind: "reload", code, message: "Không tìm thấy mục này. Có thể tổ chức hoặc công trình đã bị vô hiệu hóa." };

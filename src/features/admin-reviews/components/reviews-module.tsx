@@ -2,7 +2,7 @@
 
 import { Building2, ClipboardCheck, Eye, RefreshCw, Search } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useAsyncData } from "@/api/use-async-data";
+import { invalidateAsyncData, useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -19,9 +19,10 @@ import { useAuthSession } from "@/features/auth/auth-session";
 import { formatCount } from "@/features/admin-overview/format";
 import { organizationsApi } from "@/features/organizations/api";
 import { formatDateTime } from "@/utils/date-range";
-import { describeReadError, reviewsApi } from "../api";
+import { describeReadError, REVIEW_ASSIGNMENT_TAG, reviewsApi } from "../api";
 import { parseStatusParam, statusLabel, statusTone } from "../format";
 import type { ReviewStatus, ReviewSummary } from "../types";
+import { AssignmentPanel } from "./assignment-panel";
 import { ReviewDrawer } from "./review-detail";
 import "./reviews.css";
 import { LoadingBlock } from "@/components/ui/spinner";
@@ -77,7 +78,7 @@ export function ReviewsModule() {
   const submitted = useStatusTotal("Submitted", accessToken, enabled);
   const approved = useStatusTotal("Approved", accessToken, enabled);
   const rejected = useStatusTotal("Rejected", accessToken, enabled);
-  const reloadAll = () => { list.reload(); submitted.reload(); approved.reload(); rejected.reload(); };
+  const reloadAll = () => { list.reload(); submitted.reload(); approved.reload(); rejected.reload(); invalidateAsyncData(REVIEW_ASSIGNMENT_TAG); };
   const totals: Record<ReviewStatus, number | null> = { Submitted: submitted.value, Approved: approved.value, Rejected: rejected.value };
 
   const items = useMemo(() => list.data?.items ?? [], [list.data]);
@@ -141,8 +142,7 @@ export function ReviewsModule() {
       onRowClick={(row) => open(row.reviewId)}
       rowMenu={(row) => [
         { label: "Mở chi tiết", icon: Eye, onSelect: () => open(row.reviewId) },
-        { label: "Chỉ xem tổ chức này", icon: Building2, onSelect: () => setParams({ organizationId: row.organizationId, page: 1 }), disabled: organizationId === row.organizationId, hint: organizationId === row.organizationId ? "Đang lọc theo tổ chức này" : undefined },
-      ]}
+        { label: "Chỉ xem tổ chức này", icon: Building2, onSelect: () => setParams({ organizationId: row.organizationId, page: 1 }), disabled: organizationId === row.organizationId, hint: organizationId === row.organizationId ? "Đang lọc theo tổ chức này" : undefined },      ]}
       loading={list.loading && !list.data}
       error={failure && <Alert tone="danger" title={failure.title} action={failure.denied ? undefined : <Button size="sm" variant="secondary" className="mt-3" onClick={list.reload}>Thử lại</Button>}>{failure.message}</Alert>}
       empty={empty}
@@ -176,6 +176,8 @@ export function ReviewsModule() {
     />
     {organizations.error !== undefined && <p className="rev-note" role="status" style={{ marginTop: 8 }}>Không tải được danh sách tổ chức nên bộ lọc tổ chức chỉ giữ giá trị hiện tại. <Button size="sm" variant="quiet" onClick={organizations.reload}>Tải lại danh sách</Button></p>}
     {list.data && totalCount > 0 && <p className="adm-note" role="status">Hiển thị {visible.length} trên {formatCount(totalCount)} · trạng thái và tổ chức lọc toàn bộ hàng chờ; ô tìm chỉ lọc trang đang xem.</p>}
+
+    <AssignmentPanel accessToken={accessToken} enabled={enabled} onOpenScenario={open} onChanged={reloadAll} />
 
     <ReviewDrawer
       key={reviewId}

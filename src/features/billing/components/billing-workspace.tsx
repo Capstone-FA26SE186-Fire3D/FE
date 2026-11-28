@@ -1,11 +1,13 @@
 "use client";
 
 import { CreditCard, FileText, Plus, RefreshCw, ShieldAlert } from "lucide-react";
+import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
 import { useAsyncData } from "@/api/use-async-data";
 import { useUrlParams, useUrlSearch } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
+import { routes } from "@/configs/routes";
 import { Button } from "@/components/ui/button";
 import { CellTitle, DataTable, TableSearch, type DataColumn } from "@/components/ui/data-table";
 import { Drawer } from "@/components/ui/dialog";
@@ -39,7 +41,7 @@ const TAB_ITEMS: Array<{ value: TabId; label: string }> = [
   { value: "services", label: "Dịch vụ theo công trình" },
   { value: "quotes", label: "Báo giá và thanh toán" },
   { value: "ai", label: "Hạn mức AI" },
-  { value: "reminders", label: "Nhắc gia hạn" },
+  { value: "reminders", label: "Thông báo" },
   { value: "enterprise", label: "Số lượng lớn" },
 ];
 
@@ -107,8 +109,10 @@ export function BillingWorkspace() {
   const urlSearch = get("q");
   const [searchText, setSearchText] = useUrlSearch(urlSearch, setParams);
 
-  const enabled = ready && Boolean(accessToken) && (user?.role === 1 || user?.role === 0);
-  const canPurchase = user?.role === 1;
+  // Only OrganizationUser (role 1) owns this page; a PlatformAdmin is sent to the cross-organization commerce view and
+  // no billing call is made for them (the "/organizations/me/..." routes have no organization for an admin).
+  const enabled = ready && Boolean(accessToken) && user?.role === 1;
+  const canPurchase = enabled;
   const token = accessToken as string;
 
   const quotations = useAsyncData(`billing:quotes:${page}`, (signal) => billingApi.listQuotations(token, page, PAGE_SIZE, signal), enabled);
@@ -147,7 +151,7 @@ export function BillingWorkspace() {
   const openQuotation = (id: string) => { setOverride(null); setParams({ tab: "quotes", quotation: id, payment: null }); };
 
   if (!ready) return <LoadingBlock label="Đang kiểm tra phiên đăng nhập…" />;
-  if (!enabled) return <Alert tone="danger" title="Không có quyền truy cập">Khu này dành cho tài khoản tổ chức.</Alert>;
+  if (!enabled) return <Alert tone="danger" title="Không có quyền truy cập" action={user?.role === 0 ? <div className="mt-3"><Button asChild size="sm" variant="secondary"><Link href={routes.adminCommerce}>Xem dịch vụ và thanh toán của mọi tổ chức</Link></Button></div> : undefined}>Khu này dành cho tài khoản tổ chức.</Alert>;
 
   const items = quotations.data?.items ?? [];
   const totalCount = quotations.data?.totalCount ?? 0;
