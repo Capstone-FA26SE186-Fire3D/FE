@@ -367,6 +367,12 @@ test.describe("library template on a PC06 situation (BE#215)", () => {
     expect(by["template:workingHours"].status).toBe("same");
   });
 
+  test("replacing a partial assumption keeps the author's other fields", () => {
+    const partial = { ...template, payload: { state: { assumption: { time: "Đêm" } } } } as LibraryVersion;
+    const plan = planApply(partial, { assumption: { time: "Sáng", location: "Bếp", peoplePresent: 12 } }, { ...context, situation: true });
+    expect(plan.groups[0].writes.replace).toEqual([{ path: ["assumption"], value: { time: "Đêm", location: "Bếp", peoplePresent: 12 } }]);
+  });
+
   test("a draft that is not a situation on a fire infrastructure does not take these fields, and is told why", () => {
     const plan = planApply(template, { schemaVersion: "fet3d.editor/1" }, { ...context, situation: false });
     expect(ids(plan)).toEqual(["template:name"]);
