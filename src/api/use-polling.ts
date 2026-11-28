@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { idlePollDelay, nextUnchangedCount, pollSignature, type IdleBackoff } from "./poll-backoff";
 import { ApiError } from "./types/common";
 
 export type PollingOptions<T> = {
@@ -13,6 +14,13 @@ export type PollingOptions<T> = {
   maxBackoffMs?: number;
   /** Change to restart polling for a different resource (e.g. another revision). */
   resetKey?: string;
+  /**
+   * Opt-in: after `after` consecutive polls whose result did not change, the interval grows by `factor` per poll up to
+   * `maxMs`; any change (or `refresh()`, or a new `resetKey`) brings it back to `intervalMs`. Omitted = fixed interval.
+   */
+  idleBackoff?: IdleBackoff;
+  /** Cheap identity used by `idleBackoff` to tell "unchanged" (default: `JSON.stringify`). */
+  signature?: (value: T) => string;
 };
 
 /** Delay before the next attempt: base interval, doubled per consecutive failure, or server Retry-After. */
@@ -24,9 +32,9 @@ export function nextPollDelay(baseMs: number, failures: number, maxBackoffMs: nu
 
 /**
  * Polls while the page is visible and the component is mounted. Starts at `intervalMs` (3s), backs off on
- * errors, honors Retry-After, pauses in background tabs, stops on a final state and halts on 401/403 (`halted`; `refresh()` resumes).
+ * errors, honors Retry-After, optionally slows down while the result stays unchanged (`idleBackoff`), pauses in background tabs, stops on a final state and halts on 401/403 (`halted`; `refresh()` resumes).
  */
-export function usePolling<T>({ fetcher, isDone, enabled = true, intervalMs = 3000, maxBackoffMs = 30_000, resetKey = "" }: PollingOptions<T>) {
+export function usePolling<T>({ fetcher, isDone, enabled = true, intervalMs = 3000, maxBackoffMs = 30_000, resetKey = "", idleBackoff, signature }: PollingOptions<T>) {
   const [data, setData] = useState<T | undefined>();
   const [error, setError] = useState<unknown>();
   const [finishedFor, setFinishedFor] = useState<string | null>(null);
@@ -37,10 +45,12 @@ export function usePolling<T>({ fetcher, isDone, enabled = true, intervalMs = 30
   const [reloadToken, setReloadToken] = useState(0);
   const fetcherRef = useRef(fetcher);
   const isDoneRef = useRef(isDone);
+  const idleRef = useRef({ idleBackoff, signature });
 
   useEffect(() => {
     fetcherRef.current = fetcher;
     isDoneRef.current = isDone;
+    idleRef.current = { idleBackoff, signature };
   });
 
   useEffect(() => {
@@ -49,6 +59,9 @@ export function usePolling<T>({ fetcher, isDone, enabled = true, intervalMs = 30
     let timer: number | undefined;
     let failures = 0;
     let stopped = false;
+    // Idle backoff (opt-in): how many results in a row were equal to the one before.
+    let unchanged = 0;
+    let lastSignature: string | undefined;
 
     const schedule = (delay: number) => {
       if (stopped) return;
@@ -71,7 +84,12 @@ export function usePolling<T>({ fetcher, isDone, enabled = true, intervalMs = 30
           setFinishedFor(resetKey);
           return;
         }
-        schedule(intervalMs);
+        const idle = idleRef.current;
+        if (!idle.idleBackoff) { schedule(intervalMs); return; }
+        const current = pollSignature(value, idle.signature);
+        unchanged = nextUnchangedCount(lastSignature, current, unchanged);
+        lastSignature = current;
+        schedule(idlePollDelay(intervalMs, unchanged, idle.idleBackoff));
       } catch (cause) {
         if (stopped || controller.signal.aborted) return;
         failures += 1;

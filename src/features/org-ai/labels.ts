@@ -69,6 +69,11 @@ export const statusTone = (status: string, resultType?: string | null): Tone => 
 /** States the service may still change by itself: poll these, stop on anything else. NeedsReconcile waits for an admin, not for polling. */
 export const isInFlight = (status: string) => status === "Accepted" || status === "Processing";
 
+/** A request that stays Accepted/Processing is polled less often: after 5 equal answers the 3s interval grows ×1.5 up to 15s. */
+export const AI_REQUEST_IDLE_BACKOFF = { after: 5, factor: 1.5, maxMs: 15_000 };
+/** What tells two reads of one request apart while it is in flight (cheaper than serializing result and provider payload). */
+export const aiRequestSignature = (request: AiRequest) => [request.requestId, request.status, request.revision, request.updatedAt, request.attempts, request.reconcileRequestedAt, request.completedAt].join("|");
+
 type Outcome = Pick<AiRequest, "status" | "resultType">;
 export const hasResultType = (request: Outcome, resultType: AiResultType) => request.status === "Succeeded" && request.resultType === resultType;
 

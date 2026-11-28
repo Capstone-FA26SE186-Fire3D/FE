@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { SkeletonRows } from "@/components/ui/skeleton";
 
 import { adminAiApi, orgAiApi, traineeAiApi } from "../api";
-import { aiErrorText, isInFlight } from "../labels";
+import { AI_REQUEST_IDLE_BACKOFF, aiErrorText, aiRequestSignature, isInFlight } from "../labels";
 import type { AiRequest } from "../types";
 import styles from "../org-ai.module.css";
 import { RequestView } from "./request-view";
@@ -35,7 +35,7 @@ export function RequestPanel({ accessToken, requestId, admin, trainee, onApply, 
 }) {
   const fetcher = useCallback((signal: AbortSignal) => (admin ? adminAiApi.getRequest(accessToken, requestId, signal) : trainee ? traineeAiApi.getRequest(accessToken, requestId, signal) : orgAiApi.getRequest(accessToken, requestId, signal)), [accessToken, admin, trainee, requestId]);
   const isDone = useCallback((request: AiRequest) => (admin ? !(isInFlight(request.status) || (request.status === "NeedsReconcile" && Boolean(request.reconcileRequestedAt))) : !isInFlight(request.status)), [admin]);
-  const polling = usePolling<AiRequest>({ fetcher, isDone, resetKey: `${admin ? "admin" : trainee ? "trainee" : "org"}:${requestId}` });
+  const polling = usePolling<AiRequest>({ fetcher, isDone, resetKey: `${admin ? "admin" : trainee ? "trainee" : "org"}:${requestId}`, idleBackoff: AI_REQUEST_IDLE_BACKOFF, signature: aiRequestSignature });
   const gone = polling.error instanceof ApiError && (polling.error.status === 404 || polling.error.status === 403 || polling.error.status === 401);
   const request = !gone && polling.data?.requestId === requestId ? polling.data : undefined;
   const settled = polling.finished && request ? request : undefined;

@@ -9,6 +9,9 @@ import { playtestApi } from "./api";
 import { acceptStatus, isPlaytestTerminal } from "./status";
 import type { PlaytestStatus } from "./types";
 
+/** A playtest that sits in the same state (waiting for the player) is read less often: after 5 equal answers ×1.5 up to 15s. */
+const IDLE_BACKOFF = { after: 5, factor: 1.5, maxMs: 15_000 };
+
 /** What one poll produced: a status, or a definitive refusal (401/403/404) that polling cannot fix. */
 type Polled = { kind: "ok"; status: PlaytestStatus } | { kind: "fatal"; error: ApiError };
 
@@ -42,6 +45,7 @@ export function usePlaytestStatus({ accessToken, playtestId, intervalMs = 3000 }
     enabled: !terminal,
     intervalMs,
     resetKey: playtestId,
+    idleBackoff: IDLE_BACKOFF,
     fetcher: async (signal) => {
       try {
         return { kind: "ok", status: await playtestApi.get(accessToken, playtestId, signal) };
