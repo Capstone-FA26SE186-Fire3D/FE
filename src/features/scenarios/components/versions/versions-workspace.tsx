@@ -4,7 +4,7 @@ import { Camera, GitCommitVertical, RefreshCw } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { useAsyncData } from "@/api/use-async-data";
+import { invalidateAsyncData, useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import { LoadingBlock } from "@/components/ui/spinner";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { routes } from "@/configs/routes";
+import { buildingJourneyTag } from "@/features/buildings/building-journey";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { usePlaytestPackage } from "@/features/playtest/use-playtest-package";
 
@@ -229,6 +230,7 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
     if (submission && selectedId) setSubmittedHere({ versionId: selectedId, submission });
     versions.reload();
     detail.reload();
+    invalidateAsyncData(buildingJourneyTag(buildingId)); // the sidebar journey shows the version / review / release state
   };
   const openSnapshot = () => setSnapshotOpen(true);
   const selectedGate = selected ? approvalGate(selected.reviewStatus, selected.rejectReason) : undefined;
@@ -324,7 +326,7 @@ export function VersionsWorkspace({ buildingId, scenarioId }: { buildingId: stri
       initialDraftId={get("draft")}
       preferredDraftId={scenario.data?.currentDraftId ?? ""}
       editorHref={editorHref}
-      onCreated={(versionId) => { versions.reload(); setParams({ version: versionId, tab: "build", page: "" }); }}
+      onCreated={(versionId) => { versions.reload(); invalidateAsyncData(buildingJourneyTag(buildingId)); setParams({ version: versionId, tab: "build", page: "" }); }}
     />}
   </div>;
 }

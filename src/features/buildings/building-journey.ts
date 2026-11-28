@@ -8,6 +8,12 @@ import type { Building, BuildingRevision } from "./types";
  * Every state is derived from a field the BE returns (revision status, scenario draftCount, version reviewStatus,
  * release status, entitlement); a step never unlocks from a guess. The backend re-checks every gate anyway.
  */
+/**
+ * Tag of every read behind the sidebar journey card of one building (`useAsyncData` `tags`): a screen that changed what
+ * the journey shows (building info, IFC status, scenarios, versions, releases) calls `invalidateAsyncData` with it.
+ */
+export const buildingJourneyTag = (buildingId: string) => `building-journey:${buildingId}`;
+
 export type JourneyStepKey = "info" | "ifc" | "scenario" | "version" | "release" | "usage";
 export type JourneyStepState = "done" | "current" | "locked";
 

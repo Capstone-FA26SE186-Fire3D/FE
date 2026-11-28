@@ -3,7 +3,7 @@
 import { Archive, MoreHorizontal, Pencil, QrCode, RefreshCw, Upload } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePolling } from "@/api/use-polling";
-import { useAsyncData } from "@/api/use-async-data";
+import { invalidateAsyncData, useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import { summarizeEntitlements } from "@/features/billing/entitlements";
 import { formatDate } from "@/features/billing/format";
 import { rememberRecentBuilding } from "@/features/command-palette/recent-buildings";
 import { buildingsApi } from "../api";
+import { buildingJourneyTag } from "../building-journey";
 import { describeApiError, isStatus } from "../format";
 import { derivePipelineProgress, emptyPipeline, isTerminalJob, newestGeometryJob, isUnsettledRevision, revisionLabel, type PipelineAction, type RevisionPipeline } from "../pipeline";
 import type { QaAction } from "../qa-codes";
@@ -141,6 +142,17 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
   const entitlements = useAsyncData(`billing:entitlements:${buildingId}`, (signal) => billingApi.listEntitlements(token, { buildingId, pageSize: 50 }, signal), enabled && !isAdmin);
   const service = useMemo(() => (entitlements.data ? summarizeEntitlements(entitlements.data.items) : undefined), [entitlements.data]);
   const scenarios = useAsyncData(`scenarios:${buildingId}:${scenarioPage}`, (signal) => buildingsApi.listScenarios(token, buildingId, scenarioPage, SCENARIO_PAGE_SIZE, signal), enabled);
+
+  // The sidebar journey card reads the same facts through its own queries. It no longer re-reads on every tab click, so
+  // it is told when a re-read here (after a save, an upload, a finished job, a new scenario) brought a new answer.
+  const journeyFacts = useRef<{ buildingId: string; building?: unknown; revisions?: unknown; scenarios?: unknown }>({ buildingId });
+  useEffect(() => {
+    const seen = journeyFacts.current.buildingId === buildingId ? journeyFacts.current : { buildingId };
+    const reread = (before: unknown, now: unknown) => before !== undefined && now !== undefined && before !== now;
+    const changed = reread(seen.building, building.data) || reread(seen.revisions, revisions.data) || reread(seen.scenarios, scenarios.data);
+    journeyFacts.current = { buildingId, building: building.data ?? seen.building, revisions: revisions.data ?? seen.revisions, scenarios: scenarios.data ?? seen.scenarios };
+    if (changed) invalidateAsyncData(buildingJourneyTag(buildingId));
+  }, [buildingId, building.data, revisions.data, scenarios.data]);
 
   const data = building.data?.data;
   useEffect(() => {
