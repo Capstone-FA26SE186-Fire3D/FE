@@ -176,7 +176,10 @@ function planTemplate(version: LibraryVersion, draft: JsonObject, context: Apply
       if (result) merged = { value: result.value, note: `Hợp nhất giữ tiêu chí của bạn và thêm ${result.added} tiêu chí chưa có${result.skipped > 0 ? `; ${result.skipped} tiêu chí trùng mã giữ bản của bạn` : ""}.` };
     }
     if (field === "rubric") warnings = rubricWarnings(incoming, context);
-    groups.push(group(base, merged, warnings));
+    const planned = group(base, merged, warnings);
+    if (field === "assumption" && isObject(current) && isObject(incoming) && planned.writes.replace)
+      planned.writes.replace = [{ path: base.path, value: { ...current, ...incoming } }];
+    groups.push(planned);
   }
   const ignored = ignoredTemplateParts(state);
   return { groups, reference: [], notes, ignored, blocker: groups.length === 0 ? "Kịch bản mẫu này không có trường nào áp dụng được cho bản nháp." : null };

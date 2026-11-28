@@ -130,7 +130,7 @@ export default function EditorViewport({ ref, markers, selection, tool, placeKin
     }, themeRef.current);
     controllerRef.current = controller;
     const p = latest.current;
-    controller.setInputs({ markers: p.markers, selection: p.selection, tool: p.gizmoEnabled || p.tool === "select" || p.tool === "place" ? p.tool : "select", placeKind: p.placeKind });
+    controller.setInputs({ markers: p.markers, selection: p.selection, tool: p.gizmoEnabled || p.tool === "select" || p.tool === "place" ? p.tool : "select", placeKind: p.placeKind, allowGrab: p.gizmoEnabled });
     return () => {
       controller.dispose();
       if (controllerRef.current === controller) controllerRef.current = null;
@@ -141,7 +141,7 @@ export default function EditorViewport({ ref, markers, selection, tool, placeKin
 
   useEffect(() => {
     const effective = gizmoEnabled || tool === "select" || tool === "place" ? tool : "select";
-    controllerRef.current?.setInputs({ markers, selection, tool: effective, placeKind });
+    controllerRef.current?.setInputs({ markers, selection, tool: effective, placeKind, allowGrab: gizmoEnabled });
   }, [markers, selection, tool, placeKind, gizmoEnabled, remount]);
 
   useEffect(() => { if (floors) controllerRef.current?.setFloors(floors); }, [floors, remount]);

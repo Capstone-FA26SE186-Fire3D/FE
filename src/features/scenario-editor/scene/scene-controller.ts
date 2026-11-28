@@ -61,7 +61,7 @@ export type SceneCallbacks = {
   onFrame?: () => void;
 };
 
-export type SceneInputs = { markers: MarkerInput[]; selection: MarkerRef | null; tool: SceneTool; placeKind: string };
+export type SceneInputs = { markers: MarkerInput[]; selection: MarkerRef | null; tool: SceneTool; placeKind: string; allowGrab: boolean };
 
 export type ModelInfo = {
   meshes: number;
@@ -117,7 +117,7 @@ export class EditorSceneController {
   private readonly materials: Record<string, THREE.MeshStandardMaterial | THREE.MeshBasicMaterial> = {};
   private readonly markers = new Map<string, THREE.Group>();
   private palette: ScenePalette = PALETTES.dark;
-  private inputs: SceneInputs = { markers: [], selection: null, tool: "select", placeKind: "" };
+  private inputs: SceneInputs = { markers: [], selection: null, tool: "select", placeKind: "", allowGrab: false };
   private readonly markerLayers = new Map<string, boolean>();
   private floors: FloorInfo[] = [];
   private activeFloor: string | null = null;
@@ -172,6 +172,8 @@ export class EditorSceneController {
     canvas.addEventListener("pointermove", this.onGrabMove);
     canvas.addEventListener("pointerup", this.onGrabUp);
     canvas.addEventListener("pointercancel", this.onGrabUp);
+    window.addEventListener("pointerup", this.onGrabUp);
+    window.addEventListener("pointercancel", this.onGrabUp);
     canvas.addEventListener("pointerdown", this.onPointerDown);
     canvas.addEventListener("pointerup", this.onPointerUp);
     canvas.addEventListener("webglcontextlost", this.onContextLost as EventListener);
@@ -214,6 +216,8 @@ export class EditorSceneController {
     canvas.removeEventListener("pointermove", this.onGrabMove);
     canvas.removeEventListener("pointerup", this.onGrabUp);
     canvas.removeEventListener("pointercancel", this.onGrabUp);
+    window.removeEventListener("pointerup", this.onGrabUp);
+    window.removeEventListener("pointercancel", this.onGrabUp);
     canvas.removeEventListener("pointerdown", this.onPointerDown);
     canvas.removeEventListener("pointerup", this.onPointerUp);
     canvas.removeEventListener("webglcontextlost", this.onContextLost as EventListener);
@@ -729,10 +733,10 @@ export class EditorSceneController {
    * to move. Nothing happens until the pointer has travelled 5 px, so a click still only selects.
    */
   private readonly onGrabDown = (event: PointerEvent) => {
-    if (event.button !== 0 || this.dragging || this.inputs.tool !== "select") return;
+    if (event.button !== 0 || this.dragging || !this.inputs.allowGrab || this.inputs.tool !== "select") return;
     this.raycaster.setFromCamera(this.ndc(event.clientX, event.clientY), this.camera);
     const marker = this.markerUnderRay();
-    if (!marker || marker.userData.kind === "locked") return;
+    if (!marker || marker.userData.kind === "locked" || marker.userData.kind === "review") return;
     this.grab = { marker, ref: { kind: marker.userData.kind as string, index: marker.userData.index as number }, pointerId: event.pointerId, x: event.clientX, y: event.clientY, moved: false, orbitWas: this.orbit.enabled };
     this.orbit.enabled = false;
   };

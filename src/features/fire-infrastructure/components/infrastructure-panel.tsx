@@ -43,14 +43,15 @@ export function summarizeItems(items: unknown): string {
 
 /** Vietnamese for the submit checks the server reports in English; unknown codes fall back to a neutral sentence. */
 function issueText(issue: DraftValidationIssue, objects: readonly ObjectView[]): string {
+  const path = typeof issue.path === "string" ? issue.path : "";
   // A missing parameter names the object and the field ("Bình chữa cháy xách tay #1: chưa điền Loại chất chữa cháy").
   if (issue.code === "FIELD_REQUIRED") {
-    const named = parameterIssueText({ ...issue, path: itemPathToObjectPath(issue.path) }, objects);
+    const named = parameterIssueText({ ...issue, path: itemPathToObjectPath(path) }, objects);
     if (named) return `${named}.`;
   }
   switch (issue.code) {
     case "EXIT_REQUIRED": return "Cần ít nhất một lối thoát nạn.";
-    case "FIELD_REQUIRED": return issue.path.startsWith("$.geometry") ? "Chưa gắn mô hình 3D của bản IFC. Mở trình soạn rồi lưu lại." : issue.path.startsWith("$.runtimeVersion") ? "Chưa chọn phiên bản ứng dụng. Mở trình soạn rồi lưu lại." : "Một mục còn thiếu thông tin bắt buộc.";
+    case "FIELD_REQUIRED": return path.startsWith("$.geometry") ? "Chưa gắn mô hình 3D của bản IFC. Mở trình soạn rồi lưu lại." : path.startsWith("$.runtimeVersion") ? "Chưa chọn phiên bản ứng dụng. Mở trình soạn rồi lưu lại." : "Một mục còn thiếu thông tin bắt buộc.";
     case "CAPABILITY_REQUIRED": return "Một thiết bị chưa chọn loại.";
     case "INFRASTRUCTURE_CAPABILITY_NOT_FIXED": return "Có mục không thuộc hạ tầng (khăn, đồ đạc cá nhân hoặc thang máy). Hãy xóa khỏi hạ tầng.";
     case "FLOOR_NOT_FOUND": return "Một mục nằm ở tầng không còn trong mô hình 3D.";
@@ -59,7 +60,7 @@ function issueText(issue: DraftValidationIssue, objects: readonly ObjectView[]):
   }
 }
 
-type Checked = { id: string; isValid: boolean; issues: DraftValidationIssue[] };
+type Checked = { id: string; revision: number; isValid: boolean; issues: DraftValidationIssue[] };
 
 /**
  * "Hạ tầng PCCC" of one IFC revision (BE#213, FR-PLAN-04): every version with its status, and the steps of the open one
@@ -104,7 +105,7 @@ export function InfrastructurePanel({ accessToken, buildingId, revisionId, readO
     setFailure(null);
     try {
       const result = await fireInfrastructureApi.validate(accessToken, item.id);
-      setChecked({ id: item.id, isValid: result.isValid, issues: result.issues });
+      setChecked({ id: item.id, revision: item.revision, isValid: result.isValid, issues: result.issues });
     } catch (error) {
       fail(error, "Chưa kiểm tra được hạ tầng.");
     } finally {
@@ -125,7 +126,7 @@ export function InfrastructurePanel({ accessToken, buildingId, revisionId, readO
       versions.reload();
     } catch (error) {
       setConfirming(null);
-      if (error instanceof ApiError && Array.isArray(error.payload?.issues)) setChecked({ id: item.id, isValid: false, issues: error.payload.issues as DraftValidationIssue[] });
+      if (error instanceof ApiError && Array.isArray(error.payload?.issues)) setChecked({ id: item.id, revision: item.revision, isValid: false, issues: error.payload.issues as DraftValidationIssue[] });
       fail(error, "Chưa gửi thẩm định được.");
       versions.reload();
     } finally {
@@ -147,7 +148,7 @@ export function InfrastructurePanel({ accessToken, buildingId, revisionId, readO
           : <ul className="ops-stack" style={{ listStyle: "none", margin: 0, padding: 0 }} aria-label="Các phiên bản hạ tầng">
             {items.map((item) => {
               const status = INFRASTRUCTURE_STATUS[item.status] ?? { label: "Không rõ", tone: "neutral" as const };
-              const result = checked?.id === item.id ? checked : null;
+              const result = checked?.id === item.id && checked.revision === item.revision ? checked : null;
               const objects = result ? readObjects({ objects: itemsToObjects(item.items) }) : [];
               return <li key={item.id} className="ops-panel" data-testid={`infrastructure-${item.version}`} data-status={item.status}>
                 <div className="ops-panel-body ops-stack">
