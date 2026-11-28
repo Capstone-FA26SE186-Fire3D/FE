@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { pagesAfterFirst } from "@/api/paging";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { learnApi } from "../api";
 
@@ -46,10 +47,16 @@ export function LearnBookmarksProvider({ children }: { children: ReactNode }) {
     void (async () => {
       const ids = new Set<string>();
       try {
-        for (let page = 1; page <= MAX_PAGES; page += 1) {
-          const result = await learnApi.bookmarks(token, { page, pageSize: PAGE_SIZE }, controller.signal);
-          for (const item of result.items) ids.add(item.postId);
-          if (result.items.length === 0 || page * PAGE_SIZE >= result.total) break;
+        const first = await learnApi.bookmarks(token, { page: 1, pageSize: PAGE_SIZE }, controller.signal);
+        for (const item of first.items) ids.add(item.postId);
+        // Page 1 says how many there are: the other pages are read together. A page that fails keeps the ids of the
+        // pages before it (as the one-by-one loop did) and marks the set as failed.
+        const pages = first.items.length === 0 ? [] : pagesAfterFirst(first.total, PAGE_SIZE, MAX_PAGES);
+        const rest = await Promise.allSettled(pages.map((page) => learnApi.bookmarks(token, { page, pageSize: PAGE_SIZE }, controller.signal)));
+        for (const [index, outcome] of rest.entries()) {
+          if (outcome.status === "rejected") throw outcome.reason;
+          for (const item of outcome.value.items) ids.add(item.postId);
+          if (outcome.value.items.length === 0 || pages[index] * PAGE_SIZE >= outcome.value.total) break;
         }
         if (!controller.signal.aborted) setLoaded({ owner, ids, failed: false });
       } catch {

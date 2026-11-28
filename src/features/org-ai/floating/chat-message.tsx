@@ -13,7 +13,7 @@ import { isObject } from "@/features/scenario-editor/store/json";
 
 import { readProposalNotes, readProposalState } from "../apply-plan";
 import { orgAiApi, traineeAiApi } from "../api";
-import { aiErrorText, failureText, hasResultType, isInFlight, isSuccessfulDraft, operationLabel, sourceKindLabel, statusLabel, statusTone } from "../labels";
+import { AI_REQUEST_IDLE_BACKOFF, aiErrorText, aiRequestSignature, failureText, hasResultType, isInFlight, isSuccessfulDraft, operationLabel, sourceKindLabel, statusLabel, statusTone } from "../labels";
 import type { AiCitation, AiRequest } from "../types";
 import { citationHref } from "../components/request-view";
 import { traineeRequestHref } from "../trainee";
@@ -98,7 +98,7 @@ export function AssistantMessage({ message, accessToken, onSettled, onApply, tra
   const requestId = message.requestId;
   const fetcher = useCallback((signal: AbortSignal) => (trainee ? traineeAiApi.getRequest(accessToken, requestId, signal) : orgAiApi.getRequest(accessToken, requestId, signal)), [accessToken, requestId, trainee]);
   const isDone = useCallback((request: AiRequest) => !isInFlight(request.status), []);
-  const polling = usePolling<AiRequest>({ fetcher, isDone, resetKey: `bubble:${requestId}` });
+  const polling = usePolling<AiRequest>({ fetcher, isDone, resetKey: `bubble:${requestId}`, idleBackoff: AI_REQUEST_IDLE_BACKOFF, signature: aiRequestSignature });
   const gone = polling.error instanceof ApiError && (polling.error.status === 404 || polling.error.status === 403 || polling.error.status === 401);
   const request = !gone && polling.data?.requestId === requestId ? polling.data : undefined;
   const settled = polling.finished && request ? request : undefined;

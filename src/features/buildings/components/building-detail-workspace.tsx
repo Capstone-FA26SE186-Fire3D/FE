@@ -1,27 +1,28 @@
 "use client";
 
 import { Archive, MoreHorizontal, Pencil, QrCode, RefreshCw, Upload } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePolling } from "@/api/use-polling";
-import { useAsyncData } from "@/api/use-async-data";
+import { invalidateAsyncData, useAsyncData } from "@/api/use-async-data";
 import { useUrlParams } from "@/api/use-url-params";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { RowMenu } from "@/components/ui/dropdown-menu";
 import { PageHeader, type Crumb } from "@/components/ui/page-header";
-import { Skeleton, SkeletonDetail, SkeletonReveal } from "@/components/ui/skeleton";
+import { Skeleton, SkeletonDetail, SkeletonReveal, SkeletonRows } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SubTabs, SubTabsContent } from "@/components/ui/sub-tabs";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { routes } from "@/configs/routes";
 import { useAuthSession } from "@/features/auth/auth-session";
 import { billingApi } from "@/features/billing/api";
-import { BuildingServicesTab } from "@/features/billing/components/building-services-tab";
 import { summarizeEntitlements } from "@/features/billing/entitlements";
 import { formatDate } from "@/features/billing/format";
 import { rememberRecentBuilding } from "@/features/command-palette/recent-buildings";
 import { buildingsApi } from "../api";
+import { buildingJourneyTag } from "../building-journey";
 import { describeApiError, isStatus } from "../format";
 import { derivePipelineProgress, emptyPipeline, isTerminalJob, newestGeometryJob, isUnsettledRevision, revisionLabel, type PipelineAction, type RevisionPipeline } from "../pipeline";
 import type { QaAction } from "../qa-codes";
@@ -30,20 +31,27 @@ import { useProcessingActions } from "../use-processing-actions";
 import { AnnotationsPanel } from "./annotations-panel";
 import { BuildingAccessPanel, buildingAccessTag } from "./building-access-panel";
 import { ConfirmTrainingPanel } from "./confirm-training-panel";
-import { EquipmentPanel } from "./equipment-panel";
-import { IfcUploadModal } from "./ifc-upload-modal";
 import { JourneyOverview } from "./journey-overview";
 import { PipelineProgress } from "./pipeline-progress";
 import { PreviewPanel } from "./preview-panel";
 import { ProcessingStatusPanel } from "./processing-status-panel";
-import { QrPanel } from "./qr-panel";
 import { buildingTypeLabel } from "../data/building-types";
-import { InfrastructurePanel } from "@/features/fire-infrastructure/components/infrastructure-panel";
-import { PlanDossierView } from "@/features/fire-infrastructure/components/plan-dossier";
-import { RevisionDetailsPanel } from "./revision-details-panel";
 import { ScenariosPanel } from "./scenarios-panel";
 import "../building-v2.css";
 import { LoadingBlock } from "@/components/ui/spinner";
+
+// The page opens on "Hành trình" (or IFC › Tiến trình): panels of the other tabs / sub-tabs and the upload modal are their
+// own chunks, fetched when first shown (the QR panel alone brings `qrcode`), as on the versions page.
+const PanelLoading = () => <SkeletonRows rows={4} label="Đang tải…" />;
+const loadEquipmentPanel = () => import("./equipment-panel");
+const loadRevisionDetailsPanel = () => import("./revision-details-panel");
+const EquipmentPanel = dynamic(() => loadEquipmentPanel().then((m) => m.EquipmentPanel), { loading: PanelLoading });
+const RevisionDetailsPanel = dynamic(() => loadRevisionDetailsPanel().then((m) => m.RevisionDetailsPanel), { loading: PanelLoading });
+const InfrastructurePanel = dynamic(() => import("@/features/fire-infrastructure/components/infrastructure-panel").then((m) => m.InfrastructurePanel), { loading: PanelLoading });
+const PlanDossierView = dynamic(() => import("@/features/fire-infrastructure/components/plan-dossier").then((m) => m.PlanDossierView), { loading: PanelLoading });
+const QrPanel = dynamic(() => import("./qr-panel").then((m) => m.QrPanel), { loading: PanelLoading });
+const BuildingServicesTab = dynamic(() => import("@/features/billing/components/building-services-tab").then((m) => m.BuildingServicesTab), { loading: PanelLoading });
+const IfcUploadModal = dynamic(() => import("./ifc-upload-modal").then((m) => m.IfcUploadModal));
 
 export const buildingTabs = ["journey", "ifc", "scenarios", "access", "services"] as const;
 export type BuildingTab = (typeof buildingTabs)[number];
@@ -57,6 +65,8 @@ const ifcSubLabels: Record<IfcSub, string> = { progress: "Tiến trình", previe
 const SCENARIO_PAGE_SIZE = 20;
 // After a Succeeded job the revision is re-read until QA moved it out of Uploaded/Processing; ~1 minute at most.
 const MAX_SETTLE_POLLS = 20;
+/** Polls without any model-building job before the page stops asking (about one minute); see idlePolls. */
+const MAX_IDLE_POLLS = 20;
 /** Job list paging while looking for the Geometry job behind newer package builds. */
 const JOB_PAGE_SIZE = 20;
 const MAX_JOB_PAGES = 5;
@@ -130,6 +140,9 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
 
   // ?upload=1 (⌘K, list button) opens the modal directly; closing it clears the param so a reload does not reopen it.
   const uploadModalOpen = uploadOpen || wantUpload;
+  // The modal's chunk is fetched on first open; it then stays mounted (its close animation and state as before).
+  const [uploadMounted, setUploadMounted] = useState(false);
+  if (uploadModalOpen && !uploadMounted) setUploadMounted(true);
   const setUploadModal = (next: boolean) => { setUploadOpen(next); if (!next && wantUpload) setParams({ upload: null }, "replace"); };
 
   const building = useAsyncData(`building:${buildingId}`, (signal) => buildingsApi.getVersioned(token, buildingId, signal), enabled);
@@ -139,6 +152,22 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
   const entitlements = useAsyncData(`billing:entitlements:${buildingId}`, (signal) => billingApi.listEntitlements(token, { buildingId, pageSize: 50 }, signal), enabled && !isAdmin);
   const service = useMemo(() => (entitlements.data ? summarizeEntitlements(entitlements.data.items) : undefined), [entitlements.data]);
   const scenarios = useAsyncData(`scenarios:${buildingId}:${scenarioPage}`, (signal) => buildingsApi.listScenarios(token, buildingId, scenarioPage, SCENARIO_PAGE_SIZE, signal), enabled);
+
+  // The sidebar journey card reads the same facts through its own queries. It no longer re-reads on every tab click, so
+  // it is told when a re-read here (after a save, an upload, a finished job, a new scenario) brought a new answer.
+  const journeyFacts = useRef<{ buildingId: string; building?: unknown; revisions?: unknown; scenarios?: unknown }>({ buildingId });
+  useEffect(() => {
+    const seen = journeyFacts.current.buildingId === buildingId ? journeyFacts.current : { buildingId };
+    const reread = (before: unknown, now: unknown) => before !== undefined && now !== undefined && before !== now;
+    const changed = reread(seen.building, building.data) || reread(seen.revisions, revisions.data) || reread(seen.scenarios, scenarios.data);
+    journeyFacts.current = { buildingId, building: building.data ?? seen.building, revisions: revisions.data ?? seen.revisions, scenarios: scenarios.data ?? seen.scenarios };
+    if (changed) invalidateAsyncData(buildingJourneyTag(buildingId));
+  }, [buildingId, building.data, revisions.data, scenarios.data]);
+
+  // "Xem issue" / "Thiết bị" jump to a sub-tab and focus inside it: fetch those two chunks as soon as the IFC tab is open.
+  useEffect(() => {
+    if (tab === "ifc") { void loadEquipmentPanel(); void loadRevisionDetailsPanel(); }
+  }, [tab]);
 
   const data = building.data?.data;
   useEffect(() => {
@@ -152,6 +181,9 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
   const listedStatus = listedRevision?.status;
   const latestRevision = useMemo(() => [...(revisionItems ?? [])].sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null, [revisionItems]);
   const settlePolls = useRef({ revisionId: "", count: 0 });
+  // Polls that found no model-building job yet. "Uploaded" without a job is also where a revision rests until the user starts
+  // processing, and polling it forever cost one request every 3 s on every tab; refresh() (after "process") polls again.
+  const idlePolls = useRef({ revisionId: "", count: 0 });
 
   // --- Processing job of the selected revision (polled) ---
   const pollEnabled = enabled && Boolean(revisionId);
@@ -171,7 +203,12 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
       }
       // Every kind stays in `jobs` (confirm-for-training looks up the package job of a scenario version).
       const jobs = [...items].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-      if (!newest) return { revisionId, jobs, pipeline: emptyPipeline };
+      if (!newest) {
+        if (idlePolls.current.revisionId !== revisionId) idlePolls.current = { revisionId, count: 0 };
+        idlePolls.current.count += 1;
+        return { revisionId, jobs, pipeline: emptyPipeline };
+      }
+      idlePolls.current = { revisionId, count: 0 };
       const detail = await buildingsApi.getJob(token, newest.id, signal);
       const pipeline: RevisionPipeline = { job: detail.job, detail, qa: null };
       if (detail.job.status === "Running") {
@@ -195,7 +232,12 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
       const job = snapshot.pipeline.job;
       const status = snapshot.revision?.status ?? listedStatus;
       // No job yet: keep polling only while the revision is waiting for one to appear.
-      if (!job) return !isUnsettledRevision(status);
+      if (!job) {
+        if (!isUnsettledRevision(status)) return true;
+        if (idlePolls.current.count < MAX_IDLE_POLLS) return false;
+        idlePolls.current = { revisionId, count: 0 }; // a later refresh() gets a full round of polls again
+        return true;
+      }
       if (!isTerminalJob(job.status)) return false;
       // A failed job leaves the revision Uploaded on the BE, so only a Succeeded job waits for the status to settle.
       if (job.status !== "Succeeded" || snapshot.pipeline.qaError !== undefined) return true;
@@ -211,7 +253,8 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
   const reloadKey = `${jobStatus}:${pipeline.detail?.currentAttemptId ?? ""}`;
   const pollError = pipelineState.data?.revisionId === revisionId || pipelineState.data === undefined ? pipelineState.error : undefined;
 
-  const issues = useAsyncData(`issues:${revisionId}:${reloadKey}`, (signal) => buildingsApi.listIssues(token, revisionId, 1, 100, signal), pollEnabled && (tab === "ifc" || tab === "journey"));
+  // Wait for the first poll: reloadKey is ":" before it and "<status>:<attempt>" after, which sent this 100-row read twice per load.
+  const issues = useAsyncData(`issues:${revisionId}:${reloadKey}`, (signal) => buildingsApi.listIssues(token, revisionId, 1, 100, signal), pollEnabled && snapshot !== undefined && (tab === "ifc" || tab === "journey"));
 
   // When the worker finishes, the revision status changes on the server: refresh the list once, and again whenever a
   // fresh read of the revision disagrees with the list.
@@ -384,6 +427,6 @@ export function BuildingDetailWorkspace({ buildingId, defaultTab = "journey" }: 
       </TabsContent>
     </Tabs>
 
-    <IfcUploadModal open={uploadModalOpen} onOpenChange={setUploadModal} accessToken={accessToken} buildingId={buildingId} onRevisionChanged={onRevisionChanged} />
+    {uploadMounted && <IfcUploadModal open={uploadModalOpen} onOpenChange={setUploadModal} accessToken={accessToken} buildingId={buildingId} onRevisionChanged={onRevisionChanged} />}
   </div>;
 }

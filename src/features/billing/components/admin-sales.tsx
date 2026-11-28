@@ -241,7 +241,7 @@ export function QuotationsSection({ accessToken }: { accessToken: string }) {
   const { page, get, setParams, setPage } = useUrlParams({ pageSize: PAGE_SIZE });
   const selectedId = get("quotation");
   const list = useAsyncData(`commerce:quotes:${page}`, (signal) => billingApi.listQuotations(accessToken, page, PAGE_SIZE, signal));
-  const organizations = useAsyncData("commerce:orgs", () => organizationsApi.list(accessToken, { page: 1, pageSize: 100 }));
+  const organizations = useAsyncData("commerce:orgs", (signal) => organizationsApi.list(accessToken, { page: 1, pageSize: 100 }, signal));
   const detail = useAsyncData(`commerce:quote:${selectedId}`, (signal) => billingApi.getQuotation(accessToken, selectedId, signal), Boolean(selectedId), { keepPrevious: false });
   const checkouts = useAsyncData(`commerce:quote-checkouts:${selectedId}:${detail.data?.data.revision ?? 0}`, (signal) => billingApi.listQuotationCheckouts(accessToken, selectedId, 1, 20, signal), Boolean(selectedId) && Boolean(detail.data) && detail.data?.data.status !== "Draft", { keepPrevious: false });
   const [override, setOverride] = useState<WithEtag<Quotation> | null>(null);

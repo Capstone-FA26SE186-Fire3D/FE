@@ -1,5 +1,6 @@
 "use client";
 
+import { pagesAfterFirst } from "@/api/paging";
 import { useAsyncData, type AsyncData } from "@/api/use-async-data";
 import { trainingHistoryApi } from "./api";
 import { isUuid } from "./filters";
@@ -17,10 +18,14 @@ export function useHistoryBuildings(accessToken: string | null, userId: string):
     `history:buildings:${userId}`,
     async (signal) => {
       const byId = new Map<string, NamedRef>();
-      for (let page = 1; page <= BUILDING_PAGES; page += 1) {
-        const result = await trainingHistoryApi.buildings(accessToken ?? "", page, 100, signal);
+      const read = (page: number) => trainingHistoryApi.buildings(accessToken ?? "", page, 100, signal);
+      const first = await read(1);
+      // Page 1 says how many pages exist: the others are read together and merged in page order.
+      const pages = first.items.length === 0 ? [] : pagesAfterFirst(first.totalCount, 100, BUILDING_PAGES);
+      const results = [first, ...(await Promise.all(pages.map(read)))];
+      for (const [index, result] of results.entries()) {
         for (const item of result.items) if (!byId.has(item.id)) byId.set(item.id, { id: item.id, name: item.name });
-        if (page * 100 >= result.totalCount || result.items.length === 0) break;
+        if ((index + 1) * 100 >= result.totalCount || result.items.length === 0) break;
       }
       return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, "vi"));
     },

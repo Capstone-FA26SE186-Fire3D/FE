@@ -123,7 +123,7 @@ export function PaymentsSection({ accessToken }: { accessToken: string }) {
   const [range, setRange] = useState({ from: isoToLocalInput(from), to: isoToLocalInput(to) });
   const [rangeError, setRangeError] = useState("");
 
-  const organizations = useAsyncData("commerce:orgs", () => organizationsApi.list(accessToken, { page: 1, pageSize: 100 }));
+  const organizations = useAsyncData("commerce:orgs", (signal) => organizationsApi.list(accessToken, { page: 1, pageSize: 100 }, signal));
   const orgName = useMemo(() => Object.fromEntries((organizations.data?.items ?? []).map((item) => [item.id, item.name])), [organizations.data]);
   const list = useAsyncData(`commerce:ledger:${kind}:${page}:${status}:${organizationId}:${quotationId}:${from}:${to}`, (signal) => billingApi.listLedger(accessToken, kind, { page, pageSize: PAGE_SIZE, status: status || undefined, organizationId: organizationId || undefined, quotationId: quotationId || undefined, from: from || undefined, to: to || undefined }, signal));
   const items = list.data?.items ?? [];

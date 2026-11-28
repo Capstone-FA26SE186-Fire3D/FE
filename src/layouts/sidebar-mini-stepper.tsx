@@ -11,7 +11,7 @@ import { useAuthSession } from "@/features/auth/auth-session";
 import { billingApi } from "@/features/billing/api";
 import { summarizeEntitlements } from "@/features/billing/entitlements";
 import { buildingsApi } from "@/features/buildings/api";
-import { buildJourney, type JourneyScenarioFacts, type JourneyStepKey, type JourneyStepModel } from "@/features/buildings/building-journey";
+import { buildJourney, buildingJourneyTag, type JourneyScenarioFacts, type JourneyStepKey, type JourneyStepModel } from "@/features/buildings/building-journey";
 import { scenarioVersionsApi } from "@/features/scenarios/versions-api";
 
 /** Short labels for the 248px sidebar (Figma 43:406); the journey titles are longer. */
@@ -28,7 +28,8 @@ const newestFirst = <T extends { createdAt: string }>(items: T[] | undefined) =>
 
 /**
  * Six-dot journey card under "Công trình" while a building is open. States come from `buildJourney` (server fields only),
- * loaded once per building and refreshed when the detail page switches tab (the user probably changed something).
+ * loaded once per building page (route) and re-read when a screen that changed them says so (`buildingJourneyTag`):
+ * switching tab on the detail page reads nothing.
  */
 export function SidebarMiniStepper({ buildingId }: { buildingId: string }) {
   const router = useRouter();
@@ -38,20 +39,21 @@ export function SidebarMiniStepper({ buildingId }: { buildingId: string }) {
   const token = accessToken ?? "";
   const enabled = Boolean(accessToken);
   const isAdmin = user?.role === 0;
-  // Part of every key: a tab change on the detail page re-reads the journey facts.
-  const tab = params.get("tab") ?? "";
-  const scope = `${buildingId}:${tab}`;
+  // The route (not the tab) is part of every key: coming back from the editor or the versions page re-reads the facts,
+  // a tab click does not. Commands on the open page invalidate the tag instead.
+  const scope = `${buildingId}:${pathname}`;
+  const tags = useMemo(() => [buildingJourneyTag(buildingId)], [buildingId]);
 
-  const building = useAsyncData(`mini:building:${scope}`, (signal) => buildingsApi.getVersioned(token, buildingId, signal), enabled, { scope: buildingId });
-  const revisions = useAsyncData(`mini:revisions:${scope}`, (signal) => buildingsApi.listRevisions(token, buildingId, 1, 50, signal), enabled, { scope: buildingId });
-  const scenarios = useAsyncData(`mini:scenarios:${scope}`, (signal) => buildingsApi.listScenarios(token, buildingId, 1, 20, signal), enabled, { scope: buildingId });
-  const releases = useAsyncData(`mini:releases:${scope}`, (signal) => scenarioVersionsApi.listReleases(token, { buildingId }, 1, 1, signal), enabled, { scope: buildingId });
-  const entitlements = useAsyncData(`mini:entitlements:${scope}`, (signal) => billingApi.listEntitlements(token, { buildingId, pageSize: 50 }, signal), enabled && !isAdmin, { scope: buildingId });
+  const building = useAsyncData(`mini:building:${scope}`, (signal) => buildingsApi.getVersioned(token, buildingId, signal), enabled, { scope: buildingId, tags });
+  const revisions = useAsyncData(`mini:revisions:${scope}`, (signal) => buildingsApi.listRevisions(token, buildingId, 1, 50, signal), enabled, { scope: buildingId, tags });
+  const scenarios = useAsyncData(`mini:scenarios:${scope}`, (signal) => buildingsApi.listScenarios(token, buildingId, 1, 20, signal), enabled, { scope: buildingId, tags });
+  const releases = useAsyncData(`mini:releases:${scope}`, (signal) => scenarioVersionsApi.listReleases(token, { buildingId }, 1, 1, signal), enabled, { scope: buildingId, tags });
+  const entitlements = useAsyncData(`mini:entitlements:${scope}`, (signal) => billingApi.listEntitlements(token, { buildingId, pageSize: 50 }, signal), enabled && !isAdmin, { scope: buildingId, tags });
 
   const newestScenario = useMemo(() => newestFirst(scenarios.data?.items), [scenarios.data]);
   const scenarioId = newestScenario?.id ?? "";
-  const detail = useAsyncData(`mini:scenario:${scenarioId}:${tab}`, (signal) => scenarioVersionsApi.getScenario(token, scenarioId, signal), enabled && Boolean(scenarioId), { scope: scenarioId });
-  const versions = useAsyncData(`mini:versions:${scenarioId}:${tab}`, (signal) => scenarioVersionsApi.listVersions(token, scenarioId, 1, 1, signal), enabled && Boolean(scenarioId), { scope: scenarioId });
+  const detail = useAsyncData(`mini:scenario:${scenarioId}:${pathname}`, (signal) => scenarioVersionsApi.getScenario(token, scenarioId, signal), enabled && Boolean(scenarioId), { scope: scenarioId, tags });
+  const versions = useAsyncData(`mini:versions:${scenarioId}:${pathname}`, (signal) => scenarioVersionsApi.listVersions(token, scenarioId, 1, 1, signal), enabled && Boolean(scenarioId), { scope: scenarioId, tags });
 
   const revision = useMemo(() => newestFirst(revisions.data?.items), [revisions.data]);
   const service = useMemo(() => (entitlements.data ? summarizeEntitlements(entitlements.data.items).state : undefined), [entitlements.data]);
