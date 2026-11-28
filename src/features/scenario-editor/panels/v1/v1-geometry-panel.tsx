@@ -19,7 +19,9 @@ import { NumberField } from "../fields";
  * Geometry the draft is pinned to and the floors/transform the editor works with. The IFC → GLB `coordinateTransform` is
  * shown and can be checked with a point, but it is never applied to scenario objects: objects are floor-local.
  */
-export function V1GeometryPanel({ reading, preview, pin, buildingId, revisionId, onRepin, modelSummary }: {
+export function V1GeometryPanel({ floorNames, reading, preview, pin, buildingId, revisionId, onRepin, modelSummary }: {
+  /** Display name per floor id (Tầng trệt, Tầng 1, Hầm 1). */
+  floorNames: ReadonlyMap<string, string>;
   reading: GeometryReading;
   preview: PreviewState;
   pin: GeometryPin | null;
@@ -61,7 +63,7 @@ export function V1GeometryPanel({ reading, preview, pin, buildingId, revisionId,
       <fieldset className="ops-fieldset">
         <legend>Tầng ({info.floors.length})</legend>
         <ul className="se-floors" data-testid="floor-list">
-          {[...info.floors].sort((a, b) => a.elevationMeters - b.elevationMeters).map((floor) => <li key={floor.id}><strong>{floor.name}</strong><span>{round3(floor.elevationMeters)} m</span></li>)}
+          {[...info.floors].sort((a, b) => a.elevationMeters - b.elevationMeters).map((floor) => <li key={floor.id} title={floor.name}><strong>{floorNames.get(floor.id) ?? floor.name}</strong><span>{round3(floor.elevationMeters)} m</span></li>)}
         </ul>
         <p className="ops-field-hint">{info.semantic.length} cấu kiện có thể dùng làm neo.</p>
       </fieldset>

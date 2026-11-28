@@ -129,9 +129,10 @@ export function DraftPreview({ state, notes }: { state: JsonObject; notes: strin
         : <ul className={styles.list} data-testid="ai-draft-objects">{objects.map((object, index) => {
           const placement = isObject(object.placement) ? object.placement : {};
           const kind = typeof object.kind === "string" ? object.kind : "?";
+          // The proposal carries only the model's pin, not its floors: no storey name or number can be derived here (the apply dialog has the draft's model and names them).
           return <li key={index} className={styles.item}>
             <span className={styles.itemTitle}>{KIND_META[kind as ObjectKind]?.label ?? "Đối tượng khác"}{typeof object.label === "string" && object.label ? ` · ${object.label}` : ""}</span>
-            <span className={styles.dim}>{typeof placement.floorId === "string" ? `Tầng ${/(-?\d+)$/.exec(placement.floorId)?.[1] !== undefined ? Number(/(-?\d+)$/.exec(placement.floorId)![1]) : placement.floorId}` : "Chưa chọn tầng"}{typeof object.anchorId === "string" ? " · gắn vào cấu kiện IFC" : ""}{isObject(object.capability) && typeof object.capability.id === "string" ? ` · ${capabilityLabel(object.capability.id)}` : ""}</span>
+            <span className={styles.dim}>{typeof placement.floorId === "string" ? "Đã chọn tầng" : "Chưa chọn tầng"}{typeof object.anchorId === "string" ? " · gắn vào cấu kiện IFC" : ""}{isObject(object.capability) && typeof object.capability.id === "string" ? ` · ${capabilityLabel(object.capability.id)}` : ""}</span>
           </li>;
         })}</ul>}
     </div>

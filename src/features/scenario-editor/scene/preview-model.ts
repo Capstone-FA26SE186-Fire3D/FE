@@ -1,3 +1,5 @@
+import { floorNames } from "../v1/floor-names";
+
 /**
  * `floors` and `semanticMapping` come from `GET /api/buildings/{id}/editor-preview` as raw artifact metadata: the BE
  * only checks `floors` is an array and `semanticMapping` an object (BE#54 asks for a schema). These parsers read what
@@ -23,22 +25,31 @@ const firstNumber = (source: Record<string, unknown>, keys: string[]) => {
   return undefined;
 };
 
-/** ASSUMPTION (BE#54): `elevation` is metres in the same space as the GLB after `coordinateTransform` (Y-up). */
+/** What a floor with neither a name nor an elevation is called: its place in the list says nothing about which storey it is. */
+export const UNNAMED_FLOOR = "Tầng chưa rõ";
+
+/**
+ * ASSUMPTION (BE#54): `elevation` is metres in the same space as the GLB after `coordinateTransform` (Y-up).
+ * A floor given without a name is named from its elevation by the shared rule (Tầng trệt, Tầng 1, Hầm 1), never by its place in the list.
+ */
 export function parseFloors(raw: unknown): FloorInfo[] {
   if (!Array.isArray(raw)) return [];
   const floors: FloorInfo[] = [];
   raw.forEach((item, index) => {
     if (typeof item === "string" && item.trim()) floors.push({ key: `floor-${index}`, name: item.trim(), elevation: null });
-    else if (typeof item === "number" && Number.isFinite(item)) floors.push({ key: `floor-${index}`, name: `Tầng ${index + 1}`, elevation: item });
+    else if (typeof item === "number" && Number.isFinite(item)) floors.push({ key: `floor-${index}`, name: "", elevation: item });
     else if (isRecord(item)) {
       const elevation = firstNumber(item, ["elevationMeters", "elevation", "elevationM", "elevation_m", "z", "height", "level"]);
-      const name = firstString(item, ["name", "label", "title", "storey", "storeyName"]) ?? `Tầng ${index + 1}`;
+      const name = firstString(item, ["name", "label", "title", "storey", "storeyName"]) ?? "";
       floors.push({ key: firstString(item, ["id", "guid", "globalId", "ifcGuid", "ifc_guid", "key"]) ?? `floor-${index}`, name, elevation: elevation ?? null });
     }
   });
   const unique = new Map<string, FloorInfo>();
   floors.forEach((floor) => { if (!unique.has(floor.key)) unique.set(floor.key, floor); });
-  return [...unique.values()].sort((a, b) => (a.elevation ?? Number.POSITIVE_INFINITY) - (b.elevation ?? Number.POSITIVE_INFINITY));
+  const all = [...unique.values()];
+  const ruleNames = floorNames(all, []);
+  return all.map((floor) => (floor.name ? floor : { ...floor, name: floor.elevation === null ? UNNAMED_FLOOR : ruleNames.get(floor.key) ?? UNNAMED_FLOOR }))
+    .sort((a, b) => (a.elevation ?? Number.POSITIVE_INFINITY) - (b.elevation ?? Number.POSITIVE_INFINITY));
 }
 
 /** Upper bound of the active floor: the next floor's elevation, or null for the top floor / unknown elevations. */

@@ -43,8 +43,10 @@ function labelIfcLayers(layers: LayerInfo[]) {
   });
 }
 
-export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, selected, issues, onSelect, onAdd, kindStatus, addDisabledReason, modelLayers, layerVisibility, onLayer, modelVisible, onModelVisible, hasModel, onImportEquipment, kinds = OBJECT_KINDS, footer }: {
+export function V1Tree({ floors, floorNames, geometryNote, activeFloor, onFloor, objects, selected, issues, onSelect, onAdd, kindStatus, addDisabledReason, modelLayers, layerVisibility, onLayer, modelVisible, onModelVisible, hasModel, onImportEquipment, kinds = OBJECT_KINDS, footer }: {
   floors: FloorV1[];
+  /** Display name per floor id (Tầng trệt, Tầng 1, Hầm 1); the IFC name stays as a tooltip. */
+  floorNames: ReadonlyMap<string, string>;
   geometryNote: string | null;
   activeFloor: string | null;
   onFloor: (id: string | null) => void;
@@ -77,7 +79,9 @@ export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, se
   };
   const ifcLayers = labelIfcLayers(modelLayers);
   const hiddenCount = [...kinds, ...modelLayers.map((layer) => layer.key)].filter((key) => layerVisibility[key] === false).length + (hasModel && !modelVisible ? 1 : 0);
-  const floorName = (id: string) => floors.find((floor) => floor.id === id)?.name ?? id;
+  const nameOf = (floor: FloorV1) => floorNames.get(floor.id) ?? floor.name;
+  const floorOf = (id: string) => floors.find((floor) => floor.id === id);
+  const floorName = (id: string) => { const floor = floorOf(id); return floor ? nameOf(floor) : id; };
 
   return <div className="se-tree" data-testid="v1-tree">
     <section aria-labelledby="se-floors-title">
@@ -87,8 +91,8 @@ export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, se
         : <ul className="se-chips" role="radiogroup" aria-label="Chọn tầng">
           <li role="none"><button type="button" role="radio" aria-checked={activeFloor === null} className="se-chip" onClick={() => onFloor(null)}>Tất cả</button></li>
           {[...floors].sort((a, b) => a.elevationMeters - b.elevationMeters).map((floor) => <li role="none" key={floor.id}>
-            <button type="button" role="radio" aria-checked={activeFloor === floor.id} className="se-chip" onClick={() => onFloor(floor.id)} title={`Cao độ ${fmt(floor.elevationMeters)} m`}>
-              {floor.name}<small>{fmt(floor.elevationMeters)} m</small>
+            <button type="button" role="radio" aria-checked={activeFloor === floor.id} className="se-chip" onClick={() => onFloor(floor.id)} title={`${floor.name} · cao độ ${fmt(floor.elevationMeters)} m`}>
+              {nameOf(floor)}<small>{fmt(floor.elevationMeters)} m</small>
             </button>
           </li>)}
         </ul>}
@@ -129,7 +133,7 @@ export function V1Tree({ floors, geometryNote, activeFloor, onFloor, objects, se
             // Unnamed objects share their capability name, so the inspector's number tells them apart.
             const name = objectName(object);
             return <li key={object.index}><button type="button" className="se-object" aria-pressed={selected === object.index} data-testid={`object-item-${object.index}`} onClick={() => onSelect(object.index)}>
-              <Icon size={16} aria-hidden="true" /><span>{name === object.label.trim() ? name : `${name} #${object.index + 1}`}</span><small>{floorName(object.floorId)} · {fmt(object.position.x)}, {fmt(object.position.y)}, {fmt(object.position.z)}</small>
+              <Icon size={16} aria-hidden="true" /><span>{name === object.label.trim() ? name : `${name} #${object.index + 1}`}</span><small title={floorOf(object.floorId)?.name}>{floorName(object.floorId)} · {fmt(object.position.x)}, {fmt(object.position.y)}, {fmt(object.position.z)}</small>
               {flagged && <span className="se-flag" role="img" aria-label="Có lỗi" title="Có lỗi cần xử lý" />}
             </button></li>;
           })}

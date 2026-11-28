@@ -15,6 +15,7 @@ import type { Issue } from "../../store/validation";
 import { capabilityAllowed, type EditorScope } from "../../v1/scope";
 import { capabilitiesForKind, findCapability, findRuntime, rangeMessage, type CapabilityOption, type ParameterField, type RuntimeOption } from "../../v1/catalog";
 import { CAPABILITY_REQUIRED_KINDS, KIND_META, type ObjectKind } from "../../v1/contract";
+import { floorLabel } from "../../v1/floor-names";
 import { anchorsForFloor, floorOf, type GeometryInfo } from "../../v1/geometry";
 import { messageAt, objectIssues } from "../../v1/issues";
 import { emptyParameterPeers, objectName } from "../../v1/object-name";
@@ -28,7 +29,7 @@ const MAX_ANCHOR_OPTIONS = 200;
 
 export type CatalogView = { loading: boolean; error: boolean; reload: () => void; runtimes: RuntimeOption[] };
 
-export function V1ObjectForm({ object, objects = [], issues, actions, geometry, catalog, runtimeVersion, pick, onOpenScenario, scope = "scenario", onMount, wallGap }: {
+export function V1ObjectForm({ object, floorNames, objects = [], issues, actions, geometry, catalog, runtimeVersion, pick, onOpenScenario, scope = "scenario", onMount, wallGap }: {
   /** Every object of the draft: where a parameter value can also be copied to (same capability, still empty). */
   objects?: ObjectView[];
   /** Puts the object the way its capability is mounted (onto the closest wall, at the right height). */
@@ -36,6 +37,8 @@ export function V1ObjectForm({ object, objects = [], issues, actions, geometry, 
   /** Metres from a wall item to the closest wall; null when no wall is within reach; undefined when it does not apply. */
   wallGap?: number | null;
   object: ObjectView | undefined;
+  /** Display name per floor id (Tầng trệt, Tầng 1, Hầm 1). */
+  floorNames: ReadonlyMap<string, string>;
   issues: Issue[];
   actions: V1Actions;
   geometry: GeometryInfo | null;
@@ -85,7 +88,7 @@ export function V1ObjectForm({ object, objects = [], issues, actions, geometry, 
       <Field label="Tầng" required error={messageAt(issues, `${base}.placement.floorId`)}>
         {(props) => <Select {...props} data-testid="field-floor" value={object.floorId} onChange={(event) => actions.setFloor(index, event.target.value)}>
           {!floor && <option value={object.floorId}>{object.floorId ? `${object.floorId} (không có trong mô hình 3D)` : "Chọn tầng…"}</option>}
-          {geometry?.floors.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          {geometry?.floors.map((item) => <option key={item.id} value={item.id} title={item.name}>{floorLabel(floorNames.get(item.id) ?? item.name, item.elevationMeters)}</option>)}
         </Select>}
       </Field>
       <div className="se-coord-grid">
