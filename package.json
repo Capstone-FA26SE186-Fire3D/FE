@@ -10,6 +10,13 @@
     "start": "next start --port 5173",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
+    "test": "node tests/run.mjs",
+    "test:unit": "node tests/run.mjs unit",
+    "test:adapter": "node tests/run.mjs adapter",
+    "test:coverage": "node tests/run.mjs all --coverage",
+    "test:unit:coverage": "node tests/run.mjs unit --coverage",
+    "test:adapter:coverage": "node tests/run.mjs adapter --coverage",
+    "test:inventory": "node tests/inventory.mjs",
     "test:e2e": "playwright test",
     "ifc:wasm": "node scripts/copy-ifc-wasm.mjs",
     "analyze": "node scripts/analyze.mjs"

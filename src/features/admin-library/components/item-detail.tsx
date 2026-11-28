@@ -143,7 +143,7 @@ export function ItemDetail({ accessToken, itemId, versionParam, onVersion, onClo
     </>,
     children: <div className="ops-stack" data-testid="item-detail">
       <DetailList items={[
-        { label: "Bản tổ chức đang thấy", value: item.latestPublished ? `v${item.latestPublished.versionNumber} · ${item.latestPublished.name}` : "Chưa có bản đã xuất bản" },
+        { label: item.isActive ? "Bản tổ chức đang thấy" : "Tổ chức không thấy mục này (đang ngừng dùng)", value: item.latestPublished ? `v${item.latestPublished.versionNumber} · ${item.latestPublished.name}` : "Chưa có bản đã xuất bản" },
         { label: "Phiên bản", value: `${versions.length} (${draftCount} bản nháp)` },
         { label: "Cập nhật", value: formatDateTime(item.updatedAt) },
       ]} />
@@ -161,7 +161,7 @@ export function ItemDetail({ accessToken, itemId, versionParam, onVersion, onClo
             <thead><tr><th>Phiên bản</th><th>Trạng thái</th><th>Xuất bản</th><th><span className="sr-only">Thao tác</span></th></tr></thead>
             <tbody>{versions.map((entry) => <tr key={entry.id} data-testid={`version-row-${entry.versionNumber}`}>
               <td><span className="ops-cell-primary">v{entry.versionNumber}</span><span className="ops-cell-sub">{entry.name}</span></td>
-              <td><span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}><StatusBadge tone={entry.status === "Published" ? "success" : "warning"}>{entry.status === "Published" ? "Đã xuất bản" : "Bản nháp"}</StatusBadge>{entry.id === publishedId && <StatusBadge tone="ember">Tổ chức đang thấy</StatusBadge>}</span></td>
+              <td><span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}><StatusBadge tone={entry.status === "Published" ? "success" : "warning"}>{entry.status === "Published" ? "Đã xuất bản" : "Bản nháp"}</StatusBadge>{entry.id === publishedId && (item.isActive ? <StatusBadge tone="ember">Tổ chức đang thấy</StatusBadge> : <StatusBadge tone="neutral">Bản xuất bản mới nhất</StatusBadge>)}</span></td>
               <td>{formatDateTime(entry.publishedAt)}</td>
               <td className="ops-cell-actions"><Button size="sm" variant="quiet" aria-label={`Mở phiên bản ${entry.versionNumber}`} onClick={() => onVersion(entry.id)}>Mở</Button></td>
             </tr>)}</tbody>

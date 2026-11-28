@@ -187,6 +187,37 @@ test.describe("expiry reminders (mock)", () => {
     await expect(page.getByText(/nhắc gia hạn chưa đọc/)).toHaveCount(0);
   });
 
+  test("the reminders tab keeps service reminders and Thẩm định results in two headed groups, reminders first", async ({ page }) => {
+    const mock = newMock();
+    mock.notifications = [
+      notification({ id: "n-review-1", type: "FireInfrastructureApproved", title: "Hạ tầng PCCC đạt thẩm định", body: "Hạ tầng PCCC của Công trình 1 đã đạt.", entitlementId: null, referenceEndsAt: null, fireInfrastructureId: "fi-1" }),
+      notification({ id: "n-review-2", type: "ContentReviewApproved", title: "Tình huống đạt thẩm định", body: "Tình huống của Công trình 1 đã đạt.", entitlementId: null, referenceEndsAt: null, contentReviewId: "cr-1", scenarioVersionId: "sv-1" }),
+      notification(),
+    ];
+    await signIn(page, owner);
+    await mockBilling(page, mock);
+    await page.goto("/workspace/billing?tab=reminders");
+    const reminders = page.getByTestId("notifications-reminders");
+    const reviews = page.getByTestId("notifications-reviews");
+    await expect(reminders.getByRole("heading", { name: "Nhắc gia hạn dịch vụ" })).toBeVisible();
+    await expect(reviews.getByRole("heading", { name: "Kết quả thẩm định" })).toBeVisible();
+    await expect(reminders.getByTestId("notification")).toHaveCount(1);
+    await expect(reminders).toContainText("Dịch vụ sắp hết hạn");
+    await expect(reminders).not.toContainText("đạt thẩm định");
+    await expect(reviews.getByTestId("notification")).toHaveCount(2);
+    await expect(reviews).toContainText("Hạ tầng PCCC đạt thẩm định");
+    await expect(reviews).toContainText("Tình huống đạt thẩm định");
+    await expect(reviews).not.toContainText("Dịch vụ sắp hết hạn");
+    // Reminders come first in the page even though the list returned the results first.
+    const order = await page.getByTestId("notifications").locator('[data-testid="notifications-reminders"], [data-testid="notifications-reviews"]').evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-testid")));
+    expect(order).toEqual(["notifications-reminders", "notifications-reviews"]);
+    // Only results on this account: no empty "Nhắc gia hạn dịch vụ" group is drawn.
+    mock.notifications = [notification({ id: "n-review-3", type: "ContentReviewRejected", title: "Tình huống chưa đạt thẩm định", entitlementId: null, referenceEndsAt: null, contentReviewId: "cr-2" })];
+    await page.reload();
+    await expect(page.getByTestId("notifications-reviews")).toContainText("Tình huống chưa đạt thẩm định");
+    await expect(page.getByTestId("notifications-reminders")).toHaveCount(0);
+  });
+
   test("renew from a reminder opens the renewal quotation for that Building (selective renewal)", async ({ page }) => {
     const mock = newMock();
     mock.notifications = [notification()];

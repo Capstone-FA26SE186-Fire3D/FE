@@ -26,6 +26,13 @@ test.describe("Download page (/download)", () => {
     for (const stale of ["sắp có", "Chưa khả dụng", "Hiện chưa có bản ứng dụng Android", "sẽ sớm mở"]) await expect(main).not.toContainText(stale);
   });
 
+  test("says 3D exercises play only in the Android app and that there is no iPhone version", async ({ page }) => {
+    await page.goto("/download");
+    const main = page.locator("main");
+    await expect(main).toContainText("Bài tập 3D chỉ chơi trong ứng dụng Android; trang web không có bài 3D.");
+    await expect(main).toContainText("Chưa có bản cho iPhone (iOS).");
+  });
+
   test("has no dead button and no store, file or app link; the only link in the page body works", async ({ page }) => {
     await page.goto("/download");
     const main = page.locator("main");

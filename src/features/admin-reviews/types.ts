@@ -1,4 +1,5 @@
 import type { PageResponse } from "@/api/types/common";
+import type { ExpertReviewItem } from "@/features/expert-reviews/api";
 
 /** Lifecycle of a scenario content review (BE `scenario_content_reviews.status`). */
 export type ReviewStatus = "Submitted" | "Approved" | "Rejected";
@@ -31,6 +32,19 @@ export type ReviewSummary = {
   submittedByName?: string | null;
   decidedByName?: string | null;
 };
+
+/**
+ * Item of `GET /api/admin/reviews` (BE#242): the expert queue's item shape (Scenario AND Infrastructure) with
+ * `assigneeId/assigneeName/assignedAt`. A Scenario item's `reviewId` is the same id as `ReviewSummary.reviewId`.
+ */
+export type AssignedReview = ExpertReviewItem;
+export type AssignedReviewPage = PageResponse<AssignedReview>;
+/** Query of `GET /api/admin/reviews`: status Submitted by default; `assigneeId` narrows to one expert. */
+export type AssignedReviewQuery = { kind?: "Scenario" | "Infrastructure"; status?: ReviewStatus; assigneeId?: string; page: number; pageSize: number };
+
+/** Body of `POST /api/admin/reviews/{id}/reassign` (BE#242): `reason` 1–500 characters. Answers 200 with the updated item. */
+export type ReassignReviewRequest = { expertId: string; reason: string };
+export const REASSIGN_REASON_MAX = 500;
 
 export type ReviewPage = PageResponse<ReviewSummary>;
 

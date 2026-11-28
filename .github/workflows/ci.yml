@@ -11,6 +11,33 @@ permissions:
   contents: read
 
 jobs:
+  node-tests:
+    name: Node unit and adapter tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:coverage
+      - name: Inventory all FE source modules
+        if: always()
+        run: pnpm test:inventory
+      - name: Upload Node test results, coverage and inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fe-node-coverage-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .codex/local/coverage/
+          if-no-files-found: ignore
   quality:
     name: Quality checks
     runs-on: ubuntu-latest
