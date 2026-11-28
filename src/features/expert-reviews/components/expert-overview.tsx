@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMemo } from "react";
 
 import { describeApiError } from "@/api/describe-error";
+import { pagesAfterFirst } from "@/api/paging";
 import { useAsyncData } from "@/api/use-async-data";
 import { ChartCard } from "@/components/charts/chart-card";
 import { seriesColor } from "@/components/charts/chart-config";
@@ -28,10 +29,14 @@ const PAGE_SIZE = 100;
 const MAX_PAGES = 5;
 
 async function loadDecided(token: string, status: ExpertReviewStatus, signal: AbortSignal): Promise<{ items: ExpertReviewItem[]; total: number }> {
-  const items: ExpertReviewItem[] = [];
-  let total = 0;
-  for (let page = 1; page <= MAX_PAGES; page += 1) {
-    const result = await expertReviewsApi.list(token, { status, assignee: "all", page, pageSize: PAGE_SIZE }, signal);
+  const read = (page: number) => expertReviewsApi.list(token, { status, assignee: "all", page, pageSize: PAGE_SIZE }, signal);
+  const first = await read(1);
+  const items: ExpertReviewItem[] = [...first.items];
+  let total = first.totalCount;
+  // The remaining pages are read together (page 1 says how many there are) and appended in page order.
+  // `first.items.length` is the page size the server really used, should it cap below PAGE_SIZE.
+  const rest = await Promise.all(pagesAfterFirst(total, first.items.length, MAX_PAGES).map(read));
+  for (const result of rest) {
     total = result.totalCount;
     items.push(...result.items);
     if (items.length >= total || result.items.length === 0) break;

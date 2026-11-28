@@ -4,6 +4,7 @@ import { Send } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { ApiError } from "@/api";
 import { useIdempotencyKey } from "@/api/idempotency";
+import { pagesAfterFirst } from "@/api/paging";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, Textarea } from "@/components/ui/field";
@@ -27,8 +28,10 @@ async function loadDetail(scope: TicketScope, accessToken: string, id: string, s
   const first = await supportApi.getTicket(scope, accessToken, id, { page: 1, pageSize: MESSAGE_PAGE_SIZE }, signal);
   const messages = [...(first.ticket.messages?.items ?? [])];
   const total = first.ticket.messages?.total ?? messages.length;
-  for (let page = 2; messages.length < total && page <= MAX_MESSAGE_PAGES; page += 1) {
-    const next = await supportApi.getTicket(scope, accessToken, id, { page, pageSize: MESSAGE_PAGE_SIZE }, signal);
+  // Page 1 says how many messages exist: the other pages are read together and appended in page order.
+  const rest = await Promise.all(pagesAfterFirst(total, messages.length, MAX_MESSAGE_PAGES).map((page) => supportApi.getTicket(scope, accessToken, id, { page, pageSize: MESSAGE_PAGE_SIZE }, signal)));
+  for (const next of rest) {
+    if (messages.length >= total) break;
     messages.push(...(next.ticket.messages?.items ?? []));
   }
   return { ticket: first.ticket, etag: first.etag, messages, messageTotal: total };
