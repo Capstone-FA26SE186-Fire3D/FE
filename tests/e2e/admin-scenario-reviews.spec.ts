@@ -20,7 +20,7 @@ const hex = (seed: string) => (seed.repeat(64)).slice(0, 64);
 const expertAccount = (id: string, fullName: string, isActive = true) => ({ id, email: `${id}@fire3d.test`, fullName, role: "FireSafetyExpert", organizationId: null, isActive, lastLoginAt: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" });
 const EXPERT_A = expertAccount("expert-a", "Chuyên viên Lê Văn T");
 const EXPERT_B = expertAccount("expert-b", "Chuyên viên Trần Thị B");
-const EXPERTS = [EXPERT_A, EXPERT_B, expertAccount("expert-c", "Chuyên viên đã nghỉ", false)];
+const EXPERTS = [EXPERT_A, EXPERT_B, expertAccount("expert-c", "Chuyên viên đã nghỉ", false), { ...expertAccount("expert-d", "Chuyên viên chưa xác minh"), emailVerifiedAt: null, firstLoginStep: "VerifyEmail" }];
 
 type Status = "Submitted" | "Approved" | "Rejected";
 type Seed = { n: number; status?: Status; org?: string; scenarioName?: string; versionNumber?: number; reason?: string | null; ready?: boolean; legacy?: boolean; instructions?: string };
@@ -547,9 +547,10 @@ test.describe("assignment (BE#242)", () => {
     expect(server.reassignRequests).toHaveLength(0);
 
     await dialog.getByRole("combobox", { name: "Chuyên viên PCCC" }).click();
-    // The current holder and inactive experts are not offered.
+    // The current holder, inactive experts and experts still verifying their email (BE#245) are not offered.
     await expect(page.getByRole("option", { name: /Chuyên viên Lê Văn T/ })).toHaveCount(0);
     await expect(page.getByRole("option", { name: /Chuyên viên đã nghỉ/ })).toHaveCount(0);
+    await expect(page.getByRole("option", { name: /Chuyên viên chưa xác minh/ })).toHaveCount(0);
     await page.getByRole("option", { name: /Chuyên viên Trần Thị B/ }).click();
     await dialog.getByTestId("reassign-reason").fill("  Chuyên viên T nghỉ phép tuần này.  ");
     await dialog.getByTestId("reassign-submit").click();
